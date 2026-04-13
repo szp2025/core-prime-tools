@@ -50,7 +50,7 @@ download_smart "nmap" "Nmap" \
 
 # SOCAT (Сердце Модуля [95])
 download_smart "socat" "Socat" \
-    "https://github.com/vlad-s/static-binaries/raw/master/socat-arm" \
+    "https://github.com/therealsaumil/static-arm-bins/raw/master/socat-armel-static" \
     "https://github.com/andrew-d/static-binaries/raw/master/binaries/linux/armel/socat"
 
 # TCPDUMP (Модуль [88])
