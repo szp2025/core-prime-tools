@@ -7,7 +7,7 @@ SHARE_DIR="$BASE_DIR/share/nmap"
 
 # Находим BusyBox
 [ -f "$BIN_DIR/busybox" ] && BB="$BIN_DIR/busybox" || BB="busybox"
-WGET="$BB wget --no-check-certificate -q"
+WGET="$BB ./wget --no-check-certificate -q"
 
 echo "[*] Запуск неубиваемого установщика [88/90/95]..."
 mkdir -p $BIN_DIR $SHARE_DIR
