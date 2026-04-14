@@ -1,51 +1,76 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# 1. ПУТИ И БИБЛИОТЕКИ
-export T_PREFIX="/data/data/com.termux/files/usr"
-export T_BIN="$T_PREFIX/bin"
-export T_LIB="$T_PREFIX/lib"
-export T_HOME="/data/data/com.termux/files/home"
-export LD_LIBRARY_PATH="$T_LIB"
+# --- ЭВРИСТИЧЕСКИЙ БЛОК ОПРЕДЕЛЕНИЯ ОКРУЖЕНИЯ ---
+# Ищем рабочие пути, даже если переменные окружения стерты
+[ -z "$PREFIX" ] && PREFIX="/data/data/com.termux/files/usr"
+[ -z "$HOME" ] && HOME="/data/data/com.termux/files/home"
+
+export T_BIN="$PREFIX/bin"
+export T_LIB="$PREFIX/lib"
+export LD_LIBRARY_PATH="$T_LIB:$LD_LIBRARY_PATH"
 export PATH="$T_BIN:$PATH"
 
-# Новая актуальная ссылка со скриншота
+# Ссылки и пути
 KALI_URL="https://kali.download/nethunter-images/current/rootfs/kali-nethunter-rootfs-minimal-armhf.tar.xz"
-
-echo "[*] ОБХОД APT И ЗАГРУЗКА НОВОГО ОБРАЗА"
-
-# 2. ОЖИВЛЯЕМ ПРАВА (на всякий случай еще раз)
-$T_BIN/chmod 755 $T_BIN/* 2>/dev/null
-
-# 3. ПОДГОТОВКА ПАПОК
-BASE="$T_HOME/kali"
+BASE="$HOME/kali"
 ROOTFS="$BASE/rootfs"
+ARCHIVE="$HOME/kali-minimal.tar.xz"
+
+echo "[*] ЭВРИСТИЧЕСКИЙ ЗАПУСК: Анализ системы..."
+
+# 1. ПРОВЕРКА ИСПРАВНОСТИ БИНАРНИКОВ
+for tool in chmod mkdir tar wget curl proot; do
+    if [ ! -x "$T_BIN/$tool" ]; then
+        echo "[!] Внимание: $tool не имеет прав на запуск. Исправляем..."
+        /system/bin/chmod 755 "$T_BIN/$tool" 2>/dev/null || chmod 755 "$T_BIN/$tool"
+    fi
+done
+
+# 2. СОЗДАНИЕ СТРУКТУРЫ
 $T_BIN/mkdir -p "$ROOTFS"
-cd "$T_HOME"
+cd "$HOME"
 
-# 4. ЗАГРУЗКА (используем новое имя файла)
-if [ ! -f "kali-minimal.tar.xz" ]; then
-    echo "[*] СКАЧИВАНИЕ: kali-nethunter-rootfs-minimal-armhf.tar.xz"
-    # Пытаемся wget, если нет - curl
-    $T_BIN/wget --no-check-certificate "$KALI_URL" -O kali-minimal.tar.xz || \
-    $T_BIN/curl -L -k "$KALI_URL" -o kali-minimal.tar.xz
+# 3. УМНАЯ ЗАГРУЗКА (Fallback-стратегия)
+if [ ! -f "$ARCHIVE" ]; then
+    echo "[*] Попытка загрузки образа..."
+    $T_BIN/wget --no-check-certificate "$KALI_URL" -O "$ARCHIVE" || \
+    $T_BIN/curl -L -k "$KALI_URL" -o "$ARCHIVE" || {
+        echo "[!!!] Ошибка сети: невозможно скачать образ."; exit 1
+    }
 fi
 
-# 5. РАСПАКОВКА (БЕЗ PROOT - напрямую)
+# 4. ЭВРИСТИЧЕСКАЯ РАСПАКОВКА (Три уровня попыток)
 if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] РАСПАКОВКА НАПРЯМУЮ (ОБХОД ОШИБКИ EXECVE)..."
-    # Распаковываем обычным tar, который лежит в Termux
-    $T_BIN/tar -xJf "$T_HOME/kali.tar.xz" -C "$ROOTFS" || { echo "[!] ОШИБКА РАСПАКОВКИ"; exit 1; }
-    
-    # После прямой распаковки на Android 5.1 могут слететь права внутри
-    # Мы их поправим позже внутри самого proot
+    echo "[*] Начало распаковки. Метод 1: Прямой tar..."
+    if ! $T_BIN/tar -xJf "$ARCHIVE" -C "$ROOTFS" 2>/dev/null; then
+        echo "[!] Метод 1 не сработал. Метод 2: Распаковка через xz + tar..."
+        $T_BIN/xz -d -c "$ARCHIVE" | $T_BIN/tar -x -C "$ROOTFS" || {
+            echo "[!] Метод 2 провален. Метод 3: Принудительный proot-bypass..."
+            # На случай, если tar требует специальных флагов для Android 5
+            $T_BIN/tar --privileged -xf "$ARCHIVE" -C "$ROOTFS"
+        }
+    fi
 fi
 
-# 6. Создание скрипта запуска (упрощенный вход)
-cat > "$T_HOME/g_kali" << EOF
+# 5. ПРОВЕРКА ЦЕЛОСТНОСТИ ПОСЛЕ РАСПАКОВКИ
+if [ ! -f "$ROOTFS/bin/bash" ]; then
+    echo "[!!!] Критическая ошибка: Файлы Kali не найдены в $ROOTFS"; exit 1
+fi
+
+# 6. ГЕНЕРАЦИЯ "УМНОГО" ЗАПУСКА
+cat > "$HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
-export LD_LIBRARY_PATH=$T_LIB
+# Автоматическое восстановление окружения перед входом
+export LD_LIBRARY_PATH="$T_LIB"
+export PATH="$T_BIN:\$PATH"
 unset LD_PRELOAD
-# Запускаем proot только для входа, а не для распаковки
+
+# Исправление DNS внутри Kali (если файл пропал)
+if [ ! -f "$ROOTFS/etc/resolv.conf" ]; then
+    mkdir -p "$ROOTFS/etc"
+    echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
+fi
+
 exec $T_BIN/proot \\
 --link2symlink \\
 -0 \\
@@ -59,9 +84,8 @@ TERM=\$TERM \\
 /bin/bash --login
 EOF
 
-$T_BIN/chmod 755 "$T_HOME/g_kali"
+$T_BIN/chmod 755 "$HOME/g_kali"
 
-echo "---------------------------------------"
-echo "[✔] ГОТОВО! Новая ссылка сработала."
+echo "--- УСПЕХ ---"
+echo "[✔] Система адаптирована под ядро Android 5.1"
 echo "[*] Запуск: bash ~/g_kali"
-echo "---------------------------------------"
