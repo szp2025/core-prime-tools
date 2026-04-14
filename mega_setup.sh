@@ -1,55 +1,58 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Прямые пути
-T_BIN="/data/data/com.termux/files/usr/bin"
-T_LIB="/data/data/com.termux/files/usr/lib"
-T_HOME="/data/data/com.termux/files/home"
-ROOTFS="$T_HOME/kali/rootfs"
-
-echo "[*] РЕЖИМ ПРЯМОЙ УСТАНОВКИ (ОБХОД APT)..."
-
-# 1. Настройка окружения (библиотеки)
+# Настройка путей и либ
+export T_BIN="/data/data/com.termux/files/usr/bin"
+export T_LIB="/data/data/com.termux/files/usr/lib"
 export LD_LIBRARY_PATH="$T_LIB"
 export PATH="$T_BIN:$PATH"
 
-# 2. Создаем папки
+T_HOME="/data/data/com.termux/files/home"
+ROOTFS="$T_HOME/kali/rootfs"
+
+echo "[*] ФОРСИРОВАННАЯ УСТАНОВКА (БЕЗ APT МЕТОДОВ)..."
+
+# 1. Создание папок
 mkdir -p "$ROOTFS"
 
-# 3. Настройка прав для curl и tar (на всякий случай)
+# 2. Проверка и фикс прав для curl/tar
 [ -f "$T_BIN/curl" ] && chmod 755 "$T_BIN/curl"
 [ -f "$T_BIN/tar" ] && chmod 755 "$T_BIN/tar"
 
-# 4. Загрузка образа (Строго по ссылке со скрина)
+# 3. Загрузка напрямую через CURL (игнорируя методы apt)
 cd "$T_HOME"
 if [ ! -s "kali.tar.xz" ]; then
-    echo "[*] Загрузка Kali Minimal ARMHF через curl..."
+    echo "[*] Загрузка образа через CURL (игнорируем ошибки http/https)..."
+    # Флаг -k игнорирует проблемы с сертификатами SSL
     $T_BIN/curl -L -k "https://kali.download/nethunter-images/current/rootfs/kali-nethunter-rootfs-minimal-armhf.tar.xz" -o "kali.tar.xz"
 else
-    echo "[✔] Архив уже скачан, пропускаем загрузку."
+    echo "[✔] Образ найден в памяти, скачивание не требуется."
 fi
 
-# 5. Распаковка (Прямой tar)
+# 4. Прямая распаковка (БЕЗ использования proot на этом этапе)
 if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] Распаковка образа... Это займет время (5-15 минут)."
-    echo "[*] Если экран погаснет, процесс может прерваться!"
+    echo "[*] НАЧАЛО РАСПАКОВКИ..."
+    echo "[*] Это займет около 10-15 минут. Не закрывай терминал."
+    
+    # Используем tar напрямую, чтобы избежать execve ошибок
     $T_BIN/tar -xJf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
     
     if [ $? -eq 0 ]; then
-        echo "[✔] Распаковка завершена!"
+        echo "[✔] Успешно распаковано!"
     else
-        echo "[!] Ошибка распаковки. Возможно, мало места."
+        echo "[!] Критическая ошибка при распаковке. Проверь место (нужно ~2GB)."
         exit 1
     fi
 fi
 
-# 6. Фикс DNS
+# 5. Настройка DNS внутри будущего Kali
 mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
-# 7. Создание скрипта запуска g_kali
+# 6. Создание скрипта входа g_kali
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
+export PATH=$T_BIN:\$PATH
 unset LD_PRELOAD
 exec $T_BIN/proot \\
 --link2symlink \\
@@ -67,6 +70,6 @@ EOF
 chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] ВСЁ ГОТОВО!"
-echo "[*] Запускай Kali командой: bash ~/g_kali"
+echo "[✔] УСТАНОВКА ЗАВЕРШЕНА!"
+echo "[*] Теперь просто введи: bash ~/g_kali"
 echo "---------------------------------------"
