@@ -10,49 +10,48 @@ MY_TOOLS="$T_HOME/tools"
 mkdir -p "$MY_TOOLS"
 mkdir -p "$ROOTFS"
 
-echo "[*] ЗАГРУЗКА СУПЕР-БИНАРНИКОВ (BASH, TAR, XZ)..."
+echo "[*] ЗАГРУЗКА АВТОНОМНОГО КОМПЛЕКТА (XZ + TAR + BASH)..."
 
-# 1. Скачиваем инструменты (curl — единственный, кому мы верим)
+# 1. Скачиваем статические бинарники (игнорируем системный мусор)
 cd "$MY_TOOLS"
-# Ссылки на статический Bash и инструменты распаковки
 [ ! -f "bash" ] && curl -L -k "https://github.com/Inknyto/arm-binaries/raw/main/bash/system/xbin/bash" -o "bash"
 [ ! -f "tar" ] && curl -L -k "https://github.com/Inknyto/arm-binaries/raw/master/tar" -o "tar"
 [ ! -f "xz" ] && curl -L -k "https://github.com/Inknyto/arm-binaries/raw/master/xz" -o "xz"
 
-# Выставляем права (в домашней папке chmod 755 работает без ошибок)
+# Выставляем права (в /home/tools это пройдет без ошибок)
 chmod 755 bash tar xz
 
-echo "[✔] Инструменты подготовлены."
+echo "[✔] Инструменты готовы к работе."
 
-# 2. Загрузка Kali
+# 2. Загрузка Kali (если еще не скачана)
 cd "$T_HOME"
 if [ ! -s "kali.tar.xz" ]; then
     echo "[*] Загрузка Kali Minimal ARMHF..."
     curl -L -k "https://kali.download/nethunter-images/current/rootfs/kali-nethunter-rootfs-minimal-armhf.tar.xz" -o "kali.tar.xz"
 fi
 
-# 3. РАСПАКОВКА (Используем только наши новые инструменты)
+# 3. РАСПАКОВКА (Силовой метод через статический XZ)
 if [ ! -d "$ROOTFS/bin" ]; then
     echo "[*] НАЧАЛО РАСПАКОВКИ..."
-    export PATH="$MY_TOOLS:$PATH"
     
-    # Прямой запуск через наш статический tar
-    "$MY_TOOLS/tar" -xJf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
+    # Мы принудительно заставляем tar использовать наш скачанный xz
+    # Флаг --use-compress-program указывает прямой путь к декомпрессору
+    "$MY_TOOLS/tar" --use-compress-program="$MY_TOOLS/xz" -xvf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
     
     if [ $? -eq 0 ]; then
         echo "[✔] Успешно распаковано!"
     else
-        echo "[!] Ошибка. Пробуем конвейер через статический xz..."
+        echo "[!] Прямой метод не пошел, пробуем конвейер..."
         cat "kali.tar.xz" | "$MY_TOOLS/xz" -d | "$MY_TOOLS/tar" -x -C "$ROOTFS"
     fi
 fi
 
-# 4. Создание скрипта входа g_kali (используем наш статический bash)
+# 4. Создание скрипта входа g_kali
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
 unset LD_PRELOAD
-# Запускаем через proot, используя наш надежный bash
+# Входим в Kali, используя наш статический bash для надежности
 exec $T_BIN/proot \\
 --link2symlink \\
 -0 \\
@@ -69,6 +68,6 @@ EOF
 chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] ПОЛНЫЙ ПРОРЫВ ЗАВЕРШЕН!"
-echo "[*] Запускай Kali командой: bash ~/g_kali"
+echo "[✔] ВСЁ ГОТОВО! Мы обошли системные ограничения."
+echo "[*] Запускай: bash ~/g_kali"
 echo "---------------------------------------"
