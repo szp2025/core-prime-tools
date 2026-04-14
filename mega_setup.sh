@@ -6,53 +6,57 @@ T_LIB="/data/data/com.termux/files/usr/lib"
 T_HOME="/data/data/com.termux/files/home"
 ROOTFS="$T_HOME/kali/rootfs"
 
-echo "[*] ФИНАЛЬНЫЙ РЫВОК (БЕЗ APT И С ФИКСОМ ПРАВ TAR)..."
+echo "[*] ФОРСИРОВАННАЯ УСТАНОВКА (ФИКС ПРАВ)..."
 
-# 1. Окружение
+# 1. Настройка окружения
 export LD_LIBRARY_PATH="$T_LIB"
 export PATH="$T_BIN:$PATH"
 
-# 2. Создаем папку
+# 2. Создаем структуру папок
 mkdir -p "$ROOTFS"
 
-# 3. ЧИНИМ ПРАВА ДЛЯ ВСЕХ ИНСТРУМЕНТОВ РАСПАКОВКИ
-# Это уберет ошибку "Cannot exec: Permission denied"
-echo "[*] Настройка прав для бинарников..."
+# 3. БЕЗОПАСНАЯ СМЕНА ПРАВ (Убираем "bad mode")
+echo "[*] Настройка инструментов..."
+cd "$T_BIN"
+# Используем максимально простой формат для каждого файла
 for tool in tar xz gzip curl proot; do
-    [ -f "$T_BIN/$tool" ] && chmod 755 "$T_BIN/$tool"
+    if [ -f "$tool" ]; then
+        chmod 755 "$tool" || chmod +x "$tool"
+    fi
 done
 
-# 4. Загрузка через CURL (если файла еще нет)
+# 4. Загрузка через CURL (если архива нет)
 cd "$T_HOME"
 if [ ! -s "kali.tar.xz" ]; then
     echo "[*] Загрузка образа через CURL..."
     $T_BIN/curl -L -k "https://kali.download/nethunter-images/current/rootfs/kali-nethunter-rootfs-minimal-armhf.tar.xz" -o "kali.tar.xz"
 fi
 
-# 5. РАСПАКОВКА (С ФИКСОМ PATH)
+# 5. РАСПАКОВКА (С прямым вызовом xz)
 if [ ! -d "$ROOTFS/bin" ]; then
     echo "[*] НАЧАЛО РАСПАКОВКИ..."
-    echo "[*] Если опять будет Permission Denied, мы попробуем другой метод."
+    echo "[*] Если видишь список файлов - значит всё заработало!"
     
-    # Принудительно указываем tar, где искать xz
-    $T_BIN/tar --xz -xvf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
+    # Принудительно заставляем систему видеть xz через переменную
+    export XZ_OPT="--decompress"
     
-    if [ $? -eq 0 ]; then
-        echo "[✔] Успешно распаковано!"
-    else
-        echo "[!] Ошибка. Пробуем упрощенный метод..."
-        # Запасной вариант если первый упал
+    # Прямая команда распаковки (самая надежная для Android 5.1)
+    $T_BIN/tar -xJf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
+    
+    if [ $? -ne 0 ]; then
+        echo "[!] Первый метод упал, пробуем через конвейер..."
         cat "kali.tar.xz" | $T_BIN/xz -d | $T_BIN/tar -x -C "$ROOTFS"
     fi
 fi
 
-# 6. DNS и запуск
+# 6. Фикс DNS и создание пускового файла
 mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
+export PATH=$T_BIN:\$PATH
 unset LD_PRELOAD
 exec $T_BIN/proot \\
 --link2symlink \\
