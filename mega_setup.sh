@@ -1,35 +1,37 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Путь в домашнюю директорию (самый надежный вариант)
+# ПУТЬ ВНУТРИ TERMUX (Здесь всегда есть права на запись)
 BASE="$HOME/kali"
 ROOTFS="$BASE/rootfs"
 
 mkdir -p "$ROOTFS"
 cd "$BASE"
 
-echo "[*] Старт установки Kali NetHunter..."
+echo "[*] СТАРТ УСТАНОВКИ KALI (FIXED PATHS)"
 
-# Установка системных инструментов
-pkg install -y proot wget tar xz-utils
+# Установка инструментов прямо здесь
+pkg update && pkg install -y proot wget tar xz-utils
 
-# Загрузка образа
+# Загрузка (если файла еще нет)
 if [ ! -f kali.tar.xz ]; then
-    echo "[*] Загрузка образа (armhf)..."
+    echo "[*] Загрузка образа..."
     wget --no-check-certificate "https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" -O kali.tar.xz
 fi
 
-# Распаковка (самый долгий этап)
+# Распаковка (самое важное)
 if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] Распаковка... Наберись терпения."
+    echo "[*] Распаковка... Жди, телефон может греться."
     proot --link2symlink tar -xJf kali.tar.xz -C "$ROOTFS"
 fi
 
-# DNS
+# Исправление DNS
+mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
-# Создание скрипта запуска
+# Создание пускового файла
 cat > "$BASE/start.sh" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
+unset LD_PRELOAD
 exec proot \\
 --link2symlink \\
 -0 \\
@@ -44,4 +46,6 @@ TERM=\$TERM \\
 EOF
 
 chmod 755 "$BASE/start.sh"
-echo "[✔] Готово! Запускай: bash $BASE/start.sh"
+echo "---------------------------------------"
+echo "[✔] ГОТОВО! Теперь вводи:"
+echo "bash $BASE/start.sh"
