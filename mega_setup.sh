@@ -1,70 +1,56 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# --- ПАРАМЕТРЫ ПУТЕЙ ---
+# Прямые пути для стабильности
 T_BIN="/data/data/com.termux/files/usr/bin"
 T_LIB="/data/data/com.termux/files/usr/lib"
 T_ETC="/data/data/com.termux/files/usr/etc"
 T_HOME="/data/data/com.termux/files/home"
+
+echo "[*] СТАРТ РЕАНИМАЦИИ ГАМБИТА..."
+
+# 1. Исправляем репозитории
+echo "deb http://packages.termux.org/termux-main-21 stable main" > $T_ETC/apt/sources.list
+
+# 2. ПРИНУДИТЕЛЬНАЯ НАСТРОЙКА ПРАВ (Твой запрос)
+echo "[*] Настройка прав доступа к методам APT..."
+chmod +x $T_BIN/apt
+chmod +x $T_BIN/gpg
+chmod +x $T_LIB/apt/methods/http
+chmod +x $T_LIB/apt/methods/https
+chmod +x $T_BIN/curl
+chmod +x $T_BIN/tar
+
+# 3. Обновление (с подавлением ошибок SSL и использованием прямых либ)
+export LD_LIBRARY_PATH=$T_LIB
+$T_BIN/apt update -o "Acquire::https::Verify-Peer=false"
+
+# 4. Подготовка папок для Kali
 BASE="$T_HOME/kali"
 ROOTFS="$BASE/rootfs"
+mkdir -p "$ROOTFS"
+cd "$T_HOME"
 
 # Новое имя файла согласно скриншоту
-FILE_NAME="kali-nethunter-rootfs-minimal-armhf.tar.xz"
-URL="https://kali.download/nethunter-images/current/rootfs/$FILE_NAME"
+#FILE_NAME="kali-nethunter-rootfs-minimal-armhf.tar.xz"
+#URL="https://kali.download/nethunter-images/current/rootfs/$FILE_NAME"
 
-echo "[*] СТАРТ ПОЛНОЙ УСТАНОВКИ (FIXED URL)..."
-
-# 1. ПРИНУДИТЕЛЬНАЯ РЕАНИМАЦИЯ ПРАВ
-echo "[*] Восстановление прав доступа к инструментам..."
-chmod 755 $T_BIN/* 2>/dev/null
-chmod 755 $T_LIB/apt/methods/* 2>/dev/null
-
-# 2. ОЧИСТКА СТАРОГО МУСОРА
-if [ -d "$ROOTFS" ]; then
-    echo "[!] Найдена старая папка установки. Удаляю для очистки места..."
-    rm -rf "$ROOTFS"
+# 5. Загрузка (если вдруг файл удалили или он битый)
+if [ ! -s "kali.tar.xz" ]; then
+    echo "[*] Загрузка образа Kali..."
+    $T_BIN/curl -L -k "https://kali.download/nethunter-images/current/rootfs/kali-nethunter-rootfs-minimal-armhf.tar.xz" -o "kali.tar.xz"
 fi
 
-# 3. НАСТРОЙКА РЕПОЗИТОРИЕВ (HTTP-FIX)
-echo "[*] Настройка репозиториев (HTTP mode)..."
-echo "deb http://packages.termux.org/termux-main-21 stable main" > $T_ETC/apt/sources.list
-echo "deb http://packages.termux.dev/termux-main-21/ stable main" >> $T_ETC/apt/sources.list
-
-# 4. ОБНОВЛЕНИЕ APT И ЗАВИСИМОСТЕЙ
-export LD_LIBRARY_PATH=$T_LIB
-echo "[*] Обновление базы пакетов..."
-$T_BIN/apt update -y -o "Acquire::https::Verify-Peer=false" || echo "[!] Репозитории недоступны, попробуем продолжить..."
-$T_BIN/apt install xz-utils wget proot tar -y -o "Acquire::https::Verify-Peer=false"
-
-# 5. ЗАГРУЗКА ОБРАЗА (ПО ПРЯМОЙ ССЫЛКЕ СО СКРИНШОТА)
-cd "$T_HOME"
-if [ ! -f "$FILE_NAME" ]; then
-    echo "[*] Загрузка актуального образа: $FILE_NAME"
-    # Очищаем старые битые закачки если есть
-    rm -f *.tar.xz.tmp 
-    $T_BIN/wget --no-check-certificate "$URL" -O "$FILE_NAME"
-else
-    echo "[✔] Образ $FILE_NAME уже скачан."
+# 6. РАСПАКОВКА НАПРЯМУЮ (Обходим ошибку proot execve)
+if [ ! -d "$ROOTFS/bin" ]; then
+    echo "[*] Распаковка образа... Это займет 5-10 минут."
+    $T_BIN/tar -xJf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
 fi
 
-# 6. ПРЯМАЯ РАСПАКОВКА (ОБХОД ОШИБОК PROOT)
-mkdir -p "$ROOTFS"
-echo "[*] НАЧИНАЮ РАСПАКОВКУ (5-10 МИНУТ)..."
-# Используем tar напрямую из Termux
-$T_BIN/tar -xJf "$FILE_NAME" -C "$ROOTFS" --exclude='dev'
-
-if [ $? -eq 0 ]; then
-    echo "[✔] УСПЕХ! Распаковка завершена."
-else
-    echo "[!] ОШИБКА РАСПАКОВКИ! Проверь свободное место на телефоне."
-    exit 1
-fi
-
-# 7. ФИКС DNS И СЕТИ
+# 7. Настройка интернета внутри Kali
 mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
-# 8. ФИНАЛЬНЫЙ СКРИПТ ЗАПУСКА (G_KALI)
+# 8. Создание скрипта запуска
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
@@ -85,7 +71,6 @@ EOF
 chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] УСТАНОВКА ПОЛНОСТЬЮ ЗАВЕРШЕНА!"
-echo "[*] Теперь просто напиши:"
+echo "[✔] ГОТОВО! Теперь просто напиши:"
 echo "bash ~/g_kali"
 echo "---------------------------------------"
