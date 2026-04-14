@@ -1,54 +1,52 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Пути
+# Прямые пути
 T_BIN="/data/data/com.termux/files/usr/bin"
 T_LIB="/data/data/com.termux/files/usr/lib"
-T_ETC="/data/data/com.termux/files/usr/etc"
 T_HOME="/data/data/com.termux/files/home"
 ROOTFS="$T_HOME/kali/rootfs"
 
-echo "[*] СТАРТ РЕАНИМАЦИИ (FINAL FIX)..."
+echo "[*] РЕЖИМ ПРЯМОЙ УСТАНОВКИ (ОБХОД APT)..."
 
-# 1. Создаем структуру (чтобы chmod не ругался на отсутствие папок)
-mkdir -p "$ROOTFS"
-mkdir -p "$T_LIB/apt/methods"
-
-# 2. ФИКС: Устанавливаем права 755 по одному (избегаем bad mode)
-# Если файл есть - даем права. Если нет - молча идем дальше.
-[ -f "$T_BIN/apt" ] && chmod 755 "$T_BIN/apt"
-[ -f "$T_BIN/curl" ] && chmod 755 "$T_BIN/curl"
-[ -f "$T_BIN/tar" ] && chmod 755 "$T_BIN/tar"
-[ -f "$T_LIB/apt/methods/http" ] && chmod 755 "$T_LIB/apt/methods/http"
-[ -f "$T_LIB/apt/methods/https" ] && chmod 755 "$T_LIB/apt/methods/https"
-
-# 3. Настройка репозитория (строго HTTP)
-echo "deb http://packages.termux.org/termux-main-21 stable main" > "$T_ETC/apt/sources.list"
-
-# 4. Переменные окружения (чтобы либы виделись всегда)
+# 1. Настройка окружения (библиотеки)
 export LD_LIBRARY_PATH="$T_LIB"
 export PATH="$T_BIN:$PATH"
 
-# 5. Обновление APT (теперь методы http/https должны ожить)
-echo "[*] Обновление источников..."
-$T_BIN/apt update -o "Acquire::https::Verify-Peer=false"
+# 2. Создаем папки
+mkdir -p "$ROOTFS"
 
-# 6. Загрузка Kali (ссылка с твоего скриншота)
+# 3. Настройка прав для curl и tar (на всякий случай)
+[ -f "$T_BIN/curl" ] && chmod 755 "$T_BIN/curl"
+[ -f "$T_BIN/tar" ] && chmod 755 "$T_BIN/tar"
+
+# 4. Загрузка образа (Строго по ссылке со скрина)
 cd "$T_HOME"
 if [ ! -s "kali.tar.xz" ]; then
-    echo "[*] Загрузка Kali Minimal ARMHF..."
+    echo "[*] Загрузка Kali Minimal ARMHF через curl..."
     $T_BIN/curl -L -k "https://kali.download/nethunter-images/current/rootfs/kali-nethunter-rootfs-minimal-armhf.tar.xz" -o "kali.tar.xz"
+else
+    echo "[✔] Архив уже скачан, пропускаем загрузку."
 fi
 
-# 7. Распаковка НАПРЯМУЮ (Обход proot execve)
+# 5. Распаковка (Прямой tar)
 if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] Распаковка... Это займет около 10 минут."
+    echo "[*] Распаковка образа... Это займет время (5-15 минут)."
+    echo "[*] Если экран погаснет, процесс может прерваться!"
     $T_BIN/tar -xJf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
+    
+    if [ $? -eq 0 ]; then
+        echo "[✔] Распаковка завершена!"
+    else
+        echo "[!] Ошибка распаковки. Возможно, мало места."
+        exit 1
+    fi
 fi
 
-# 8. Фикс DNS и создание скрипта запуска
+# 6. Фикс DNS
 mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
+# 7. Создание скрипта запуска g_kali
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
@@ -69,5 +67,6 @@ EOF
 chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] ГОТОВО! Теперь запускай:"
-echo "bash ~/g_kali"
+echo "[✔] ВСЁ ГОТОВО!"
+echo "[*] Запускай Kali командой: bash ~/g_kali"
+echo "---------------------------------------"
