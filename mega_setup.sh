@@ -1,55 +1,69 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Прямое указание путей и библиотек (Реанимация)
-export T_BIN="/data/data/com.termux/files/usr/bin"
-export T_LIB="/data/data/com.termux/files/usr/lib"
-export T_ETC="/data/data/com.termux/files/usr/etc"
+# 1. ЖЕСТКАЯ ПРИВЯЗКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ
+export T_PREFIX="/data/data/com.termux/files/usr"
+export T_BIN="$T_PREFIX/bin"
+export T_LIB="$T_PREFIX/lib"
+export T_ETC="$T_PREFIX/etc"
 export T_HOME="/data/data/com.termux/files/home"
-export LD_LIBRARY_PATH=$T_LIB
-export PATH=$T_BIN:$PATH
 
-echo "[*] СТАРТ: ГАМБИТ РЕАНИМАЦИЯ (Core Prime Edition)"
+# Форсируем пути для библиотек, иначе получим "not found"
+export LD_LIBRARY_PATH="$T_LIB"
+export PATH="$T_BIN:$PATH"
 
-# 1. ПРИНУДИТЕЛЬНАЯ УСТАНОВКА ПРАВ (на случай ручной заливки)
-echo "[*] Фиксация прав доступа (755)..."
-$T_BIN/chmod 755 $T_BIN/proot 2>/dev/null
-$T_BIN/chmod 755 $T_BIN/apt 2>/dev/null
+echo "[*] СТАРТ: ГАМБИТ ЭВРИСТИЧЕСКАЯ РЕАНИМАЦИЯ"
+
+# 2. ЭВРИСТИЧЕСКАЯ КОРРЕКЦИЯ ПРАВ (CHMOD 755 везде, где это критично)
+echo "[*] Эвристическая настройка прав..."
+# Права на основные бинарники
+$T_BIN/chmod 755 $T_BIN/proot $T_BIN/apt $T_BIN/wget $T_BIN/curl $T_BIN/tar $T_BIN/chmod 2>/dev/null
+
+# Права на системные библиотеки (иногда они помечаются как неисполняемые)
+$T_BIN/chmod 644 $T_LIB/*.so 2>/dev/null
+
+# Права на методы APT (твой затык с HTTPS был именно здесь)
 $T_BIN/chmod 755 $T_LIB/apt/methods/* 2>/dev/null
 
-# 2. ФИКС РЕПОЗИТОРИЕВ (Переход на HTTP, если HTTPS хромает)
-echo "[*] Настройка источников (HTTP Mode)..."
+# Права на временные папки (чтобы apt мог создавать кэш)
+$T_BIN/chmod 1777 /data/data/com.termux/files/usr/var/lib/apt/lists/partial 2>/dev/null
+
+# 3. ФИКС РЕПОЗИТОРИЕВ (Переход на HTTP для стабильности на старом Android)
+echo "[*] Настройка источников (Fallback HTTP)..."
 echo "deb http://packages.termux.org/termux-main-21 stable main" > $T_ETC/apt/sources.list
 
-# 3. ОБНОВЛЕНИЕ APT С УКАЗАНИЕМ БИБЛИОТЕК
-echo "[*] Обновление пакетов..."
-LD_LIBRARY_PATH=$T_LIB $T_BIN/apt update -o "Acquire::https::Verify-Peer=false"
-LD_LIBRARY_PATH=$T_LIB $T_BIN/apt install wget tar xz-utils -y -o "Acquire::https::Verify-Peer=false"
+# 4. ОБНОВЛЕНИЕ СИСТЕМЫ С ПОДАВЛЕНИЕМ SSL-ОШИБОК
+echo "[*] Обновление базы пакетов..."
+LD_LIBRARY_PATH=$T_LIB $T_BIN/apt update -y -o "Acquire::https::Verify-Peer=false" -o "Acquire::AllowInsecureRepositories=true"
 
-# 4. ПОДГОТОВКА СРЕДЫ KALI
+echo "[*] Установка зависимостей (wget, tar, xz)..."
+LD_LIBRARY_PATH=$T_LIB $T_BIN/apt install wget tar xz-utils -y --force-yes -o "Acquire::https::Verify-Peer=false"
+
+# 5. ПОДГОТОВКА СРЕДЫ KALI
 BASE="$T_HOME/kali"
 ROOTFS="$BASE/rootfs"
 
 $T_BIN/mkdir -p "$ROOTFS"
 cd "$T_HOME"
 
-# 5. ЗАГРУЗКА ОБРАЗА (если не скачан)
+# 6. ЗАГРУЗКА ОБРАЗА (с обходом проверки сертификатов)
 if [ ! -f "$T_HOME/kali.tar.xz" ]; then
-    echo "[*] ЗАГРУЗКА ОБРАЗА KALI..."
+    echo "[*] ЗАГРУЗКА ОБРАЗА KALI ARMHF..."
     LD_LIBRARY_PATH=$T_LIB $T_BIN/wget --no-check-certificate "https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" -O "$T_HOME/kali.tar.xz"
 fi
 
-# 6. РАСПАКОВКА ЧЕРЕЗ PROOT (Force Mode)
+# 7. РАСПАКОВКА ЧЕРЕЗ PROOT (Force Link2Symlink)
 if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] РАСПАКОВКА (ЭТО ЗАЙМЕТ ВРЕМЯ)..."
-    LD_LIBRARY_PATH=$T_LIB $T_BIN/proot --link2symlink $T_BIN/tar -xJf "$T_HOME/kali.tar.xz" -C "$ROOTFS"
+    echo "[*] РАСПАКОВКА... ЖДИ (может занять до 15 минут)..."
+    # Даем права на сам архив перед распаковкой
+    $T_BIN/chmod 644 "$T_HOME/kali.tar.xz"
+    LD_LIBRARY_PATH=$T_LIB $T_BIN/proot --link2symlink $T_BIN/tar -xJf "$T_HOME/kali.tar.xz" -C "$ROOTFS" || { echo "[!] Сбой распаковки"; exit 1; }
 fi
 
-# 7. ИСПРАВЛЕНИЕ DNS ВНУТРИ KALI
+# 8. ИСПРАВЛЕНИЕ СЕТИ И СОЗДАНИЕ ЗАПУСКА
 $T_BIN/mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
-# 8. СОЗДАНИЕ ПУСКОВОГО ФАЙЛА G_KALI
-echo "[*] Создание скрипта запуска g_kali..."
+echo "[*] Финализация пускового скрипта g_kali..."
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
@@ -71,6 +85,6 @@ EOF
 $T_BIN/chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] ГОТОВО! БАЗА ВОССТАНОВЛЕНА."
-echo "[*] ВХОД В KALI: bash ~/g_kali"
+echo "[✔] ГАМБИТ ЗАВЕРШЕН УСПЕШНО!"
+echo "[*] Для входа в Kali: bash ~/g_kali"
 echo "---------------------------------------"
