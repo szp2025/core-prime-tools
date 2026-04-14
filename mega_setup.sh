@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# --- КОНФИГУРАЦИЯ ПУТЕЙ ---
+# Настройка путей
 T_BIN="/data/data/com.termux/files/usr/bin"
 T_LIB="/data/data/com.termux/files/usr/lib"
 T_ETC="/data/data/com.termux/files/usr/etc"
@@ -8,63 +8,47 @@ T_HOME="/data/data/com.termux/files/home"
 BASE="$T_HOME/kali"
 ROOTFS="$BASE/rootfs"
 
-echo "[*] СТАРТ РЕАНИМАЦИИ ГАМБИТА..."
+# 1. ПРИНУДИТЕЛЬНАЯ РЕАНИМАЦИЯ ПРАВ
+echo "[*] Исправляем права на методы APT и бинарники..."
+chmod 755 $T_BIN/*
+chmod 755 $T_LIB/apt/methods/* 2>/dev/null
 
-# 1. ОЧИСТКА ПРЕДЫДУЩИХ ОШИБОК
-# Если папка существует, значит прошлая распаковка прервалась — удаляем её
+# 2. ОЧИСТКА МЕСТА
 if [ -d "$ROOTFS" ]; then
-    echo "[!] Найдена поврежденная установка. Очищаю место..."
+    echo "[!] Удаление старой папки rootfs..."
     rm -rf "$ROOTFS"
 fi
 
-# 2. ФИКСАЦИЯ ПРАВ (БЕЗ ЭТОГО БУДЕТ PERMISSION DENIED)
-echo "[*] Настройка прав доступа..."
-chmod 755 $T_BIN/* 2>/dev/null
+# 3. НАСТРОЙКА РЕПОЗИТОРИЕВ (ПЕРЕХОД НА HTTP ДЛЯ ОБХОДА HTTPS ERROR)
+echo "[*] Переключаемся на HTTP (обход ошибки Exec Method)..."
+echo "deb http://packages.termux.org/termux-main-21 stable main" > $T_ETC/apt/sources.list
+echo "deb http://packages.termux.dev/termux-main-21/ stable main" >> $T_ETC/apt/sources.list
 
-# 3. НАСТРОЙКА РЕПОЗИТОРИЕВ (ОСНОВНОЙ + РЕЗЕРВНЫЙ)
-echo "[*] Обновление источников пакетов..."
-# Пробуем основной архив
-echo "deb https://packages.termux.dev/termux-main-21/ stable main" > $T_ETC/apt/sources.list
-# Если основной упадет, добавим зеркало вторым приоритетом
-echo "deb http://packages.termux.org/termux-main-21 stable main" >> $T_ETC/apt/sources.list
-
-# 4. ОБНОВЛЕНИЕ APT (ИГНОРИРУЕМ ОШИБКИ SSL И HTTPS МЕТОДОВ)
+# 4. ОБНОВЛЕНИЕ С ИГНОРИРОВАНИЕМ SSL
 export LD_LIBRARY_PATH=$T_LIB
-$T_BIN/apt update -o "Acquire::https::Verify-Peer=false" -o "Acquire::AllowInsecureRepositories=true"
+echo "[*] Обновление базы пакетов..."
+$T_BIN/apt update -y -o "Acquire::https::Verify-Peer=false" || echo "[!] Пропускаем апдейт, пробуем так..."
 
-# Установка необходимых утилит, если они пропали
-$T_BIN/apt install wget proot tar xz-utils curl -y -o "Acquire::https::Verify-Peer=false"
-
-# 5. ПОДГОТОВКА ПАПОК
-mkdir -p "$ROOTFS"
+# 5. ЗАГРУЗКА (ЕСЛИ НЕТ АРХИВА)
 cd "$T_HOME"
-
-# 6. ЗАГРУЗКА ОБРАЗА (ЕСЛИ НЕТ)
 if [ ! -f "kali.tar.xz" ]; then
-    echo "[*] Загрузка Kali (armhf)..."
+    echo "[*] Загрузка образа Kali..."
     $T_BIN/wget --no-check-certificate "https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" -O kali.tar.xz
-else
-    echo "[✔] Архив kali.tar.xz уже на месте."
 fi
 
-# 7. ПРЯМАЯ РАСПАКОВКА (ОБХОД ОШИБКИ 'INVALID ARGUMENT')
-echo "[*] НАЧИНАЮ РАСПАКОВКУ В ОБХОД PROOT..."
-echo "[*] Это займет около 10 минут. Не выключай телефон!"
-
-# Распаковываем напрямую через системный tar
+# 6. ПРЯМАЯ РАСПАКОВКА (ГЛАВНЫЙ ЭТАП)
+mkdir -p "$ROOTFS"
+echo "[*] НАЧИНАЮ ПРЯМУЮ РАСПАКОВКУ ТАРОМ..."
 $T_BIN/tar -xJf kali.tar.xz -C "$ROOTFS" --exclude='dev'
 
 if [ $? -eq 0 ]; then
-    echo "[✔] РАСПАКОВКА ЗАВЕРШЕНА!"
+    echo "[✔] УСПЕХ! Файловая система готова."
 else
-    echo "[!] ОШИБКА: Недостаточно места или архив поврежден."
+    echo "[!] Ошибка распаковки. Проверь место (нужно ~2ГБ)."
     exit 1
 fi
 
-# 8. ФИКС СЕТИ И ПУСКОГОЙ ФАЙЛ
-mkdir -p "$ROOTFS/etc"
-echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
-
+# 7. ФИНАЛЬНЫЙ СКРИПТ ЗАПУСКА
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
@@ -85,6 +69,6 @@ EOF
 chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] УСТАНОВКА ЗАВЕРШЕНА УСПЕШНО!"
-echo "[*] Вход в Kali: bash ~/g_kali"
+echo "[✔] ГОТОВО! Входи в Kali:"
+echo "bash ~/g_kali"
 echo "---------------------------------------"
