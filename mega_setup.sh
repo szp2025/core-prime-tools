@@ -61,7 +61,7 @@ download_smart "tcpdump" "Tcpdump" \
 
 # AIRCRACK-NG (Зеркало, которое должно ожить)
 download_smart "aircrack-ng" "Aircrack" \
-    https://github.com/JofreSastre/static-binaries/raw/master/aircrack-ng-arm -O aircrack-ng" \
+    "https://github.com/JofreSastre/static-binaries/raw/master/aircrack-ng-arm -O aircrack-ng" \
     "https://github.com/theMiddleBlue/static-binaries/raw/master/aircrack-ng-arm"
 
 # --- 2. БАЗЫ ---
