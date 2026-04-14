@@ -1,89 +1,112 @@
 #!/system/bin/sh
 
-# --- ГЛОБАЛЬНЫЕ ПУТИ ---
-BASE_DIR="/data/local/tmp"
-BIN_DIR="$BASE_DIR/bin"
-SHARE_DIR="$BASE_DIR/share/nmap"
+# =========================================================
+# KALI FULL ROOT (CHROOT VERSION)
+# =========================================================
 
-# Используем исправленный системный WGET
-WGET="wget --no-check-certificate -q"
+BASE="/data/local/kali"
+ROOTFS="$BASE/rootfs"
+LOG="$BASE/install.log"
 
-echo "[*] Запуск неубиваемого установщика [88/90/95/PKG]..."
-mkdir -p "$BIN_DIR" "$SHARE_DIR"
+mkdir -p "$BASE"
 
-# --- УМНАЯ ФУНКЦИЯ СКАНЕРА ССЫЛОК ---
-download_smart() {
-    FILE_PATH="$1"
-    NAME="$2"
-    shift 2
-    
-    if [ -s "$FILE_PATH" ]; then
-        echo "[v] $NAME уже на месте."
+echo "[*] Kali chroot install..." | tee -a "$LOG"
+
+# =========================================================
+# FUNCTION: download
+# =========================================================
+/**
+ * Télécharge un fichier si inexistant
+ * @param {string} url
+ * @param {string} file
+ */
+download() {
+    URL="$1"
+    FILE="$2"
+
+    if [ -f "$FILE" ]; then
+        echo "[v] already exists"
         return
     fi
 
-    for URL in "$@"; do
-        echo "[*] Пробую зеркало для $NAME..."
-        if $WGET "$URL" -O "$FILE_PATH"; then
-            if [ -s "$FILE_PATH" ]; then
-                echo "[+] $NAME успешно загружен!"
-                chmod 755 "$FILE_PATH"
-                return 0
-            fi
-        fi
-        echo "[!] Ссылка не сработала..."
-    done
-
-    echo "[!!!] Ошибка: Ни одна ссылка для $NAME не доступна."
-    return 1
+    wget --no-check-certificate "$URL" -O "$FILE"
 }
 
-# --- 0. ОЖИВЛЯЕМ PKG (РЕПОЗИТОРИИ) ---
-echo "[*] Настройка репозиториев для Android 5.1..."
-if [ -d "$PREFIX/etc/apt" ]; then
-    echo "deb https://termux.pwn.net/termux-main-21 stable main" > "$PREFIX/etc/apt/sources.list"
-    # Добавляем альтернативное зеркало Grimler
-    echo "deb https://main.termux-mirror.ml stable main" >> "$PREFIX/etc/apt/sources.list"
-fi
+cd "$BASE"
 
-# --- 1. ЯДРО (БИНАРНИКИ ARM) ---
-cd "$BIN_DIR"
+# =========================================================
+# 1. ROOTFS
+# =========================================================
+download \
+"https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-full.tar.xz" \
+"kali.tar.xz"
 
-# NMAP
-download_smart "nmap" "Nmap" \
-    "https://github.com/therealsaumil/static-arm-bins/raw/master/nmap-7.01-armel-static" \
-    "https://github.com/vlad-s/static-binaries/raw/master/nmap-arm"
+echo "[*] extracting..."
+mkdir -p "$ROOTFS"
+tar -xJf kali.tar.xz -C "$ROOTFS"
 
-# SOCAT (Твой рабочий 1.7.3.2)
-download_smart "socat" "Socat" \
-    "https://github.com/therealsaumil/static-arm-bins/raw/master/socat-armel-static" \
-    "https://github.com/m-p-h-c/static-binaries/raw/master/socat-armv7l"
+# =========================================================
+# 2. DNS
+# =========================================================
+echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
-# TCPDUMP
-download_smart "tcpdump" "Tcpdump" \
-    "https://github.com/therealsaumil/static-arm-bins/raw/master/tcpdump-4.7.4-armel-static" \
-    "https://github.com/vlad-s/static-binaries/raw/master/tcpdump-arm"
+# =========================================================
+# 3. MOUNT SCRIPT
+# =========================================================
+cat > "$BASE/mount.sh" << 'EOF'
+#!/system/bin/sh
 
-# AIRCRACK-NG (Смешанные ссылки для пробива)
-download_smart "aircrack-ng" "Aircrack" \
-    "http://distro.ibiblio.org/fatdog/arm/packages/700/aircrack-ng-1.2-rc1-arm-1.txz" \
-    "https://github.com/theMiddleBlue/static-binaries/raw/master/aircrack-ng-arm" \
-    "https://github.com/JofreSastre/static-binaries/raw/master/aircrack-ng-arm" \
-    "http://andpwn.com/binaries/aircrack-ng-arm"
+ROOTFS="/data/local/kali/rootfs"
 
-# --- 2. БАЗЫ ---
-cd "$SHARE_DIR"
-download_smart "nmap-services" "Nmap Services" \
-    "https://raw.githubusercontent.com/nmap/nmap/master/nmap-services" \
-    "http://svn.nmap.org/nmap/nmap-services"
+mount -o bind /dev $ROOTFS/dev
+mount -t proc proc $ROOTFS/proc
+mount -t sysfs sys $ROOTFS/sys
+mount -o bind /sdcard $ROOTFS/sdcard
+EOF
 
-# --- 3. ФИНАЛИЗАЦИЯ ---
-echo "export PATH=\$PATH:$BIN_DIR" > "$BASE_DIR/env.sh"
-echo "export NMAPDIR=$SHARE_DIR" >> "$BASE_DIR/env.sh"
-echo "alias статус='echo \"Проверка...\"; [ -f $BIN_DIR/nmap ] && echo \"Nmap OK\"; [ -f $BIN_DIR/socat ] && echo \"Socat OK\"; [ -f $BIN_DIR/aircrack-ng ] && echo \"Aircrack OK\"'" >> "$BASE_DIR/env.sh"
+chmod 755 "$BASE/mount.sh"
 
-chmod 755 "$BASE_DIR/env.sh"
+# =========================================================
+# 4. START SCRIPT
+# =========================================================
+cat > "$BASE/start.sh" << 'EOF'
+#!/system/bin/sh
 
-echo " "
-echo "[УСПЕХ] Все ссылки добавлены. PKG настроен."
-echo "Введи: source $BASE_DIR/env.sh"
+BASE="/data/local/kali"
+ROOTFS="$BASE/rootfs"
+
+su -c "$BASE/mount.sh"
+
+su -c "chroot $ROOTFS /bin/bash"
+EOF
+
+chmod 755 "$BASE/start.sh"
+
+# =========================================================
+# 5. INIT INSIDE KALI
+# =========================================================
+cat > "$ROOTFS/root/init.sh" << 'EOF'
+#!/bin/bash
+
+apt update
+
+apt install -y kali-linux-core
+
+apt install -y \
+nmap \
+aircrack-ng \
+hydra \
+sqlmap \
+nikto \
+net-tools \
+wireless-tools \
+iw \
+tcpdump
+
+echo "[✔] Kali FULL ready"
+EOF
+
+chmod +x "$ROOTFS/root/init.sh"
+
+echo "[✔] INSTALL DONE"
+echo "Run: su -c sh $BASE/start.sh"
