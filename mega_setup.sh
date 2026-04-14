@@ -1,16 +1,17 @@
-#!/system/bin/sh
+#!/data/data/com.termux/files/usr/bin/bash
 
 # =========================================================
-# KALI FULL ROOT (CHROOT VERSION)
+# KALI NETHUNTER PRO (TERMUX + ROOT)
 # =========================================================
 
-BASE="/data/local/kali"
+BASE="/data/data/com.termux/files/usr/var/kali"
 ROOTFS="$BASE/rootfs"
-LOG="$BASE/install.log"
+SCRIPTS="$BASE/scripts"
+LOGS="$BASE/logs"
 
-mkdir -p "$BASE"
+mkdir -p "$BASE" "$SCRIPTS" "$LOGS"
 
-echo "[*] Kali chroot install..." | tee -a "$LOG"
+echo "[*] Kali PRO install..."
 
 # =========================================================
 # FUNCTION: download
@@ -38,52 +39,124 @@ cd "$BASE"
 # 1. ROOTFS
 # =========================================================
 download \
-"https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-full.tar.xz" \
+"https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" \
 "kali.tar.xz"
 
-echo "[*] extracting..."
+echo "[*] extract..."
 mkdir -p "$ROOTFS"
-tar -xJf kali.tar.xz -C "$ROOTFS"
+proot --link2symlink tar -xJf kali.tar.xz -C "$ROOTFS"
 
 # =========================================================
-# 2. DNS
+# 2. DNS FIX
 # =========================================================
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
 # =========================================================
 # 3. MOUNT SCRIPT
 # =========================================================
-cat > "$BASE/mount.sh" << 'EOF'
+cat > "$SCRIPTS/mount.sh" << 'EOF'
 #!/system/bin/sh
 
-ROOTFS="/data/local/kali/rootfs"
+ROOTFS="/data/data/com.termux/files/usr/var/kali/rootfs"
 
+/**
+ * Monte les systèmes nécessaires pour chroot
+ */
 mount -o bind /dev $ROOTFS/dev
 mount -t proc proc $ROOTFS/proc
 mount -t sysfs sys $ROOTFS/sys
 mount -o bind /sdcard $ROOTFS/sdcard
 EOF
 
-chmod 755 "$BASE/mount.sh"
+chmod 755 "$SCRIPTS/mount.sh"
 
 # =========================================================
 # 4. START SCRIPT
 # =========================================================
-cat > "$BASE/start.sh" << 'EOF'
+cat > "$SCRIPTS/start.sh" << 'EOF'
 #!/system/bin/sh
 
-BASE="/data/local/kali"
+BASE="/data/data/com.termux/files/usr/var/kali"
 ROOTFS="$BASE/rootfs"
 
-su -c "$BASE/mount.sh"
-
+/**
+ * Lance Kali en chroot avec root
+ */
+su -c "$BASE/scripts/mount.sh"
 su -c "chroot $ROOTFS /bin/bash"
 EOF
 
-chmod 755 "$BASE/start.sh"
+chmod 755 "$SCRIPTS/start.sh"
 
 # =========================================================
-# 5. INIT INSIDE KALI
+# 5. WIFI SCRIPT
+# =========================================================
+cat > "$SCRIPTS/wifi.sh" << 'EOF'
+#!/bin/bash
+
+/**
+ * Script de gestion WiFi pentest
+ */
+
+echo "[*] Interfaces:"
+ip link
+
+echo "[*] Switching to monitor mode..."
+airmon-ng check kill
+airmon-ng start wlan1
+
+echo "[+] Done"
+EOF
+
+chmod 755 "$SCRIPTS/wifi.sh"
+
+# =========================================================
+# 6. MENU (WIFISLAX STYLE)
+# =========================================================
+cat > "$SCRIPTS/nethunter-menu.sh" << 'EOF'
+#!/bin/bash
+
+/**
+ * Menu interactif Kali NetHunter style
+ */
+
+while true; do
+    clear
+    echo "==== KALI PRO MENU ===="
+    echo "1) Nmap scan"
+    echo "2) WiFi attack"
+    echo "3) SQLMap"
+    echo "4) Hydra brute"
+    echo "5) Exit"
+    read -p "Choice: " c
+
+    case $c in
+        1)
+            read -p "Target: " t
+            nmap -A $t
+        ;;
+        2)
+            bash /scripts/wifi.sh
+        ;;
+        3)
+            read -p "URL: " u
+            sqlmap -u "$u" --batch
+        ;;
+        4)
+            read -p "Target: " t
+            hydra -l admin -P rockyou.txt $t http-get
+        ;;
+        5)
+            exit
+        ;;
+    esac
+done
+EOF
+
+chmod 755 "$SCRIPTS/nethunter-menu.sh"
+
+# =========================================================
+# 7. INIT KALI
 # =========================================================
 cat > "$ROOTFS/root/init.sh" << 'EOF'
 #!/bin/bash
@@ -98,15 +171,21 @@ aircrack-ng \
 hydra \
 sqlmap \
 nikto \
-net-tools \
 wireless-tools \
 iw \
-tcpdump
+tcpdump \
+net-tools
 
-echo "[✔] Kali FULL ready"
+echo "[✔] Kali PRO ready"
 EOF
 
 chmod +x "$ROOTFS/root/init.sh"
 
 echo "[✔] INSTALL DONE"
-echo "Run: su -c sh $BASE/start.sh"
+echo ""
+echo "RUN:"
+echo "su -c sh $SCRIPTS/start.sh"
+echo ""
+echo "INSIDE KALI:"
+echo "./init.sh"
+echo "bash /scripts/nethunter-menu.sh"
