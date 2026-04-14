@@ -1,45 +1,43 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Определяем базовые пути
-BIN="/data/data/com.termux/files/usr/bin"
-HOME_DIR="/data/data/com.termux/files/home"
-BASE="$HOME_DIR/kali"
+# ОПРЕДЕЛЯЕМ ЖЕСТКИЕ ПУТИ (БЕЗ ПЕРЕМЕННЫХ, КОТОРЫЕ МОГУТ СЛЕТЕТЬ)
+T_BIN="/data/data/com.termux/files/usr/bin"
+T_ETC="/data/data/com.termux/files/usr/etc"
+T_HOME="/data/data/com.termux/files/home"
+
+echo "[*] ИСПРАВЛЕНИЕ READ-ONLY ОШИБОК..."
+
+# 1. Записываем репозитории (этот путь внутри Termux всегда доступен на запись)
+echo "deb https://packages.termux.org/termux-main-21 stable main" > $T_ETC/apt/sources.list
+
+# 2. Установка инструментов
+$T_BIN/apt update -o "Acquire::https::Verify-Peer=false"
+$T_BIN/apt install wget proot tar xz-utils -y -o "Acquire::https::Verify-Peer=false"
+
+# 3. Настройка папок для Kali (СТРОГО В HOME)
+BASE="$T_HOME/kali"
 ROOTFS="$BASE/rootfs"
 
-echo "[*] ФИКСАЦИЯ РЕПОЗИТОРИЕВ..."
-# Прямая запись в конфиг apt
-echo "deb https://packages.termux.org/termux-main-21 stable main" > /data/data/com.termux/files/usr/etc/apt/sources.list
+# Удаляем старое, если оно мешает, и создаем заново
+$T_BIN/rm -rf "$BASE"
+$T_BIN/mkdir -p "$ROOTFS"
+cd "$T_HOME"
 
-echo "[*] ОБНОВЛЕНИЕ СИСТЕМЫ (ПРЯМЫЕ ПУТИ)..."
-# Используем полный путь к apt
-$BIN/apt update -o "Acquire::https::Verify-Peer=false"
-$BIN/apt install wget proot tar xz-utils -y -o "Acquire::https::Verify-Peer=false"
-
-echo "[*] ПОДГОТОВКА ДИРЕКТОРИЙ..."
-$BIN/mkdir -p "$ROOTFS"
-cd "$BASE"
-
-# Загрузка Kali
-if [ ! -f kali.tar.xz ]; then
-    echo "[*] ЗАГРУЗКА ОБРАЗА..."
-    $BIN/wget --no-check-certificate "https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" -O kali.tar.xz
+# 4. Загрузка образа
+if [ ! -f "$T_HOME/kali.tar.xz" ]; then
+    echo "[*] ЗАГРУЗКА ОБРАЗА В $T_HOME..."
+    $T_BIN/wget --no-check-certificate "https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" -O "$T_HOME/kali.tar.xz"
 fi
 
-# Распаковка через proot
-if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] РАСПАКОВКА (ЭТО ЗАЙМЕТ ВРЕМЯ)..."
-    $BIN/proot --link2symlink $BIN/tar -xJf kali.tar.xz -C "$ROOTFS" || { echo "[!] ОШИБКА РАСПАКОВКИ"; exit 1; }
-fi
+# 5. Распаковка (самый важный этап для обхода Read-only)
+echo "[*] РАСПАКОВКА В $ROOTFS..."
+$T_BIN/proot --link2symlink $T_BIN/tar -xJf "$T_HOME/kali.tar.xz" -C "$ROOTFS"
 
-# Настройка DNS для интернета внутри Kali
-$BIN/mkdir -p "$ROOTFS/etc"
-echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
-
-# Создание пускового файла
-cat > "$HOME_DIR/g_kali" << EOF
+# 6. Создание скрипта запуска
+cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 unset LD_PRELOAD
-exec $BIN/proot \\
+exec $T_BIN/proot \\
 --link2symlink \\
 -0 \\
 -r $ROOTFS \\
@@ -52,9 +50,9 @@ TERM=\$TERM \\
 /bin/bash --login
 EOF
 
-$BIN/chmod 755 "$HOME_DIR/g_kali"
+$T_BIN/chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] ГОТОВО! БАЗА УСТАНОВЛЕНА."
-echo "[*] Запуск Kali: bash ~/g_kali"
+echo "[✔] УСТАНОВКА ЗАВЕРШЕНА!"
+echo "[*] Запуск: bash ~/g_kali"
 echo "---------------------------------------"
