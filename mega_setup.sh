@@ -1,59 +1,58 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Настройка путей и библиотек, чтобы всё работало напрямую
+# Прямые пути
 T_BIN="/data/data/com.termux/files/usr/bin"
 T_LIB="/data/data/com.termux/files/usr/lib"
-export LD_LIBRARY_PATH="$T_LIB"
-export PATH="$T_BIN:$PATH"
-
 T_HOME="/data/data/com.termux/files/home"
 ROOTFS="$T_HOME/kali/rootfs"
 
-echo "[*] ФОРСИРОВАННЫЙ СТАРТ (ИГНОРИРУЕМ APT)..."
+echo "[*] ФИНАЛЬНЫЙ РЫВОК (БЕЗ APT И С ФИКСОМ ПРАВ TAR)..."
 
-# 1. Создание структуры папок
+# 1. Окружение
+export LD_LIBRARY_PATH="$T_LIB"
+export PATH="$T_BIN:$PATH"
+
+# 2. Создаем папку
 mkdir -p "$ROOTFS"
 
-# 2. Установка прав (числовой формат, чтобы не было "bad mode")
-[ -f "$T_BIN/curl" ] && chmod 755 "$T_BIN/curl"
-[ -f "$T_BIN/tar" ] && chmod 755 "$T_BIN/tar"
+# 3. ЧИНИМ ПРАВА ДЛЯ ВСЕХ ИНСТРУМЕНТОВ РАСПАКОВКИ
+# Это уберет ошибку "Cannot exec: Permission denied"
+echo "[*] Настройка прав для бинарников..."
+for tool in tar xz gzip curl proot; do
+    [ -f "$T_BIN/$tool" ] && chmod 755 "$T_BIN/$tool"
+done
 
-# 3. Загрузка Kali напрямую через CURL
-# Мы используем ссылку на minimal-armhf из твоего списка
+# 4. Загрузка через CURL (если файла еще нет)
 cd "$T_HOME"
 if [ ! -s "kali.tar.xz" ]; then
-    echo "[*] Загрузка образа через CURL (это надежнее APT)..."
-    # Флаг -k игнорирует проблемы с сертификатами SSL на старом Android
+    echo "[*] Загрузка образа через CURL..."
     $T_BIN/curl -L -k "https://kali.download/nethunter-images/current/rootfs/kali-nethunter-rootfs-minimal-armhf.tar.xz" -o "kali.tar.xz"
-else
-    echo "[✔] Образ уже скачан, продолжаем..."
 fi
 
-# 4. РАСПАКОВКА НАПРЯМУЮ (Обход ошибки proot execve)
+# 5. РАСПАКОВКА (С ФИКСОМ PATH)
 if [ ! -d "$ROOTFS/bin" ]; then
     echo "[*] НАЧАЛО РАСПАКОВКИ..."
-    echo "[*] Это займет около 10-15 минут. НЕ ВЫКЛЮЧАЙ ЭКРАН."
+    echo "[*] Если опять будет Permission Denied, мы попробуем другой метод."
     
-    # Используем tar из Termux напрямую
-    $T_BIN/tar -xJf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
+    # Принудительно указываем tar, где искать xz
+    $T_BIN/tar --xz -xvf "kali.tar.xz" -C "$ROOTFS" --exclude='dev'
     
     if [ $? -eq 0 ]; then
         echo "[✔] Успешно распаковано!"
     else
-        echo "[!] Ошибка распаковки. Проверь память (нужно минимум 2 ГБ)."
-        exit 1
+        echo "[!] Ошибка. Пробуем упрощенный метод..."
+        # Запасной вариант если первый упал
+        cat "kali.tar.xz" | $T_BIN/xz -d | $T_BIN/tar -x -C "$ROOTFS"
     fi
 fi
 
-# 5. Настройка интернета (DNS) внутри Kali
+# 6. DNS и запуск
 mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
-# 6. Создание скрипта запуска g_kali
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
-export PATH=$T_BIN:\$PATH
 unset LD_PRELOAD
 exec $T_BIN/proot \\
 --link2symlink \\
@@ -71,6 +70,4 @@ EOF
 chmod 755 "$T_HOME/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] УСТАНОВКА ЗАВЕРШЕНА!"
-echo "[*] Чтобы войти в Kali, напиши: bash ~/g_kali"
-echo "---------------------------------------"
+echo "[✔] ГОТОВО! Запускай: bash ~/g_kali"
