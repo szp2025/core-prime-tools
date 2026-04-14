@@ -30,18 +30,22 @@ if [ ! -f "kali-minimal.tar.xz" ]; then
     $T_BIN/curl -L -k "$KALI_URL" -o kali-minimal.tar.xz
 fi
 
-# 5. РАСПАКОВКА ЧЕРЕЗ PROOT
+# 5. РАСПАКОВКА (БЕЗ PROOT - напрямую)
 if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] РАСПАКОВКА... Жди, это займет время."
-    $T_BIN/proot --link2symlink $T_BIN/tar -xJf kali-minimal.tar.xz -C "$ROOTFS"
+    echo "[*] РАСПАКОВКА НАПРЯМУЮ (ОБХОД ОШИБКИ EXECVE)..."
+    # Распаковываем обычным tar, который лежит в Termux
+    $T_BIN/tar -xJf "$T_HOME/kali.tar.xz" -C "$ROOTFS" || { echo "[!] ОШИБКА РАСПАКОВКИ"; exit 1; }
+    
+    # После прямой распаковки на Android 5.1 могут слететь права внутри
+    # Мы их поправим позже внутри самого proot
 fi
 
-# 6. СКРИПТ ЗАПУСКА
+# 6. Создание скрипта запуска (упрощенный вход)
 cat > "$T_HOME/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 export LD_LIBRARY_PATH=$T_LIB
-export PATH=$T_BIN:\$PATH
 unset LD_PRELOAD
+# Запускаем proot только для входа, а не для распаковки
 exec $T_BIN/proot \\
 --link2symlink \\
 -0 \\
