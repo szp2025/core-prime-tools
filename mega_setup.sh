@@ -1,44 +1,45 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-echo "[*] ЭТАП 1: РЕАНИМАЦИЯ РЕПОЗИТОРИЕВ..."
-
-# Чиним источники для Android 5.1
-echo "deb https://packages.termux.org/termux-main-21 stable main" > $PREFIX/etc/apt/sources.list
-
-# Обновляем базу и ставим инструменты (игнорируем SSL)
-apt update -o "Acquire::https::Verify-Peer=false"
-apt install python wget proot tar xz-utils -y -o "Acquire::https::Verify-Peer=false"
-
-echo "[*] ЭТАП 2: ПОДГОТОВКА СРЕДЫ KALI..."
-
-# ПУТЬ ВНУТРИ TERMUX
-BASE="$HOME/kali"
+# Определяем базовые пути
+BIN="/data/data/com.termux/files/usr/bin"
+HOME_DIR="/data/data/com.termux/files/home"
+BASE="$HOME_DIR/kali"
 ROOTFS="$BASE/rootfs"
 
-mkdir -p "$ROOTFS"
+echo "[*] ФИКСАЦИЯ РЕПОЗИТОРИЕВ..."
+# Прямая запись в конфиг apt
+echo "deb https://packages.termux.org/termux-main-21 stable main" > /data/data/com.termux/files/usr/etc/apt/sources.list
+
+echo "[*] ОБНОВЛЕНИЕ СИСТЕМЫ (ПРЯМЫЕ ПУТИ)..."
+# Используем полный путь к apt
+$BIN/apt update -o "Acquire::https::Verify-Peer=false"
+$BIN/apt install wget proot tar xz-utils -y -o "Acquire::https::Verify-Peer=false"
+
+echo "[*] ПОДГОТОВКА ДИРЕКТОРИЙ..."
+$BIN/mkdir -p "$ROOTFS"
 cd "$BASE"
 
-# Загрузка образа (если файла еще нет)
+# Загрузка Kali
 if [ ! -f kali.tar.xz ]; then
-    echo "[*] Загрузка образа Kali armhf..."
-    wget --no-check-certificate "https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" -O kali.tar.xz
+    echo "[*] ЗАГРУЗКА ОБРАЗА..."
+    $BIN/wget --no-check-certificate "https://kali.download/nethunter-images/current/rootfs/kalifs-armhf-minimal.tar.xz" -O kali.tar.xz
 fi
 
-# Распаковка
+# Распаковка через proot
 if [ ! -d "$ROOTFS/bin" ]; then
-    echo "[*] Распаковка... Это займет время, не выключай экран."
-    proot --link2symlink tar -xJf kali.tar.xz -C "$ROOTFS" || { echo "[!] Ошибка!"; exit 1; }
+    echo "[*] РАСПАКОВКА (ЭТО ЗАЙМЕТ ВРЕМЯ)..."
+    $BIN/proot --link2symlink $BIN/tar -xJf kali.tar.xz -C "$ROOTFS" || { echo "[!] ОШИБКА РАСПАКОВКИ"; exit 1; }
 fi
 
-# Исправление DNS
-mkdir -p "$ROOTFS/etc"
+# Настройка DNS для интернета внутри Kali
+$BIN/mkdir -p "$ROOTFS/etc"
 echo "nameserver 8.8.8.8" > "$ROOTFS/etc/resolv.conf"
 
 # Создание пускового файла
-cat > "$HOME/kali_start.sh" << EOF
+cat > "$HOME_DIR/g_kali" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 unset LD_PRELOAD
-exec proot \\
+exec $BIN/proot \\
 --link2symlink \\
 -0 \\
 -r $ROOTFS \\
@@ -51,9 +52,9 @@ TERM=\$TERM \\
 /bin/bash --login
 EOF
 
-chmod 755 "$HOME/kali_start.sh"
+$BIN/chmod 755 "$HOME_DIR/g_kali"
 
 echo "---------------------------------------"
-echo "[✔] ВСЁ ГОТОВО!"
-echo "[*] Запуск Kali командой: bash ~/kali_start.sh"
+echo "[✔] ГОТОВО! БАЗА УСТАНОВЛЕНА."
+echo "[*] Запуск Kali: bash ~/g_kali"
 echo "---------------------------------------"
