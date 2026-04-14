@@ -59,10 +59,11 @@ download_smart "tcpdump" "Tcpdump" \
     "https://github.com/therealsaumil/static-arm-bins/raw/master/tcpdump-4.7.4-armel-static" \
     "https://github.com/vlad-s/static-binaries/raw/master/tcpdump-arm"
 
-# AIRCRACK-NG (Зеркало, которое должно ожить)
+# AIRCRACK-NG (Зеркала: JofreSastre, theMiddleBlue, Saumil)
 download_smart "aircrack-ng" "Aircrack" \
-    "https://github.com/JofreSastre/static-binaries/raw/master/aircrack-ng-arm -O aircrack-ng" \
-    "https://github.com/theMiddleBlue/static-binaries/raw/master/aircrack-ng-arm"
+    "https://github.com/JofreSastre/static-binaries/raw/master/aircrack-ng-arm" \
+    "https://github.com/theMiddleBlue/static-binaries/raw/master/aircrack-ng-arm" \
+    "https://github.com/therealsaumil/static-arm-bins/raw/master/aircrack-ng-1.2-rc4-armel-static"
 
 # --- 2. БАЗЫ ---
 cd $SHARE_DIR
