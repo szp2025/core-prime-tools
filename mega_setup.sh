@@ -15,31 +15,43 @@ if [ ! -s "$BB_STATIC" ]; then
     chmod 777 "$BB_STATIC"
 fi
 
-# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh
-echo "[*] Создание локального ярлыка..."
-
-# Определяем владельца (обычно это имя папки в /data/data/com.termux)
-TERMUX_USER=$(ls -ld $HOME_DIR | awk '{print $3}')
+# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh (Цветная версия)
+echo "[*] Обновление ярлыка с цветовой схемой..."
 
 cat <<EOF > "$START_KALI"
 #!/system/bin/sh
-# Переходим в корень Termux
-cd $HOME_DIR
-echo "[*] Запуск Kali Linux через SuperUser..."
-# Используем полный путь к BusyBox
-su -c "$BB_STATIC mount -o bind /dev $KALI_PATH/dev 2>/dev/null; \
-       $BB_STATIC mount -o bind /proc $KALI_PATH/proc 2>/dev/null; \
-       $BB_STATIC mount -o bind /sys $KALI_PATH/sys 2>/dev/null; \
-       $BB_STATIC chroot $KALI_PATH /bin/bash --login"
+
+# Цветовые коды
+G='\033[0;32m' # Green (Успех)
+R='\033[0;31m' # Red (Ошибка)
+Y='\033[1;33m' # Yellow (Процесс)
+NC='\033[0m'    # No Color (Сброс)
+
+echo "\${Y}[*] Запуск Kali Linux через SuperUser...\${NC}"
+
+# Запуск через su
+su -c "
+    # Проверка монтирования
+    if ! \$BB_STATIC mount | grep -q '$KALI_PATH/proc'; then
+        echo "\${Y}[*] Монтирование ресурсов...\${NC}"
+        \$BB_STATIC mount -o bind /dev $KALI_PATH/dev
+        \$BB_STATIC mount -o bind /proc $KALI_PATH/proc
+        \$BB_STATIC mount -o bind /sys $KALI_PATH/sys
+    fi
+
+    echo "\${G}[+] Окружение готово. Вход в chroot...\${NC}"
+    
+    # Попытка входа
+    if ! \$BB_STATIC chroot $KALI_PATH /bin/bash --login; then
+        echo "\${R}[!] КРИТИЧЕСКАЯ ОШИБКА: chroot не смог запустить оболочку.\${NC}"
+        echo "\${Y}[?] Проверь: whoami должен быть root внутри su.\${NC}"
+    fi
+"
 EOF
 
-# УСТАНОВКА ПРАВ
-# 1. Даем полные права на исполнение
+# Права и владелец
 chmod 777 "$START_KALI"
-# 2. Передаем владение пользователю Termux, чтобы он мог "открыть" файл
-chown $TERMUX_USER:$TERMUX_USER "$START_KALI"
-
-echo "[+] Ярлык готов. Владелец: $TERMUX_USER"
+chown $(ls -ld $HOME_DIR | awk '{print $3}') "$START_KALI"
 
 echo "[+] Ярлык готов: теперь можно запускать командой ./start_kali.sh"
 
