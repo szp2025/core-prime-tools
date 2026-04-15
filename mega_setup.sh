@@ -1,39 +1,25 @@
 #!/system/bin/sh
 
-# Пути
 KALI_PATH="/data/data/com.termux/files/home/kali-system/kali-armhf"
 TERMUX_BIN="/data/data/com.termux/files/usr/bin"
 
-echo "[*] Инициализация окружения Kali Linux..."
+echo "[*] Внутри mega_setup.sh: Настройка Kali..."
 
-# 1. Проверка и монтирование (только если еще не смонтировано)
-# Используем проверку через grep, чтобы не плодить дубликаты монтирований
+# 1. Монтирование
 if ! mount | grep -q "$KALI_PATH/proc"; then
-    echo "[*] Монтирование системных разделов..."
-    su -c "mount -o bind /dev $KALI_PATH/dev && \
-           mount -o bind /proc $KALI_PATH/proc && \
-           mount -o bind /sys $KALI_PATH/sys"
-    echo "[+] Разделы готовы."
-else
-    echo "[i] Разделы уже смонтированы."
+    mount -o bind /dev $KALI_PATH/dev
+    mount -o bind /proc $KALI_PATH/proc
+    mount -o bind /sys $KALI_PATH/sys
+    echo "[+] Системные разделы смонтированы."
 fi
 
-# 2. Поиск рабочего бинарника chroot
-echo "[*] Поиск chroot..."
+# 2. Поиск chroot
 CHROOT_CMD=""
-if [ -f "/system/bin/chroot" ]; then
-    CHROOT_CMD="/system/bin/chroot"
-elif [ -f "/system/xbin/chroot" ]; then
-    CHROOT_CMD="/system/xbin/chroot"
-elif [ -f "/system/xbin/busybox" ]; then
-    CHROOT_CMD="/system/xbin/busybox chroot"
-else
-    CHROOT_CMD="chroot"
-fi
+[ -f "/system/bin/chroot" ] && CHROOT_CMD="/system/bin/chroot"
+[ -z "$CHROOT_CMD" ] && [ -f "/system/xbin/chroot" ] && CHROOT_CMD="/system/xbin/chroot"
+[ -z "$CHROOT_CMD" ] && [ -f "/system/xbin/busybox" ] && CHROOT_CMD="/system/xbin/busybox chroot"
 
-echo "[+] Используем: $CHROOT_CMD"
-
-# 3. ФИНАЛЬНЫЙ ЗАПУСК
-# Мы передаем PATH внутрь su, чтобы chroot точно нашелся
-echo "[!] ВХОД В KALI..."
-su -c "export PATH=$TERMUX_BIN:/system/bin:/system/xbin; $CHROOT_CMD $KALI_PATH /bin/bash"
+# 3. Вход
+echo "[!] ВХОД В СИСТЕМУ KALI..."
+export PATH=$TERMUX_BIN:/system/bin:/system/xbin
+$CHROOT_CMD $KALI_PATH /usr/bin/env -i HOME=/root TERM=xterm-256color /bin/bash --login
