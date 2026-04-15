@@ -23,39 +23,41 @@ fi
 
 cat <<EOF > start_kali.sh
 #!/system/bin/sh
-# Параметры путей
 HOME_PATH="/data/data/com.termux/files/home"
 K_PATH="\$HOME_PATH/kali-system/kali-armhf"
 BB_ORIGIN="\$HOME_PATH/busybox-static"
 BB_DEV="/dev/busybox-kali"
 
-echo "[*] Инициализация окружения..."
-
-# 1. Восстановление BusyBox в /dev (после перезагрузки он пропадает)
+# 1. Подготовка окружения
+echo "[*] Настройка системы..."
 su -c "cp \$BB_ORIGIN \$BB_DEV && chmod 755 \$BB_DEV"
-
-# 2. Снятие защиты noexec с раздела /data (чтобы Kali могла запускаться)
 su -c "mount -o remount,exec /data"
 
-# 3. Монтирование ресурсов (с проверкой, чтобы не дублировать)
+# 2. Монтирование ресурсов
 su -c "
-    if ! grep -q '\$K_PATH/proc' /proc/mounts; then
-        \$BB_DEV mount -o bind /dev \$K_PATH/dev
-        \$BB_DEV mount -o bind /proc \$K_PATH/proc
-        \$BB_DEV mount -o bind /sys \$K_PATH/sys
-        \$BB_DEV mount -t devpts devpts \$K_PATH/dev/pts
-    fi
-    # Настройка интернета внутри Kali
+    \$BB_DEV mount -o bind /dev \$K_PATH/dev
+    \$BB_DEV mount -o bind /proc \$K_PATH/proc
+    \$BB_DEV mount -o bind /sys \$K_PATH/sys
+    # Настройка DNS для работы интернета
     echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
 "
 
-echo "[+] ПОПЫТКА ВХОДА В KALI (SH MODE)..."
-# Мы используем /bin/sh -i, так как это самый стабильный режим для Android 5.1
-su -c "\$BB_DEV chroot \$K_PATH /bin/sh -i"
+echo "[+] ВХОД В KALI LINUX..."
 
-# 4. Авто-размонтирование после выхода из Kali (для чистоты)
-echo "[*] Размонтирование ресурсов..."
-su -c "umount -l \$K_PATH/dev/pts; umount -l \$K_PATH/dev; umount -l \$K_PATH/proc; umount -l \$K_PATH/sys"
+# 3. Запуск с автоматической настройкой окружения
+# Мы объединяем все экспортные команды в одну строку инициализации
+su -c "\$BB_DEV chroot \$K_PATH /bin/sh -c '
+    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin;
+    export TERM=xterm-256color;
+    export HOME=/root;
+    cd /root;
+    /bin/sh -i
+'"
+
+# 4. Очистка ресурсов после выхода (exit)
+echo "[*] Завершение работы и размонтирование..."
+su -c "umount -l \$K_PATH/dev; umount -l \$K_PATH/proc; umount -l \$K_PATH/sys"
 EOF
 
+# Даем права на запуск самого скрипта
 chmod +x start_kali.sh
