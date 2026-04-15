@@ -15,19 +15,26 @@ if [ ! -s "$BB_STATIC" ]; then
     chmod 777 "$BB_STATIC"
 fi
 
-# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh
+# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh (Улучшенная версия)
 echo "[*] Обновление локального ярлыка start_kali.sh..."
 cat <<EOF > "$START_KALI"
-#!/data/data/com.termux/files/usr/bin/sh
-# Этот файл создан автоматически через mega_setup.sh
-echo "[*] Запуск Kali Linux через SuperUser..."
+#!/system/bin/sh
+# Переходим в домашнюю папку, чтобы пути были корректными
+cd $HOME_DIR
+echo "[*] Запрос прав Root для входа в Kali..."
+# Запускаем всю логику одной командой через su
 su -c "$BB_STATIC mount -o bind /dev $KALI_PATH/dev 2>/dev/null; \
        $BB_STATIC mount -o bind /proc $KALI_PATH/proc 2>/dev/null; \
        $BB_STATIC mount -o bind /sys $KALI_PATH/sys 2>/dev/null; \
+       echo '[+] Окружение готово. Вход...'; \
        $BB_STATIC chroot $KALI_PATH /bin/bash --login"
 EOF
 
+# Даем права на чтение и исполнение всем
+chmod 755 "$START_KALI"
+# Дополнительно пробуем убрать атрибут 'noexec' если это возможно (на некоторых прошивках помогает)
 chmod +x "$START_KALI"
+
 echo "[+] Ярлык готов: теперь можно запускать командой ./start_kali.sh"
 
 # 3. МОНТИРОВАНИЕ (текущая сессия)
