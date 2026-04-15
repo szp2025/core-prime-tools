@@ -29,7 +29,7 @@ cat <<EOF > "$START_KALI"
 K_PATH="$KALI_PATH"
 BB="$BB_STATIC"
 
-# 1. Тихое монтирование
+# Монтирование
 su -c "
     if ! grep -q '\$K_PATH/proc' /proc/mounts; then
         \$BB mount -o bind /dev \$K_PATH/dev
@@ -37,13 +37,11 @@ su -c "
         \$BB mount -o bind /sys \$K_PATH/sys
         \$BB mount -t devpts devpts \$K_PATH/dev/pts
     fi
-    echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
 "
 
-# 2. ИНТЕРАКТИВНЫЙ ВХОД (Фикс для Android 5.1)
 echo "[+] ПЕРЕХОД В KALI..."
-# Мы используем su -c для запуска chroot, а внутри просим открыть оболочку через script
-su -c "\$BB chroot \$K_PATH /usr/bin/script -qc '/bin/su - root' /dev/null"
+# Прямой вход через bash с сохранением стандартного ввода
+su -c "\$BB chroot \$K_PATH /bin/bash -i"
 EOF
 
 chmod 777 "$START_KALI"
