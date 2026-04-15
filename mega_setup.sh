@@ -19,7 +19,9 @@ CHROOT_CMD=""
 [ -z "$CHROOT_CMD" ] && [ -f "/system/xbin/chroot" ] && CHROOT_CMD="/system/xbin/chroot"
 [ -z "$CHROOT_CMD" ] && [ -f "/system/xbin/busybox" ] && CHROOT_CMD="/system/xbin/busybox chroot"
 
-# 3. Вход
+# 3. Вход (Исправленная версия)
 echo "[!] ВХОД В СИСТЕМУ KALI..."
 export PATH=$TERMUX_BIN:/system/bin:/system/xbin
+
+# Важно: сначала идет команда chroot, потом ПУТЬ к системе, потом ПРОГРАММА (/bin/bash)
 $CHROOT_CMD $KALI_PATH /usr/bin/env -i HOME=/root TERM=xterm-256color /bin/bash --login
