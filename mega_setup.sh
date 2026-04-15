@@ -21,7 +21,7 @@ if [ ! -s "$BB_STATIC" ]; then
     chmod 777 "$BB_STATIC"
 fi
 
-# 3. СОЗДАНИЕ УМНОГО start_kali.sh С ПРОВЕРКОЙ MOUNT
+# 3. СОЗДАНИЕ УМНОГО start_kali.sh
 echo "[*] Обновление ярлыка запуска..."
 
 cat <<EOF > "$START_KALI"
@@ -29,7 +29,7 @@ cat <<EOF > "$START_KALI"
 K_PATH="$KALI_PATH"
 BB="$BB_STATIC"
 
-# 1. Монтирование (если нужно) через su -c
+# 1. Тихое монтирование
 su -c "
     if ! grep -q '\$K_PATH/proc' /proc/mounts; then
         \$BB mount -o bind /dev \$K_PATH/dev
@@ -40,14 +40,10 @@ su -c "
     echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
 "
 
-# 2. ИНТЕРАКТИВНЫЙ ВХОД
-echo "[+] ВХОД В KALI..."
-# exec заменяет процесс Termux процессом Kali, не давая ему закрыться
-su -c "exec \$BB chroot \$K_PATH /bin/su - root"
+# 2. ИНТЕРАКТИВНЫЙ ВХОД (Фикс для Android 5.1)
+echo "[+] ПЕРЕХОД В KALI..."
+# Мы используем su -c для запуска chroot, а внутри просим открыть оболочку через script
+su -c "\$BB chroot \$K_PATH /usr/bin/script -qc '/bin/su - root' /dev/null"
 EOF
 
 chmod 777 "$START_KALI"
-
-# 4. ЗАПУСК
-echo "[!] ПОПЫТКА ВХОДА..."
-sh "$START_KALI"
