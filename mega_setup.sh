@@ -22,20 +22,23 @@ if [ ! -s "$BB_STATIC" ]; then
 fi
 
 # 3. СОЗДАНИЕ УМНОГО start_kali.sh
-echo "[*] Обновление ярлыка запуска..."
-
 cat <<EOF > "$START_KALI"
 #!/system/bin/sh
 K_PATH="$KALI_PATH"
 BB="$BB_STATIC"
 
-# 1. Тихое монтирование
-su -c "\$BB mount -o bind /dev \$K_PATH/dev; \$BB mount -o bind /proc \$K_PATH/proc; \$BB mount -o bind /sys \$K_PATH/sys; \$BB mount -t devpts devpts \$K_PATH/dev/pts"
+# 1. Монтирование (тихий режим)
+su -c "
+    if ! grep -q '\$K_PATH/proc' /proc/mounts; then
+        \$BB mount -o bind /dev \$K_PATH/dev
+        \$BB mount -o bind /proc \$K_PATH/proc
+        \$BB mount -o bind /sys \$K_PATH/sys
+        \$BB mount -t devpts devpts \$K_PATH/dev/pts
+    fi
+    echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
+"
 
-# 2. ВХОД ЧЕРЕЗ СУПЕР-ИНТЕРАКТИВ
-echo "[+] ПУСК СИСТЕМЫ KALI..."
-# Мы просим su запустить busybox chroot и не закрывать поток
-su -c "\$BB chroot \$K_PATH /usr/bin/env -i HOME=/root TERM=\$TERM /bin/bash --login"
+echo "[+] ПОПЫТКА ВХОДА В KALI..."
+# Использование ключа -l (login) и явного указания оболочки
+su -c "\$BB chroot \$K_PATH /bin/bash --login -i"
 EOF
-
-chmod 777 "$START_KALI"
