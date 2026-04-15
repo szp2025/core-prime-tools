@@ -6,7 +6,7 @@ KALI_PATH="$HOME_DIR/kali-system/kali-armhf"
 BB_STATIC="$HOME_DIR/busybox-static"
 START_KALI="$HOME_DIR/start_kali.sh"
 
-echo "[*] Контекст: Глобальная оптимизация..."
+echo "[*] Контекст: Глобальная оптимизация и проверка монтирования..."
 
 # 1. МОДУЛЬ ЧИСТОТЫ (Удаляем всё лишнее)
 echo "[*] Уборка мусора..."
@@ -21,7 +21,7 @@ if [ ! -s "$BB_STATIC" ]; then
     chmod 777 "$BB_STATIC"
 fi
 
-# 3. СОЗДАНИЕ УМНОГО start_kali.sh
+# 3. СОЗДАНИЕ УМНОГО start_kali.sh С ПРОВЕРКОЙ MOUNT
 echo "[*] Обновление ярлыка запуска..."
 
 cat <<EOF > "$START_KALI"
@@ -29,26 +29,26 @@ cat <<EOF > "$START_KALI"
 K_PATH="$KALI_PATH"
 BB="$BB_STATIC"
 
+# Основная логика под SU
 su -c "
-    # Авто-монтирование при необходимости
-    if [ ! -e \$K_PATH/proc/1 ]; then
-        echo '[*] Монтирование ресурсов...'
+    # ПРОВЕРКА: Смонтирован ли proc? (Признак живого монтирования)
+    if ! grep -q '\$K_PATH/proc' /proc/mounts; then
+        echo '[!] Ресурсы не смонтированы. Запуск mount...'
         \$BB mount -o bind /dev \$K_PATH/dev
         \$BB mount -o bind /proc \$K_PATH/proc
         \$BB mount -o bind /sys \$K_PATH/sys
         \$BB mount -t devpts devpts \$K_PATH/dev/pts
+        echo '[+] Монтирование успешно.'
+    else
+        echo '[i] Ресурсы уже активны.'
     fi
     
-    # Фикс интернета и вход
+    # Фикс интернета
     echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
     
-    echo '[+] ВХОД В KALI (Root Mode)...'
-    \$BB chroot \$K_PATH /usr/bin/env -i \\
-        HOME=/root \\
-        USER=root \\
-        TERM=xterm-256color \\
-        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \\
-        /bin/bash --login
+    echo '[+] ВХОД В KALI (Official Root)...'
+    # Вход через внутренний su для получения '#'
+    \$BB chroot \$K_PATH /bin/su - root
 "
 EOF
 
