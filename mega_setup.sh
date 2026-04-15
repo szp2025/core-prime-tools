@@ -21,23 +21,41 @@ if [ ! -s "$BB_STATIC" ]; then
     chmod 777 "$BB_STATIC"
 fi
 
-# 3. СОЗДАНИЕ УМНОГО start_kali.sh
 cat <<EOF > start_kali.sh
 #!/system/bin/sh
-K_PATH="/data/data/com.termux/files/home/kali-system/kali-armhf"
-BB="/data/data/com.termux/files/home/busybox-static"
+# Параметры путей
+HOME_PATH="/data/data/com.termux/files/home"
+K_PATH="\$HOME_PATH/kali-system/kali-armhf"
+BB_ORIGIN="\$HOME_PATH/busybox-static"
+BB_DEV="/dev/busybox-kali"
 
-# Монтирование системных ресурсов
+echo "[*] Инициализация окружения..."
+
+# 1. Восстановление BusyBox в /dev (после перезагрузки он пропадает)
+su -c "cp \$BB_ORIGIN \$BB_DEV && chmod 755 \$BB_DEV"
+
+# 2. Снятие защиты noexec с раздела /data (чтобы Kali могла запускаться)
+su -c "mount -o remount,exec /data"
+
+# 3. Монтирование ресурсов (с проверкой, чтобы не дублировать)
 su -c "
-    \$BB mount -o bind /dev \$K_PATH/dev
-    \$BB mount -o bind /proc \$K_PATH/proc
-    \$BB mount -o bind /sys \$K_PATH/sys
-    \$BB mount -t devpts devpts \$K_PATH/dev/pts
+    if ! grep -q '\$K_PATH/proc' /proc/mounts; then
+        \$BB_DEV mount -o bind /dev \$K_PATH/dev
+        \$BB_DEV mount -o bind /proc \$K_PATH/proc
+        \$BB_DEV mount -o bind /sys \$K_PATH/sys
+        \$BB_DEV mount -t devpts devpts \$K_PATH/dev/pts
+    fi
+    # Настройка интернета внутри Kali
+    echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
 "
 
-echo "[+] ВХОД В KALI..."
-# Используем прямой проброс интерактивной оболочки
-su -c "\$BB chroot \$K_PATH /bin/bash -i"
+echo "[+] ПОПЫТКА ВХОДА В KALI (SH MODE)..."
+# Мы используем /bin/sh -i, так как это самый стабильный режим для Android 5.1
+su -c "\$BB_DEV chroot \$K_PATH /bin/sh -i"
+
+# 4. Авто-размонтирование после выхода из Kali (для чистоты)
+echo "[*] Размонтирование ресурсов..."
+su -c "umount -l \$K_PATH/dev/pts; umount -l \$K_PATH/dev; umount -l \$K_PATH/proc; umount -l \$K_PATH/sys"
 EOF
 
-chmod 777 start_kali.sh
+chmod +x start_kali.sh
