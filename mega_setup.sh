@@ -64,7 +64,7 @@ fi
 # 4. ВХОД (Гарантированный Root)
 echo "[!] ВХОД В KALI..."
 # Мы используем env для установки USER и HOME, и запуск bash с флагом --login
-$BB_STATIC chroot "$KALI_PATH" /bin/su - root
+$BB_STATIC chroot "$KALI_PATH" /usr/bin/env -i \
     HOME=/root \
     USER=root \
     TERM=xterm-256color \
