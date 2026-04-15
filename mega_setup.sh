@@ -16,33 +16,30 @@ if [ ! -s "$BB_STATIC" ]; then
 fi
 
 # 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh
-echo "[*] Обновление ярлыка: Убираем printf и исправляем пути..."
+echo "[*] Фикс прав: Принудительный ROOT вход..."
 
 cat <<'EOF' > "$START_KALI"
 #!/system/bin/sh
 
-# Жесткие пути (БЕЗ ПЕРЕМЕННЫХ, ЧТОБЫ НЕ ТЕРЯЛИСЬ)
 KALI_PATH="/data/data/com.termux/files/home/kali-system/kali-armhf"
 BB="/data/data/com.termux/files/home/busybox-static"
 
-echo "[*] Подготовка окружения..."
+echo "[*] Запрос SuperUser..."
 
-# Запуск одной командой
-su -c "
-    # Проверка монтирования через BusyBox
-    $BB mount | grep -q '$KALI_PATH/proc' || (
+# Запуск с принудительной установкой ID пользователя (0 = root)
+su 0 -c "
+    # Монтирование
+    if [ ! -d $KALI_PATH/proc/1 ]; then
         $BB mount -o bind /dev $KALI_PATH/dev
         $BB mount -o bind /proc $KALI_PATH/proc
         $BB mount -o bind /sys $KALI_PATH/sys
         $BB mount -o bind /dev/pts $KALI_PATH/dev/pts
-    )
+    fi
     
-    # Фикс интернета
     echo 'nameserver 8.8.8.8' > $KALI_PATH/etc/resolv.conf
+    echo '[+] Вход в Kali (Force Root)...'
     
-    echo '[+] Вход в Kali Linux...'
-    
-    # Запуск chroot через абсолютный путь к BusyBox
+    # Пытаемся зайти через chroot с явным указанием UID/GID
     $BB chroot $KALI_PATH /usr/bin/env -i \
         HOME=/root \
         TERM=xterm-256color \
@@ -51,7 +48,6 @@ su -c "
 "
 EOF
 
-# Исправляем права и владельца
 chmod 777 "$START_KALI"
 chown $(ls -ld $HOME_DIR | awk '{print $3}') "$START_KALI"
 
