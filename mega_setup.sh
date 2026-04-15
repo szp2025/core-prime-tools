@@ -16,39 +16,34 @@ if [ ! -s "$BB_STATIC" ]; then
 fi
 
 # 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh
-echo "[*] Обновление ярлыка: Фикс ошибок chroot и цветов..."
+echo "[*] Обновление ярлыка: Убираем printf и исправляем пути..."
 
 cat <<'EOF' > "$START_KALI"
 #!/system/bin/sh
 
-# Цвета (используем printf для надежности)
-G='\033[0;32m'
-Y='\033[1;33m'
-R='\033[0;31m'
-NC='\033[0m'
-
-# Жесткие пути, чтобы su их не потерял
-KALI="/data/data/com.termux/files/home/kali-system/kali-armhf"
+# Жесткие пути (БЕЗ ПЕРЕМЕННЫХ, ЧТОБЫ НЕ ТЕРЯЛИСЬ)
+KALI_PATH="/data/data/com.termux/files/home/kali-system/kali-armhf"
 BB="/data/data/com.termux/files/home/busybox-static"
 
-printf "${Y}[*] Запуск Kali Linux через SuperUser...${NC}\n"
+echo "[*] Подготовка окружения..."
 
-# Запуск одной строкой без переменных, которые могут потеряться
+# Запуск одной командой
 su -c "
-    if [ ! -d $KALI/proc/1 ]; then
-        $BB mount -o bind /dev $KALI/dev
-        $BB mount -o bind /proc $KALI/proc
-        $BB mount -o bind /sys $KALI/sys
-        $BB mount -o bind /dev/pts $KALI/dev/pts
-    fi
+    # Проверка монтирования через BusyBox
+    $BB mount | grep -q '$KALI_PATH/proc' || (
+        $BB mount -o bind /dev $KALI_PATH/dev
+        $BB mount -o bind /proc $KALI_PATH/proc
+        $BB mount -o bind /sys $KALI_PATH/sys
+        $BB mount -o bind /dev/pts $KALI_PATH/dev/pts
+    )
     
-    # Фикс DNS
-    echo 'nameserver 8.8.8.8' > $KALI/etc/resolv.conf
+    # Фикс интернета
+    echo 'nameserver 8.8.8.8' > $KALI_PATH/etc/resolv.conf
     
-    printf '${G}[+] Вход в систему...${NC}\n'
+    echo '[+] Вход в Kali Linux...'
     
-    # Прямой вызов chroot через полный путь к BusyBox
-    $BB chroot $KALI /usr/bin/env -i \
+    # Запуск chroot через абсолютный путь к BusyBox
+    $BB chroot $KALI_PATH /usr/bin/env -i \
         HOME=/root \
         TERM=xterm-256color \
         PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
@@ -56,6 +51,7 @@ su -c "
 "
 EOF
 
+# Исправляем права и владельца
 chmod 777 "$START_KALI"
 chown $(ls -ld $HOME_DIR | awk '{print $3}') "$START_KALI"
 
