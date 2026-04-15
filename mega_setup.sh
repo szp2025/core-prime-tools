@@ -21,7 +21,7 @@ if [ ! -s "$BB_STATIC" ]; then
     chmod 777 "$BB_STATIC"
 fi
 
-# 3. СОЗДАНИЕ УМНОГО start_kali.sh
+# 3. СОЗДАНИЕ УМНОГО start_kali.sh С ПРОВЕРКОЙ MOUNT
 echo "[*] Обновление ярлыка запуска..."
 
 cat <<EOF > "$START_KALI"
@@ -29,7 +29,7 @@ cat <<EOF > "$START_KALI"
 K_PATH="$KALI_PATH"
 BB="$BB_STATIC"
 
-# 1. МОНТИРОВАНИЕ (через su -c, тихо и быстро)
+# 1. Монтирование (если нужно) через su -c
 su -c "
     if ! grep -q '\$K_PATH/proc' /proc/mounts; then
         \$BB mount -o bind /dev \$K_PATH/dev
@@ -40,9 +40,14 @@ su -c "
     echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
 "
 
-# 2. ВХОД (теперь напрямую, чтобы терминал не закрывался)
-echo "[+] ВХОД В KALI (Official Root)..."
-su -c "\$BB chroot \$K_PATH /bin/su - root"
+# 2. ИНТЕРАКТИВНЫЙ ВХОД
+echo "[+] ВХОД В KALI..."
+# exec заменяет процесс Termux процессом Kali, не давая ему закрыться
+su -c "exec \$BB chroot \$K_PATH /bin/su - root"
 EOF
 
 chmod 777 "$START_KALI"
+
+# 4. ЗАПУСК
+echo "[!] ПОПЫТКА ВХОДА..."
+sh "$START_KALI"
