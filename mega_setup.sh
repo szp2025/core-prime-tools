@@ -15,41 +15,51 @@ if [ ! -s "$BB_STATIC" ]; then
     chmod 777 "$BB_STATIC"
 fi
 
-# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh (Цветная версия)
-echo "[*] Обновление ярлыка с цветовой схемой..."
+# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh (Максимальная комплектация)
+echo "[*] Обновление ярлыка: Интернет + Память + Цвета..."
 
 cat <<EOF > "$START_KALI"
 #!/system/bin/sh
 
-# Цветовые коды
-G='\033[0;32m' # Green (Успех)
-R='\033[0;31m' # Red (Ошибка)
-Y='\033[1;33m' # Yellow (Процесс)
-NC='\033[0m'    # No Color (Сброс)
+G='\033[0;32m'
+R='\033[0;31m'
+Y='\033[1;33m'
+NC='\033[0m'
 
 echo "\${Y}[*] Запуск Kali Linux через SuperUser...\${NC}"
 
-# Запуск через su
 su -c "
-    # Проверка монтирования
+    # 1. МОНТИРОВАНИЕ
     if ! \$BB_STATIC mount | grep -q '$KALI_PATH/proc'; then
         echo "\${Y}[*] Монтирование ресурсов...\${NC}"
         \$BB_STATIC mount -o bind /dev $KALI_PATH/dev
         \$BB_STATIC mount -o bind /proc $KALI_PATH/proc
         \$BB_STATIC mount -o bind /sys $KALI_PATH/sys
+        \$BB_STATIC mount -o bind /dev/pts $KALI_PATH/dev/pts
+        # Монтируем внутреннюю память (SDCard) внутрь Kali
+        mkdir -p $KALI_PATH/mnt/sdcard
+        \$BB_STATIC mount -o bind /sdcard $KALI_PATH/mnt/sdcard
     fi
 
-    echo "\${G}[+] Окружение готово. Вход в chroot...\${NC}"
+    # 2. ФИКС ИНТЕРНЕТА (DNS)
+    echo 'nameserver 8.8.8.8' > $KALI_PATH/etc/resolv.conf
+    echo 'nameserver 8.8.4.4' >> $KALI_PATH/etc/resolv.conf
     
-    # Попытка входа
-    if ! \$BB_STATIC chroot $KALI_PATH /bin/bash --login; then
-        echo "\${R}[!] КРИТИЧЕСКАЯ ОШИБКА: chroot не смог запустить оболочку.\${NC}"
-        echo "\${Y}[?] Проверь: whoami должен быть root внутри su.\${NC}"
-    fi
+    # 3. ФИКС ГРУПП (Чтобы не было Permission Denied на сокетах)
+    # Группа 3003 (inet) в Android отвечает за интернет
+    grep -q 'inet:x:3003' $KALI_PATH/etc/group || echo 'inet:x:3003:root' >> $KALI_PATH/etc/group
+
+    echo "\${G}[+] Окружение готово. Вход...\${NC}"
+    
+    # 4. ВХОД С ПРАВИЛЬНЫМИ ПЕРЕМЕННЫМИ
+    \$BB_STATIC chroot $KALI_PATH /usr/bin/env -i \
+        HOME=/root \
+        TERM=xterm-256color \
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+        /bin/bash --login
 "
 EOF
 
-# Права и владелец
 chmod 777 "$START_KALI"
 chown $(ls -ld $HOME_DIR | awk '{print $3}') "$START_KALI"
 
