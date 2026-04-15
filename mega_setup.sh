@@ -61,6 +61,12 @@ if [ ! -e "$KALI_PATH/proc/1" ]; then
     $BB_STATIC mount -o bind /sys "$KALI_PATH/sys"
 fi
 
-# 4. ВХОД
+# 4. ВХОД (Гарантированный Root)
 echo "[!] ВХОД В KALI..."
-$BB_STATIC chroot "$KALI_PATH" /bin/bash --login
+# Мы используем env для установки USER и HOME, и запуск bash с флагом --login
+$BB_STATIC chroot "$KALI_PATH" /usr/bin/env -i \
+    HOME=/root \
+    USER=root \
+    TERM=xterm-256color \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    /bin/bash --login
