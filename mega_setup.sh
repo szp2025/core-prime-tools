@@ -29,19 +29,13 @@ cat <<EOF > "$START_KALI"
 K_PATH="$KALI_PATH"
 BB="$BB_STATIC"
 
-# Монтирование
-su -c "
-    if ! grep -q '\$K_PATH/proc' /proc/mounts; then
-        \$BB mount -o bind /dev \$K_PATH/dev
-        \$BB mount -o bind /proc \$K_PATH/proc
-        \$BB mount -o bind /sys \$K_PATH/sys
-        \$BB mount -t devpts devpts \$K_PATH/dev/pts
-    fi
-"
+# 1. Тихое монтирование
+su -c "\$BB mount -o bind /dev \$K_PATH/dev; \$BB mount -o bind /proc \$K_PATH/proc; \$BB mount -o bind /sys \$K_PATH/sys; \$BB mount -t devpts devpts \$K_PATH/dev/pts"
 
-echo "[+] ПЕРЕХОД В KALI..."
-# Прямой вход через bash с сохранением стандартного ввода
-su -c "\$BB chroot \$K_PATH /bin/bash -i"
+# 2. ВХОД ЧЕРЕЗ СУПЕР-ИНТЕРАКТИВ
+echo "[+] ПУСК СИСТЕМЫ KALI..."
+# Мы просим su запустить busybox chroot и не закрывать поток
+su -c "\$BB chroot \$K_PATH /usr/bin/env -i HOME=/root TERM=\$TERM /bin/bash --login"
 EOF
 
 chmod 777 "$START_KALI"
