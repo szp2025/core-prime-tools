@@ -65,7 +65,8 @@ fi
 echo "[!] ВХОД В KALI..."
 
 # Мы добавляем /usr/bin/groups и явную очистку, чтобы система перечитала /etc/passwd
-$BB_STATIC chroot "$KALI_PATH" /usr/bin/env -i \
+#$BB_STATIC chroot "$KALI_PATH" /usr/bin/env -i \
+$BB_STATIC chroot "$KALI_PATH" /bin/su - root
     HOME=/root \
     TERM=xterm-256color \
     USER=root \
