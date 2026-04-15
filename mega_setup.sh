@@ -25,11 +25,12 @@ if [ -z "$CHROOT_CMD" ]; then
     CHROOT_CMD="chroot"
 fi
 
-# 3. ФИНАЛЬНЫЙ ВХОД
-echo "[!] ВХОД В KALI LINUX..."
+# 3. ФИНАЛЬНЫЙ ВХОД (Исправлено)
+echo "[!] ВХОД В СИСТЕМУ KALI..."
 
-# Устанавливаем PATH, чтобы chroot нашел свои библиотеки
-export PATH="$TERMUX_BIN:/system/bin:/system/xbin"
+# Принудительно задаем пути, чтобы Android нашел chroot
+export PATH="/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin:$PATH"
 
-# ВАЖНО: Мы запускаем оболочку /bin/bash, которая находится ВНУТРИ $KALI_PATH
-$CHROOT_CMD "$KALI_PATH" /usr/bin/env -i HOME=/root TERM=xterm-256color /bin/bash --login
+# ВНИМАНИЕ: Проверь, чтобы между $CHROOT_CMD и $KALI_PATH был пробел!
+# Формат: КОМАНДА [пробел] ПУТЬ_К_ПАПКЕ [пробел] ЧТО_ЗАПУСТИТЬ
+$CHROOT_CMD "$KALI_PATH" /bin/bash --login
