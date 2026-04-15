@@ -22,23 +22,22 @@ if [ ! -s "$BB_STATIC" ]; then
 fi
 
 # 3. СОЗДАНИЕ УМНОГО start_kali.sh
-cat <<EOF > "$START_KALI"
+cat <<EOF > start_kali.sh
 #!/system/bin/sh
-K_PATH="$KALI_PATH"
-BB="$BB_STATIC"
+K_PATH="/data/data/com.termux/files/home/kali-system/kali-armhf"
+BB="/data/data/com.termux/files/home/busybox-static"
 
-# 1. Монтирование (тихий режим)
+# Монтирование системных ресурсов
 su -c "
-    if ! grep -q '\$K_PATH/proc' /proc/mounts; then
-        \$BB mount -o bind /dev \$K_PATH/dev
-        \$BB mount -o bind /proc \$K_PATH/proc
-        \$BB mount -o bind /sys \$K_PATH/sys
-        \$BB mount -t devpts devpts \$K_PATH/dev/pts
-    fi
-    echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
+    \$BB mount -o bind /dev \$K_PATH/dev
+    \$BB mount -o bind /proc \$K_PATH/proc
+    \$BB mount -o bind /sys \$K_PATH/sys
+    \$BB mount -t devpts devpts \$K_PATH/dev/pts
 "
 
-echo "[+] ПОПЫТКА ВХОДА В KALI..."
-# Использование ключа -l (login) и явного указания оболочки
-su -c "\$BB chroot \$K_PATH /bin/bash --login -i"
+echo "[+] ВХОД В KALI..."
+# Используем прямой проброс интерактивной оболочки
+su -c "\$BB chroot \$K_PATH /bin/bash -i"
 EOF
+
+chmod 777 start_kali.sh
