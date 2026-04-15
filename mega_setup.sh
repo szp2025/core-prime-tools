@@ -6,42 +6,46 @@ KALI_PATH="$HOME_DIR/kali-system/kali-armhf"
 BB_STATIC="$HOME_DIR/busybox-static"
 START_KALI="$HOME_DIR/start_kali.sh"
 
-echo "[*] Контекст: Режим автоматизации..."
+echo "[*] Контекст: Глобальная оптимизация..."
 
-# 1. Проверка и загрузка BusyBox
+# 1. МОДУЛЬ ЧИСТОТЫ (Удаляем всё лишнее)
+echo "[*] Уборка мусора..."
+rm -rf "$HOME_DIR/kali-armhf" "$HOME_DIR/bin" "$HOME_DIR/downloads"
+rm -rf "$HOME_DIR/g_kali" "$HOME_DIR/tools" "$HOME_DIR/bind" "$HOME_DIR/-o"
+rm -f "$HOME_DIR"/*.tar.xz "$HOME_DIR"/*.tar.gz "$HOME_DIR"/nmap "$HOME_DIR"/strace
+
+# 2. Проверка BusyBox
 if [ ! -s "$BB_STATIC" ]; then
     echo "[*] Загрузка BusyBox..."
-    /data/data/com.termux/files/home/wget --no-check-certificate "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox-armv7l" -O "$BB_STATIC"
+    "$HOME_DIR/wget" --no-check-certificate "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox-armv7l" -O "$BB_STATIC"
     chmod 777 "$BB_STATIC"
 fi
 
-# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh
-echo "[*] Фикс прав: Принудительный ROOT вход..."
+# 3. СОЗДАНИЕ УМНОГО start_kali.sh
+echo "[*] Обновление ярлыка запуска..."
 
 cat <<EOF > "$START_KALI"
 #!/system/bin/sh
-KALI_PATH="$KALI_PATH"
+K_PATH="$KALI_PATH"
 BB="$BB_STATIC"
 
-echo "[*] Запрос SuperUser..."
-
 su -c "
-    if [ ! -e \$KALI_PATH/proc/1 ]; then
-        echo '[*] Ресурсы не найдены. Авто-монтирование...'
-        \$BB mount -o bind /dev \$KALI_PATH/dev
-        \$BB mount -o bind /proc \$KALI_PATH/proc
-        \$BB mount -o bind /sys \$KALI_PATH/sys
-        \$BB mount -t devpts devpts \$KALI_PATH/dev/pts
-        echo '[+] Монтирование завершено.'
-    else
-        echo '[i] Ресурсы уже в норме.'
+    # Авто-монтирование при необходимости
+    if [ ! -e \$K_PATH/proc/1 ]; then
+        echo '[*] Монтирование ресурсов...'
+        \$BB mount -o bind /dev \$K_PATH/dev
+        \$BB mount -o bind /proc \$K_PATH/proc
+        \$BB mount -o bind /sys \$K_PATH/sys
+        \$BB mount -t devpts devpts \$K_PATH/dev/pts
     fi
     
-    echo 'nameserver 8.8.8.8' > \$KALI_PATH/etc/resolv.conf
-    echo '[+] Вход в Kali (Force Root)...'
+    # Фикс интернета и вход
+    echo 'nameserver 8.8.8.8' > \$K_PATH/etc/resolv.conf
     
-    \$BB chroot \$KALI_PATH /usr/bin/env -i \\
+    echo '[+] ВХОД В KALI (Root Mode)...'
+    \$BB chroot \$K_PATH /usr/bin/env -i \\
         HOME=/root \\
+        USER=root \\
         TERM=xterm-256color \\
         PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \\
         /bin/bash --login
@@ -49,27 +53,7 @@ su -c "
 EOF
 
 chmod 777 "$START_KALI"
-# Возвращаем владение текущему пользователю Termux для удобства
-chown $(stat -c %u $HOME_DIR) "$START_KALI"
 
-echo "[+] Ярлык готов: ./start_kali.sh"
-
-# 3. МОНТИРОВАНИЕ (для текущей сессии запуска)
-if [ ! -e "$KALI_PATH/proc/1" ]; then
-    $BB_STATIC mount -o bind /dev "$KALI_PATH/dev"
-    $BB_STATIC mount -o bind /proc "$KALI_PATH/proc"
-    $BB_STATIC mount -o bind /sys "$KALI_PATH/sys"
-fi
-
-# 4. ВХОД (Силовой Root через ID)
-echo "[!] ВХОД В KALI..."
-
-# Мы добавляем /usr/bin/groups и явную очистку, чтобы система перечитала /etc/passwd
-#$BB_STATIC chroot "$KALI_PATH" /usr/bin/env -i \
-$BB_STATIC chroot "$KALI_PATH" /bin/su - root
-    HOME=/root \
-    TERM=xterm-256color \
-    USER=root \
-    LOGNAME=root \
-    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    /bin/bash --login
+# 4. ПЕРВЫЙ ВХОД
+echo "[!] ВСЁ ГОТОВО. ЗАПУСКАЕМ..."
+sh "$START_KALI"
