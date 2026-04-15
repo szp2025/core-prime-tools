@@ -17,7 +17,7 @@ rm -f "$HOME_DIR"/*.tar.xz "$HOME_DIR"/*.tar.gz "$HOME_DIR"/nmap "$HOME_DIR"/str
 # 2. Проверка BusyBox
 if [ ! -s "$BB_STATIC" ]; then
     echo "[*] Загрузка BusyBox..."
-    "$HOME_DIR/wget" --no-check-certificate "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox-armv7l" -O "$BB_STATIC"
+    "$HOME_DIR/wget" --no-check-certificate "https://github.com/zoobab/busybox-static-for-android/raw/master/busybox" -O "$BB_STATIC"
     chmod 777 "$BB_STATIC"
 fi
 
