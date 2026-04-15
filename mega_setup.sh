@@ -1,44 +1,36 @@
 #!/system/bin/sh
 
-# Полные пути - ПРОВЕРЬ ИХ ЕЩЕ РАЗ
-KALI_PATH="/data/data/com.termux/files/home/kali-system/kali-armhf"
-BB_STATIC="/data/data/com.termux/files/home/busybox-static"
-WGET="/data/data/com.termux/files/home/wget"
+# Полные пути
+HOME_DIR="/data/data/com.termux/files/home"
+KALI_PATH="$HOME_DIR/kali-system/kali-armhf"
+BB_STATIC="$HOME_DIR/busybox-static"
+START_KALI="$HOME_DIR/start_kali.sh"
 
-echo "[*] Проверка наличия BusyBox по пути: $BB_STATIC"
+echo "[*] Контекст: Режим автоматизации..."
 
-# Посмотрим, что там на самом деле лежит
-ls -l "$BB_STATIC" 2>/dev/null
-
-# 1. Проверяем: если файл существует И его размер больше 100 Кб (защита от пустых файлов)
-if [ -f "$BB_STATIC" ] && [ $(ls -l "$BB_STATIC" | awk '{print $4}') -gt 100000 ]; then
-    echo "[+] BusyBox найден и весит достаточно. Пропускаем загрузку."
-else
-    echo "[!] BusyBox не найден, пуст или битый. Качаем..."
-    
-    # Удаляем старый мусор, если он есть
-    rm -f "$BB_STATIC"
-    
-    # Качаем (пробуем сначала официальную ссылку)
-    $WGET --no-check-certificate "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox-armv7l" -O "$BB_STATIC"
-    
-    # Если все еще 0 байт, пробуем запасную
-    if [ ! -s "$BB_STATIC" ]; then
-        echo "[!] Пробую запасное зеркало..."
-        $WGET --no-check-certificate "https://github.com/meefik/busybox/releases/download/1.34.1/busybox-armhf" -O "$BB_STATIC"
-    fi
-    
+# 1. Проверка и загрузка BusyBox (если нужно)
+if [ ! -s "$BB_STATIC" ]; then
+    echo "[*] Загрузка BusyBox..."
+    /data/data/com.termux/files/home/wget --no-check-certificate "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox-armv7l" -O "$BB_STATIC"
     chmod 777 "$BB_STATIC"
 fi
 
-# 2. Финальная проверка
-if [ ! -s "$BB_STATIC" ]; then
-    echo "[!] Ошибка: Скачать не удалось. Проверь Wi-Fi."
-    exit 1
-fi
+# 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh
+echo "[*] Обновление локального ярлыка start_kali.sh..."
+cat <<EOF > "$START_KALI"
+#!/data/data/com.termux/files/usr/bin/sh
+# Этот файл создан автоматически через mega_setup.sh
+echo "[*] Запуск Kali Linux через SuperUser..."
+su -c "$BB_STATIC mount -o bind /dev $KALI_PATH/dev 2>/dev/null; \
+       $BB_STATIC mount -o bind /proc $KALI_PATH/proc 2>/dev/null; \
+       $BB_STATIC mount -o bind /sys $KALI_PATH/sys 2>/dev/null; \
+       $BB_STATIC chroot $KALI_PATH /bin/bash --login"
+EOF
 
-# 3. Монтирование
-echo "[*] Настройка монтирования..."
+chmod +x "$START_KALI"
+echo "[+] Ярлык готов: теперь можно запускать командой ./start_kali.sh"
+
+# 3. МОНТИРОВАНИЕ (текущая сессия)
 $BB_STATIC mount -o bind /dev "$KALI_PATH/dev" 2>/dev/null
 $BB_STATIC mount -o bind /proc "$KALI_PATH/proc" 2>/dev/null
 $BB_STATIC mount -o bind /sys "$KALI_PATH/sys" 2>/dev/null
