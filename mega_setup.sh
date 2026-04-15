@@ -8,7 +8,7 @@ START_KALI="$HOME_DIR/start_kali.sh"
 
 echo "[*] Контекст: Режим автоматизации..."
 
-# 1. Проверка и загрузка BusyBox (если нужно)
+# 1. Проверка и загрузка BusyBox
 if [ ! -s "$BB_STATIC" ]; then
     echo "[*] Загрузка BusyBox..."
     /data/data/com.termux/files/home/wget --no-check-certificate "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox-armv7l" -O "$BB_STATIC"
@@ -18,45 +18,48 @@ fi
 # 2. СОЗДАНИЕ/ОБНОВЛЕНИЕ start_kali.sh
 echo "[*] Фикс прав: Принудительный ROOT вход..."
 
-cat <<'EOF' > "$START_KALI"
+cat <<EOF > "$START_KALI"
 #!/system/bin/sh
-
-KALI_PATH="/data/data/com.termux/files/home/kali-system/kali-armhf"
-BB="/data/data/com.termux/files/home/busybox-static"
+KALI_PATH="$KALI_PATH"
+BB="$BB_STATIC"
 
 echo "[*] Запрос SuperUser..."
 
-# Запуск с принудительной установкой ID пользователя (0 = root)
-su 0 -c "
-    # Монтирование
-    if [ ! -d $KALI_PATH/proc/1 ]; then
-        $BB mount -o bind /dev $KALI_PATH/dev
-        $BB mount -o bind /proc $KALI_PATH/proc
-        $BB mount -o bind /sys $KALI_PATH/sys
-        $BB mount -o bind /dev/pts $KALI_PATH/dev/pts
+su -c "
+    if [ ! -e \$KALI_PATH/proc/1 ]; then
+        echo '[*] Ресурсы не найдены. Авто-монтирование...'
+        \$BB mount -o bind /dev \$KALI_PATH/dev
+        \$BB mount -o bind /proc \$KALI_PATH/proc
+        \$BB mount -o bind /sys \$KALI_PATH/sys
+        \$BB mount -t devpts devpts \$KALI_PATH/dev/pts
+        echo '[+] Монтирование завершено.'
+    else
+        echo '[i] Ресурсы уже в норме.'
     fi
     
-    echo 'nameserver 8.8.8.8' > $KALI_PATH/etc/resolv.conf
+    echo 'nameserver 8.8.8.8' > \$KALI_PATH/etc/resolv.conf
     echo '[+] Вход в Kali (Force Root)...'
     
-    # Пытаемся зайти через chroot с явным указанием UID/GID
-    $BB chroot $KALI_PATH /usr/bin/env -i \
-        HOME=/root \
-        TERM=xterm-256color \
-        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    \$BB chroot \$KALI_PATH /usr/bin/env -i \\
+        HOME=/root \\
+        TERM=xterm-256color \\
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \\
         /bin/bash --login
 "
 EOF
 
 chmod 777 "$START_KALI"
-chown $(ls -ld $HOME_DIR | awk '{print $3}') "$START_KALI"
+# Возвращаем владение текущему пользователю Termux для удобства
+chown $(stat -c %u $HOME_DIR) "$START_KALI"
 
-echo "[+] Ярлык готов: теперь можно запускать командой ./start_kali.sh"
+echo "[+] Ярлык готов: ./start_kali.sh"
 
-# 3. МОНТИРОВАНИЕ (текущая сессия)
-$BB_STATIC mount -o bind /dev "$KALI_PATH/dev" 2>/dev/null
-$BB_STATIC mount -o bind /proc "$KALI_PATH/proc" 2>/dev/null
-$BB_STATIC mount -o bind /sys "$KALI_PATH/sys" 2>/dev/null
+# 3. МОНТИРОВАНИЕ (для текущей сессии запуска)
+if [ ! -e "$KALI_PATH/proc/1" ]; then
+    $BB_STATIC mount -o bind /dev "$KALI_PATH/dev"
+    $BB_STATIC mount -o bind /proc "$KALI_PATH/proc"
+    $BB_STATIC mount -o bind /sys "$KALI_PATH/sys"
+fi
 
 # 4. ВХОД
 echo "[!] ВХОД В KALI..."
