@@ -33,7 +33,7 @@ print(f'   \033[0;34m[ СТАТУС ПАМЯТИ ]:\033[0m {free//mb} MB сво�
 }
 
 show_menu() {
-    clear
+    
     echo -e "\${CYAN}===========================================\${NC}"
     echo -e "\${GREEN}      KALI SAMSUNG ARSENAL - MENU v1.5     \${NC}"
     echo -e "\${CYAN}===========================================\${NC}"
