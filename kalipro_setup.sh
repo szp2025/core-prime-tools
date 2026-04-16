@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# VERSION 3.6 (Rescue & Sterile Edition)
+
 CURRENT_VERSION="5.8"
+# VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
@@ -12,7 +13,7 @@ CLEAN_OPTS="-o DPkg::Post-Invoke={'apt-get clean';} -o APT::Keep-Downloaded-Pack
 create_files() {
     cat << 'EOF' > "$TARGET_FILE"
 #!/bin/bash
-# VERSION=3.6
+# VERSION=CURRENT_VERSION
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -252,6 +253,9 @@ auto_mount_pc() {
 # --- СТЕРИЛЬНЫЙ ЭВРИСТИЧЕСКИЙ МОДУЛЬ: USB GUARDIAN v4.2 ---
 
 usb_guardian_smart() {
+# 1. Автоматический вызов настроек модема
+    am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
+
     WHITELIST="22,80,443,3389,8080"
     echo -e "${YELLOW}[*] Запуск стерильного анализа...${NC}"
     
@@ -294,6 +298,9 @@ usb_guardian_smart() {
 # --- АВТОНОМНЫЙ ЭВРИСТИЧЕСКИЙ КРИМИНАЛИСТ: DEEP INSIGHT v4.4 ---
 
 deep_insight_auto() {
+
+am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
+
     echo -e "${YELLOW}[*] Запуск автономного криминалистического анализа...${NC}"
     # Сначала монтируем, если удачно — запускаем анализ
     if auto_mount_pc; then
@@ -391,15 +398,8 @@ while true; do
         9) deep_purge ;;
         10) run_sherlock ;;
         11) run_wifite ;;
-        12) 
-            # Авто-вызов настроек модема для удобства
-            am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
-            usb_guardian_smart 
-            ;;
-        13) 
-            am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
-            deep_insight_auto 
-            ;;
+        12) usb_guardian_smart ;;
+        13) deep_insight_auto  ;;
         0) exit 0 ;;
         *) sleep 0.5 ;;
     esac
