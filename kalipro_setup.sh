@@ -81,8 +81,7 @@ except Exception as e:
         sqlmap -u "\$target" --batch --random-agent
         echo -e "\${CYAN}-------------------------------------------\${NC}"
         read -p "Нажмите Enter для возврата в меню..."
-    else
-        sleep 3
+  
     fi
 }
 
