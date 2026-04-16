@@ -50,14 +50,23 @@ smart_installer() {
     read -p "Пакет для установки: " pkg
     [[ -z "$pkg" ]] && return
     
-    echo -e "${CYAN}[*] Установка БЕЗ лишних зависимостей: $pkg...${NC}"
+    echo -e "${CYAN}[*] Поиск и стерильная установка: $pkg...${NC}"
+    
+    # Снимаем блокировки и обновляем индексы, чтобы не было "Unable to locate"
     dpkg --configure -a >/dev/null 2>&1
+    apt-get update -y >/dev/null 2>&1
     
-    # Теперь ставим только ядро программы, игнорируя тяжелый "рекомендованный" софт
-    apt-get install $INSTALL_FLAGS $PROGRESS_OPTS $CLEAN_OPTS "$pkg"
+    # Установка БЕЗ рекомендованного мусора с визуализацией прогресса
+    # Используем $INSTALL_FLAGS для отсечения Metasploit и прочих тяжеловесов
+    if apt-get install $INSTALL_FLAGS $PROGRESS_OPTS $CLEAN_OPTS "$pkg"; then
+        echo -e "${GREEN}[+] Пакет $pkg успешно интегрирован.${NC}"
+    else
+        echo -e "${RED}[-] Ошибка: пакет не найден или недостаточно места.${NC}"
+    fi
     
+    # Мгновенное удаление сиротских зависимостей
     apt-get autoremove -y >/dev/null 2>&1
-    echo -e "${GREEN}[+] Готово. Лишний мусор отсечен.${NC}"
+    echo -e "${GREEN}[+] Хвосты зачищены.${NC}"
     sleep 1
 }
 
@@ -67,27 +76,33 @@ clean_system() {
     
     echo -e "${YELLOW}[*] Проверка наличия обновлений...${NC}"
     apt-get update >/dev/null
-    UPGRADES=$(apt-get upgrade -s | grep -P '^\d+ upgraded' | cut -d' ' -f1)
+    # Эвристика: считаем только те пакеты, которые реально требуют обновления
+    UPGRADES=$(apt-get upgrade -s | grep -P '^\d+ upgraded' | awk '{print $1}')
     
-    if [ "$UPGRADES" -gt 0 ]; then
+    if [[ "$UPGRADES" =~ ^[0-9]+$ ]] && [ "$UPGRADES" -gt 0 ]; then
         echo -e "${BLUE}[!] Найдено обновлений: $UPGRADES. Запуск конвейера...${NC}"
-        # Обновляем каждый пакет и сразу стираем его архив
+        # Полное обновление с мгновенной зачисткой каждого скачанного .deb
         apt-get full-upgrade -y $PROGRESS_OPTS $CLEAN_OPTS
     else
-        echo -e "${GREEN}[+] Все пакеты актуальны. Обновление не требуется.${NC}"
+        echo -e "${GREEN}[+] Система не нуждается в обновлении пакетов.${NC}"
     fi
 
-    echo -e "${YELLOW}[*] Тотальная дезинфекция системы...${NC}"
-    apt-get autoremove --purge -y >/dev/null
+    echo -e "${YELLOW}[*] Тотальная дезинфекция и сброс кэша...${NC}"
+    # Глубокая очистка: удаляем даже конфиги удаленных программ (--purge)
+    apt-get autoremove --purge -y >/dev/null 2>&1
+    apt-get autoclean -y >/dev/null 2>&1
+    apt-get clean
+    
+    # Чистка временных путей и логов
     rm -rf /tmp/* /var/tmp/*
     find $HOME -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
     find $HOME -name "*.log" -type f -delete 2>/dev/null
     
-    # Сверхбыстрая очистка трофеев
+    # Стерилизация папки с данными
     rm -rf "$LOOT_DIR"/*
     history -c
     
-    echo -e "${GREEN}[+] Система стерильна и оптимизирована!${NC}"
+    echo -e "${GREEN}[+] Система стерильна! Свободно: $(df -h / | awk 'NR==2 {print $4}')${NC}"
     sleep 2
 }
 
