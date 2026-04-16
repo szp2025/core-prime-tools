@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.6 (Rescue & Sterile Edition)
-CURRENT_VERSION="4.5"
+CURRENT_VERSION="4.7"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
@@ -92,24 +92,24 @@ smart_installer() {
     read -p "Пакет для установки: " pkg
     [[ -z "$pkg" ]] && return
     
-    echo -e "${CYAN}[*] Настройка окружения...${NC}"
+    echo -e "${CYAN}[*] Подготовка и обновление базы (необходимо)...${NC}"
     dpkg --configure -a >/dev/null 2>&1
     
-    echo -e "${YELLOW}[*] Обновление базы репозиториев (нужно для поиска)...${NC}"
+    # Обновляем индексы, чтобы найти пакет
     if apt-get update; then
-        echo -e "${GREEN}[+] База обновлена. Ставлю $pkg...${NC}"
+        echo -e "${GREEN}[+] База обновлена. Установка $pkg...${NC}"
+        
+        # Установка с твоими флагами стерильности
         apt-get install $INSTALL_FLAGS $PROGRESS_OPTS $CLEAN_OPTS "$pkg"
         
-        # Сразу после установки предлагаем почистить индексы, чтобы вернуть память
-        echo -e "${BLUE}[?] Вернуть память (удалить индексы)? (y/n)${NC}"
-        read -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            rm -rf /var/lib/apt/lists/*
-            echo -e "${GREEN}[+] Индексы удалены. Память спасена.${NC}"
-        fi
+        # АВТОМАТИЧЕСКАЯ ОЧИСТКА (Без лишних вопросов)
+        echo -e "${YELLOW}[*] Завершено. Мгновенная очистка индексов для экономии памяти...${NC}"
+        rm -rf /var/lib/apt/lists/*
+        apt-get autoremove -y >/dev/null 2>&1
+        
+        echo -e "${GREEN}[+] Готово. Пакет установлен, память возвращена.${NC}"
     else
-        echo -e "${RED}[-] Ошибка сети! Не удалось связаться с серверами Kali.${NC}"
+        echo -e "${RED}[-] Ошибка: нет связи с репозиториями Kali.${NC}"
     fi
     sleep 1
 }
