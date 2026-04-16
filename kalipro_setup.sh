@@ -6,6 +6,10 @@ CURRENT_VERSION="3.3"
 TARGET_FILE="/usr/local/bin/kali_pro"
 UPDATE_SCRIPT="/usr/local/bin/update_kali"
 REPO_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/kalipro_setup.sh"
+# Добавь этот флаг в настройки в начале файла
+INSTALL_FLAGS="-y --no-install-recommends"
+PROGRESS_OPTS="-o Dpkg::Progress-Fancy=1 -o APT::Color=1"
+CLEAN_OPTS="-o DPkg::Post-Invoke={'apt-get clean';} -o APT::Keep-Downloaded-Packages=false"
 
 create_files() {
     cat << 'EOF' > "$TARGET_FILE"
@@ -47,15 +51,14 @@ smart_installer() {
     read -p "Пакет для установки: " pkg
     [[ -z "$pkg" ]] && return
     
-    echo -e "${CYAN}[*] Установка с конвейерной зачисткой: $pkg...${NC}"
+    echo -e "${CYAN}[*] Установка БЕЗ лишних зависимостей: $pkg...${NC}"
     dpkg --configure -a >/dev/null 2>&1
     
-    # Установка с хуком на мгновенную очистку после каждого шага dpkg
-    apt-get install -y $PROGRESS_OPTS $CLEAN_OPTS "$pkg"
+    # Теперь ставим только ядро программы, игнорируя тяжелый "рекомендованный" софт
+    apt-get install $INSTALL_FLAGS $PROGRESS_OPTS $CLEAN_OPTS "$pkg"
     
-    # Финальная полировка
     apt-get autoremove -y >/dev/null 2>&1
-    echo -e "${GREEN}[+] Пакет установлен. Хвосты зачищены.${NC}"
+    echo -e "${GREEN}[+] Готово. Лишний мусор отсечен.${NC}"
     sleep 1
 }
 
