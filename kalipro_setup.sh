@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.3 (Ultra-Precision)
-CURRENT_VERSION="3.3"
+CURRENT_VERSION="3.4"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 UPDATE_SCRIPT="/usr/local/bin/update_kali"
