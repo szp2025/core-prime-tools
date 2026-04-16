@@ -67,21 +67,35 @@ clean_system() {
 # Функция для динамического запуска веб-инструментов
 smart_web_scan() {
     read -p "Введите URL цели: " target
+    # Проверка на пустой ввод
+    if [[ -z "$target" ]]; then
+        echo -e "${RED}[!] URL не введен${NC}"
+        sleep 2
+        return
+    fi
+
     echo -e "\${BLUE}[*] Python проверяет доступность цели...\${NC}"
     
     python3 -c "
 import urllib.request, sys
 try:
-    urllib.request.urlopen('\$target', timeout=5)
+    # Добавляем User-Agent, чтобы сайты не блокировали простую проверку
+    req = urllib.request.Request('\$target', headers={'User-Agent': 'Mozilla/5.0'})
+    urllib.request.urlopen(req, timeout=5)
     print('\033[0;32m[+] Цель отвечает. Запуск SQLmap...\033[0m')
     sys.exit(0)
-except:
-    print('\033[0;31m[-] Ошибка: Цель недоступна. Проверьте URL.\033[0m')
+except Exception as e:
+    print(f'\033[0;31m[-] Ошибка: Цель недоступна ({e}).\033[0m')
     sys.exit(1)
 "
     if [ \$? -eq 0 ]; then
+        # Основная работа sqlmap
         sqlmap -u "\$target" --batch --random-agent
+        
+        echo -e "\${CYAN}-------------------------------------------\${NC}"
+        read -n 1 -s -r -p "SQLmap завершил работу. Нажмите любую клавишу для возврата в меню..."
     else
+        # Если цель недоступна, даем 3 секунды прочитать ошибку Python
         sleep 3
     fi
 }
