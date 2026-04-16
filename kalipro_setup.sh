@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.6 (Rescue & Sterile Edition)
-CURRENT_VERSION="5.0"
+CURRENT_VERSION="5.1"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
@@ -206,6 +206,10 @@ deep_purge() {
     # 8. Удаление старых бэкапов конфигураций
     find /etc -name "*.bak" -delete 2>/dev/null
     find /etc -name "*.old" -delete 2>/dev/null
+
+rm -rf ~/.cache/pip/* 2>/dev/null
+find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+
 
     # Финальный аккорд: удаление неиспользуемых библиотек
     apt-get autoremove --purge -y >/dev/null 2>&1
