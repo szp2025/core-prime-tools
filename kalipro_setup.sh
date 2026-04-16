@@ -157,7 +157,7 @@ deep_purge() {
     apt-get autoclean -y
     rm -rf /var/lib/apt/lists/*
     rm -rf /var/cache/apt/archives/partial/*
-
+    rm -rf "$LOOT_DIR"/*
     # 2. Удаление графики, локалей и шрифтов (самый тяжелый балласт)
     echo -e "${YELLOW}[*] Удаляю иконки, локали и шрифты...${NC}"
     rm -rf /usr/share/icons/*
