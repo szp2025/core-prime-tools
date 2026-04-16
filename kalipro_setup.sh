@@ -115,55 +115,65 @@ clean_system() {
     sleep 2
 }
 
-# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v3.8 (MAX-FORCE) ---
+# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v3.9 (BLACK HOLE EDITION) ---
 deep_purge() {
-    echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (MAX-FORCE) ===${NC}"
+    echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (BLACK HOLE) ===${NC}"
     
     # 1. Жёсткая зачистка APT и индексов
     echo -e "${YELLOW}[*] Вычищаю индексы и архивы APT...${NC}"
     apt-get clean
     apt-get autoclean -y
     rm -rf /var/lib/apt/lists/*
-    
-    # 2. Удаление графического мусора, локалей и манов
-    echo -e "${YELLOW}[*] Удаляю иконки, локали и документацию...${NC}"
+    rm -rf /var/cache/apt/archives/partial/*
+
+    # 2. Удаление графики, локалей и шрифтов (самый тяжелый балласт)
+    echo -e "${YELLOW}[*] Удаляю иконки, локали и шрифты...${NC}"
     rm -rf /usr/share/icons/*
     rm -rf /usr/share/locale/*
+    rm -rf /usr/share/fonts/*
+    rm -rf /usr/share/themes/*
+
+    # 3. Удаление документации и справочников
+    echo -e "${YELLOW}[*] Сношу мануалы и документацию...${NC}"
     rm -rf /usr/share/doc/*
     rm -rf /usr/share/man/*
     rm -rf /var/cache/man/*
-    
-    # 3. Глубокая зачистка системных логов и кэша
-    echo -e "${YELLOW}[*] Стираю системные логи и временные кэши...${NC}"
+
+    # 4. Глубокая очистка Python (удаляем скомпилированные файлы)
+    echo -e "${YELLOW}[*] Чистка Python байт-кода (.pyc)...${NC}"
+    find /usr/lib/python3* -name "*.pyc" -delete 2>/dev/null
+    find /usr/lib/python3* -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
+    rm -rf ~/.cache/pip/*
+
+    # 5. Стирание системных логов и временных папок
+    echo -e "${YELLOW}[*] Стерилизация логов...${NC}"
     find /var/log -type f -delete 2>/dev/null
     find /var/cache -type f -delete 2>/dev/null
     rm -rf /var/tmp/*
     rm -rf /tmp/*
-    
-    # 4. Проверка и удаление базы PostgreSQL (если она весит много)
+
+    # 6. Проверка и удаление базы PostgreSQL
     if [ -d "/var/lib/postgresql" ]; then
         PG_SIZE=$(du -sm /var/lib/postgresql | awk '{print $1}')
-        echo -e "${BLUE}[?] Размер базы PostgreSQL: ${PG_SIZE}MB${NC}"
         if [ "$PG_SIZE" -gt 50 ]; then
-            echo -e "${RED}[!] База слишком тяжелая. Сношу...${NC}"
+            echo -e "${RED}[!] Удаляю базу данных (${PG_SIZE}MB)...${NC}"
             rm -rf /var/lib/postgresql
         fi
     fi
-    
-    # 5. Очистка кэша Python/Pip
-    echo -e "${YELLOW}[*] Очистка Python/Pip кэша...${NC}"
-    rm -rf ~/.cache/pip/*
-    rm -rf ~/.cache/fontconfig/*
-    
-    # 6. Стерилизация трофеев и истории
+
+    # 7. Стерилизация твоих "Трофеев" и истории
     rm -rf "$LOOT_DIR"/*
     history -c
-    
+
+    # 8. Удаление старых бэкапов конфигураций
+    find /etc -name "*.bak" -delete 2>/dev/null
+    find /etc -name "*.old" -delete 2>/dev/null
+
     # Финальный аккорд: удаление неиспользуемых библиотек
     apt-get autoremove --purge -y >/dev/null 2>&1
 
-    echo -e "${GREEN}[+] DEEP PURGE v3.8 завершен!${NC}"
-    echo -ne "${BLUE}[!] Текущий остаток памяти: ${NC}"
+    echo -e "${GREEN}[+] DEEP PURGE v3.9 завершен!${NC}"
+    echo -ne "${BLUE}[!] Памяти доступно: ${NC}"
     df -h / | awk 'NR==2 {print $4}'
     sleep 3
 }
