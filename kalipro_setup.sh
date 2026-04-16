@@ -25,10 +25,25 @@ NC='\033[0m'
 run_smart_check() {
     python3 -c "
 import shutil, os
-total, used, free = shutil.disk_usage('/')
-mb = 1024**2
-status = '\033[0;32mOK' if free > (100*mb) else '\033[0;31mCRITICAL'
-print(f'   \033[0;34m[ СТАТУС ПАМЯТИ ]:\033[0m {free//mb} MB свободно ({status}\033[0m)')
+
+def get_status(path, label):
+    try:
+        total, used, free = shutil.disk_usage(path)
+        mb = 1024**2
+        gb = 1024**3
+        # Если больше 1 ГБ - пишем в ГБ, если меньше - в МБ
+        if free > gb:
+            disp_free = f'{free/gb:.1f} GB'
+        else:
+            disp_free = f'{free//mb} MB'
+            
+        status = '\033[0;32mOK' if free > (500*mb) else '\033[0;31mLOW'
+        print(f'   \033[0;34m[ {label} ]:\033[0m {disp_free} свободно ({status}\033[0m)')
+    except:
+        pass
+
+get_status('/', 'СИСТЕМА')
+get_status('/sdcard', 'ПАМЯТЬ ТЕЛЕФОНА')
 "
 }
 
@@ -245,11 +260,6 @@ while true; do
         4) smart_brute ;;
         5) smart_web_scan ;;
         6) smart_bettercap ;;
-        7) 
-            df -h /
-            echo -e "\${CYAN}--- Нажмите Enter для возврата ---\${NC}"
-            read 
-            ;;
         0) 
             echo -e "\${YELLOW}[?] Вы уверены, что хотите выйти? (y/n)\${NC}"
             read -n 1 confirm
