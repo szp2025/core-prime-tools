@@ -26,15 +26,28 @@ NC='\033[0m'
 run_smart_check() {
     python3 -c "
 import shutil, os
+
 def get_status(path, label):
     try:
         total, used, free = shutil.disk_usage(path)
-        mb = 1024**2
-        gb = 1024**3
-        disp_free = f'{free/gb:.1f} GB' if free > gb else f'{free//mb} MB'
-        status = '\033[0;32mOK' if free > (500*mb) else '\033[0;31mLOW'
-        print(f'   \033[0;34m[ {label} ]:\033[0m {disp_free} свободно ({status}\033[0m)')
-    except: pass
+        
+        def format_size(bytes):
+            gb = 1024**3
+            mb = 1024**2
+            if bytes >= gb:
+                return f'{bytes/gb:.1f}G'
+            return f'{bytes//mb}MB'
+
+        f_str = format_size(free)
+        t_str = format_size(total)
+        
+        # Цвет статуса зависит от свободного места (LOW если меньше 500MB)
+        status = '\033[0;32mOK' if free > (500 * 1024**2) else '\033[0;31mLOW'
+        
+        print(f'   \033[0;34m[ {label} ]:\033[0m свободно {f_str} / {t_str} ({status}\033[0m)')
+    except:
+        pass
+
 get_status('/', 'СИСТЕМА')
 get_status('/sdcard', 'ПАМЯТЬ ТЕЛЕФОНА')
 "
