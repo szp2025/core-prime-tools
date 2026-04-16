@@ -38,11 +38,10 @@ def get_status(path, label):
         def fmt(b):
             if b >= 1024**3: return f'{b/1024**3:.1f}G'
             return f'{b//1024**2}MB'
-        status = '\033[0;32mOK' if free > (500*1024**2) else '\033[0;31mLOW'
+        status = '\033[0;32mOK' if free > (400*1024**2) else '\033[0;31mLOW'
         print(f'   \033[0;34m[ {label} ]:\033[0m {fmt(free)} / {fmt(total)} ({status}\033[0m)')
     except: pass
 get_status('/', 'СИСТЕМА')
-get_status('/sdcard', 'ПАМЯТЬ ТЕЛЕФОНА')
 "
 }
 
@@ -92,20 +91,27 @@ clean_system() {
     sleep 2
 }
 
+smart_nikto() {
+    read -p "Target URL/IP: " t
+    [[ -z "$t" ]] && return
+    echo -e "${BLUE}[*] Запуск Nikto Scan: $t${NC}"
+    nikto -h "$t" | tee "$LOOT_DIR/nikto_$t.txt"
+    read -p "Enter..."
+}
+
 show_menu() {
     clear
     echo -e "${CYAN}===========================================${NC}"
-    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v3.3     ${NC}"
+    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v3.4     ${NC}"
     echo -e "${CYAN}===========================================${NC}"
     run_smart_check
     echo -e "${CYAN}-------------------------------------------${NC}"
-    echo -e "${BLUE}1.${NC} КОНВЕЙЕРНЫЙ РЕМОНТ И ЧИСТКА"
-    echo -e "${BLUE}2.${NC} SMART NMAP"
-    echo -e "${BLUE}3.${NC} SEARCHSPLOIT"
-    echo -e "${BLUE}4.${NC} HYDRA"
-    echo -e "${BLUE}5.${NC} SQLMAP"
+    echo -e "${BLUE}1.${NC} КОНВЕЙЕРНЫЙ РЕМОНТ"
+    echo -e "${BLUE}2.${NC} NMAP  ${BLUE}3.${NC} SEARCHSPLOIT"
+    echo -e "${BLUE}4.${NC} HYDRA ${BLUE}5.${NC} SQLMAP"
     echo -e "${BLUE}6.${NC} BETTERCAP"
-    echo -e "${BLUE}7.${NC} SMART INSTALLER (Sterile Flow)"
+    echo -e "${BLUE}7.${NC} NIKTO (Web Scanner)"
+    echo -e "${BLUE}8.${NC} SMART INSTALLER (Sterile Flow)"
     echo -e "${RED}0.${NC} ВЫХОД"
     echo -e "${CYAN}===========================================${NC}"
 }
@@ -159,14 +165,15 @@ while true; do
     show_menu
     read -p "Опция: " opt
     case $opt in
-        1) clean_system ;;      # Ремонт и зачистка
-        2) smart_nmap ;;        # Сеть
-        3) smart_searchsploit ;; # Эксплойты
-        4) smart_hydra ;;       # Брут
-        5) smart_sqlmap ;;      # Веб
-        6) smart_bettercap_v3 ;;# Перехват
-        7) smart_installer ;;   # Установка
-        0) exit 0 ;;            # Выход
+        1) clean_system ;;
+        2) read -p "IP: " t; nmap -sV --open "$t" | tee "$LOOT_DIR/nmap_$t.txt"; read -p "." ;;
+        3) read -p "Q: " q; searchsploit "$q"; read -p "." ;;
+        4) read -p "IP: " t; read -p "U: " u; hydra -l $u -P /usr/share/wordlists/rockyou.txt $t http-get -V; read -p "." ;;
+        5) read -p "URL: " u; sqlmap -u "$u" --batch --random-agent; read -p "." ;;
+        6) bettercap -eval "net.probe on; net.sniff on" ;;
+        7) smart_nikto ;;
+        8) smart_installer ;;
+        0) exit 0 ;;
         *) sleep 1 ;;
     esac
 done
