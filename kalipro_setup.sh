@@ -130,6 +130,21 @@ clean_system() {
     sleep 2
 }
 
+run_sherlock() {
+    read -p "Никнейм для поиска: " nick
+    [[ -z "$nick" ]] && return
+    echo -e "${CYAN}[*] Запуск Sherlock для: $nick...${NC}"
+    sherlock "$nick" | tee "$LOOT_DIR/sherlock_$nick.txt"
+    read -p "Нажми Enter..."
+}
+
+run_wifite() {
+    echo -e "${YELLOW}[!] Внимание: требуется root и адаптер в Monitor Mode${NC}"
+    # Запуск wifite с автоматическим убиванием конфликтующих процессов
+    wifite --kill
+    read -p "Нажми Enter..."
+}
+
 # --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v3.9 (BLACK HOLE EDITION) ---
 deep_purge() {
     echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (BLACK HOLE) ===${NC}"
@@ -153,6 +168,12 @@ deep_purge() {
     rm -rf /usr/share/doc/*
     rm -rf /usr/share/man/*
     rm -rf /var/cache/man/*
+    rm -rf /var/lib/apt/lists/*
+    rm -rf /usr/share/icons/* /usr/share/locale/* /usr/share/doc/* /usr/share/man/*
+    find /var/log -type f -delete 2>/dev/null
+    rm -rf ~/.cache/pip/* /tmp/* /var/tmp/*
+    # Удаление кэша шрифтов (часто весит много)
+    rm -rf /var/cache/fontconfig/*
 
     # 4. Глубокая очистка Python (удаляем скомпилированные файлы)
     echo -e "${YELLOW}[*] Чистка Python байт-кода (.pyc)...${NC}"
@@ -196,16 +217,16 @@ deep_purge() {
 show_menu() {
     clear
     echo -e "${CYAN}===========================================${NC}"
-    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v3.6     ${NC}"
+    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v3.7     ${NC}"
     echo -e "${CYAN}===========================================${NC}"
     run_smart_check
     echo -e "${CYAN}-------------------------------------------${NC}"
-    echo -e " ${BLUE}1.${NC} РЕМОНТ И ОБНОВЛЕНИЕ"
-    echo -e " ${BLUE}2.${NC} NMAP          ${BLUE}3.${NC} SEARCHSPLOIT"
-    echo -e " ${BLUE}4.${NC} HYDRA         ${BLUE}5.${NC} SQLMAP"
-    echo -e " ${BLUE}6.${NC} BETTERCAP     ${BLUE}7.${NC} NIKTO"
-    echo -e " ${BLUE}8.${NC} SMART INSTALLER"
-    echo -e " ${RED}9. DEEP PURGE (СРОЧНАЯ ОЧИСТКА)${NC}"
+    echo -e " ${BLUE}1.${NC} РЕМОНТ/ОБНОВЛЕНИЕ  ${BLUE}2.${NC} NMAP"
+    echo -e " ${BLUE}3.${NC} SEARCHSPLOIT      ${BLUE}4.${NC} HYDRA"
+    echo -e " ${BLUE}5.${NC} SQLMAP            ${BLUE}6.${NC} BETTERCAP"
+    echo -e " ${BLUE}7.${NC} NIKTO             ${BLUE}8.${NC} SMART INSTALLER"
+    echo -e " ${YELLOW}10. SHERLOCK        11. WIFITE${NC}"
+    echo -e " ${RED}9. DEEP PURGE (ОЧИСТКА)${NC}"
     echo -e " ${RED}0.${NC} ВЫХОД"
     echo -e "${CYAN}===========================================${NC}"
 }
@@ -224,6 +245,8 @@ while true; do
         7) smart_nikto ;;
         8) smart_installer ;;
         9) deep_purge ;;
+        10) run_sherlock ;;
+        11) run_wifite ;;
         0) exit 0 ;;
         *) sleep 1 ;;
     esac
