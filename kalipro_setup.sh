@@ -148,78 +148,56 @@ run_wifite() {
     read -p "Нажми Enter..."
 }
 
-# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v3.9 (BLACK HOLE EDITION) ---
+# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v6.0 (EVENT HORIZON EDITION) ---
 deep_purge() {
-    echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (BLACK HOLE) ===${NC}"
+    echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (EVENT HORIZON) ===${NC}"
     
-    # 1. Жёсткая зачистка APT и индексов
-    echo -e "${YELLOW}[*] Вычищаю индексы и архивы APT...${NC}"
+    # 1. Стерилизация пакетного менеджера и индексов
+    echo -e "${YELLOW}[*] Сжатие пакетной базы и APT...${NC}"
+    apt-get autoremove --purge -y >/dev/null 2>&1
     apt-get clean
-    apt-get autoclean -y
-    rm -rf /var/lib/apt/lists/*
-    rm -rf /var/cache/apt/archives/partial/*
-    rm -rf "$LOOT_DIR"/*
-    # 2. Удаление графики, локалей и шрифтов (самый тяжелый балласт)
-    echo -e "${YELLOW}[*] Удаляю иконки, локали и шрифты...${NC}"
-    rm -rf /usr/share/icons/*
-    rm -rf /usr/share/locale/*
-    rm -rf /usr/share/fonts/*
-    rm -rf /usr/share/themes/*
+    apt-get autoclean
+    # Удаляем индексы - они скачиваются заново при apt update
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/*
 
-    # 3. Удаление документации и справочников
-    echo -e "${YELLOW}[*] Сношу мануалы и документацию...${NC}"
-    rm -rf /usr/share/doc/*
-    rm -rf /usr/share/man/*
-    rm -rf /var/cache/man/*
-    rm -rf /var/lib/apt/lists/*
-    rm -rf /usr/share/icons/* /usr/share/locale/* /usr/share/doc/* /usr/share/man/*
-    find /var/log -type f -delete 2>/dev/null
-    rm -rf ~/.cache/pip/* /tmp/* /var/tmp/*
-    # Удаление кэша шрифтов (часто весит много)
-    rm -rf /var/cache/fontconfig/*
+    # 2. Массовое удаление статического балласта (Графика, мануалы, шрифты)
+    echo -e "${YELLOW}[*] Ликвидация интерфейсного балласта (Doc/Fonts/Icons)...${NC}"
+    rm -rf /usr/share/{doc,man,info,locale,icons,fonts,themes}/* 2>/dev/null
 
-    # 4. Глубокая очистка Python (удаляем скомпилированные файлы)
-    echo -e "${YELLOW}[*] Чистка Python байт-кода (.pyc)...${NC}"
+    # 3. Уничтожение кэша сред разработки и окружения
+    echo -e "${YELLOW}[*] Зачистка кэша сред разработки (Python/Pip/Go/Ruby)...${NC}"
+    # Python & Pip
     find /usr/lib/python3* -name "*.pyc" -delete 2>/dev/null
-    find /usr/lib/python3* -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
-    rm -rf ~/.cache/pip/*
+    find / -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+    rm -rf ~/.cache/pip ~/.cache/go-build ~/.gem 2>/dev/null
 
-    # 5. Стирание системных логов и временных папок
-    echo -e "${YELLOW}[*] Стерилизация логов...${NC}"
+    # 4. Стерилизация системных логов и временных зон
+    echo -e "${YELLOW}[*] Стерилизация логов и /tmp...${NC}"
     find /var/log -type f -delete 2>/dev/null
-    find /var/cache -type f -delete 2>/dev/null
-    rm -rf /var/tmp/*
-    rm -rf /tmp/*
+    rm -rf /tmp/* /var/tmp/* /var/cache/fontconfig/* 2>/dev/null
 
-    # 6. Проверка и удаление базы PostgreSQL
+    # 5. Интеллектуальное удаление БД PostgreSQL (если весит > 50MB)
     if [ -d "/var/lib/postgresql" ]; then
-        PG_SIZE=$(du -sm /var/lib/postgresql | awk '{print $1}')
-        if [ "$PG_SIZE" -gt 50 ]; then
-            echo -e "${RED}[!] Удаляю базу данных (${PG_SIZE}MB)...${NC}"
+        if [ "$(du -sm /var/lib/postgresql | awk '{print $1}')" -gt 50 ]; then
+            echo -e "${RED}[!] База данных PostgreSQL аннигилирована.${NC}"
             rm -rf /var/lib/postgresql
         fi
     fi
 
-    # 7. Стерилизация твоих "Трофеев" и истории
-    rm -rf "$LOOT_DIR"/*
+    # 6. Очистка трофеев и истории команд
+    echo -e "${YELLOW}[*] Стирание оперативных данных и истории...${NC}"
+    rm -rf "$LOOT_DIR"/* ~/.bettercap_history ~/.bash_history 2>/dev/null
     history -c
 
-    # 8. Удаление старых бэкапов конфигураций
-    find /etc -name "*.bak" -delete 2>/dev/null
-    find /etc -name "*.old" -delete 2>/dev/null
+    # 7. Финальное удаление бэкапов конфигураций
+    find /etc -name "*.bak" -o -name "*.old" -delete 2>/dev/null
 
-rm -rf ~/.cache/pip/* 2>/dev/null
-find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-
-
-    # Финальный аккорд: удаление неиспользуемых библиотек
-    apt-get autoremove --purge -y >/dev/null 2>&1
-
-    echo -e "${GREEN}[+] DEEP PURGE v3.9 завершен!${NC}"
-    echo -ne "${BLUE}[!] Памяти доступно: ${NC}"
+    echo -e "${GREEN}[+ ] DEEP PURGE v6.0 завершен! Стерильность достигнута.${NC}"
+    echo -ne "${BLUE}[!] Доступная память: ${NC}"
     df -h / | awk 'NR==2 {print $4}'
-    sleep 3
+    sleep 2
 }
+
 
 # --- ФУНКЦИЯ АВТО-МОНТИРОВАНИЯ ---
 auto_mount_pc() {
