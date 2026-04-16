@@ -116,18 +116,44 @@ clean_system() {
 }
 
 deep_purge() {
-    echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (DEEP PURGE) ===${NC}"
+    echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (MAX-FORCE) ===${NC}"
+    
+    # 1. Жёсткая зачистка APT
+    echo -e "${YELLOW}[*] Вычищаю индексы и архивы...${NC}"
     apt-get clean
     apt-get autoclean -y
-    apt-get autoremove --purge -y >/dev/null 2>&1
-    rm -rf /tmp/* /var/tmp/*
-    find $HOME -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
-    find $HOME -name "*.log" -type f -delete 2>/dev/null
-    rm -rf ~/.cache/pip
+    # Удаляем сами списки доступных пакетов (они скачаются заново при apt update)
+    # Это может освободить 100-300 МБ
+    rm -rf /var/lib/apt/lists/*
+    
+    # 2. Удаление кэша мануалов и документации
+    echo -e "${YELLOW}[*] Удаляю документацию и кэш манов...${NC}"
+    rm -rf /var/cache/man/*
+    rm -rf /usr/share/doc/*
+    rm -rf /usr/share/man/*
+    
+    # 3. Глубокая зачистка логов (включая скрытые)
+    echo -e "${YELLOW}[*] Стираю все системные логи...${NC}"
+    find /var/log -type f -delete 2>/dev/null
+    find /var/cache -type f -delete 2>/dev/null
+    
+    # 4. Очистка кэша Python/Pip и локальных временных файлов
+    echo -e "${YELLOW}[*] Удаляю кэш Python и временные файлы...${NC}"
+    rm -rf ~/.cache/pip/*
+    rm -rf ~/.cache/fontconfig/*
+    rm -rf /tmp/*
+    rm -rf /var/tmp/*
+    
+    # 5. Очистка твоих "Трофеев" (если они не нужны)
     rm -rf "$LOOT_DIR"/*
-    history -c
-    echo -e "${GREEN}[+] Память максимально освобождена!${NC}"
-    sleep 2
+    
+    # Финальный аккорд: принудительная очистка неиспользуемых библиотек
+    apt-get autoremove --purge -y >/dev/null 2>&1
+
+    echo -e "${GREEN}[+] DEEP PURGE завершен!${NC}"
+    echo -ne "${BLUE}[!] Свободно сейчас: ${NC}"
+    df -h / | awk 'NR==2 {print $4}'
+    sleep 3
 }
 
 show_menu() {
