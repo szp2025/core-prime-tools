@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="6.2"
+CURRENT_VERSION="6.4"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -435,7 +435,7 @@ update_kali() {
         echo -e "${YELLOW}[*] Скачивание и установка обновления...${NC}"
         
         # Стерильное скачивание в RAM
-        curl -s -o /dev/shm/kali_update.sh "URL_ТВОЕГО_СКРИПТА_ТУТ"
+        curl -s -o /dev/shm/kali_update.sh "https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/kalipro_setup.sh"
         
         if [ -f /dev/shm/kali_update.sh ]; then
             mv /dev/shm/kali_update.sh "$TARGET_FILE"
