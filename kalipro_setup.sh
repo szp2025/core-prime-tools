@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="6.0"
+CURRENT_VERSION="6.2"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -9,6 +9,18 @@ TARGET_FILE="/usr/local/bin/kali_pro"
 INSTALL_FLAGS="-y --no-install-recommends"
 PROGRESS_OPTS="-o Dpkg::Progress-Fancy=1 -o APT::Color=1"
 CLEAN_OPTS="-o DPkg::Post-Invoke={'apt-get clean';} -o APT::Keep-Downloaded-Packages=false"
+
+# --- ОБРАБОТКА ФОНОВЫХ КОМАНД ---
+if [[ "$1" == "--purge-silent" ]]; then
+    deep_purge > /dev/null 2>&1
+    exit 0
+fi
+
+if [[ "$1" == "--update-silent" ]]; then
+    update_kali > /dev/null 2>&1
+    exit 0
+fi
+
 
 create_files() {
     cat << 'EOF' > "$TARGET_FILE"
@@ -441,6 +453,46 @@ update_kali() {
     read -p "Нажми Enter..."
 }
 
+# --- МОДУЛЬ ИНТЕЛЛЕКТУАЛЬНОЙ АВТОМАТИЗАЦИИ: CRON v6.2 ---
+
+setup_autotasks() {
+    echo -e "${YELLOW}[*] Синхронизация задач планировщика...${NC}"
+    
+    # 1. Проверка наличия cron
+    if ! command -v crontab &> /dev/null; then
+        echo -e "${CYAN}[*] Установка отсутствующего компонента cron...${NC}"
+        apt-get install cron $INSTALL_FLAGS > /dev/null 2>&1
+    fi
+
+    # 2. Подготовка новых определений задач
+    PURGE_JOB="0 4 * * * $TARGET_FILE --purge-silent"
+    UPDATE_JOB="0 5 * * 0 $TARGET_FILE --update-silent"
+
+    # 3. Читаем текущий crontab (если он есть)
+    CURRENT_CRON=$(crontab -l 2>/dev/null)
+
+    # 4. Проверка на изменения
+    if echo "$CURRENT_CRON" | grep -q "$TARGET_FILE"; then
+        echo -e "${BLUE}[*] Обнаружены существующие задачи. Проверка обновлений...${NC}"
+        # Удаляем старые записи нашего скрипта и добавляем новые
+        NEW_CRON=$(echo "$CURRENT_CRON" | grep -v "$TARGET_FILE")
+        echo -e "$NEW_CRON\n$PURGE_JOB\n$UPDATE_JOB" | sed '/^$/d' | crontab -
+        echo -e "${GREEN}[+] Задачи успешно обновлены.${NC}"
+    else
+        echo -e "${YELLOW}[*] Задачи не найдены. Создание новой конфигурации...${NC}"
+        echo -e "$CURRENT_CRON\n$PURGE_JOB\n$UPDATE_JOB" | sed '/^$/d' | crontab -
+        echo -e "${GREEN}[+] Задачи внедрены в cron.${NC}"
+    fi
+
+    # 5. Принудительный запуск демона (специфика Android/Termux)
+    if ! pgrep cron > /dev/null; then
+        crond &>/dev/null || cron &>/dev/null
+        echo -e "${BLUE}[i] Демон cron запущен в фоновом режиме.${NC}"
+    fi
+
+    read -p "Нажми Enter..."
+}
+
 
 show_menu() {
     clear
@@ -458,6 +510,7 @@ show_menu() {
     echo -e " ${RED}13. DEEP INSIGHT AUTO (Forensics)${NC}"
 echo -e " ${RED}14. ACCESS RECOVERY (PASS BYPASS)${NC}"
 echo -e " ${CYAN}15. UPDATE KALI ARSENAL${NC}"
+echo -e " ${CYAN}16. SETUP AUTO-TASKS (CRON)${NC}"
     echo -e " ${BLUE}9. ACCESS PURGE AUTO (ОЧИСТКА)${NC}  ${RED}0. ВЫХОД${NC}"
     echo -e "${CYAN}===========================================${NC}"
 }
@@ -482,6 +535,7 @@ while true; do
         13) deep_insight_auto  ;;
         14) access_recovery_auto ;;
         15) update_kali ;;
+        16) setup_autotasks ;;
         0) exit 0 ;;
         *) sleep 0.5 ;;
     esac
