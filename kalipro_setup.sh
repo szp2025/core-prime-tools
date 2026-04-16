@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.6 (Rescue & Sterile Edition)
-CURRENT_VERSION="5.4"
+CURRENT_VERSION="5.6"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
@@ -295,7 +295,7 @@ while true; do
         9) deep_purge ;;
         10) run_sherlock ;;
         11) run_wifite ;;
-        12) usb_guardian_smart;;
+        12) usb_guardian_smart;; # Лаконично и мощно
         0) exit 0 ;;
         *) sleep 1 ;;
     esac
