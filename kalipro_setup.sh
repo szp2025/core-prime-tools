@@ -116,14 +116,18 @@ EOF
     echo -e "\033[0;32m[+] Обновление до v$CURRENT_VERSION завершено успешно.\033[0m"
 }
 
-# --- ЛОГИКА ПРОВЕРКИ ---
+# --- ЛОГИКА ПРОВЕРКИ (ИСПРАВЛЕННАЯ) ---
 if [ ! -f "$TARGET_FILE" ]; then
+    echo -e "\033[0;33m[!] Арсенал не обнаружен. Начинаю установку...\033[0m"
     create_files
 else
-    INSTALLED_VERSION=\$(grep "# VERSION=" "$TARGET_FILE" | cut -d'=' -f2)
-    if [ "\$INSTALLED_VERSION" != "\$CURRENT_VERSION" ]; then
+    # Здесь убираем обратный слэш перед знаком доллара!
+    INSTALLED_VERSION=$(grep "# VERSION=" "$TARGET_FILE" | cut -d'=' -f2)
+    
+    if [ "$INSTALLED_VERSION" != "$CURRENT_VERSION" ]; then
+        echo -e "\033[0;34m[*] Найдена версия ($INSTALLED_VERSION). Обновляем до ($CURRENT_VERSION)...\033[0m"
         create_files
     else
-        echo -e "\033[0;32m[+] Актуальная версия (\$INSTALLED_VERSION) установлена.\033[0m"
+        echo -e "\033[0;32m[+] У вас актуальная версия ($INSTALLED_VERSION). Обновление не требуется.\033[0m"
     fi
 fi
