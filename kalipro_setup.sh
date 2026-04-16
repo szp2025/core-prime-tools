@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Текущая версия инструментов в репозитории
-CURRENT_VERSION="2.3"
+# Текущая версия инструментов
+CURRENT_VERSION="2.4"
 
 # Пути к системным командам
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -12,36 +12,29 @@ echo -e "\033[0;36m[*] Проверка версии Kali Pro Arsenal...\033[0m"
 create_files() {
     echo -e "\033[0;33m[*] Установка/Обновление компонентов до версии $CURRENT_VERSION...\033[0m"
 
-    # 1. Создаем основное меню
-    cat << EOF > "$TARGET_FILE"
+    # 1. ЗАПИСЬ ОСНОВНОГО ФАЙЛА (Обрати внимание на 'EOF' в начале)
+    cat << 'EOF' > "$TARGET_FILE"
 #!/bin/bash
-# VERSION=$CURRENT_VERSION
+# VERSION=2.4
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 run_smart_check() {
     python3 -c "
 import shutil, os
-
 def get_status(path, label):
     try:
         total, used, free = shutil.disk_usage(path)
         mb = 1024**2
         gb = 1024**3
-        # Если больше 1 ГБ - пишем в ГБ, если меньше - в МБ
-        if free > gb:
-            disp_free = f'{free/gb:.1f} GB'
-        else:
-            disp_free = f'{free//mb} MB'
-            
+        disp_free = f'{free/gb:.1f} GB' if free > gb else f'{free//mb} MB'
         status = '\033[0;32mOK' if free > (500*mb) else '\033[0;31mLOW'
         print(f'   \033[0;34m[ {label} ]:\033[0m {disp_free} свободно ({status}\033[0m)')
-    except:
-        pass
-
+    except: pass
 get_status('/', 'СИСТЕМА')
 get_status('/sdcard', 'ПАМЯТЬ ТЕЛЕФОНА')
 "
@@ -49,235 +42,117 @@ get_status('/sdcard', 'ПАМЯТЬ ТЕЛЕФОНА')
 
 show_menu() {
     clear
-    echo -e "\${CYAN}===========================================\${NC}"
-    echo -e "\${GREEN}      KALI SAMSUNG ARSENAL - MENU v1.5     \${NC}"
-    echo -e "\${CYAN}===========================================\${NC}"
+    echo -e "${CYAN}===========================================${NC}"
+    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v2.4     ${NC}"
+    echo -e "${CYAN}===========================================${NC}"
     run_smart_check
-    echo -e "\${CYAN}-------------------------------------------\${NC}"
-    echo -e "\${BLUE}1.\${NC} БЫСТРАЯ ОЧИСТКА (Free Space)"
-    echo -e "\${BLUE}2.\${NC} СЕТЕВОЙ СКАНЕР (Nmap)"
-    echo -e "\${BLUE}3.\${NC} ПОИСК ЭКСПЛОЙТОВ (Searchsploit)"
-    echo -e "\${BLUE}4.\${NC} ВЗЛОМ ПАРОЛЕЙ (John / Hydra)"
-    echo -e "\${BLUE}5.\${NC} ВЕБ-АНАЛИЗ (Интеллектуальный SQLmap)"
-    echo -e "\${BLUE}6.\${NC} ПЕРЕХВАТ (Bettercap)"
-    echo -e "\${BLUE}7.\${NC} ПРОВЕРИТЬ МЕСТО (df -h)"
-    echo -e "\${RED}0.\${NC} ВЫХОД"
-    echo -e "\${CYAN}===========================================\${NC}"
+    echo -e "${CYAN}------------------------------------------=${NC}"
+    echo -e "${BLUE}1.${NC} БЫСТРАЯ ОЧИСТКА (Free Space)"
+    echo -e "${BLUE}2.${NC} СЕТЕВОЙ СКАНЕР (Smart Nmap)"
+    echo -e "${BLUE}3.${NC} ПОИСК ЭКСПЛОЙТОВ (Searchsploit)"
+    echo -e "${BLUE}4.${NC} ВЗЛОМ ПАРОЛЕЙ (Smart Hydra)"
+    echo -e "${BLUE}5.${NC} ВЕБ-АНАЛИЗ (Smart SQLmap)"
+    echo -e "${BLUE}6.${NC} ПЕРЕХВАТ (Smart Bettercap)"
+    echo -e "${RED}0.${NC} ВЫХОД"
+    echo -e "${CYAN}===========================================${NC}"
 }
 
 clean_system() {
-    echo -e "\${GREEN}[*] Глубокая очистка...\${NC}"
+    echo -e "${GREEN}[*] Глубокая очистка...${NC}"
     apt-get clean && apt-get autoclean && apt-get autoremove -y
     rm -rf /var/cache/apt/archives/* /tmp/* /var/tmp/*
-    rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/locale/*
-    echo -e "\${GREEN}[+] Готово! Свободное место:\${NC}"
-    df -h /
-    echo -e "\${CYAN}Пауза 20 секунд...\${NC}"
-    sleep 20
+    echo -e "${GREEN}[+] Очистка завершена.${NC}"
+    sleep 2
 }
 
 smart_web_scan() {
     read -p "Введите URL цели: " target
-    if [[ -z "\$target" ]]; then return; fi
-    echo -e "\${BLUE}[*] Python проверяет доступность цели...\${NC}"
-    
+    if [[ -z "$target" ]]; then return; fi
     python3 -c "
 import urllib.request, sys
 try:
-    req = urllib.request.Request('\$target', headers={'User-Agent': 'Mozilla/5.0'})
+    req = urllib.request.Request('$target', headers={'User-Agent': 'Mozilla/5.0'})
     urllib.request.urlopen(req, timeout=5)
-    print('\033[0;32m[+] Цель отвечает. Запуск SQLmap...\033[0m')
+    print('\033[0;32m[+] Цель отвечает.\033[0m')
     sys.exit(0)
 except Exception as e:
-    print(f'\033[0;31m[-] Ошибка: Цель недоступна ({e}).\033[0m')
-    sys.exit(1)
-"
-    if [ \$? -eq 0 ]; then
-        sqlmap -u "\$target" --batch --random-agent
-        echo -e "\${CYAN}-------------------------------------------\${NC}"
-        read -p "Нажмите Enter для возврата в меню..."
-  
-    fi
-}
-
-# Функция для автоматизации Bettercap
-smart_bettercap() {
-    echo -e "${CYAN}=== УМНЫЙ BETTERCAP (БЕЗОПАСНЫЙ РЕЖИМ) ===${NC}"
-    echo -e "${BLUE}1.${NC} СНИФФИНГ (Только прослушка)"
-    echo -e "${BLUE}2.${NC} ARP-SPOOFING (Защита от падения сети)"
-    echo -e "${BLUE}3.${NC} ПОЛНЫЙ МОНИТОРИНГ"
-    read -p "Выберите режим: " bcap_opt
-
-    case $bcap_opt in
-        1) 
-            bettercap -eval "net.probe on; net.sniff on; set net.sniff.verbose true"
-            ;;
-        2) 
-            read -p "Введите IP цели (обязательно): " b_target
-            if [[ -z "$b_target" ]]; then echo "Цель не введена!"; sleep 2; return; fi
-            
-            echo -e "${GREEN}[*] Включаю IP Forwarding в системе...${NC}"
-            echo 1 > /proc/sys/net/ipv4/ip_forward
-
-            echo -e "${GREEN}[*] Запуск ARP-Spoofing на $b_target...${NC}"
-            # Команда ниже включает спуфинг только для цели, игнорируя лишние пакеты
-            bettercap -eval "
-                set net.sniff.verbose false;
-                set net.sniff.local true;
-                set arp.spoof.targets $b_target;
-                set arp.spoof.internal true;
-                arp.spoof on;
-                net.sniff on;
-                set net.sniff.regexp .*password|.*login|.*user|.*token
-            "
-            
-            echo -e "${YELLOW}[*] Выключаю IP Forwarding...${NC}"
-            echo 0 > /proc/sys/net/ipv4/ip_forward
-            ;;
-        3) bettercap ;;
-        *) return ;;
-    esac
-    
-    echo -e "${CYAN}--- Нажмите Enter для возврата ---${NC}"
-    read
-}
-
-
-# Функция для умного брутфорса
-smart_brute() {
-    read -p "Введите IP цели: " target
-    read -p "Логин (например, root): " login
-    echo -e "${BLUE}[1] SSH (port 22)${NC}"
-    echo -e "${BLUE}[2] FTP (port 21)${NC}"
-    read -p "Выберите протокол: " proto_choice
-
-    case $proto_choice in
-        1) proto="ssh"; port=22 ;;
-        2) proto="ftp"; port=21 ;;
-        *) return ;;
-    esac
-
-    # Проверка порта через Python
-    python3 -c "
-import socket, sys
-try:
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(3)
-    s.connect(('$target', $port))
-    sys.exit(0)
-except:
+    print(f'\033[0;31m[-] Ошибка: {e}\033[0m')
     sys.exit(1)
 "
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}[+] Порт $port открыт. Начинаю атаку...${NC}"
-        # Используем стандартный rockyou или просим путь
-        read -p "Путь к словарю (Enter для /usr/share/wordlists/rockyou.txt): " passlist
-        passlist=${passlist:-/usr/share/wordlists/rockyou.txt}
-        
-        hydra -l $login -P $passlist $target $proto -t 4 -V
-        
-        echo -e "${CYAN}-------------------------------------------${NC}"
-        read -p "Если пароль не найден, попробовать другой протокол? (y/n): " retry
-        if [[ "$retry" == "y" ]]; then smart_brute; fi
-    else
-        echo -e "${RED}[-] Порт $port закрыт на этой цели!${NC}"
-        read -p "Попробовать другой протокол на этой же цели? (y/n): " retry
-        if [[ "$retry" == "y" ]]; then smart_brute; fi
-    fi
-}
-
-
-# Функция для работы с эксплойтами
-smart_searchsploit() {
-    # Создаем папку для добычи, если её нет
-    WORK_DIR="$HOME/arsenal_exploits"
-    mkdir -p "$WORK_DIR"
-    
-    read -p "Что ищем (напр. WordPress 5.0): " query
-    if [[ -z "$query" ]]; then return; fi
-
-    echo -e "${BLUE}[*] Поиск уязвимостей для: $query...${NC}"
-    searchsploit "$query"
-    
-    echo -e "${CYAN}-------------------------------------------${NC}"
-    echo -e "Введите путь/ID эксплойта для копирования (или Enter для выхода):"
-    read -p "ID: " exploit_id
-    
-    if [[ -n "$exploit_id" ]]; then
-        cd "$WORK_DIR"
-        echo -e "${GREEN}[*] Копирую эксплойт в $WORK_DIR...${NC}"
-        searchsploit -m "$exploit_id"
-        
-        # Проверяем, что скопировалось
-        ls -lh | grep $(basename "$exploit_id")
-        echo -e "${GREEN}[+] Готово. Файл готов к работе в папке exploits.${NC}"
+        sqlmap -u "$target" --batch --random-agent
         read -p "Нажмите Enter..."
     fi
 }
 
-# Функция для умного сканирования сети
 smart_nmap() {
-    echo -e "${CYAN}=== ИНТЕЛЛЕКТУАЛЬНЫЙ СКАНЕР NMAP v2.2 ===${NC}"
     read -p "Введите цель: " target
     if [[ -z "$target" ]]; then return; fi
-
-    echo -e "${BLUE}1.${NC} Быстрый скан"
-    echo -e "${BLUE}2.${NC} Глубокий анализ"
-    echo -e "${BLUE}3.${NC} Поиск уязвимостей"
-    echo -e "${YELLOW}4. ПОЛНЫЙ ЦИКЛ (1 + 2 + 3)${NC}" # Наш новый режим
-    read -p "Выберите режим: " nmap_opt
-
-    case $nmap_opt in
+    echo -e "1. Быстрый\n2. Глубокий\n3. Уязвимости\n4. ПОЛНЫЙ ЦИКЛ"
+    read -p "Выбор: " n_opt
+    case $n_opt in
         1) nmap -F --open "$target" ;;
         2) nmap -sV -sC -O --open "$target" ;;
         3) nmap -sV --script vulners --open "$target" ;;
-        4) 
-            echo -e "${GREEN}[*] ЭТАП 1: Быстрая разведка...${NC}"
-            nmap -F --open "$target"
-            echo -e "${GREEN}[*] ЭТАП 2: Определение сервисов и ОС...${NC}"
-            nmap -sV -O --open "$target"
-            echo -e "${GREEN}[*] ЭТАП 3: Поиск уязвимостей (Vulners)...${NC}"
-            nmap -sV --script vulners --open "$target"
-            ;;
-        *) return ;;
+        4) nmap -sV -sC -O --script vulners --open "$target" ;;
     esac
-
-    echo -e "${CYAN}-------------------------------------------${NC}"
-    read -p "Цикл завершен. Нажмите Enter для возврата..."
+    read -p "Enter..."
 }
 
-# Фиксируем время начала сессии
-START_TIME=$(date +"%H:%M:%S")
+smart_bettercap() {
+    echo -e "1. Сниффер\n2. ARP-Spoof (Smart)\n3. Консоль"
+    read -p "Выбор: " b_opt
+    case $b_opt in
+        1) bettercap -eval "net.probe on; net.sniff on" ;;
+        2) 
+            read -p "IP цели: " bt
+            echo 1 > /proc/sys/net/ipv4/ip_forward
+            bettercap -eval "set arp.spoof.targets $bt; arp.spoof on; net.sniff on"
+            echo 0 > /proc/sys/net/ipv4/ip_forward
+            ;;
+        3) bettercap ;;
+    esac
+}
 
+smart_brute() {
+    read -p "IP: " target
+    read -p "Login: " login
+    read -p "Протокол (ssh/ftp): " proto
+    read -p "Словарь (Enter для rockyou): " plist
+    plist=${plist:-/usr/share/wordlists/rockyou.txt}
+    hydra -l $login -P $plist $target $proto -V
+    read -p "Enter..."
+}
+
+smart_searchsploit() {
+    read -p "Поиск: " q
+    searchsploit "$q"
+    read -p "ID для копирования (или Enter): " id
+    if [[ -n "$id" ]]; then
+        mkdir -p ~/arsenal_exploits && cd ~/arsenal_exploits
+        searchsploit -m "$id"
+    fi
+}
+
+START_TIME=$(date +"%H:%M:%S")
 while true; do
     show_menu
-    # Добавим напоминание о времени начала в строке ввода
     read -p "[Start: $START_TIME] Опция: " opt
-    case \$opt in
+    case $opt in
         1) clean_system ;;
         2) smart_nmap ;;
         3) smart_searchsploit ;;
         4) smart_brute ;;
         5) smart_web_scan ;;
         6) smart_bettercap ;;
-        0) 
-            echo -e "\${YELLOW}[?] Вы уверены, что хотите выйти? (y/n)\${NC}"
-            read -n 1 confirm
-            if [[ "\$confirm" == "y" ]]; then
-                echo -e "\n\${GREEN}[*] Сессия завершена. Удачи!\${NC}"
-                exit 0
-            fi
-            ;;
-        *) 
-            echo -e "\${RED}[!] Неверный выбор\${NC}"
-            sleep 1 
-            ;;
+        0) exit 0 ;;
+        *) sleep 1 ;;
     esac
 done
 EOF
 
-    # 2. Скрипт обновления
-    cat << EOF > "$UPDATE_SCRIPT"
+    # 2. СКРИПТ ОБНОВЛЕНИЯ
+    cat << 'EOF' > "$UPDATE_SCRIPT"
 #!/bin/bash
 echo -e "\033[0;34m[*] Обновление арсенала из GitHub...\033[0m"
 curl -L https://raw.githubusercontent.com/szp2025/core-prime-tools/main/kalipro_setup.sh | bash
@@ -285,19 +160,17 @@ EOF
 
     chmod +x "$TARGET_FILE"
     chmod +x "$UPDATE_SCRIPT"
-    echo -e "\033[0;32m[+] Обновление до v$CURRENT_VERSION завершено.\033[0m"
+    echo -e "\033[0;32m[+] Обновление завершено.\033[0m"
 }
 
-# --- ЛОГИКА ПРОВЕРКИ ---
+# Логика проверки версии
 if [ ! -f "$TARGET_FILE" ]; then
-    echo -e "\033[0;33m[!] Арсенал не обнаружен. Начинаю установку...\033[0m"
     create_files
 else
     INSTALLED_VERSION=$(grep "# VERSION=" "$TARGET_FILE" | cut -d'=' -f2)
     if [ "$INSTALLED_VERSION" != "$CURRENT_VERSION" ]; then
-        echo -e "\033[0;34m[*] Обнаружена новая версия ($CURRENT_VERSION). У вас ($INSTALLED_VERSION).\033[0m"
         create_files
     else
-        echo -e "\033[0;32m[+] У вас уже установлена актуальная версия ($INSTALLED_VERSION).\033[0m"
+        echo -e "\033[0;32m[+] Актуальная версия ($INSTALLED_VERSION).\033[0m"
     fi
 fi
