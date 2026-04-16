@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="5.9"
+CURRENT_VERSION="6.0"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -424,6 +424,45 @@ access_recovery_auto() {
     read -p "Нажми Enter для возврата в меню..."
 }
 
+# --- МОДУЛЬ САМООБНОВЛЕНИЯ: UPDATE KALI v5.0 ---
+
+update_kali() {
+    echo -e "${YELLOW}[*] Проверка обновлений Арсенала...${NC}"
+    
+    # URL твоего репозитория или сервера (замени на свой, если нужно)
+    # Сейчас используем имитацию проверки версии
+    REMOTE_VERSION="5.0"
+    
+    if [ "$CURRENT_VERSION" == "$REMOTE_VERSION" ]; then
+        echo -e "${GREEN}[+] У вас установлена актуальная версия v$CURRENT_VERSION.${NC}"
+        # Предлагаем обновить системные пакеты Kali, раз уж зашли сюда
+        read -p "Обновить системные пакеты APT? (y/n): " up_sys
+        if [[ "$up_sys" == "y" ]]; then
+            clean_system
+        fi
+    else
+        echo -e "${CYAN}[!] Найдена новая версия: v$REMOTE_VERSION${NC}"
+        echo -e "${YELLOW}[*] Скачивание и установка обновления...${NC}"
+        
+        # Стерильное скачивание в RAM
+        curl -s -o /dev/shm/kali_update.sh "URL_ТВОЕГО_СКРИПТА_ТУТ"
+        
+        if [ -f /dev/shm/kali_update.sh ]; then
+            mv /dev/shm/kali_update.sh "$TARGET_FILE"
+            chmod +x "$TARGET_FILE"
+            echo -e "${GREEN}[V] Арсенал успешно обновлен до v$REMOTE_VERSION!${NC}"
+            echo -e "${YELLOW}[!] Перезапустите скрипт для применения изменений.${NC}"
+            exit 0
+        else
+            echo -e "${RED}[-] Ошибка при скачивании обновления.${NC}"
+        fi
+    fi
+    
+    # Очистка следов обновления
+    rm -rf /dev/shm/kali_update.sh 2>/dev/null
+    read -p "Нажми Enter..."
+}
+
 
 show_menu() {
     clear
@@ -439,7 +478,8 @@ show_menu() {
     echo -e " ${YELLOW}10. SHERLOCK        11. WIFITE${NC}"
     echo -e " ${RED}12. USB GUARDIAN SMART (Active)${NC}"
     echo -e " ${RED}13. DEEP INSIGHT AUTO (Forensics)${NC}"
-echo -e " ${RED}14. ACCESS RECOVERY AUTO${NC}"
+echo -e " ${RED}14. ACCESS RECOVERY (PASS BYPASS)${NC}"
+echo -e " ${CYAN}15. UPDATE KALI ARSENAL${NC}"
     echo -e " ${BLUE}9. ACCESS PURGE AUTO (ОЧИСТКА)${NC}  ${RED}0. ВЫХОД${NC}"
     echo -e "${CYAN}===========================================${NC}"
 }
@@ -463,6 +503,7 @@ while true; do
         12) usb_guardian_smart ;;
         13) deep_insight_auto  ;;
         14) access_recovery_auto ;;
+        15) update_kali ;;
         0) exit 0 ;;
         *) sleep 0.5 ;;
     esac
