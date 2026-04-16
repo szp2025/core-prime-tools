@@ -115,43 +115,55 @@ clean_system() {
     sleep 2
 }
 
+# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v3.8 (MAX-FORCE) ---
 deep_purge() {
     echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (MAX-FORCE) ===${NC}"
     
-    # 1. Жёсткая зачистка APT
-    echo -e "${YELLOW}[*] Вычищаю индексы и архивы...${NC}"
+    # 1. Жёсткая зачистка APT и индексов
+    echo -e "${YELLOW}[*] Вычищаю индексы и архивы APT...${NC}"
     apt-get clean
     apt-get autoclean -y
-    # Удаляем сами списки доступных пакетов (они скачаются заново при apt update)
-    # Это может освободить 100-300 МБ
     rm -rf /var/lib/apt/lists/*
     
-    # 2. Удаление кэша мануалов и документации
-    echo -e "${YELLOW}[*] Удаляю документацию и кэш манов...${NC}"
-    rm -rf /var/cache/man/*
+    # 2. Удаление графического мусора, локалей и манов
+    echo -e "${YELLOW}[*] Удаляю иконки, локали и документацию...${NC}"
+    rm -rf /usr/share/icons/*
+    rm -rf /usr/share/locale/*
     rm -rf /usr/share/doc/*
     rm -rf /usr/share/man/*
+    rm -rf /var/cache/man/*
     
-    # 3. Глубокая зачистка логов (включая скрытые)
-    echo -e "${YELLOW}[*] Стираю все системные логи...${NC}"
+    # 3. Глубокая зачистка системных логов и кэша
+    echo -e "${YELLOW}[*] Стираю системные логи и временные кэши...${NC}"
     find /var/log -type f -delete 2>/dev/null
     find /var/cache -type f -delete 2>/dev/null
+    rm -rf /var/tmp/*
+    rm -rf /tmp/*
     
-    # 4. Очистка кэша Python/Pip и локальных временных файлов
-    echo -e "${YELLOW}[*] Удаляю кэш Python и временные файлы...${NC}"
+    # 4. Проверка и удаление базы PostgreSQL (если она весит много)
+    if [ -d "/var/lib/postgresql" ]; then
+        PG_SIZE=$(du -sm /var/lib/postgresql | awk '{print $1}')
+        echo -e "${BLUE}[?] Размер базы PostgreSQL: ${PG_SIZE}MB${NC}"
+        if [ "$PG_SIZE" -gt 50 ]; then
+            echo -e "${RED}[!] База слишком тяжелая. Сношу...${NC}"
+            rm -rf /var/lib/postgresql
+        fi
+    fi
+    
+    # 5. Очистка кэша Python/Pip
+    echo -e "${YELLOW}[*] Очистка Python/Pip кэша...${NC}"
     rm -rf ~/.cache/pip/*
     rm -rf ~/.cache/fontconfig/*
-    rm -rf /tmp/*
-    rm -rf /var/tmp/*
     
-    # 5. Очистка твоих "Трофеев" (если они не нужны)
+    # 6. Стерилизация трофеев и истории
     rm -rf "$LOOT_DIR"/*
+    history -c
     
-    # Финальный аккорд: принудительная очистка неиспользуемых библиотек
+    # Финальный аккорд: удаление неиспользуемых библиотек
     apt-get autoremove --purge -y >/dev/null 2>&1
 
-    echo -e "${GREEN}[+] DEEP PURGE завершен!${NC}"
-    echo -ne "${BLUE}[!] Свободно сейчас: ${NC}"
+    echo -e "${GREEN}[+] DEEP PURGE v3.8 завершен!${NC}"
+    echo -ne "${BLUE}[!] Текущий остаток памяти: ${NC}"
     df -h / | awk 'NR==2 {print $4}'
     sleep 3
 }
