@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.6 (Rescue & Sterile Edition)
-CURRENT_VERSION="5.7"
+CURRENT_VERSION="5.8"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
@@ -220,6 +220,35 @@ find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
     sleep 3
 }
 
+# --- ФУНКЦИЯ АВТО-МОНТИРОВАНИЯ ---
+auto_mount_pc() {
+    echo -e "${YELLOW}[*] Попытка автоматического монтирования ресурсов ПК...${NC}"
+    mkdir -p /mnt/pc_share
+    
+    # 1. Проверяем, не смонтировано ли уже
+    if mountpoint -q /mnt/pc_share; then
+        return 0
+    fi
+
+    # 2. Поиск IP ПК (через USB-модем)
+    PC_IP=$(ip route | grep default | awk '{print $3}')
+    
+    # 3. Попытка монтирования SMB (Windows Share) без пароля или как гость
+    # Если на ПК настроена общая папка, телефон ее подцепит
+    mount -t cifs "//$PC_IP/C$" /mnt/pc_share -o guest,vers=3.0,sec=ntlmv2 2>/dev/null || \
+    mount -t cifs "//$PC_IP/Users" /mnt/pc_share -o guest,vers=3.0 2>/dev/null
+
+    if mountpoint -q /mnt/pc_share; then
+        echo -e "${GREEN}[+] Диск ПК успешно примонтирован.${NC}"
+        return 0
+    else
+        echo -e "${RED}[!] Авто-монтирование не удалось. Проверь общий доступ на ПК.${NC}"
+        return 1
+    fi
+}
+
+
+
 # --- СТЕРИЛЬНЫЙ ЭВРИСТИЧЕСКИЙ МОДУЛЬ: USB GUARDIAN v4.2 ---
 
 usb_guardian_smart() {
@@ -261,11 +290,16 @@ usb_guardian_smart() {
 }
 
 
+
 # --- АВТОНОМНЫЙ ЭВРИСТИЧЕСКИЙ КРИМИНАЛИСТ: DEEP INSIGHT v4.4 ---
 
 deep_insight_auto() {
     echo -e "${YELLOW}[*] Запуск автономного криминалистического анализа...${NC}"
-    
+    # Сначала монтируем, если удачно — запускаем анализ
+    if auto_mount_pc; then
+        echo -e "${CYAN}[>>>] Запуск эвристического сканирования...${NC}"
+        
+
     TARGET_IP=$(ip route | grep default | awk '{print $3}')
     [[ -z "$TARGET_IP" ]] && { echo -e "${RED}[-] Цель не найдена через USB.${NC}"; return; }
 
@@ -307,6 +341,10 @@ check_entropy(sys.argv[1])" {} \;
         cat /dev/shm/scanner_zone/threats.txt
     else
         echo -e "${GREEN}[+ ] Аномалий в ОЗУ не обнаружено.${NC}"
+    fi
+# В КОНЦЕ ОБЯЗАТЕЛЬНО РАЗМОНТИРУЕМ (Заметаем следы)
+        echo -e "${YELLOW}[*] Завершение сессии. Размонтирование...${NC}"
+        umount -l /mnt/pc_share 2>/dev/null
     fi
 
     # --- ФИНАЛЬНАЯ СТЕРИЛИЗАЦИЯ (АБСОЛЮТНЫЙ НОЛЬ) ---
