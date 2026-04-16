@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.6 (Rescue & Sterile Edition)
-CURRENT_VERSION="4.3"
+CURRENT_VERSION="4.5"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
@@ -91,11 +91,26 @@ smart_nikto() {
 smart_installer() {
     read -p "Пакет для установки: " pkg
     [[ -z "$pkg" ]] && return
-    echo -e "${CYAN}[*] Стерильная установка: $pkg...${NC}"
-    apt-get update -y >/dev/null 2>&1
-    apt-get install $INSTALL_FLAGS $PROGRESS_OPTS $CLEAN_OPTS "$pkg"
-    apt-get autoremove -y >/dev/null 2>&1
-    echo -e "${GREEN}[+] Готово.${NC}"
+    
+    echo -e "${CYAN}[*] Настройка окружения...${NC}"
+    dpkg --configure -a >/dev/null 2>&1
+    
+    echo -e "${YELLOW}[*] Обновление базы репозиториев (нужно для поиска)...${NC}"
+    if apt-get update; then
+        echo -e "${GREEN}[+] База обновлена. Ставлю $pkg...${NC}"
+        apt-get install $INSTALL_FLAGS $PROGRESS_OPTS $CLEAN_OPTS "$pkg"
+        
+        # Сразу после установки предлагаем почистить индексы, чтобы вернуть память
+        echo -e "${BLUE}[?] Вернуть память (удалить индексы)? (y/n)${NC}"
+        read -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf /var/lib/apt/lists/*
+            echo -e "${GREEN}[+] Индексы удалены. Память спасена.${NC}"
+        fi
+    else
+        echo -e "${RED}[-] Ошибка сети! Не удалось связаться с серверами Kali.${NC}"
+    fi
     sleep 1
 }
 
