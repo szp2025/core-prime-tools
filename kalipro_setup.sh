@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.6 (Rescue & Sterile Edition)
-CURRENT_VERSION="5.1"
+CURRENT_VERSION="5.2"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
