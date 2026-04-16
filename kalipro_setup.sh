@@ -360,7 +360,7 @@ check_entropy(sys.argv[1])" {} \;
 show_menu() {
     clear
     echo -e "${CYAN}===========================================${NC}"
-    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v3.7     ${NC}"
+    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v4.5     ${NC}"
     echo -e "${CYAN}===========================================${NC}"
     run_smart_check
     echo -e "${CYAN}-------------------------------------------${NC}"
@@ -369,11 +369,9 @@ show_menu() {
     echo -e " ${BLUE}5.${NC} SQLMAP            ${BLUE}6.${NC} BETTERCAP"
     echo -e " ${BLUE}7.${NC} NIKTO             ${BLUE}8.${NC} SMART INSTALLER"
     echo -e " ${YELLOW}10. SHERLOCK        11. WIFITE${NC}"
-    echo -e " ${RED}9. DEEP PURGE (ОЧИСТКА)${NC}"
-12. USB GUARDIAN SMART{NC}"
-13. Deep Insight Auto{NC}"
-
-    echo -e " ${RED}0.${NC} ВЫХОД"
+    echo -e " ${RED}12. USB GUARDIAN SMART (Active)${NC}"
+    echo -e " ${RED}13. DEEP INSIGHT AUTO (Forensics)${NC}"
+    echo -e " ${BLUE}9. DEEP PURGE (ОЧИСТКА)${NC}  ${RED}0. ВЫХОД${NC}"
     echo -e "${CYAN}===========================================${NC}"
 }
 
@@ -393,12 +391,20 @@ while true; do
         9) deep_purge ;;
         10) run_sherlock ;;
         11) run_wifite ;;
-        12) usb_guardian_smart;; # Лаконично и мощно
-       13) deep_insight_auto;;
+        12) 
+            # Авто-вызов настроек модема для удобства
+            am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
+            usb_guardian_smart 
+            ;;
+        13) 
+            am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
+            deep_insight_auto 
+            ;;
         0) exit 0 ;;
-        *) sleep 1 ;;
+        *) sleep 0.5 ;;
     esac
 done
+
 EOF
 
     chmod +x "$TARGET_FILE"
