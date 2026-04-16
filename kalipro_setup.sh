@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Текущая версия инструментов
-CURRENT_VERSION="2.4"
+CURRENT_VERSION="2.5"
 
 # Пути к системным командам
 TARGET_FILE="/usr/local/bin/kali_pro"
