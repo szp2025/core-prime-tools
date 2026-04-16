@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VERSION 3.6 (Rescue & Sterile Edition)
-CURRENT_VERSION="4.9"
+CURRENT_VERSION="5.0"
 
 TARGET_FILE="/usr/local/bin/kali_pro"
 # Глобальные параметры стерильности
@@ -29,6 +29,8 @@ PROGRESS_OPTS="-o Dpkg::Progress-Fancy=1 -o APT::Color=1"
 CLEAN_OPTS="-o DPkg::Post-Invoke={'apt-get clean';} -o APT::Keep-Downloaded-Packages=false"
 
 run_smart_check() {
+    # Фоновая мини-очистка при каждом обновлении меню
+    apt-get clean >/dev/null 2>&1
     python3 -c "
 import shutil
 def get_status(path, label):
@@ -37,7 +39,7 @@ def get_status(path, label):
         def fmt(b):
             if b >= 1024**3: return f'{b/1024**3:.1f}G'
             return f'{b//1024**2}MB'
-        status = '\033[0;32mOK' if free > (400*1024**2) else '\033[0;31mLOW'
+        status = '\033[0;32mOK' if free > (350*1024**2) else '\033[0;31mLOW'
         print(f'   \033[0;34m[ {label} ]:\033[0m {fmt(free)} / {fmt(total)} ({status}\033[0m)')
     except: pass
 get_status('/', 'СИСТЕМА')
