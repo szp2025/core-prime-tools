@@ -107,20 +107,63 @@ show_menu() {
     echo -e "${CYAN}===========================================${NC}"
 }
 
-# --- CASE LOOP ---
+# --- SMART FUNCTIONS v3.3 ---
+
+smart_nmap() {
+    read -p "IP: " t
+    [[ -z "$t" ]] && return
+    echo -e "${BLUE}[*] Эвристический скан: $t${NC}"
+    nmap -sV --open "$t" | grep "open" | tee "$LOOT_DIR/nmap_$t.txt"
+    read -p "Нажми Enter..."
+}
+
+smart_searchsploit() {
+    read -p "Поиск: " q
+    [[ -z "$q" ]] && return
+    searchsploit "$q"
+    read -p "ID для копирования (пусто - выход): " id
+    if [[ -n "$id" ]]; then
+        cd "$LOOT_DIR" && searchsploit -m "$id"
+        echo -e "${GREEN}[+] Сохранено в трофеи.${NC}"
+    fi
+    read -p "Нажми Enter..."
+}
+
+smart_hydra() {
+    read -p "IP: " t; read -p "User: " u; read -p "Proto: " p
+    [[ -z "$t" || -z "$u" || -z "$p" ]] && return
+    hydra -l "$u" -P /usr/share/wordlists/rockyou.txt "$t" "$p" -V | tee -a "$LOOT_DIR/brute.txt"
+    read -p "Нажми Enter..."
+}
+
+smart_sqlmap() {
+    read -p "URL: " u
+    [[ -z "$u" ]] && return
+    sqlmap -u "$u" --batch --random-agent --output-dir="$LOOT_DIR/sqlmap"
+    grep -aE "Payload:|target URL" "$LOOT_DIR/sqlmap/log" 2>/dev/null
+    read -p "Нажми Enter..."
+}
+
+smart_bettercap_v3() {
+    LFILE="$LOOT_DIR/bettercap_loot.txt"
+    echo -e "${CYAN}[*] Запуск Bettercap Stealth...${NC}"
+    # Автономная настройка и запуск одной командой
+    bettercap -eval "set net.sniff.output $LFILE; set net.sniff.verbose false; net.probe on; net.sniff on"
+}
+
+# --- ОБНОВЛЕННЫЙ ЧИСТЫЙ ЦИКЛ CASE ---
 while true; do
     show_menu
     read -p "Опция: " opt
     case $opt in
-        1) clean_system ;;
-        2) read -p "IP: " t; [[ -n "$t" ]] && nmap -sV --open "$t" | grep "open" | tee "$LOOT_DIR/nmap_$t.txt"; read -p ".." ;;
-        3) read -p "Q: " q; searchsploit "$q"; read -p "ID: " id; [[ -n "$id" ]] && { cd "$LOOT_DIR"; searchsploit -m "$id"; }; read -p ".." ;;
-        4) read -p "IP: " t; read -p "U: " u; read -p "P: " p; hydra -l $u -P /usr/share/wordlists/rockyou.txt $t $p -V; read -p ".." ;;
-        5) read -p "URL: " u; [[ -n "$u" ]] && sqlmap -u "$u" --batch --random-agent --output-dir="$LOOT_DIR/sqlmap"; read -p ".." ;;
-        6) LFILE="$LOOT_DIR/bettercap_loot.txt"
-           bettercap -eval "set net.sniff.output $LFILE; net.probe on; net.sniff on" ;;
-        7) smart_installer ;;
-        0) exit 0 ;;
+        1) clean_system ;;      # Ремонт и зачистка
+        2) smart_nmap ;;        # Сеть
+        3) smart_searchsploit ;; # Эксплойты
+        4) smart_hydra ;;       # Брут
+        5) smart_sqlmap ;;      # Веб
+        6) smart_bettercap_v3 ;;# Перехват
+        7) smart_installer ;;   # Установка
+        0) exit 0 ;;            # Выход
         *) sleep 1 ;;
     esac
 done
