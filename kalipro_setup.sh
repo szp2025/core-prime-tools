@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Текущая версия инструментов в репозитории
-CURRENT_VERSION="1.7"
+CURRENT_VERSION="2.3"
 
 # Пути к системным командам
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -172,27 +172,76 @@ except:
 }
 
 
+# Функция для работы с эксплойтами
+smart_searchsploit() {
+    # Создаем папку для добычи, если её нет
+    WORK_DIR="$HOME/arsenal_exploits"
+    mkdir -p "$WORK_DIR"
+    
+    read -p "Что ищем (напр. WordPress 5.0): " query
+    if [[ -z "$query" ]]; then return; fi
+
+    echo -e "${BLUE}[*] Поиск уязвимостей для: $query...${NC}"
+    searchsploit "$query"
+    
+    echo -e "${CYAN}-------------------------------------------${NC}"
+    echo -e "Введите путь/ID эксплойта для копирования (или Enter для выхода):"
+    read -p "ID: " exploit_id
+    
+    if [[ -n "$exploit_id" ]]; then
+        cd "$WORK_DIR"
+        echo -e "${GREEN}[*] Копирую эксплойт в $WORK_DIR...${NC}"
+        searchsploit -m "$exploit_id"
+        
+        # Проверяем, что скопировалось
+        ls -lh | grep $(basename "$exploit_id")
+        echo -e "${GREEN}[+] Готово. Файл готов к работе в папке exploits.${NC}"
+        read -p "Нажмите Enter..."
+    fi
+}
+
+# Функция для умного сканирования сети
+smart_nmap() {
+    echo -e "${CYAN}=== ИНТЕЛЛЕКТУАЛЬНЫЙ СКАНЕР NMAP v2.2 ===${NC}"
+    read -p "Введите цель: " target
+    if [[ -z "$target" ]]; then return; fi
+
+    echo -e "${BLUE}1.${NC} Быстрый скан"
+    echo -e "${BLUE}2.${NC} Глубокий анализ"
+    echo -e "${BLUE}3.${NC} Поиск уязвимостей"
+    echo -e "${YELLOW}4. ПОЛНЫЙ ЦИКЛ (1 + 2 + 3)${NC}" # Наш новый режим
+    read -p "Выберите режим: " nmap_opt
+
+    case $nmap_opt in
+        1) nmap -F --open "$target" ;;
+        2) nmap -sV -sC -O --open "$target" ;;
+        3) nmap -sV --script vulners --open "$target" ;;
+        4) 
+            echo -e "${GREEN}[*] ЭТАП 1: Быстрая разведка...${NC}"
+            nmap -F --open "$target"
+            echo -e "${GREEN}[*] ЭТАП 2: Определение сервисов и ОС...${NC}"
+            nmap -sV -O --open "$target"
+            echo -e "${GREEN}[*] ЭТАП 3: Поиск уязвимостей (Vulners)...${NC}"
+            nmap -sV --script vulners --open "$target"
+            ;;
+        *) return ;;
+    esac
+
+    echo -e "${CYAN}-------------------------------------------${NC}"
+    read -p "Цикл завершен. Нажмите Enter для возврата..."
+}
+
+# Фиксируем время начала сессии
+START_TIME=$(date +"%H:%M:%S")
+
 while true; do
     show_menu
-    read -p "Опция: " opt
+    # Добавим напоминание о времени начала в строке ввода
+    read -p "[Start: $START_TIME] Опция: " opt
     case \$opt in
         1) clean_system ;;
-        2) 
-            read -p "Цель для Nmap: " t
-            if [[ -n "\$t" ]]; then
-                nmap -F --open \$t
-                echo -e "\${CYAN}--- Нажмите Enter для возврата ---\${NC}"
-                read
-            fi
-            ;;
-        3) 
-            read -p "Поиск: " s
-            if [[ -n "\$s" ]]; then
-                searchsploit \$s
-                echo -e "\${CYAN}--- Нажмите Enter для возврата ---\${NC}"
-                read
-            fi
-            ;;
+        2) smart_nmap ;;
+        3) smart_searchsploit ;;
         4) smart_brute ;;
         5) smart_web_scan ;;
         6) smart_bettercap ;;
@@ -201,8 +250,18 @@ while true; do
             echo -e "\${CYAN}--- Нажмите Enter для возврата ---\${NC}"
             read 
             ;;
-        0) exit 0 ;;
-        *) sleep 1 ;;
+        0) 
+            echo -e "\${YELLOW}[?] Вы уверены, что хотите выйти? (y/n)\${NC}"
+            read -n 1 confirm
+            if [[ "\$confirm" == "y" ]]; then
+                echo -e "\n\${GREEN}[*] Сессия завершена. Удачи!\${NC}"
+                exit 0
+            fi
+            ;;
+        *) 
+            echo -e "\${RED}[!] Неверный выбор\${NC}"
+            sleep 1 
+            ;;
     esac
 done
 EOF
