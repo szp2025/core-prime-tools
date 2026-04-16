@@ -39,8 +39,12 @@ clean_system() {
     apt-get clean && apt-get autoclean && apt-get autoremove -y
     rm -rf /var/cache/apt/archives/* /tmp/* /var/tmp/*
     rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/locale/*
-    echo -e "${GREEN}[+] Очистка завершена!${NC}"
-    sleep 2
+    echo -e "${GREEN}[+] Очистка завершена! Состояние памяти:${NC}"
+    
+    # Твое добавление:
+    df -h /
+    echo -e "${CYAN}Пауза 20 секунд для анализа...${NC}"
+    sleep 20
 }
 
 while true; do
