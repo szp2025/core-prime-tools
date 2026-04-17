@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.6"
+CURRENT_VERSION="7.7"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1498,32 +1498,48 @@ flow_system_care() {
 }
 
 
+# --- [ SMART FLOW: WIRELESS DOMINANCE ] ---
+# Связка: 11 (Wifite) + 24 (BT-HID) + 12 (USB Guardian)
+flow_wifi_attack() {
+    echo -e "${RED}=== [ WIRELESS DOMINANCE MODE ] ===${NC}"
+    
+    echo -e "${CYAN}[1/3] Запуск Wifite (Автоматический захват хендшейков)...${NC}"
+    run_wifite
+    
+    echo -e "\n${MAGENTA}[2/3] Инициализация BT-HID (Эмуляция клавиатуры)...${NC}"
+    run_bt_hid_attack
+    
+    echo -e "\n${BLUE}[3/3] Активация USB Guardian (Защита портов)...${NC}"
+    usb_guardian_smart
+    
+    echo -e "${GREEN}>>> Беспроводные операции завершены.${NC}"
+    read -r
+}
+
+
 
 show_menu() {
     clear
-    # Компактный заголовок
     echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC} ${GREEN}     SAMSUNG AUTONOMOUS CORE v8.5    ${NC} ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC} ${GREEN}    AUTONOMOUS SAMSUNG CORE v8.5.1    ${NC} ${CYAN}│${NC}"
     echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
     
-    run_smart_check # Твоя инфо-строка [ СИСТЕМА ]
+    run_smart_check
 
     echo -e "${YELLOW} [ AUTONOMOUS OPERATIONS ]${NC}"
     
-    # Используем краткие, но мощные описания без лишних скобок
-    echo -e " ${CYAN}A.${NC} TOTAL RECON 360   ${GRAY}>> OSINT & Global Analyt${NC}"
-    echo -e " ${CYAN}B.${NC} WEB ATTACK STACK  ${GRAY}>> Vuln Scan & Exploit${NC}"
-    echo -e " ${CYAN}C.${NC} NETWORK GUARDIAN  ${GRAY}>> Sniff & Conn Ctrl${NC}"
-    echo -e " ${CYAN}D.${NC} SYSTEM STERILIZER ${GRAY}>> Ghost & Maintenance${NC}"
-    echo -e " ${CYAN}E.${NC} WIRELESS DOMINANCE${GRAY}>> WiFi & BT-HID Ops${NC}"
+    # Сокращаем длину строк до ~35-38 символов суммарно
+    echo -e " ${CYAN}A.${NC} TOTAL RECON   ${GRAY}» OSINT & Analytics${NC}"
+    echo -e " ${CYAN}B.${NC} WEB ATTACK    ${GRAY}» Scan & Exploit${NC}"
+    echo -e " ${CYAN}C.${NC} NET GUARDIAN  ${GRAY}» Sniff & Connect${NC}"
+    echo -e " ${CYAN}D.${NC} STERILIZER    ${GRAY}» Ghost & Clean${NC}"
+    echo -e " ${CYAN}E.${NC} WIRELESS      ${GRAY}» WiFi & BT-HID${NC}"
 
     echo -e "\n${GREEN} [ INTERFACE ]${NC}"
-    # Выравниваем в одну строку для экономии места
-    printf "  %-20s %-20s\n" "18. TERMINAL MODE" "0. EXIT"
+    printf "  %-18s %-18s\n" "18. TERMINAL" "0. EXIT"
 
     echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
 }
-
 
 # --- Глобальный контекст ---
 LAST_TARGET=""
