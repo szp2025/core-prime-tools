@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.3"
+CURRENT_VERSION="7.4"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1330,140 +1330,139 @@ run_file_analyzer() {
 }
 
 
-# --- MODULE: UNIFIED OSINT ANALYZER v8.1 (OPERATOR & REPUTATION) ---
+# --- MODULE: UNIFIED OSINT ANALYZER v8.3 (HYBRID & LINK DECRYPTOR) ---
 trust_analyzer_unified() {
-    echo -e "${BLUE}=== ULTIMATE TRUST ANALYZER v8.1 (REPUTATION) ===${NC}"
-    echo -ne "${YELLOW}Введите Email, Домен или Номер телефона: ${NC}"
+    echo -e "${BLUE}=== ULTIMATE TRUST ANALYZER v8.3 (TOTAL) ===${NC}"
+    echo -ne "${YELLOW}Введите Email, Домен, Номер или Ссылку: ${NC}"
     read -r target
     [[ -z "$target" ]] && return
 
-    # --- 1. ВЕКТОР: НОМЕР ТЕЛЕФОНА (OPERATOR & TRUST) ---
-    if [[ "$target" =~ ^[0-9+]{7,15}$ ]]; then
+    # --- 1. ВЕКТОР: ССЫЛКИ (DEEP LINK DECRYPTOR) ---
+    if [[ "$target" =~ ^http ]] || [[ "$target" =~ (bit\.ly|t\.co|lnkd\.in|tinyurl|clck\.ru|goo\.gl|shorte\.st) ]]; then
+        echo -e "${CYAN}[*] Обнаружена ссылка. Анализ перенаправлений (No-JS Mode)...${NC}"
+        
+        # Разворачиваем через HEAD-запросы, чтобы не качать вредоносный контент
+        local final_url=$(curl -sIL -o /dev/null -w "%{url_effective}" "$target" 2>/dev/null)
+        
+        if [[ "$final_url" != "$target" && -n "$final_url" ]]; then
+            echo -e "${MAGENTA}[!] Ссылка развернута:${NC} $final_url"
+            target="$final_url"
+        fi
+
+        local d=$(echo "$target" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+        echo -e "${BLUE}[*] Запуск аудита домена: $d${NC}"
+
+        # Проверка возраста и срока истечения (v8.0 logic)
+        local whois_raw=$(whois "$d" 2>/dev/null)
+        local created=$(echo "$whois_raw" | grep -Ei "Creation Date|created|Registered on" | head -n 1 | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}.[0-9]{2}.[0-9]{4}")
+        local expiry=$(echo "$whois_raw" | grep -Ei "Expiry Date|Expiration|expires" | head -n 1 | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}.[0-9]{2}.[0-9]{4}")
+        
+        [[ -n "$created" ]] && echo -e "${GREEN}[+] Создан: $created${NC}"
+        [[ "$created" =~ "2026" || "$created" =~ "2025" ]] && echo -e "${RED}[!!!] РИСК: Домен-однодневка (SCAM).${NC}"
+        [[ -n "$expiry" ]] && echo -e "${MAGENTA}[+] Истекает: $expiry${NC}"
+
+        # Проверка SSL и легальности
+        if timeout 4s openssl s_client -connect "$d":443 -servername "$d" </dev/null 2>/dev/null | grep -q "Verification: OK"; then
+            echo -e "${GREEN}[+] SSL: Trusted${NC}"
+        else
+            echo -e "${RED}[!!!] SSL: UNTRUSTED / EXPIRED${NC}"
+        fi
+
+    # --- 2. ВЕКТОР: НОМЕР ТЕЛЕФОНА (OPERATOR & REPUTATION) ---
+    elif [[ "$target" =~ ^[0-9+]{7,15}$ ]]; then
         local ph=$(echo "$target" | tr -d '+ ')
-        echo -e "${CYAN}[i] Формат: PHONE. Анализ оператора и уровня доверия...${NC}"
+        echo -e "${CYAN}[i] Формат: PHONE. Анализ оператора и доверия...${NC}"
         
-        # Глобальные префиксы стран
+        # Глобальная база префиксов (v8.1)
         declare -A geo_map=( ["7"]="Russia/Kazakhstan" ["1"]="USA/Canada" ["44"]="UK" ["49"]="Germany" ["33"]="France" ["380"]="Ukraine" ["375"]="Belarus" ["998"]="Uzbekistan" ["48"]="Poland" ["90"]="Turkey" ["971"]="UAE" )
+        declare -A provider_map=( ["7991"]="SberMobile (Virtual)" ["7999"]="Yota (Virtual)" ["7900"]="Tele2 (RU)" ["7910"]="MTS (RU)" ["7920"]="MegaFon (RU)" )
 
-        # Эвристика операторов и типов (Примеры для RU/FR/UA)
-        # Логика: если префикс совпадает с известными виртуальными операторами
-        declare -A provider_map=( 
-            ["7900"]="Tele2 (RU)" ["7910"]="MTS (RU)" ["7920"]="MegaFon (RU)" ["7930"]="MegaFon (RU)"
-            ["7991"]="SberMobile/Rostelecom (Virtual)" ["7999"]="Yota (Mobile/Virtual)"
-            ["336"]="Orange/SFR (FR)" ["337"]="Free Mobile/Bouygues (FR)"
-            ["38067"]="Kyivstar (UA)" ["38050"]="Vodafone (UA)"
-        )
-
-        # Определение страны
-        local country="Unknown"
         for i in {3..1}; do
-            [[ -n "${geo_map[${ph:0:$i}]}" ]] && { country="${geo_map[${ph:0:$i}]}"; break; }
+            [[ -n "${geo_map[${ph:0:$i}]}" ]] && { echo -e "${GREEN}[+] Страна: ${geo_map[${ph:0:$i}]}${NC}"; break; }
         done
-        echo -e "${GREEN}[+] Страна: $country${NC}"
 
-        # Определение оператора и доверия
-        local provider="Generic/Landline"
-        local trust_score="MEDIUM (Physical SIM likely)"
-        
-        for i in {5..3}; do
-            local pref=${ph:0:$i}
-            if [[ -n "${provider_map[$pref]}" ]]; then
-                provider="${provider_map[$pref]}"
-                # Эвристика доверия: виртуальные номера (VoIP) получают LOW TRUST
-                [[ "$provider" =~ "Virtual" ]] && trust_score="${RED}LOW (VoIP/Disposable Risk)${NC}"
-                [[ "$provider" =~ "Tele2|MTS|MegaFon|Orange|Vodafone" ]] && trust_score="${GREEN}HIGH (Major Carrier)${NC}"
+        local provider="Major/Landline"
+        local trust="${GREEN}HIGH${NC}"
+        for i in {5..4}; do
+            if [[ -n "${provider_map[${ph:0:$i}]}" ]]; then
+                provider="${provider_map[${ph:0:$i}]}"
+                [[ "$provider" =~ "Virtual" ]] && trust="${RED}LOW (VoIP)${NC}"
                 break
             fi
         done
+        echo -e "${CYAN}[*] Оператор: $provider${NC} | Доверие: $trust"
+        echo -e "${BLUE}[*] Ссылка на отзывы: https://www.google.com/search?q=%22$ph%22+кто+звонил${NC}"
 
-        echo -e "${CYAN}[*] Оператор: $provider${NC}"
-        echo -e "${YELLOW}[*] Уровень доверия: $trust_score${NC}"
-
-        # Ссылки на проверку в базах спамеров
-        echo -e "${BLUE}[*] Репутационный поиск:${NC}"
-        echo -e " > Google (Spam Check): https://www.google.com/search?q=%22$ph%22+отзывы+кто+звонил"
-        echo -e " > Tellows (Reputation): https://www.tellows.ru/num/$ph"
-
-    # --- 2. ВЕКТОР: EMAIL (DEEP VALIDATION) ---
+    # --- 3. ВЕКТОР: EMAIL (SMTP & OSINT) ---
     elif [[ "$target" =~ @ ]]; then
-        echo -e "${CYAN}[i] Формат: EMAIL. Запуск глубокой валидации...${NC}"
+        echo -e "${CYAN}[i] Формат: EMAIL. Глубокая валидация...${NC}"
         local domain="${target##*@}"
         
-        # Доверие к почтовому домену
-        if echo "$domain" | grep -EiQ "gmail.com|outlook.com|icloud.com"; then
-            echo -e "${GREEN}[+] Доверие: HIGH (Verified Provider)${NC}"
-        elif echo "$domain" | grep -EiQ "temp|yopmail|mailinator"; then
-            echo -e "${RED}[!!!] Доверие: ZERO (Disposable Email)${NC}"
+        # Проверка типа (v8.0)
+        if echo "$domain" | grep -EiQ "temp|yopmail|mailinator|guerrilla"; then
+            echo -e "${RED}[!!!] ТИП: ОДНОРАЗОВАЯ ПОЧТА${NC}"
         else
-            echo -e "${YELLOW}[!] Доверие: NEUTRAL (Private Domain)${NC}"
+            echo -e "${GREEN}[+] ТИП: ПОСТОЯННАЯ/КОРПОРАТИВНАЯ${NC}"
         fi
-        
-        # SMTP Handshake (логика v8.0)
-        local mx_first=$(host -t mx "$domain" 2>/dev/null | awk '{print $NF}' | sed 's/\.$//' | head -n 1)
-        [[ -n "$mx_first" ]] && {
-            timeout 5s bash -c "exec 3<>/dev/tcp/$mx_first/25; read -u 3; echo 'HELO hi' >&3; read -u 3; echo 'MAIL FROM:<test@example.com>' >&3; read -u 3; echo 'RCPT TO:<$target>' >&3; read -u 3; echo 'QUIT' >&3" 2>/dev/null | grep -q "250" && \
-            echo -e "${GREEN}[V] СТАТУС: Почта реально существует.${NC}" || echo -e "${RED}[-] СТАТУС: Не существует или защищена.${NC}"
+
+        # SMTP Ping
+        local mx=$(host -t mx "$domain" 2>/dev/null | awk '{print $NF}' | sed 's/\.$//' | head -n 1)
+        [[ -n "$mx" ]] && {
+            timeout 5s bash -c "exec 3<>/dev/tcp/$mx/25; read -u 3; echo 'HELO hi' >&3; read -u 3; echo 'MAIL FROM:<test@example.com>' >&3; read -u 3; echo 'RCPT TO:<$target>' >&3; read -u 3; echo 'QUIT' >&3" 2>/dev/null | grep -q "250" && \
+            echo -e "${GREEN}[V] СТАТУС: Ящик подтвержден сервером.${NC}" || echo -e "${RED}[-] СТАТУС: Не найден или защищен.${NC}"
         }
-
-    # --- 3. ВЕКТОР: ДОМЕН (SCAM AUDIT) ---
-    else
-        echo -e "${CYAN}[i] Формат: DOMAIN. Анализ риска...${NC}"
-        local d=$(echo "$target" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
-        
-        # SSL Анализ
-        if timeout 3s openssl s_client -connect "$d":443 -servername "$d" </dev/null 2>/dev/null | grep -q "Verification: OK"; then
-            echo -e "${GREEN}[+] SSL Trust: Secured${NC}"
-        else
-            echo -e "${RED}[!!!] SSL Trust: DANGEROUS / SCAM RISK${NC}"
-        fi
-
-        # Возраст домена (v8.0 logic)
-        local whois_raw=$(whois "$d" 2>/dev/null)
-        local created=$(echo "$whois_raw" | grep -Ei "Creation Date|created|Registered on" | head -n 1 | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}.[0-9]{2}.[0-9]{4}")
-        [[ -n "$created" ]] && echo -e "${BLUE}[*] Дата регистрации: $created${NC}"
     fi
 
     # СТЕРИЛИЗАЦИЯ
     truncate -s 0 ~/.bash_history
     history -c
-    echo -ne "\n${BLUE}>>> Анализ v8.1 завершен. Нажми Enter...${NC}"
+    echo -ne "\n${BLUE}>>> Анализ v8.3 завершен. Нажми Enter...${NC}"
     read -r
 }
 
 
 show_menu() {
     clear
-    echo -e "${CYAN}===========================================${NC}"
-    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - v6.6 ELITE    ${NC}"
-    echo -e "${CYAN}===========================================${NC}"
-    run_smart_check
+    # --- HEADER BLOCK ---
+    echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC} ${GREEN}      KALI SAMSUNG ARSENAL v8.4      ${NC} ${CYAN}│${NC}"
+    echo -e "${CYAN}├───────────────────────────────────────────┤${NC}"
     
-    echo -e "${YELLOW} [ SYSTEM & MAINTENANCE ]${NC}"
-    echo -e "  1. REPAIR/CLEAN        9. DEEP PURGE (911)"
-    echo -e " 15. UPDATE ARSENAL     16. SETUP AUTO-TASKS"
-    echo -e " 17. CRON MANAGER       18. TERMINAL MODE"
-    echo -e "  8. SMART INSTALLER     0. EXIT"
-    
-    echo -e "\n${BLUE} [ MONITORING & NETWORK ]${NC}"
-    echo -e " 19. RADIO CTRL (W/B)   20. NET CONNECTIONS"
-    echo -e " 21. PROCESS MONITOR    12. USB GUARDIAN"
-    echo -e " 25. Local VPN          26. File Analyzer"
-    
-    echo -e "\n${MAGENTA} [ RECON & ANALYSIS ]${NC}"
-    echo -e "  2. SMART NMAP          10. SHERLOCK (OSINT)"
-    echo -e "  7. NIKTO (WEB)         13. DEEP INSIGHT"
-    echo -e "  27. UNIFIED OSINT ANALYZER"
+    # --- STATUS BAR (Динамическая проверка) ---
+    local vpn_stat=$(pgrep openvpn > /dev/null && echo -e "${GREEN}ON${NC}" || echo -e "${RED}OFF${NC}")
+    local wifi_stat=$(iwgetid -r > /dev/null && echo -e "${GREEN}CONNECTED${NC}" || echo -e "${RED}DISC${NC}")
+    echo -e "${CYAN}│${NC} VPN: $vpn_stat | WiFi: $wifi_stat | $(date +%H:%M) ${CYAN}│${NC}"
+    echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
 
-    
-    
-    echo -e "\n${RED} [ EXPLOIT & ATTACK ]${NC}"
-    echo -e "  3. SEARCHSPLOIT        4. HYDRA (BRUTE)"
-    echo -e "  5. SQLMAP (DB)         6. BETTERCAP (MITM)"
-    echo -e " 11. WIFITE (WIFI)       14. ACCESS RECOVERY"
-    echo -e " 22. Harvest Credentials  23.Reverse Shell "
-    echo -e " 24. BT-HID "
-     
-    echo -e "${CYAN}===========================================${NC}"
+    run_smart_check # Твоя функция проверки состояния системы
+
+    # --- BLOCK 1: OSINT & ANALYTICS (Главная новинка) ---
+    echo -e "${MAGENTA} 💎 RECON & OSINT INTELLIGENCE${NC}"
+    printf "  %-24s %-24s\n" "27. UNIFIED ANALYZER" "10. SHERLOCK (OSINT)"
+    printf "  %-24s %-24s\n" "13. DEEP INSIGHT" "7. NIKTO (WEB SCAN)"
+    printf "  %-24s %-24s\n" "2. SMART NMAP" "26. FILE ANALYZER"
+
+    # --- BLOCK 2: EXPLOITATION & ATTACK ---
+    echo -e "\n${RED} ⚔️ OFFENSIVE OPERATIONS${NC}"
+    printf "  %-24s %-24s\n" "3. SEARCHSPLOIT" "4. HYDRA (BRUTE)"
+    printf "  %-24s %-24s\n" "5. SQLMAP (DB)" "6. BETTERCAP (MITM)"
+    printf "  %-24s %-24s\n" "11. WIFITE (WIFI)" "22. CREDENTIAL HARVEST"
+    printf "  %-24s %-24s\n" "23. REVERSE SHELL" "24. BT-HID ATTACK"
+
+    # --- BLOCK 3: MONITORING & NETWORK ---
+    echo -e "\n${BLUE} 📡 MONITORING & SHIELD${NC}"
+    printf "  %-24s %-24s\n" "19. RADIO CTRL (W/B)" "20. NET CONNECTIONS"
+    printf "  %-24s %-24s\n" "21. PROCESS MONITOR" "25. LOCAL VPN"
+    printf "  %-24s %-24s\n" "12. USB GUARDIAN" "14. ACCESS RECOVERY"
+
+    # --- BLOCK 4: SYSTEM & CORE ---
+    echo -e "\n${YELLOW} ⚙️ CORE SYSTEMS${NC}"
+    printf "  %-24s %-24s\n" "1. REPAIR/CLEAN" "8. SMART INSTALLER"
+    printf "  %-24s %-24s\n" "15. UPDATE ARSENAL" "16. SETUP AUTO-TASKS"
+    printf "  %-24s %-24s\n" "17. CRON MANAGER" "18. TERMINAL MODE"
+    printf "  %-24s %-24s\n" "9. DEEP PURGE (911)" "0. EXIT"
+
+    echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
 }
 
 # --- MAIN LOOP ---
