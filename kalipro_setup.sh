@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="6.7"
+CURRENT_VERSION="6.8"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -161,56 +161,62 @@ run_wifite() {
     read -p "Нажми Enter..."
 }
 
-# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v6.0 (EVENT HORIZON EDITION) ---
+# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v6.4 (GHOST EDITION) ---
 deep_purge() {
-    echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (EVENT HORIZON) ===${NC}"
-    
+    # Проверяем, запущен ли скрипт в тихом режиме
+    local silent=false
+    [[ "$1" == "--purge-silent" ]] && silent=true
+
+    if [ "$silent" = false ]; then
+        echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (GHOST MODE) ===${NC}"
+    fi
+
     # 1. Стерилизация пакетного менеджера и индексов
-    echo -e "${YELLOW}[*] Сжатие пакетной базы и APT...${NC}"
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Сжатие пакетной базы и APT...${NC}"
     apt-get autoremove --purge -y >/dev/null 2>&1
-    apt-get clean
-    apt-get autoclean
-    # Удаляем индексы - они скачиваются заново при apt update
+    apt-get clean >/dev/null 2>&1
+    apt-get autoclean >/dev/null 2>&1
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/*
 
-    # 2. Массовое удаление статического балласта (Графика, мануалы, шрифты)
-    echo -e "${YELLOW}[*] Ликвидация интерфейсного балласта (Doc/Fonts/Icons)...${NC}"
+    # 2. Массовое удаление статического балласта
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Ликвидация Doc/Fonts/Icons...${NC}"
     rm -rf /usr/share/{doc,man,info,locale,icons,fonts,themes}/* 2>/dev/null
 
-    # 3. Уничтожение кэша сред разработки и окружения
-    echo -e "${YELLOW}[*] Зачистка кэша сред разработки (Python/Pip/Go/Ruby)...${NC}"
-    # Python & Pip
+    # 3. Уничтожение кэша сред разработки
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Зачистка кэша (Python/Pip/Go/Ruby)...${NC}"
     find /usr/lib/python3* -name "*.pyc" -delete 2>/dev/null
     find / -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
     rm -rf ~/.cache/pip ~/.cache/go-build ~/.gem 2>/dev/null
 
-    # 4. Стерилизация системных логов и временных зон
-    echo -e "${YELLOW}[*] Стерилизация логов и /tmp...${NC}"
+    # 4. Стерилизация логов (включая Cron и Mail)
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Стерилизация логов и /tmp...${NC}"
     find /var/log -type f -delete 2>/dev/null
+    rm -rf /var/mail/* /var/spool/mail/* 2>/dev/null # Удаляем системную почту Cron
     rm -rf /tmp/* /var/tmp/* /var/cache/fontconfig/* 2>/dev/null
 
-    # 5. Интеллектуальное удаление БД PostgreSQL (если весит > 50MB)
+    # 5. Аннигиляция PostgreSQL (если > 50MB)
     if [ -d "/var/lib/postgresql" ]; then
         if [ "$(du -sm /var/lib/postgresql | awk '{print $1}')" -gt 50 ]; then
-            echo -e "${RED}[!] База данных PostgreSQL аннигилирована.${NC}"
+            [[ "$silent" = false ]] && echo -e "${RED}[!] PostgreSQL аннигилирована.${NC}"
             rm -rf /var/lib/postgresql
         fi
     fi
 
-    # 6. Очистка трофеев и истории команд
-    echo -e "${YELLOW}[*] Стирание оперативных данных и истории...${NC}"
+    # 6. Очистка трофеев и истории
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Стирание истории...${NC}"
     rm -rf "$LOOT_DIR"/* ~/.bettercap_history ~/.bash_history 2>/dev/null
     history -c
 
-    # 7. Финальное удаление бэкапов конфигураций
+    # 7. Финальное удаление бэкапов
     find /etc -name "*.bak" -o -name "*.old" -delete 2>/dev/null
 
-    echo -e "${GREEN}[+ ] DEEP PURGE v6.0 завершен! Стерильность достигнута.${NC}"
-    echo -ne "${BLUE}[!] Доступная память: ${NC}"
-    df -h / | awk 'NR==2 {print $4}'
-    sleep 2
+    if [ "$silent" = false ]; then
+        echo -e "${GREEN}[+] DEEP PURGE v6.4 завершен!${NC}"
+        echo -ne "${BLUE}[!] Доступная память: ${NC}"
+        df -h / | awk 'NR==2 {print $4}'
+        sleep 2
+    fi
 }
-
 
 # --- ФУНКЦИЯ АВТО-МОНТИРОВАНИЯ ---
 auto_mount_pc() {
@@ -451,25 +457,28 @@ setup_autotasks() {
     # 2. Жёсткое определение пути (чтобы не было пустых строк)
     # Используем прямой путь, так как он у нас статичен
     REAL_PATH="/usr/local/bin/kali_pro"
+    UP_KALI_PATH="/usr/local/bin/update_kali"
     
-    PURGE_JOB="0 4 * * * $REAL_PATH --purge-silent"
-    UPDATE_JOB="0 5 * * 0 $REAL_PATH --update-silent"
+    PURGE_JOB="0 4 * * * $REAL_PATH --purge-silent > /dev/null 2>&1"
+    UPDATE_JOB="0 5 * * 0 $REAL_PATH --update-silent > /dev/null 2>&1"
+    UP_KALI_JOB="0 6 1,15 * * $UP_KALI_PATH --auto > /dev/null 2>&1"
 
     # 3. Читаем текущий конфиг
     CURRENT_CRON=$(crontab -l 2>/dev/null)
 
     # 4. Умная перезапись (удаляем старое, пишем новое)
     # Очищаем всё, что связано с kali_pro, чтобы не плодить дубли
-    CLEAN_CRON=$(echo "$CURRENT_CRON" | grep -v "kali_pro" | grep -v "purge-silent" | grep -v "update-silent")
-    
+    CLEAN_CRON=$(echo "$CURRENT_CRON" | grep -vE "kali_pro|update_kali|purge-silent|update-silent")    
     # Собираем финальный конфиг
-    echo -e "$CLEAN_CRON\n$PURGE_JOB\n$UPDATE_JOB" | sed '/^$/d' | crontab -
+    echo -e "$CLEAN_CRON\n$PURGE_JOB\n$UPDATE_JOB\n$UP_KALI_JOB" | sed '/^$/d' | crontab -
 
-    # 5. Проверка результата
-    if crontab -l | grep -q "$REAL_PATH"; then
-        echo -e "${GREEN}[+] Задачи успешно синхронизированы в crontab.${NC}"
+  # 5. Проверка результата (Комплексная)
+    if crontab -l | grep -q "$REAL_PATH" && crontab -l | grep -q "$UP_KALI_PATH"; then
+        echo -e "${GREEN}[+] Полная синхронизация: Арсенал и Установщик в графике.${NC}"
+    elif crontab -l | grep -q "$REAL_PATH"; then
+        echo -e "${YELLOW}[!] Частичная синхронизация: Только Арсенал.${NC}"
     else
-        echo -e "${RED}[-] Ошибка записи! Проверь права доступа root.${NC}"
+        echo -e "${RED}[-] Критическая ошибка записи в crontab!${NC}"
     fi
 
     # 6. Оживление демона
@@ -479,26 +488,108 @@ setup_autotasks() {
     read -p "Нажми Enter..."
 }
 
+# --- МОДУЛЬ ТЕРМИНАЛА: TERMINAL MODE v6.4 ---
+run_manual_command() {
+    echo -e "${YELLOW}[!] Режим ручного ввода. Введите 'exit' для возврата в меню.${NC}"
+    while true; do
+        echo -ne "${CYAN}Arsenal-Shell> ${NC}"
+        read -r cmd
+        if [[ "$cmd" == "exit" || "$cmd" == "0" ]]; then
+            break
+        fi
+        eval "$cmd"
+        echo ""
+    done
+}
+
+# --- МОДУЛЬ УПРАВЛЕНИЯ CRON: CRON MANAGER ---
+manage_cron() {
+    echo -e "${CYAN}--- ТЕКУЩИЕ ЗАДАЧИ CRON ---${NC}"
+    crontab -l 2>/dev/null || echo -e "${RED}[!] Задачи отсутствуют.${NC}"
+    echo -e "${CYAN}---------------------------${NC}"
+    echo -e "1. Редактировать (nano)\n2. Очистить всё\n0. Назад"
+    read -p "Выбор: " cron_opt
+    case $cron_opt in
+        1) crontab -e ;;
+        2) crontab -r && echo -e "${RED}[!] Все задачи удалены.${NC}" ;;
+        *) return ;;
+    esac
+}
+
+
+# --- МОДУЛЬ МОНИТОРИНГА СИСТЕМЫ ---
+run_monitor() {
+    echo -e "${CYAN}--- МОНИТОРИНГ РЕСУРСОВ (Нажми 'q' для выхода) ---${NC}"
+    sleep 1
+    # Используем htop если есть, иначе top
+    if command -v htop &> /dev/null; then
+        htop
+    else
+        top -n 1 -b | head -n 20
+        read -p "Нажми Enter..."
+    fi
+}
+
+# --- МОДУЛЬ СЕТЕВЫХ СОЕДИНЕНИЙ ---
+run_netstat() {
+    echo -e "${CYAN}--- АКТИВНЫЕ СОЕДИНЕНИЯ (ESTABLISHED) ---${NC}"
+    netstat -tunpa | grep ESTABLISHED || echo "Активных соединений нет."
+    echo -e "\n${YELLOW}--- ПРОСЛУШИВАЕМЫЕ ПОРТЫ (LISTEN) ---${NC}"
+    netstat -tunpa | grep LISTEN
+    read -p "Нажми Enter..."
+}
+
+# --- УПРАВЛЕНИЕ ИНТЕРФЕЙСАМИ (Wi-Fi/BT) ---
+manage_interfaces() {
+    while true; do
+        clear
+        echo -e "${BLUE}--- УПРАВЛЕНИЕ ИНТЕРФЕЙСАМИ ---${NC}"
+        echo -e "1. Wi-Fi: ВКЛ          4. Bluetooth: ВКЛ"
+        echo -e "2. Wi-Fi: ВЫКЛ         5. Bluetooth: ВЫКЛ"
+        echo -e "3. Статус интерфейсов  0. Назад"
+        read -p "Выбор: " int_opt
+        case $int_opt in
+            1) nmcli radio wifi on 2>/dev/null || rfkill unblock wifi ;;
+            2) nmcli radio wifi off 2>/dev/null || rfkill block wifi ;;
+            3) ip a | grep -E "wlan|eth|blue" ; rfkill list ;;
+            4) rfkill unblock bluetooth ;;
+            5) rfkill block bluetooth ;;
+            0) break ;;
+        esac
+        [[ "$int_opt" != "0" ]] && sleep 1
+    done
+}
+
+
 
 
 show_menu() {
     clear
     echo -e "${CYAN}===========================================${NC}"
-    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v4.5     ${NC}"
+    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v6.5     ${NC}"
     echo -e "${CYAN}===========================================${NC}"
     run_smart_check
-    echo -e "${CYAN}-------------------------------------------${NC}"
-    echo -e " ${BLUE}1.${NC} РЕМОНТ/ОБНОВЛЕНИЕ  ${BLUE}2.${NC} NMAP"
-    echo -e " ${BLUE}3.${NC} SEARCHSPLOIT      ${BLUE}4.${NC} HYDRA"
-    echo -e " ${BLUE}5.${NC} SQLMAP            ${BLUE}6.${NC} BETTERCAP"
-    echo -e " ${BLUE}7.${NC} NIKTO             ${BLUE}8.${NC} SMART INSTALLER"
-    echo -e " ${YELLOW}10. SHERLOCK        11. WIFITE${NC}"
-    echo -e " ${RED}12. USB GUARDIAN SMART (Active)${NC}"
-    echo -e " ${RED}13. DEEP INSIGHT AUTO (Forensics)${NC}"
-echo -e " ${RED}14. ACCESS RECOVERY (PASS BYPASS)${NC}"
-echo -e " ${CYAN}15. UPDATE KALI ARSENAL${NC}"
-echo -e " ${CYAN}16. SETUP AUTO-TASKS (CRON)${NC}"
-    echo -e " ${BLUE}9. ACCESS PURGE AUTO (ОЧИСТКА)${NC}  ${RED}0. ВЫХОД${NC}"
+    
+    echo -e "${YELLOW} [ СИСТЕМА И ОБСЛУЖИВАНИЕ ]${NC}"
+    echo -e "  1. РЕМОНТ/ОБНОВЛЕНИЕ    9. ГЛУБОКАЯ ОЧИСТКА (911)"
+    echo -e " 15. UPDATE ARSENAL      16. SETUP CRON (AUTO)"
+    echo -e " 17. MANAGE CRON         18. TERMINAL MODE (CMD)"
+    
+    echo -e "\n${BLUE} [ МОНИТОРИНГ И СЕТЬ ]${NC}"
+    echo -e " 19. УПРАВЛЕНИЕ RF (W/B) 20. СЕТЕВЫЕ СВЯЗИ (NET)"
+    echo -e " 21. ПРОЦЕССЫ (HTOP)      0. ВЫХОД"
+    
+    echo -e "\n${MAGENTA} [ РАЗВЕДКА И АНАЛИЗ ]${NC}"
+    echo -e "  2. SMART NMAP          10. SHERLOCK (OSINT)"
+    echo -e "  7. NIKTO (WEB SCAN)    13. DEEP INSIGHT (AUTO)"
+    
+    echo -e "\n${RED} [ ЭКСПЛУАТАЦИЯ И АТАКА ]${NC}"
+    echo -e "  3. SEARCHSPLOIT         4. HYDRA (BRUTE)"
+    echo -e "  5. SQLMAP (DB)          6. BETTERCAP (MITM)"
+    echo -e " 11. WIFITE (WIFI)       14. ACCESS RECOVERY"
+    
+    echo -e "\n${BLUE} [ ЗАЩИТА И ПЕРИФЕРИЯ ]${NC}"
+    echo -e " 12. USB GUARDIAN SMART (ACTIVE)"
     echo -e "${CYAN}===========================================${NC}"
 }
 
@@ -507,24 +598,43 @@ while true; do
     show_menu
     read -p "Опция: " opt
     case $opt in
+        # --- Блок: Система ---
         1) clean_system ;;
+        8) smart_installer ;;
+        9) deep_purge ;;
+        15) update_kali ;;
+        17) manage_cron ;;         # Пункт 17
+        18) run_manual_command ;;  # Пункт 18
+        16) setup_autotasks ;;
+        0) exit 0 ;;
+
+        # --- Блок: Разведка ---
         2) smart_nmap ;;
+        7) smart_nikto ;;
+        10) run_sherlock ;;
+        13) deep_insight_auto ;;
+
+        # --- Блок: Атака ---
         3) smart_searchsploit ;;
         4) smart_hydra ;;
         5) smart_sqlmap ;;
         6) bettercap -eval "net.probe on; net.sniff on" ;;
-        7) smart_nikto ;;
-        8) smart_installer ;;
-        9) deep_purge ;;
-        10) run_sherlock ;;
         11) run_wifite ;;
-        12) usb_guardian_smart ;;
-        13) deep_insight_auto  ;;
         14) access_recovery_auto ;;
-        15) update_kali ;;
-        16) setup_autotasks ;;
-        0) exit 0 ;;
-        *) sleep 0.5 ;;
+
+        # --- Блок: Специальное ---
+        12) usb_guardian_smart ;;
+
+# --- Блок: Мониторинг ---
+        19) manage_interfaces ;;
+        20) run_netstat ;;
+        21) run_monitor ;;
+        
+        # --- Обработка ошибок ---
+        *) 
+            echo -e "${RED}[!] Неверный выбор.${NC}"
+            sleep 0.5 
+            ;;
     esac
 done
 
