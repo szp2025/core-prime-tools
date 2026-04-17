@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="6.9"
+CURRENT_VERSION="7.0"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -578,30 +578,28 @@ manage_interfaces() {
 show_menu() {
     clear
     echo -e "${CYAN}===========================================${NC}"
-    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - MENU v6.5     ${NC}"
+    echo -e "${GREEN}      KALI SAMSUNG ARSENAL - v6.6 ELITE    ${NC}"
     echo -e "${CYAN}===========================================${NC}"
     run_smart_check
     
-    echo -e "${YELLOW} [ СИСТЕМА И ОБСЛУЖИВАНИЕ ]${NC}"
-    echo -e "  1. РЕМОНТ/ОБНОВЛЕНИЕ    9. ГЛУБОКАЯ ОЧИСТКА (911)"
-    echo -e " 15. UPDATE ARSENAL      16. SETUP CRON (AUTO)"
-    echo -e " 17. MANAGE CRON         18. TERMINAL MODE (CMD)"
+    echo -e "${YELLOW} [ SYSTEM & MAINTENANCE ]${NC}"
+    echo -e "  1. REPAIR/CLEAN        9. DEEP PURGE (911)"
+    echo -e " 15. UPDATE ARSENAL     16. SETUP AUTO-TASKS"
+    echo -e " 17. CRON MANAGER       18. TERMINAL MODE"
+    echo -e "  8. SMART INSTALLER     0. EXIT"
     
-    echo -e "\n${BLUE} [ МОНИТОРИНГ И СЕТЬ ]${NC}"
-    echo -e " 19. УПРАВЛЕНИЕ RF (W/B) 20. СЕТЕВЫЕ СВЯЗИ (NET)"
-    echo -e " 21. ПРОЦЕССЫ (HTOP)      0. ВЫХОД"
+    echo -e "\n${BLUE} [ MONITORING & NETWORK ]${NC}"
+    echo -e " 19. RADIO CTRL (W/B)   20. NET CONNECTIONS"
+    echo -e " 21. PROCESS MONITOR    12. USB GUARDIAN"
     
-    echo -e "\n${MAGENTA} [ РАЗВЕДКА И АНАЛИЗ ]${NC}"
+    echo -e "\n${MAGENTA} [ RECON & ANALYSIS ]${NC}"
     echo -e "  2. SMART NMAP          10. SHERLOCK (OSINT)"
-    echo -e "  7. NIKTO (WEB SCAN)    13. DEEP INSIGHT (AUTO)"
+    echo -e "  7. NIKTO (WEB)         13. DEEP INSIGHT"
     
-    echo -e "\n${RED} [ ЭКСПЛУАТАЦИЯ И АТАКА ]${NC}"
-    echo -e "  3. SEARCHSPLOIT         4. HYDRA (BRUTE)"
-    echo -e "  5. SQLMAP (DB)          6. BETTERCAP (MITM)"
+    echo -e "\n${RED} [ EXPLOIT & ATTACK ]${NC}"
+    echo -e "  3. SEARCHSPLOIT        4. HYDRA (BRUTE)"
+    echo -e "  5. SQLMAP (DB)         6. BETTERCAP (MITM)"
     echo -e " 11. WIFITE (WIFI)       14. ACCESS RECOVERY"
-    
-    echo -e "\n${BLUE} [ ЗАЩИТА И ПЕРИФЕРИЯ ]${NC}"
-    echo -e " 12. USB GUARDIAN SMART (ACTIVE)"
     echo -e "${CYAN}===========================================${NC}"
 }
 
