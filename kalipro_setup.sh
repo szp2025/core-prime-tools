@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="8.0"
+CURRENT_VERSION="8.1"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1440,11 +1440,11 @@ flow_antivirus_scan() {
     ps aux | awk '$3 > 30.0 {print "[!] Нагрузка:", $11}' 
 
     # 3. Глубокое сканирование (Эвристика + Удаление)
-    echo -e "${CYAN}[*] Запуск эвристического сканирования...${NC}"
+    echo -e "${CYAN}[*] Запуск эвристического сканирования системы и загрузок...${NC}"
     # --no-summary: не выводит отчет в конце (меньше текста)
     # --remove: мгновенная ликвидация
-    clamscan -r --infected --remove --heuristic-scan-precedence=yes \
-             --no-summary $HOME $TMPDIR 2>/dev/null
+   clamscan -r --infected --remove --heuristic-scan-precedence=yes \
+         --no-summary $HOME $TMPDIR /sdcard/Download 2>/dev/null
 
     # 4. Проверка на скрытые маяки (Backdoors)
     echo -e "${CYAN}[*] Проверка внешних соединений...${NC}"
