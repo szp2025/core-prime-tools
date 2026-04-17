@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.8"
+CURRENT_VERSION="7.9"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1597,11 +1597,11 @@ show_menu() {
     echo -e "${YELLOW} [ AUTONOMOUS OPERATIONS ]${NC}"
     
     # Сокращаем длину строк до ~35-38 символов суммарно
-    echo -e " ${CYAN}A.${NC} TOTAL RECON   ${GRAY}» OSINT & Analytics${NC}"
-    echo -e " ${CYAN}B.${NC} WEB ATTACK    ${GRAY}» Scan & Exploit${NC}"
-    echo -e " ${CYAN}C.${NC} NET GUARDIAN  ${GRAY}» Sniff & Connect${NC}"
-    echo -e " ${CYAN}D.${NC} STERILIZER    ${GRAY}» Ghost & Clean${NC}"
-    echo -e " ${CYAN}E.${NC} WIRELESS      ${GRAY}» WiFi & BT-HID${NC}"
+   echo -e " ${CYAN}A.${NC} TOTAL RECON   ${GRAY}- OSINT & Analyt${NC}"
+    echo -e " ${CYAN}B.${NC} WEB ATTACK    ${GRAY}- Scan & Exploit${NC}"
+    echo -e " ${CYAN}C.${NC} NET GUARDIAN  ${GRAY}- Sniff & Conn${NC}"
+    echo -e " ${CYAN}D.${NC} STERILIZER    ${GRAY}- Ghost & Clean${NC}"
+    echo -e " ${CYAN}E.${NC} WIRELESS      ${GRAY}- WiFi & BT-HID${NC}"
 
     echo -e "\n${GREEN} [ INTERFACE ]${NC}"
     printf "  %-18s %-18s\n" "18. TERMINAL" "0. EXIT"
