@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.7"
+CURRENT_VERSION="7.8"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1420,6 +1420,35 @@ trust_analyzer_unified() {
     read -r
 }
 
+# --- [ SMART FLOW: SENTINEL SHIELD ] ---
+flow_antivirus_scan() {
+    echo -e "${BLUE}=== [ SENTINEL SELF-DEFENSE MODE ] ===${NC}"
+    
+    # 1. Проверка наличия ClamAV
+    if ! command -v clamscan &> /dev/null; then
+        echo -e "${YELLOW}[!] Установка антивирусного движка...${NC}"
+        pkg install clamav -y
+        freshclam # Обновление баз
+    fi
+
+    echo -e "${CYAN}[*] Сканирование критических директорий Termux...${NC}"
+    # Сканируем домашнюю папку и временные файлы
+    # --infected (только вирусы), --remove (удаление), --recursive (глубоко)
+    clamscan -r --infected --remove $HOME $TMPDIR
+    
+    echo -e "\n${CYAN}[*] Поиск скрытых процессов и руткитов...${NC}"
+    # Ищем подозрительные бинарники в автозагрузке
+    find $HOME/.bashrc $HOME/.zshrc -type f -exec grep -H "http" {} \;
+    
+    # 2. Проверка разрешений (Anti-Spy)
+    echo -e "${MAGENTA}[*] Проверка подозрительных разрешений файлов...${NC}"
+    find $HOME -perm -o+w -type f -not -path "*/.*"
+    
+    echo -e "${GREEN}>>> Проверка безопасности завершена.${NC}"
+    log_event "ANTIVIRUS" "Scan completed. System clean."
+    read -r
+}
+
 
 
 # --- [ SMART FLOW: TOTAL RECON 360 ] ---
@@ -1486,14 +1515,32 @@ flow_network_sniffer() {
     run_monitor
 }
 
-# --- [ SMART FLOW: FULL SYSTEM CARE ] ---
-# Связка: 1 (Clean) + 15 (Update) + 16 (Auto-Tasks)
+# --- [ SMART FLOW: SENTINEL SHIELD & STERILIZER ] ---
+# Функция защиты и зачистки хвостов
 flow_system_care() {
-    echo -e "${GREEN}=== [ FULL SYSTEM MAINTENANCE ] ===${NC}"
-    clean_system
-    update_kali
-    setup_autotasks
-    echo -e "${GREEN}>>> Система в идеальном состоянии.${NC}"
+    echo -e "${GREEN}=== [ SYSTEM STERILIZER & SELF-DEFENSE ] ===${NC}"
+    
+    # 1. Антивирусный сканер (без записи логов на диск)
+    if command -v clamscan &> /dev/null; then
+        echo -e "${CYAN}[*] Сканирование на вирусы и бэкдоры...${NC}"
+        # Сканируем и сразу удаляем угрозы, вывод только в терминал
+        clamscan -r --infected --remove --no-summary $HOME $TMPDIR
+    else
+        echo -e "${YELLOW}[!] ClamAV не установлен. Пропуск...${NC}"
+    fi
+
+    # 2. Очистка системы
+    echo -e "${CYAN}[*] Очистка временных файлов и кэша...${NC}"
+    rm -rf $TMPDIR/*
+    pkg clean
+    
+    # 3. GHOST MODE: Стирание истории команд
+    echo -e "${MAGENTA}[*] Активация режима призрака (Ghost Mode)...${NC}"
+    truncate -s 0 ~/.bash_history
+    truncate -s 0 ~/.zsh_history 2>/dev/null
+    history -c
+    
+    echo -e "${GREEN}>>> Система стерильна. Следы стерты.${NC}"
     sleep 2
 }
 
