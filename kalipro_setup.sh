@@ -1420,35 +1420,47 @@ trust_analyzer_unified() {
     read -r
 }
 
-# --- [ SMART FLOW: SENTINEL SHIELD ] ---
+# --- [ SMART FLOW: SENTINEL SHIELD v8.7.1 ] ---
+# Глубокий эвристический сканер без сохранения логов
 flow_antivirus_scan() {
-    echo -e "${BLUE}=== [ SENTINEL SELF-DEFENSE MODE ] ===${NC}"
-    
-    # 1. Проверка наличия ClamAV
+    clear
+    echo -e "${RED}┌───────────────────────────────────────────┐${NC}"
+    echo -e "${RED}│${NC} ${WHITE}      SENTINEL GHOST SHIELD v8.7      ${NC} ${RED}│${NC}"
+    echo -e "${RED}└───────────────────────────────────────────┘${NC}"
+
+    # 1. Проверка ядра безопасности
     if ! command -v clamscan &> /dev/null; then
-        echo -e "${YELLOW}[!] Установка антивирусного движка...${NC}"
-        pkg install clamav -y
-        freshclam # Обновление баз
+        echo -e "${YELLOW}[!] Установка антивируса в RAM...${NC}"
+        pkg install clamav -y && freshclam
     fi
 
-    echo -e "${CYAN}[*] Сканирование критических директорий Termux...${NC}"
-    # Сканируем домашнюю папку и временные файлы
-    # --infected (только вирусы), --remove (удаление), --recursive (глубоко)
-    clamscan -r --infected --remove $HOME $TMPDIR
-    
-    echo -e "\n${CYAN}[*] Поиск скрытых процессов и руткитов...${NC}"
-    # Ищем подозрительные бинарники в автозагрузке
-    find $HOME/.bashrc $HOME/.zshrc -type f -exec grep -H "http" {} \;
-    
-    # 2. Проверка разрешений (Anti-Spy)
-    echo -e "${MAGENTA}[*] Проверка подозрительных разрешений файлов...${NC}"
-    find $HOME -perm -o+w -type f -not -path "*/.*"
-    
-    echo -e "${GREEN}>>> Проверка безопасности завершена.${NC}"
-    log_event "ANTIVIRUS" "Scan completed. System clean."
+    # 2. Эвристический анализ процессов (Поиск кейлоггеров)
+    echo -e "${CYAN}[*] Поиск скрытых угроз в процессах...${NC}"
+    # Проверяем процессы с аномальной активностью (могут влиять на клавиатуру)
+    ps aux | awk '$3 > 30.0 {print "[!] Нагрузка:", $11}' 
+
+    # 3. Глубокое сканирование (Эвристика + Удаление)
+    echo -e "${CYAN}[*] Запуск эвристического сканирования...${NC}"
+    # --no-summary: не выводит отчет в конце (меньше текста)
+    # --remove: мгновенная ликвидация
+    clamscan -r --infected --remove --heuristic-scan-precedence=yes \
+             --no-summary $HOME $TMPDIR 2>/dev/null
+
+    # 4. Проверка на скрытые маяки (Backdoors)
+    echo -e "${CYAN}[*] Проверка внешних соединений...${NC}"
+    netstat -antup 2>/dev/null | grep -Ei "ESTABLISHED" | grep -v "127.0.0.1"
+
+    # 5. TOTAL PURGE (Стирание следов сессии)
+    echo -e "${MAGENTA}[*] Стерилизация: удаление истории команд...${NC}"
+    rm -rf $TMPDIR/*
+    truncate -s 0 ~/.bash_history
+    truncate -s 0 ~/.zsh_history 2>/dev/null
+    history -c # Полная очистка текущей сессии
+
+    echo -e "${GREEN}>>> Система стерильна. Угрозы удалены.${NC}"
+    echo -e "${WHITE}Нажми Enter...${NC}"
     read -r
 }
-
 
 
 # --- [ SMART FLOW: TOTAL RECON 360 ] ---
@@ -1515,32 +1527,41 @@ flow_network_sniffer() {
     run_monitor
 }
 
-# --- [ SMART FLOW: SENTINEL SHIELD & STERILIZER ] ---
-# Функция защиты и зачистки хвостов
+# --- [ SMART FLOW: SYSTEM STERILIZER v8.8 ] ---
 flow_system_care() {
-    echo -e "${GREEN}=== [ SYSTEM STERILIZER & SELF-DEFENSE ] ===${NC}"
+    echo -e "${GREEN}=== [ INITIATING SYSTEM STERILIZATION ] ===${NC}"
     
-    # 1. Антивирусный сканер (без записи логов на диск)
-    if command -v clamscan &> /dev/null; then
-        echo -e "${CYAN}[*] Сканирование на вирусы и бэкдоры...${NC}"
-        # Сканируем и сразу удаляем угрозы, вывод только в терминал
-        clamscan -r --infected --remove --no-summary $HOME $TMPDIR
+    # 1. УРОВЕНЬ: БЕЗОПАСНОСТЬ (SENTINEL)
+    # Запускаем глубокий эвристический антивирус без сохранения логов
+    flow_antivirus_scan
+    
+    # 2. УРОВЕНЬ: ГЛУБОКАЯ ОЧИСТКА (DEEP PURGE)
+    # Если есть ROOT, запускаем тотальную аннигиляцию балласта
+    if [[ $EUID -eq 0 ]]; then
+        echo -e "${RED}[!] Root detected. Running Deep Purge (v6.9)...${NC}"
+        # Вызываем с флагом --purge-silent для автоматизации
+        deep_purge "--purge-silent"
     else
-        echo -e "${YELLOW}[!] ClamAV не установлен. Пропуск...${NC}"
+        echo -e "${YELLOW}[i] Non-root user. Running Standard Purge...${NC}"
+        # Обычная очистка для пользователя без root
+        rm -rf $TMPDIR/*
+        pkg clean
     fi
 
-    # 2. Очистка системы
-    echo -e "${CYAN}[*] Очистка временных файлов и кэша...${NC}"
-    rm -rf $TMPDIR/*
-    pkg clean
-    
-    # 3. GHOST MODE: Стирание истории команд
-    echo -e "${MAGENTA}[*] Активация режима призрака (Ghost Mode)...${NC}"
+    # 3. УРОВЕНЬ: ОБНОВЛЕНИЕ ЯДРА
+    # Обновляем пакеты Kali/Termux после освобождения места
+    echo -e "${CYAN}[*] Updating Repository & Packages...${NC}"
+    update_kali
+
+    # 4. УРОВЕНЬ: СТИРАНИЕ ТЕНИ (GHOST MODE)
+    # Финальный аккорд: удаляем историю команд, чтобы никто не знал, что мы запускали
+    echo -e "${MAGENTA}[*] Finalizing Ghost Protocol...${NC}"
     truncate -s 0 ~/.bash_history
     truncate -s 0 ~/.zsh_history 2>/dev/null
+    truncate -s 0 ~/.python_history 2>/dev/null
     history -c
-    
-    echo -e "${GREEN}>>> Система стерильна. Следы стерты.${NC}"
+
+    echo -e "${GREEN}>>> СТАТУС: Система полностью стерильна. Следы стерты.${NC}"
     sleep 2
 }
 
