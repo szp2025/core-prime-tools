@@ -491,27 +491,28 @@ setup_autotasks() {
     clear  # Очищаем экран перед возвратом, чтобы меню отрисовалось на чистом листе
 }
 
-# --- МОДУЛЬ ТЕРМИНАЛА: TERMINAL MODE v6.5 ---
+# --- MODULE: TERMINAL SHELL v6.6 (ELITE) ---
 run_manual_command() {
-    echo -e "${YELLOW}[!] Режим ручного ввода.${NC}"
-    echo -e "${BLUE}[i] Нажми ENTER (пустая строка) или введи 'exit' для возврата.${NC}"
+    echo -e "${YELLOW}[!] Shell Mode Active.${NC}"
+    echo -e "${BLUE}[i] Press ENTER or type 'exit' to return to Menu.${NC}"
     
     while true; do
-        echo -ne "${CYAN}Arsenal-Shell> ${NC}"
+        # Имитация классического приглашения Linux
+        echo -ne "${GREEN}arsenal@kali${NC}:${BLUE}~${NC}$ "
         read -r cmd
         
-        # Если введено 'exit', '0' ИЛИ если строка пустая (Enter)
-        if [[ "$cmd" == "exit" || "$cmd" == "0" || -z "$cmd" ]]; then
-            echo -e "${YELLOW}[*] Возврат в главное меню...${NC}"
+        # Выход по Enter, 'exit' или '0'
+        if [[ -z "$cmd" || "$cmd" == "exit" || "$cmd" == "0" ]]; then
+            echo -e "${YELLOW}[*] Returning to Menu...${NC}"
             sleep 0.3
             break
         fi
         
         # Выполнение команды
         eval "$cmd"
-        echo "" # Отступ после вывода команды для читаемости
+        echo "" # Интервал для визуальной чистоты
     done
-    clear # Очищаем экран перед отрисовкой меню
+    clear
 }
 
 # --- МОДУЛЬ УПРАВЛЕНИЯ CRON: CRON MANAGER ---
