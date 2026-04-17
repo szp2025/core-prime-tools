@@ -1330,6 +1330,107 @@ run_file_analyzer() {
 }
 
 
+# --- MODULE: UNIFIED OSINT ANALYZER v8.1 (OPERATOR & REPUTATION) ---
+trust_analyzer_unified() {
+    echo -e "${BLUE}=== ULTIMATE TRUST ANALYZER v8.1 (REPUTATION) ===${NC}"
+    echo -ne "${YELLOW}Введите Email, Домен или Номер телефона: ${NC}"
+    read -r target
+    [[ -z "$target" ]] && return
+
+    # --- 1. ВЕКТОР: НОМЕР ТЕЛЕФОНА (OPERATOR & TRUST) ---
+    if [[ "$target" =~ ^[0-9+]{7,15}$ ]]; then
+        local ph=$(echo "$target" | tr -d '+ ')
+        echo -e "${CYAN}[i] Формат: PHONE. Анализ оператора и уровня доверия...${NC}"
+        
+        # Глобальные префиксы стран
+        declare -A geo_map=( ["7"]="Russia/Kazakhstan" ["1"]="USA/Canada" ["44"]="UK" ["49"]="Germany" ["33"]="France" ["380"]="Ukraine" ["375"]="Belarus" ["998"]="Uzbekistan" ["48"]="Poland" ["90"]="Turkey" ["971"]="UAE" )
+
+        # Эвристика операторов и типов (Примеры для RU/FR/UA)
+        # Логика: если префикс совпадает с известными виртуальными операторами
+        declare -A provider_map=( 
+            ["7900"]="Tele2 (RU)" ["7910"]="MTS (RU)" ["7920"]="MegaFon (RU)" ["7930"]="MegaFon (RU)"
+            ["7991"]="SberMobile/Rostelecom (Virtual)" ["7999"]="Yota (Mobile/Virtual)"
+            ["336"]="Orange/SFR (FR)" ["337"]="Free Mobile/Bouygues (FR)"
+            ["38067"]="Kyivstar (UA)" ["38050"]="Vodafone (UA)"
+        )
+
+        # Определение страны
+        local country="Unknown"
+        for i in {3..1}; do
+            [[ -n "${geo_map[${ph:0:$i}]}" ]] && { country="${geo_map[${ph:0:$i}]}"; break; }
+        done
+        echo -e "${GREEN}[+] Страна: $country${NC}"
+
+        # Определение оператора и доверия
+        local provider="Generic/Landline"
+        local trust_score="MEDIUM (Physical SIM likely)"
+        
+        for i in {5..3}; do
+            local pref=${ph:0:$i}
+            if [[ -n "${provider_map[$pref]}" ]]; then
+                provider="${provider_map[$pref]}"
+                # Эвристика доверия: виртуальные номера (VoIP) получают LOW TRUST
+                [[ "$provider" =~ "Virtual" ]] && trust_score="${RED}LOW (VoIP/Disposable Risk)${NC}"
+                [[ "$provider" =~ "Tele2|MTS|MegaFon|Orange|Vodafone" ]] && trust_score="${GREEN}HIGH (Major Carrier)${NC}"
+                break
+            fi
+        done
+
+        echo -e "${CYAN}[*] Оператор: $provider${NC}"
+        echo -e "${YELLOW}[*] Уровень доверия: $trust_score${NC}"
+
+        # Ссылки на проверку в базах спамеров
+        echo -e "${BLUE}[*] Репутационный поиск:${NC}"
+        echo -e " > Google (Spam Check): https://www.google.com/search?q=%22$ph%22+отзывы+кто+звонил"
+        echo -e " > Tellows (Reputation): https://www.tellows.ru/num/$ph"
+
+    # --- 2. ВЕКТОР: EMAIL (DEEP VALIDATION) ---
+    elif [[ "$target" =~ @ ]]; then
+        echo -e "${CYAN}[i] Формат: EMAIL. Запуск глубокой валидации...${NC}"
+        local domain="${target##*@}"
+        
+        # Доверие к почтовому домену
+        if echo "$domain" | grep -EiQ "gmail.com|outlook.com|icloud.com"; then
+            echo -e "${GREEN}[+] Доверие: HIGH (Verified Provider)${NC}"
+        elif echo "$domain" | grep -EiQ "temp|yopmail|mailinator"; then
+            echo -e "${RED}[!!!] Доверие: ZERO (Disposable Email)${NC}"
+        else
+            echo -e "${YELLOW}[!] Доверие: NEUTRAL (Private Domain)${NC}"
+        fi
+        
+        # SMTP Handshake (логика v8.0)
+        local mx_first=$(host -t mx "$domain" 2>/dev/null | awk '{print $NF}' | sed 's/\.$//' | head -n 1)
+        [[ -n "$mx_first" ]] && {
+            timeout 5s bash -c "exec 3<>/dev/tcp/$mx_first/25; read -u 3; echo 'HELO hi' >&3; read -u 3; echo 'MAIL FROM:<test@example.com>' >&3; read -u 3; echo 'RCPT TO:<$target>' >&3; read -u 3; echo 'QUIT' >&3" 2>/dev/null | grep -q "250" && \
+            echo -e "${GREEN}[V] СТАТУС: Почта реально существует.${NC}" || echo -e "${RED}[-] СТАТУС: Не существует или защищена.${NC}"
+        }
+
+    # --- 3. ВЕКТОР: ДОМЕН (SCAM AUDIT) ---
+    else
+        echo -e "${CYAN}[i] Формат: DOMAIN. Анализ риска...${NC}"
+        local d=$(echo "$target" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+        
+        # SSL Анализ
+        if timeout 3s openssl s_client -connect "$d":443 -servername "$d" </dev/null 2>/dev/null | grep -q "Verification: OK"; then
+            echo -e "${GREEN}[+] SSL Trust: Secured${NC}"
+        else
+            echo -e "${RED}[!!!] SSL Trust: DANGEROUS / SCAM RISK${NC}"
+        fi
+
+        # Возраст домена (v8.0 logic)
+        local whois_raw=$(whois "$d" 2>/dev/null)
+        local created=$(echo "$whois_raw" | grep -Ei "Creation Date|created|Registered on" | head -n 1 | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}.[0-9]{2}.[0-9]{4}")
+        [[ -n "$created" ]] && echo -e "${BLUE}[*] Дата регистрации: $created${NC}"
+    fi
+
+    # СТЕРИЛИЗАЦИЯ
+    truncate -s 0 ~/.bash_history
+    history -c
+    echo -ne "\n${BLUE}>>> Анализ v8.1 завершен. Нажми Enter...${NC}"
+    read -r
+}
+
+
 show_menu() {
     clear
     echo -e "${CYAN}===========================================${NC}"
@@ -1351,6 +1452,9 @@ show_menu() {
     echo -e "\n${MAGENTA} [ RECON & ANALYSIS ]${NC}"
     echo -e "  2. SMART NMAP          10. SHERLOCK (OSINT)"
     echo -e "  7. NIKTO (WEB)         13. DEEP INSIGHT"
+    echo -e "  27. UNIFIED OSINT ANALYZER"
+
+    
     
     echo -e "\n${RED} [ EXPLOIT & ATTACK ]${NC}"
     echo -e "  3. SEARCHSPLOIT        4. HYDRA (BRUTE)"
@@ -1383,6 +1487,7 @@ while true; do
         7) smart_nikto ;;
         10) run_sherlock ;;
         13) deep_insight_auto ;;
+        27) trust_analyzer_unified ;;
 
         # --- Блок: Атака ---
         3) smart_searchsploit ;;
