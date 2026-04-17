@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="6.4"
+CURRENT_VERSION="6.5"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
