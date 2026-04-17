@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="6.6"
+CURRENT_VERSION="6.7"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -440,39 +440,41 @@ update_kali() {
 # --- МОДУЛЬ ИНТЕЛЛЕКТУАЛЬНОЙ АВТОМАТИЗАЦИИ: CRON v6.2 ---
 
 setup_autotasks() {
-    echo -e "${YELLOW}[*] Синхронизация задач планировщика...${NC}"
+    echo -e "${YELLOW}[*] Синхронизация задач Sentinel (v6.2)...${NC}"
     
     # 1. Проверка наличия cron
     if ! command -v crontab &> /dev/null; then
-        echo -e "${CYAN}[*] Установка отсутствующего компонента cron...${NC}"
-        apt-get install cron $INSTALL_FLAGS > /dev/null 2>&1
+        echo -e "${CYAN}[*] Установка компонента cron...${NC}"
+        apt-get install cron -y > /dev/null 2>&1
     fi
 
-    # 2. Подготовка новых определений задач
-    PURGE_JOB="0 4 * * * $TARGET_FILE --purge-silent"
-    UPDATE_JOB="0 5 * * 0 $TARGET_FILE --update-silent"
+    # 2. Жёсткое определение пути (чтобы не было пустых строк)
+    # Используем прямой путь, так как он у нас статичен
+    REAL_PATH="/usr/local/bin/kali_pro"
+    
+    PURGE_JOB="0 4 * * * $REAL_PATH --purge-silent"
+    UPDATE_JOB="0 5 * * 0 $REAL_PATH --update-silent"
 
-    # 3. Читаем текущий crontab (если он есть)
+    # 3. Читаем текущий конфиг
     CURRENT_CRON=$(crontab -l 2>/dev/null)
 
-    # 4. Проверка на изменения
-    if echo "$CURRENT_CRON" | grep -q "$TARGET_FILE"; then
-        echo -e "${BLUE}[*] Обнаружены существующие задачи. Проверка обновлений...${NC}"
-        # Удаляем старые записи нашего скрипта и добавляем новые
-        NEW_CRON=$(echo "$CURRENT_CRON" | grep -v "$TARGET_FILE")
-        echo -e "$NEW_CRON\n$PURGE_JOB\n$UPDATE_JOB" | sed '/^$/d' | crontab -
-        echo -e "${GREEN}[+] Задачи успешно обновлены.${NC}"
+    # 4. Умная перезапись (удаляем старое, пишем новое)
+    # Очищаем всё, что связано с kali_pro, чтобы не плодить дубли
+    CLEAN_CRON=$(echo "$CURRENT_CRON" | grep -v "kali_pro" | grep -v "purge-silent" | grep -v "update-silent")
+    
+    # Собираем финальный конфиг
+    echo -e "$CLEAN_CRON\n$PURGE_JOB\n$UPDATE_JOB" | sed '/^$/d' | crontab -
+
+    # 5. Проверка результата
+    if crontab -l | grep -q "$REAL_PATH"; then
+        echo -e "${GREEN}[+] Задачи успешно синхронизированы в crontab.${NC}"
     else
-        echo -e "${YELLOW}[*] Задачи не найдены. Создание новой конфигурации...${NC}"
-        echo -e "$CURRENT_CRON\n$PURGE_JOB\n$UPDATE_JOB" | sed '/^$/d' | crontab -
-        echo -e "${GREEN}[+] Задачи внедрены в cron.${NC}"
+        echo -e "${RED}[-] Ошибка записи! Проверь права доступа root.${NC}"
     fi
 
-    # 5. Принудительный запуск демона (специфика Android/Termux)
-    if ! pgrep cron > /dev/null; then
-        crond &>/dev/null || cron &>/dev/null
-        echo -e "${BLUE}[i] Демон cron запущен в фоновом режиме.${NC}"
-    fi
+    # 6. Оживление демона
+    pgrep cron > /dev/null || (cron &>/dev/null || crond &>/dev/null)
+    echo -e "${BLUE}[i] Служба планировщика активна.${NC}"
 
     read -p "Нажми Enter..."
 }
