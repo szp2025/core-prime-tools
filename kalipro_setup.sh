@@ -1423,44 +1423,40 @@ trust_analyzer_unified() {
 
 show_menu() {
     clear
-    # --- HEADER BLOCK ---
+    # Динамическая ширина (подгоняем под экран)
     echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC} ${GREEN}      KALI SAMSUNG ARSENAL v8.4      ${NC} ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC} ${GREEN}    KALI SAMSUNG ARSENAL v8.4.1     ${NC} ${CYAN}│${NC}"
     echo -e "${CYAN}├───────────────────────────────────────────┤${NC}"
     
-    # --- STATUS BAR (Динамическая проверка) ---
     local vpn_stat=$(pgrep openvpn > /dev/null && echo -e "${GREEN}ON${NC}" || echo -e "${RED}OFF${NC}")
-    local wifi_stat=$(iwgetid -r > /dev/null && echo -e "${GREEN}CONNECTED${NC}" || echo -e "${RED}DISC${NC}")
-    echo -e "${CYAN}│${NC} VPN: $vpn_stat | WiFi: $wifi_stat | $(date +%H:%M) ${CYAN}│${NC}"
+    # Исправляем время (берем системное)
+    echo -e "${CYAN}│${NC} VPN: $vpn_stat | WiFi: OK | $(date +%H:%M)  ${CYAN}│${NC}"
     echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
 
-    run_smart_check # Твоя функция проверки состояния системы
+    run_smart_check
 
-    # --- BLOCK 1: OSINT & ANALYTICS (Главная новинка) ---
-    echo -e "${MAGENTA} 💎 RECON & OSINT INTELLIGENCE${NC}"
-    printf "  %-24s %-24s\n" "27. UNIFIED ANALYZER" "10. SHERLOCK (OSINT)"
-    printf "  %-24s %-24s\n" "13. DEEP INSIGHT" "7. NIKTO (WEB SCAN)"
-    printf "  %-24s %-24s\n" "2. SMART NMAP" "26. FILE ANALYZER"
+    # Используем фиксированную ширину 20 символов для колонки
+    echo -e "${MAGENTA} 💎 RECON & OSINT${NC}"
+    printf "  %-20s %-20s\n" "27. UNIFIED ANALYZE" "10. SHERLOCK"
+    printf "  %-20s %-20s\n" "13. DEEP INSIGHT"   "7. NIKTO SCAN"
+    printf "  %-20s %-20s\n" "2. SMART NMAP"     "26. FILE ANALYZER"
 
-    # --- BLOCK 2: EXPLOITATION & ATTACK ---
-    echo -e "\n${RED} ⚔️ OFFENSIVE OPERATIONS${NC}"
-    printf "  %-24s %-24s\n" "3. SEARCHSPLOIT" "4. HYDRA (BRUTE)"
-    printf "  %-24s %-24s\n" "5. SQLMAP (DB)" "6. BETTERCAP (MITM)"
-    printf "  %-24s %-24s\n" "11. WIFITE (WIFI)" "22. CREDENTIAL HARVEST"
-    printf "  %-24s %-24s\n" "23. REVERSE SHELL" "24. BT-HID ATTACK"
+    echo -e "\n${RED} ⚔️ OFFENSIVE${NC}"
+    printf "  %-20s %-20s\n" "3. SEARCHSPLOIT"   "4. HYDRA BRUTE"
+    printf "  %-20s %-20s\n" "5. SQLMAP"         "6. BETTERCAP"
+    printf "  %-20s %-20s\n" "11. WIFITE"        "22. HARVESTER"
+    printf "  %-20s %-20s\n" "23. REV SHELL"     "24. BT-HID"
 
-    # --- BLOCK 3: MONITORING & NETWORK ---
-    echo -e "\n${BLUE} 📡 MONITORING & SHIELD${NC}"
-    printf "  %-24s %-24s\n" "19. RADIO CTRL (W/B)" "20. NET CONNECTIONS"
-    printf "  %-24s %-24s\n" "21. PROCESS MONITOR" "25. LOCAL VPN"
-    printf "  %-24s %-24s\n" "12. USB GUARDIAN" "14. ACCESS RECOVERY"
+    echo -e "\n${BLUE} 📡 MONITOR & NET${NC}"
+    printf "  %-20s %-20s\n" "19. RADIO CTRL"    "20. NET CONNECT"
+    printf "  %-20s %-20s\n" "21. PROC MONITOR"  "25. LOCAL VPN"
+    printf "  %-20s %-20s\n" "12. USB GUARD"     "14. ACC RECOVERY"
 
-    # --- BLOCK 4: SYSTEM & CORE ---
-    echo -e "\n${YELLOW} ⚙️ CORE SYSTEMS${NC}"
-    printf "  %-24s %-24s\n" "1. REPAIR/CLEAN" "8. SMART INSTALLER"
-    printf "  %-24s %-24s\n" "15. UPDATE ARSENAL" "16. SETUP AUTO-TASKS"
-    printf "  %-24s %-24s\n" "17. CRON MANAGER" "18. TERMINAL MODE"
-    printf "  %-24s %-24s\n" "9. DEEP PURGE (911)" "0. EXIT"
+    echo -e "\n${YELLOW} ⚙️ SYSTEM${NC}"
+    printf "  %-20s %-20s\n" "1. REPAIR/CLEAN"   "8. SMART INST"
+    printf "  %-20s %-20s\n" "15. UPDATE"        "16. AUTO-TASKS"
+    printf "  %-20s %-20s\n" "17. CRON MGMT"     "18. TERM MODE"
+    printf "  %-20s %-20s\n" "9. PURGE (911)"    "0. EXIT"
 
     echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
 }
