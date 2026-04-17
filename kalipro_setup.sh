@@ -416,40 +416,23 @@ access_recovery_auto() {
 
 # --- МОДУЛЬ САМООБНОВЛЕНИЯ: UPDATE KALI v5.0 ---
 
+# --- ФУНКЦИЯ ВЫЗОВА ОБНОВЛЕНИЯ v6.2 ---
 update_kali() {
-    echo -e "${YELLOW}[*] Проверка обновлений Арсенала...${NC}"
+    echo -e "${YELLOW}[*] Запуск системного модуля обновления...${NC}"
     
-    # URL твоего репозитория или сервера (замени на свой, если нужно)
-    # Сейчас используем имитацию проверки версии
-    REMOTE_VERSION="5.0"
-    
-    if [ "$CURRENT_VERSION" == "$REMOTE_VERSION" ]; then
-        echo -e "${GREEN}[+] У вас установлена актуальная версия v$CURRENT_VERSION.${NC}"
-        # Предлагаем обновить системные пакеты Kali, раз уж зашли сюда
-        read -p "Обновить системные пакеты APT? (y/n): " up_sys
-        if [[ "$up_sys" == "y" ]]; then
-            clean_system
-        fi
+    # Проверяем, существует ли команда в системе
+    if command -v update_kali &> /dev/null; then
+        # Запускаем системный апдейтер
+        # Мы используем exec, чтобы текущий процесс Арсенала завершился
+        # и уступил место процессу обновления
+        exec update_kali
     else
-        echo -e "${CYAN}[!] Найдена новая версия: v$REMOTE_VERSION${NC}"
-        echo -e "${YELLOW}[*] Скачивание и установка обновления...${NC}"
-        
-        # Стерильное скачивание в RAM
-        curl -s -o /dev/shm/kali_update.sh 
-        
-        if [ -f /dev/shm/kali_update.sh ]; then
-            mv /dev/shm/kali_update.sh "$TARGET_FILE"
-            chmod +x "$TARGET_FILE"
-            echo -e "${GREEN}[V] Арсенал успешно обновлен до v$REMOTE_VERSION!${NC}"
-            echo -e "${YELLOW}[!] Перезапустите скрипт для применения изменений.${NC}"
-            exit 0
-        else
-            echo -e "${RED}[-] Ошибка при скачивании обновления.${NC}"
-        fi
+        echo -e "${RED}[-] Системный модуль update_kali не найден в /usr/local/bin/${NC}"
+        echo -e "${CYAN}[*] Попытка найти локальную копию...${NC}"
+        # Если команды нет, пробуем запустить файл из текущей папки
+        [[ -f "./update_kali.sh" ]] && exec bash ./update_kali.sh
     fi
     
-    # Очистка следов обновления
-    rm -rf /dev/shm/kali_update.sh 2>/dev/null
     read -p "Нажми Enter..."
 }
 
