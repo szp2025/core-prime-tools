@@ -1421,94 +1421,128 @@ trust_analyzer_unified() {
 }
 
 
+
+# --- [ SMART FLOW: TOTAL RECON 360 ] ---
+# Связка: 27 (Analyzer) + 10 (Sherlock) + 13 (Deep Insight)
+flow_total_recon() {
+    echo -e "${BLUE}=== [ TOTAL RECON 360 MODE ] ===${NC}"
+    echo -ne "${YELLOW}Введите цель (Email/Nick/Domain): ${NC}"
+    read -r target
+    [[ -z "$target" ]] && return
+
+    # 1. Глубокий анализ доверия и типа (твоя v8.3)
+    trust_analyzer_unified "$target"
+    
+    # 2. Поиск по соцсетям (если это не чистый домен)
+    if [[ ! "$target" =~ ^http ]]; then
+        echo -e "\n${CYAN}[*] Запуск Sherlock для поиска аккаунтов...${NC}"
+        run_sherlock "${target%%@*}"
+    fi
+
+    # 3. Сбор метаданных и глубоких инсайтов
+    echo -e "\n${CYAN}[*] Сбор Deep Insights...${NC}"
+    deep_insight_auto "$target"
+    
+    LAST_TARGET="$target" # Запоминаем цель для следующего шага
+    echo -e "${GREEN}>>> Recon 360 завершен.${NC}"
+    read -r
+}
+
+# --- [ SMART FLOW: WEB ATTACK STACK ] ---
+# Связка: 2 (Nmap) + 7 (Nikto) + 5 (Sqlmap)
+flow_web_stack() {
+    echo -e "${RED}=== [ WEB ATTACK STACK ] ===${NC}"
+    [[ -n "$LAST_TARGET" ]] && echo -e "${YELLOW}Последняя цель: $LAST_TARGET${NC}"
+    echo -ne "${YELLOW}Введите URL/IP (или Enter для последней): ${NC}"
+    read -r target
+    target=${target:-$LAST_TARGET}
+    [[ -z "$target" ]] && return
+
+    # 1. Разведка портов
+    smart_nmap "$target"
+    
+    # 2. Поиск уязвимостей сервера
+    echo -e "\n${MAGENTA}[*] Передача цели в Nikto...${NC}"
+    smart_nikto "$target"
+    
+    # 3. Проверка на SQL-инъекции (если есть параметры)
+    echo -e "\n${MAGENTA}[*] Финальная проверка Sqlmap...${NC}"
+    smart_sqlmap "$target"
+    
+    read -r
+}
+
+# --- [ SMART FLOW: NETWORK SNIFFER ] ---
+# Связка: 6 (Bettercap) + 20 (Netstat) + 21 (Monitor)
+flow_network_sniffer() {
+    echo -e "${BLUE}=== [ NETWORK SNIFFER SUITE ] ===${NC}"
+    # Запускаем мониторинг соединений в фоне, пока работает сниффер
+    run_netstat & 
+    local net_pid=$!
+    
+    run_bettercap_sniffer
+    
+    kill $net_pid 2>/dev/null
+    run_monitor
+}
+
+# --- [ SMART FLOW: FULL SYSTEM CARE ] ---
+# Связка: 1 (Clean) + 15 (Update) + 16 (Auto-Tasks)
+flow_system_care() {
+    echo -e "${GREEN}=== [ FULL SYSTEM MAINTENANCE ] ===${NC}"
+    clean_system
+    update_kali
+    setup_autotasks
+    echo -e "${GREEN}>>> Система в идеальном состоянии.${NC}"
+    sleep 2
+}
+
+
+
 show_menu() {
     clear
-    # Динамическая ширина (подгоняем под экран)
     echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC} ${GREEN}    KALI SAMSUNG ARSENAL v8.4.1     ${NC} ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC} ${GREEN}    KALI SAMSUNG ARSENAL v9.1 AI    ${NC} ${CYAN}│${NC}"
     echo -e "${CYAN}├───────────────────────────────────────────┤${NC}"
-    
     local vpn_stat=$(pgrep openvpn > /dev/null && echo -e "${GREEN}ON${NC}" || echo -e "${RED}OFF${NC}")
-    # Исправляем время (берем системное)
     echo -e "${CYAN}│${NC} VPN: $vpn_stat | WiFi: OK | $(date +%H:%M)  ${CYAN}│${NC}"
     echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
 
     run_smart_check
 
-    # Используем фиксированную ширину 20 символов для колонки
-    echo -e "${MAGENTA} 💎 RECON & OSINT${NC}"
-    printf "  %-20s %-20s\n" "27. UNIFIED ANALYZE" "10. SHERLOCK"
-    printf "  %-20s %-20s\n" "13. DEEP INSIGHT"   "7. NIKTO SCAN"
-    printf "  %-20s %-20s\n" "2. SMART NMAP"     "26. FILE ANALYZER"
+    echo -e "${MAGENTA} [🔥 AUTONOMOUS OPERATIONS ]${NC}"
+    echo -e "  A. TOTAL RECON 360    (Deep OSINT & Analytics)"
+    echo -e "  B. WEB ATTACK STACK   (Vuln Scan & Exploitation)"
+    echo -e "  C. NETWORK GUARDIAN   (Sniffing & Connection Ctrl)"
+    echo -e "  D. SYSTEM STERILIZER  (Maintenance & Ghost Mode)"
+    echo -e "  E. WIRELESS DOMINANCE (WiFi & BT-HID Operations)"
 
-    echo -e "\n${RED} ⚔️ OFFENSIVE${NC}"
-    printf "  %-20s %-20s\n" "3. SEARCHSPLOIT"   "4. HYDRA BRUTE"
-    printf "  %-20s %-20s\n" "5. SQLMAP"         "6. BETTERCAP"
-    printf "  %-20s %-20s\n" "11. WIFITE"        "22. HARVESTER"
-    printf "  %-20s %-20s\n" "23. REV SHELL"     "24. BT-HID"
-
-    echo -e "\n${BLUE} 📡 MONITOR & NET${NC}"
-    printf "  %-20s %-20s\n" "19. RADIO CTRL"    "20. NET CONNECT"
-    printf "  %-20s %-20s\n" "21. PROC MONITOR"  "25. LOCAL VPN"
-    printf "  %-20s %-20s\n" "12. USB GUARD"     "14. ACC RECOVERY"
-
-    echo -e "\n${YELLOW} ⚙️ SYSTEM${NC}"
-    printf "  %-20s %-20s\n" "1. REPAIR/CLEAN"   "8. SMART INST"
-    printf "  %-20s %-20s\n" "15. UPDATE"        "16. AUTO-TASKS"
-    printf "  %-20s %-20s\n" "17. CRON MGMT"     "18. TERM MODE"
-    printf "  %-20s %-20s\n" "9. PURGE (911)"    "0. EXIT"
+    echo -e "\n${YELLOW} [⚙️ INTERFACE ]${NC}"
+    printf "  %-20s %-20s\n" "18. TERMINAL MODE" "0. EXIT"
 
     echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
 }
 
-# --- MAIN LOOP ---
+
+# --- Глобальный контекст ---
+LAST_TARGET=""
+
 while true; do
     show_menu
-    read -p "Опция: " opt
+    read -p "Выберите операцию: " opt
     case $opt in
-        # --- Блок: Система ---
-        1) clean_system ;;
-        8) smart_installer ;;
-        9) deep_purge ;;
-        15) update_kali ;;
-        17) manage_cron ;;         # Пункт 17
-        18) run_manual_command ;;  # Пункт 18
-        16) setup_autotasks ;;
-        
+        A|a) flow_total_recon ;;      # Внутри: 27 -> 10 -> 13
+        B|b) flow_web_stack ;;        # Внутри: 2 -> 7 -> 5 (с проверкой LAST_TARGET)
+        C|c) flow_network_sniffer ;;  # Внутри: 6 + 20 + 21
+        D|d) flow_system_care ;;      # Внутри: 1 + 15 + 16 + 9
+        E|e) flow_wifi_attack ;;      # Внутри: 11 + 24 + 12
+
+        18) run_manual_command ;;     # Оставляем только чистый терминал для спецзадач
         0) exit 0 ;;
 
-        # --- Блок: Разведка ---
-        2) smart_nmap ;;
-        7) smart_nikto ;;
-        10) run_sherlock ;;
-        13) deep_insight_auto ;;
-        27) trust_analyzer_unified ;;
-
-        # --- Блок: Атака ---
-        3) smart_searchsploit ;;
-        4) smart_hydra ;;
-        5) smart_sqlmap ;;
-        6) run_bettercap_sniffer ;;
-        11) run_wifite ;;
-        14) access_recovery_auto ;;
-        22) harvest_credentials_auto ;;
-        23) run_reverse_handler ;;
-        24) run_bt_hid_attack ;;
-
-        # --- Блок: Специальное ---
-        12) usb_guardian_smart ;;
-        26) run_file_analyzer ;;
-
-        # --- Блок: Мониторинг ---
-        19) manage_interfaces ;;
-        20) run_netstat ;;
-        21) run_monitor ;;
-        25)run_local_vpn ;;
-        
-        # --- Обработка ошибок ---
         *) 
-            echo -e "${RED}[!] Неверный выбор.${NC}"
-            sleep 0.5 
+            echo -e "${RED}[!] Ошибка. Доступны только режимы A, B, C, D, E.${NC}"
+            sleep 1 
             ;;
     esac
 done
