@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.9"
+CURRENT_VERSION="8.0"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1527,38 +1527,41 @@ flow_network_sniffer() {
     run_monitor
 }
 
-# --- [ SMART FLOW: SYSTEM STERILIZER v8.8 ] ---
+# --- [ SMART FLOW: SYSTEM STERILIZER v8.8.1 ] ---
 flow_system_care() {
     echo -e "${GREEN}=== [ INITIATING SYSTEM STERILIZATION ] ===${NC}"
     
     # 1. УРОВЕНЬ: БЕЗОПАСНОСТЬ (SENTINEL)
-    # Запускаем глубокий эвристический антивирус без сохранения логов
     flow_antivirus_scan
     
     # 2. УРОВЕНЬ: ГЛУБОКАЯ ОЧИСТКА (DEEP PURGE)
-    # Если есть ROOT, запускаем тотальную аннигиляцию балласта
     if [[ $EUID -eq 0 ]]; then
         echo -e "${RED}[!] Root detected. Running Deep Purge (v6.9)...${NC}"
-        # Вызываем с флагом --purge-silent для автоматизации
         deep_purge "--purge-silent"
     else
         echo -e "${YELLOW}[i] Non-root user. Running Standard Purge...${NC}"
-        # Обычная очистка для пользователя без root
         rm -rf $TMPDIR/*
-        pkg clean
+        pkg clean 2>/dev/null
     fi
 
     # 3. УРОВЕНЬ: ОБНОВЛЕНИЕ ЯДРА
-    # Обновляем пакеты Kali/Termux после освобождения места
     echo -e "${CYAN}[*] Updating Repository & Packages...${NC}"
     update_kali
 
     # 4. УРОВЕНЬ: СТИРАНИЕ ТЕНИ (GHOST MODE)
-    # Финальный аккорд: удаляем историю команд, чтобы никто не знал, что мы запускали
     echo -e "${MAGENTA}[*] Finalizing Ghost Protocol...${NC}"
+    
+    # Обнуление истории команд (Bash, Zsh, Python)
     truncate -s 0 ~/.bash_history
     truncate -s 0 ~/.zsh_history 2>/dev/null
     truncate -s 0 ~/.python_history 2>/dev/null
+    
+    # Очистка системных логов доступа (wtmp, lastlog)
+    # Это сотрет записи о времени входа и IP-адресах сессий
+    if [[ -f /var/log/wtmp ]]; then cat /dev/null > /var/log/wtmp; fi
+    if [[ -f /var/log/lastlog ]]; then cat /dev/null > /var/log/lastlog; fi
+    
+    # Очистка текущей памяти истории
     history -c
 
     echo -e "${GREEN}>>> СТАТУС: Система полностью стерильна. Следы стерты.${NC}"
