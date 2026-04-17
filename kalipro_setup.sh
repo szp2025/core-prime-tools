@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-CURRENT_VERSION="7.5"
+CURRENT_VERSION="7.6"
 # VERSION CURRENT_VERSION (Rescue & Sterile Edition)
 
 TARGET_FILE="/usr/local/bin/kali_pro"
@@ -1501,23 +1501,24 @@ flow_system_care() {
 
 show_menu() {
     clear
+    # Компактный заголовок
     echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC} ${GREEN}    KALI SAMSUNG ARSENAL v9.1 AI    ${NC} ${CYAN}│${NC}"
-    echo -e "${CYAN}├───────────────────────────────────────────┤${NC}"
-    local vpn_stat=$(pgrep openvpn > /dev/null && echo -e "${GREEN}ON${NC}" || echo -e "${RED}OFF${NC}")
-    echo -e "${CYAN}│${NC} VPN: $vpn_stat | WiFi: OK | $(date +%H:%M)  ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC} ${GREEN}     SAMSUNG AUTONOMOUS CORE v8.5    ${NC} ${CYAN}│${NC}"
     echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
+    
+    run_smart_check # Твоя инфо-строка [ СИСТЕМА ]
 
-    run_smart_check
+    echo -e "${YELLOW} [ AUTONOMOUS OPERATIONS ]${NC}"
+    
+    # Используем краткие, но мощные описания без лишних скобок
+    echo -e " ${CYAN}A.${NC} TOTAL RECON 360   ${GRAY}>> OSINT & Global Analyt${NC}"
+    echo -e " ${CYAN}B.${NC} WEB ATTACK STACK  ${GRAY}>> Vuln Scan & Exploit${NC}"
+    echo -e " ${CYAN}C.${NC} NETWORK GUARDIAN  ${GRAY}>> Sniff & Conn Ctrl${NC}"
+    echo -e " ${CYAN}D.${NC} SYSTEM STERILIZER ${GRAY}>> Ghost & Maintenance${NC}"
+    echo -e " ${CYAN}E.${NC} WIRELESS DOMINANCE${GRAY}>> WiFi & BT-HID Ops${NC}"
 
-    echo -e "${MAGENTA} [🔥 AUTONOMOUS OPERATIONS ]${NC}"
-    echo -e "  A. TOTAL RECON 360    (Deep OSINT & Analytics)"
-    echo -e "  B. WEB ATTACK STACK   (Vuln Scan & Exploitation)"
-    echo -e "  C. NETWORK GUARDIAN   (Sniffing & Connection Ctrl)"
-    echo -e "  D. SYSTEM STERILIZER  (Maintenance & Ghost Mode)"
-    echo -e "  E. WIRELESS DOMINANCE (WiFi & BT-HID Operations)"
-
-    echo -e "\n${YELLOW} [⚙️ INTERFACE ]${NC}"
+    echo -e "\n${GREEN} [ INTERFACE ]${NC}"
+    # Выравниваем в одну строку для экономии места
     printf "  %-20s %-20s\n" "18. TERMINAL MODE" "0. EXIT"
 
     echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
