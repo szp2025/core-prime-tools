@@ -42,6 +42,7 @@ PROGRESS_OPTS="-o Dpkg::Progress-Fancy=1 -o APT::Color=1"
 CLEAN_OPTS="-o DPkg::Post-Invoke={'apt-get clean';} -o APT::Keep-Downloaded-Packages=false"
 
 run_smart_check() {
+pgrep cron > /dev/null || cron &>/dev/null
     # Фоновая мини-очистка при каждом обновлении меню
     apt-get clean >/dev/null 2>&1
     python3 -c "
