@@ -446,7 +446,7 @@ update_kali() {
 # --- МОДУЛЬ ИНТЕЛЛЕКТУАЛЬНОЙ АВТОМАТИЗАЦИИ: CRON v6.2 ---
 
 setup_autotasks() {
-    echo -e "${YELLOW}[*] Синхронизация задач Sentinel (v6.2)...${NC}"
+    echo -e "${YELLOW}[*] Синхронизация задач Sentinel (v6.5)...${NC}"
     
     # 1. Проверка наличия cron
     if ! command -v crontab &> /dev/null; then
@@ -454,8 +454,7 @@ setup_autotasks() {
         apt-get install cron -y > /dev/null 2>&1
     fi
 
-    # 2. Жёсткое определение пути (чтобы не было пустых строк)
-    # Используем прямой путь, так как он у нас статичен
+    # 2. Определение путей и задач (Стелс-режим)
     REAL_PATH="/usr/local/bin/kali_pro"
     UP_KALI_PATH="/usr/local/bin/update_kali"
     
@@ -466,40 +465,53 @@ setup_autotasks() {
     # 3. Читаем текущий конфиг
     CURRENT_CRON=$(crontab -l 2>/dev/null)
 
-    # 4. Умная перезапись (удаляем старое, пишем новое)
-    # Очищаем всё, что связано с kali_pro, чтобы не плодить дубли
-    CLEAN_CRON=$(echo "$CURRENT_CRON" | grep -vE "kali_pro|update_kali|purge-silent|update-silent")    
-    # Собираем финальный конфиг
+    # 4. Умная перезапись без дублей
+    CLEAN_CRON=$(echo "$CURRENT_CRON" | grep -vE "kali_pro|update_kali|purge-silent|update-silent")
+    
+    # Запись нового конфига
     echo -e "$CLEAN_CRON\n$PURGE_JOB\n$UPDATE_JOB\n$UP_KALI_JOB" | sed '/^$/d' | crontab -
 
-  # 5. Проверка результата (Комплексная)
+    # 5. Проверка результата
+    echo -ne "${YELLOW}[*] Верификация... ${NC}"
     if crontab -l | grep -q "$REAL_PATH" && crontab -l | grep -q "$UP_KALI_PATH"; then
+        echo -e "${GREEN}[ OK ]${NC}"
         echo -e "${GREEN}[+] Полная синхронизация: Арсенал и Установщик в графике.${NC}"
-    elif crontab -l | grep -q "$REAL_PATH"; then
-        echo -e "${YELLOW}[!] Частичная синхронизация: Только Арсенал.${NC}"
     else
-        echo -e "${RED}[-] Критическая ошибка записи в crontab!${NC}"
+        echo -e "${RED}[ FAIL ]${NC}"
+        echo -e "${RED}[-] Ошибка записи! Проверь права root.${NC}"
     fi
 
     # 6. Оживление демона
     pgrep cron > /dev/null || (cron &>/dev/null || crond &>/dev/null)
     echo -e "${BLUE}[i] Служба планировщика активна.${NC}"
 
-    read -p "Нажми Enter..."
+    # 7. Возврат в меню
+    echo -e "${CYAN}\n[ Нажми Enter для возврата в меню ]${NC}"
+    read -r
+    clear  # Очищаем экран перед возвратом, чтобы меню отрисовалось на чистом листе
 }
 
-# --- МОДУЛЬ ТЕРМИНАЛА: TERMINAL MODE v6.4 ---
+# --- МОДУЛЬ ТЕРМИНАЛА: TERMINAL MODE v6.5 ---
 run_manual_command() {
-    echo -e "${YELLOW}[!] Режим ручного ввода. Введите 'exit' для возврата в меню.${NC}"
+    echo -e "${YELLOW}[!] Режим ручного ввода.${NC}"
+    echo -e "${BLUE}[i] Нажми ENTER (пустая строка) или введи 'exit' для возврата.${NC}"
+    
     while true; do
         echo -ne "${CYAN}Arsenal-Shell> ${NC}"
         read -r cmd
-        if [[ "$cmd" == "exit" || "$cmd" == "0" ]]; then
+        
+        # Если введено 'exit', '0' ИЛИ если строка пустая (Enter)
+        if [[ "$cmd" == "exit" || "$cmd" == "0" || -z "$cmd" ]]; then
+            echo -e "${YELLOW}[*] Возврат в главное меню...${NC}"
+            sleep 0.3
             break
         fi
+        
+        # Выполнение команды
         eval "$cmd"
-        echo ""
+        echo "" # Отступ после вывода команды для читаемости
     done
+    clear # Очищаем экран перед отрисовкой меню
 }
 
 # --- МОДУЛЬ УПРАВЛЕНИЯ CRON: CRON MANAGER ---
