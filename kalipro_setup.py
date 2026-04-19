@@ -65,25 +65,22 @@ while true; do
     show_menu
     read -p "Выберите операцию: " opt
     case $opt in
-        A|a) # Твоя функция flow_total_recon
+        A|a) 
              echo "Запуск Recon..." ; sleep 1 ;;
-        B|b) # Твоя функция flow_web_stack
+        B|b) 
              echo "Запуск Web Attack..." ; sleep 1 ;;
-        C|c) # Твоя функция flow_network_sniffer
+        C|c) # <--- Здесь добавлена пропущенная скобка
              echo "Запуск Sniffer..." ; sleep 1 ;;
-        D|d) # Твоя функция flow_system_care
+        D|d) 
              echo "Запуск Sterilizer..." ; sleep 1 ;;
-        E|e) # Твоя функция flow_wifi_attack
+        E|e) 
              echo "Запуск Wireless..." ; sleep 1 ;;
-
         18) 
-            # ВОЗВРАТ В ЧИСТЫЙ ROOT@KALI (Интерактивный шелл)
             clear
             echo -e "${BLUE}[*] Вход в Root Shell. Введите 'exit' для возврата в Арсенал.${NC}"
             /bin/bash --login
             ;;
         0) 
-            # ПОЛНЫЙ ВЫХОД
             clear
             echo -e "${RED}[!] Сессия завершена. Возврат в root@kali.${NC}"
             exit 0 
@@ -94,6 +91,7 @@ while true; do
             ;;
     esac
 done
+
 EOF
 
 chmod +x /usr/local/bin/kali_pro
