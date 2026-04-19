@@ -5,72 +5,91 @@ import os
 import sys
 import subprocess
 
-# --- КОНФИГУРАЦИЯ ---
-VERSION = "8.1 Ultra-Precision"
-TARGET_PATH = "/usr/local/bin/kali_pro"
+# --- ГЛОБАЛЬНЫЕ ПАРАМЕТРЫ СТЕРИЛЬНОСТИ (ИЗ ОРИГИНАЛА) ---
+VERSION = "CURRENT_VERSION (Rescue & Sterile Edition)"
+TARGET_FILE = "/usr/local/bin/kali_pro"
+INSTALL_FLAGS = "-y --no-install-recommends"
+PROGRESS_OPTS = "-o Dpkg::Progress-Fancy=1 -o APT::Color=1"
+CLEAN_OPTS = "-o Dpkg::Post-Invoke={'apt-get clean';}"
 
-class Colors:
-    GREEN = '\033[1;32m'
-    RED = '\033[1;31m'
-    CYAN = '\033[1;36m'
+class Style:
+    RED = '\033[0;31m'
+    GREEN = '\033[0;32m'
+    BLUE = '\033[0;34m'
+    CYAN = '\033[0;36m'
     YELLOW = '\033[1;33m'
-    END = '\033[0m'
+    NC = '\033[0m'
 
-def run_cmd(command):
-    """Выполняет команду в системе и возвращает результат"""
-    try:
-        result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        return None
+def run_smart_check():
+    """Фоновая мини-очистка при каждом обновлении меню (из оригинала)"""
+    # pgrep cron > /dev/null || cron &>/dev/null
+    subprocess.run("pgrep cron > /dev/null || cron &>/dev/null", shell=True)
+    # apt-get clean >/dev/null 2>&1
+    subprocess.run(f"apt-get clean {CLEAN_OPTS} >/dev/null 2>&1", shell=True)
 
 def show_banner():
     os.system('clear')
-    print(f"{Colors.GREEN}[+] {VERSION} развернута!{Colors.END}")
-    print(f"{Colors.CYAN}--- Core Prime Tools System ---{Colors.END}\n")
+    print(f"{Style.GREEN}[+] v8.1 Ultra-Precision развернута!{Style.NC}") #
+    print(f"{Style.CYAN}--- Core Prime Tools Infrastructure ---{Style.NC}\n")
 
 def main_menu():
     show_banner()
-    print(f"{Colors.YELLOW}Выберите модуль защиты:{Colors.END}")
-    print("1. [88] Network Core (Протоколы)")
-    print("2. [90] Active City Protection (Ghost Mode)")
-    print("3. [95] Sterile Channel (Транзакции)")
-    print("4. Обновить инструменты (Nmap, Nikto, etc)")
-    print("5. Выход")
+    run_smart_check()
     
-    choice = input("\nВвод > ")
-
-    if choice == '1':
-        print(f"\n{Colors.GREEN}[*] Запуск Network Core...{Colors.END}")
-        # Здесь логика из твоего старого sh
-        os.system("nmap -sV 127.0.0.1") 
+    # СТРУКТУРА МЕНЮ (ПОЛНОЕ СООТВЕТСТВИЕ ОРИГИНАЛУ)
+    print(f"{Style.YELLOW}Доступные модули фильтрации:{Style.NC}")
+    print(f"1. {Style.CYAN}[88] Network Core{Style.NC} (Protocol Control)") #
+    print(f"2. {Style.CYAN}[90] Active City Protection{Style.NC} ('Ghost' Mode)") #
+    print(f"3. {Style.CYAN}[95] Sterile Channel{Style.NC} (Money Operations)") #
+    print(f"4. Обновить арсенал (Nmap, Nikto, Sherlock)")
+    print(f"5. Выход")
     
-    elif choice == '2':
-        print(f"\n{Colors.CYAN}[*] Активация Ghost Mode...{Colors.END}")
-        # Логика защиты
+    try:
+        choice = input(f"\n{Style.GREEN}Ввод > {Style.NC}")
         
-    elif choice == '3':
-        print(f"\n{Colors.YELLOW}[$] Sterile Channel активен.{Colors.END}")
-
-    elif choice == '4':
-        print("[!] Синхронизация репозиториев...")
-        os.system("apt update && apt upgrade -y")
-        
-    elif choice == '5':
-        sys.exit()
-    
-    input(f"\n{Colors.YELLOW}Нажмите Enter для возврата...{Colors.END}")
-    main_menu()
-
-if __name__ == "__main__":
-    # Проверка аргументов (как было в твоем sh)
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "--purge-silent":
-            print("Очистка логов...")
-            # Логика очистки
+        if choice == '1':
+            print(f"\n{Style.BLUE}[*] Активация Network Core (88)...{Style.NC}")
+            # Здесь будет твоя команда для протоколов
+            os.system("nmap -sV 127.0.0.1")
+            
+        elif choice == '2':
+            print(f"\n{Style.CYAN}[*] Вход в 'Ghost' Mode (90)...{Style.NC}")
+            # Логика Active City Protection
+            
+        elif choice == '3':
+            print(f"\n{Style.YELLOW}[$] Sterile Channel (95) активен.{Style.NC}")
+            print(f"{Style.GREEN}[+] Стратегия 'Банковский Гамбит' включена.{Style.NC}") #
+            
+        elif choice == '4':
+            print(f"\n{Style.GREEN}[!] Синхронизация репозиториев...{Style.NC}")
+            # Использование оригинальных флагов установки
+            os.system(f"apt update && apt upgrade {INSTALL_FLAGS} {PROGRESS_OPTS}")
+            
+        elif choice == '5':
+            print(f"{Style.RED}Завершение сессии...{Style.NC}")
             sys.exit()
             
-    try:
+        else:
+            print(f"{Style.RED}[!] Ошибка: Неверный модуль.{Style.NC}")
+            
+        input(f"\n{Style.YELLOW}Нажмите Enter для возврата...{Style.NC}")
         main_menu()
+        
     except KeyboardInterrupt:
-        print("\nЗавершение работы...")
+        print(f"\n{Style.RED}[!] Прервано.{Style.NC}")
+        sys.exit()
+
+# --- ОБРАБОТКА ФОНОВЫХ КОМАНД (ИЗ ОРИГИНАЛА) ---
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--purge-silent":
+            # deep_purge > /dev/null 2>&1
+            subprocess.run("apt-get autoremove -y && apt-get clean", shell=True)
+            sys.exit(0)
+            
+        if sys.argv[1] == "--update-silent":
+            # update_kali > /dev/null 2>&1
+            os.system("apt update > /dev/null 2>&1")
+            sys.exit(0)
+
+    main_menu()
