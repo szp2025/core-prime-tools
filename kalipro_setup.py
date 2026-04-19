@@ -6,7 +6,7 @@ import sys
 import subprocess
 
 # --- ПОЛНАЯ КОНФИГУРАЦИЯ ИЗ .SH ---
-VERSION = "8.1 Ultra-Precision (Rescue & Sterile Edition)"
+VERSION = "8.4 Ultra-Precision (Rescue & Sterile Edition)"
 # Флаги установки (без фигурных скобок, чтобы не злить sh)
 INSTALL_FLAGS = "-y --no-install-recommends"
 PROGRESS_OPTS = "-o Dpkg::Progress-Fancy=1 -o APT::Color=1"
