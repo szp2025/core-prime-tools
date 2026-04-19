@@ -1,83 +1,40 @@
 cat << 'EOF' > /usr/local/bin/kali_pro
-#!/bin/bash
+#!/usr/bin/env python3
 # VERSION=8.5.8
+import os, subprocess, shutil
 
-# --- ЦВЕТА И НАСТРОЙКИ ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-GRAY='\033[0;90m'
-WHITE='\033[1;37m'
-NC='\033[0m'
-
-LOOT_DIR="$HOME/arsenal_loot"
-mkdir -p "$LOOT_DIR"
-
-# --- СИСТЕМНЫЕ ФУНКЦИИ (Встроенный Python) ---
-run_smart_check() {
-    pgrep cron > /dev/null || cron &>/dev/null
-    apt-get clean >/dev/null 2>&1
-    python3 << 'PY_EOF'
-import shutil
-def get_status(path, label):
-    try:
-        total, used, free = shutil.disk_usage(path)
-        fmt = lambda b: f'{b/1024**3:.1f}G'
-        status = '\033[0;32mOK' if free > (350*1024*1024) else '\033[0;31mLOW'
-        print(f'   \033[0;34m[ {label} ]:\033[0m {fmt(free)} / {fmt(total)} ({status}\033[0m)')
-    except: pass
-get_status('/', 'СИСТЕМА')
-PY_EOF
-}
-
-show_menu() {
-    clear
-    echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC} ${GREEN}    AUTONOMOUS SAMSUNG CORE v8.5.7    ${NC} ${CYAN}│${NC}"
-    echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
+def run_smart_check():
+    # Выполнение системных команд через subprocess
+    subprocess.run("pgrep cron > /dev/null || cron &>/dev/null", shell=True)
     
-    run_smart_check
+    total, used, free = shutil.disk_usage("/")
+    fmt = lambda b: f'{b/1024**3:.1f}G'
+    status = '\033[0;32mOK' if free > (350*1024*1024) else '\033[0;31mLOW'
+    print(f'   \033[0;34m[ СИСТЕМА ]:\033[0m {fmt(free)} / {fmt(total)} ({status}\033[0m)')
 
-    echo -e "${YELLOW} [ AUTONOMOUS OPERATIONS ]${NC}"
-    echo -e " ${CYAN}A.${NC} TOTAL RECON   ${GRAY}- OSINT & Analyt${NC}"
-    echo -e " ${CYAN}B.${NC} WEB ATTACK    ${GRAY}- Scan & Exploit${NC}"
-    echo -e " ${CYAN}C.${NC} NET GUARDIAN  ${GRAY}- Sniff & Conn${NC}"
-    echo -e " ${CYAN}D.${NC} STERILIZER    ${GRAY}- Ghost & Clean${NC}"
-    echo -e " ${CYAN}E.${NC} WIRELESS      ${GRAY}- WiFi & BT-HID${NC}"
+def show_menu():
+    os.system('clear')
+    print("\033[0;36m┌───────────────────────────────────────────┐\033[0m")
+    print("\033[0;36m│\033[0m \033[0;32m    AUTONOMOUS SAMSUNG CORE v8.5.8    \033[0m \033[0;36m│\033[0m")
+    print("\033[0;36m└───────────────────────────────────────────┘\033[0m")
+    run_smart_check()
+    print("\n\033[1;33m [ AUTONOMOUS OPERATIONS ]\033[0m")
+    print(" \033[0;36mA.\033[0m TOTAL RECON")
+    print(" \033[0;36mB.\033[0m WEB ATTACK")
+    print(" \033[0;36mC.\033[0m NET GUARDIAN")
+    print("\n \033[0;32m18. TERMINAL\033[0m    \033[0;31m0. EXIT\033[0m")
 
-    echo -e "\n${GREEN} [ INTERFACE ]${NC}"
-    printf "  %-18s %-18s\n" "18. TERMINAL" "0. EXIT"
-    echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
-}
-
-# --- ГЛАВНЫЙ ЦИКЛ ---
-while true; do
-    show_menu
-    read -p "Выберите операцию: " opt
-    case $opt in
-        A|a) echo -e "${BLUE}[*] Запуск Recon...${NC}" ; sleep 1 ;;
-        B|b) echo -e "${BLUE}[*] Запуск Web Attack...${NC}" ; sleep 1 ;;
-        C|c) echo -e "${BLUE}[*] Запуск Sniffer...${NC}" ; sleep 1 ;;
-        D|d) echo -e "${BLUE}[*] Запуск Sterilizer...${NC}" ; sleep 1 ;;
-        E|e) echo -e "${BLUE}[*] Запуск Wireless...${NC}" ; sleep 1 ;;
-        18) 
-            clear
-            echo -e "${BLUE}[*] Вход в Root Shell. Введите 'exit' для возврата.${NC}"
-            /bin/bash --login
-            ;;
-        0) 
-            clear
-            echo -e "${RED}[!] Сессия завершена. Возврат в root@kali.${NC}"
-            exit 0 
-            ;;
-        *) 
-            echo -e "${RED}[!] Ошибка. Выберите A-E, 18 или 0.${NC}"
-            sleep 1 
-            ;;
-    esac
-done
+while True:
+    show_menu()
+    opt = input("\nВыберите операцию: ").upper()
+    if opt == '0':
+        print("Сессия завершена.")
+        break
+    elif opt == '18':
+        os.system('/bin/bash --login')
+    else:
+        print(f"Запуск режима {opt}...")
+        import time; time.sleep(1)
 EOF
 
 chmod +x /usr/local/bin/kali_pro
