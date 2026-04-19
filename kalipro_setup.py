@@ -1,6 +1,6 @@
 cat << 'EOF' > /usr/local/bin/kali_pro
 #!/bin/bash
-# VERSION=8.5.5
+# VERSION=8.5.6
 
 # --- ЦВЕТА И НАСТРОЙКИ ---
 RED='\033[0;31m'
@@ -19,18 +19,19 @@ mkdir -p "$LOOT_DIR"
 run_smart_check() {
     pgrep cron > /dev/null || cron &>/dev/null
     apt-get clean >/dev/null 2>&1
-    python3 -c "
+    python3 << 'EOF'
 import shutil
 def get_status(path, label):
     try:
         total, used, free = shutil.disk_usage(path)
-        fmt = lambda b: f'{b/1024**3:.1f}G' if b >= 1024**3 else f'{b//1024**2}MB'
-        status = '\033[0;32mOK' if free > (350*1024**2) else '\033[0;31mLOW'
+        fmt = lambda b: f'{b/1024**3:.1f}G'
+        status = '\033[0;32mOK' if free > (350*1024*1024) else '\033[0;31mLOW'
         print(f'   \033[0;34m[ {label} ]:\033[0m {fmt(free)} / {fmt(total)} ({status}\033[0m)')
     except: pass
 get_status('/', 'СИСТЕМА')
-"
+EOF
 }
+
 
 # --- ВКЛЮЧАЕМ ВСЕ ТВОИ МОДУЛИ (OSINT, WEB, WIFI и т.д.) ---
 # [Здесь подразумеваются все твои функции: flow_total_recon, flow_web_stack, smart_nmap и т.д.]
