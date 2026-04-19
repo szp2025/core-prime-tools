@@ -6,6 +6,7 @@ import sys
 import subprocess
 
 # --- ГЛОБАЛЬНЫЕ ПАРАМЕТРЫ СТЕРИЛЬНОСТИ (ИЗ ОРИГИНАЛА) ---
+CURRENT_VERSION ="8.3"
 VERSION = "CURRENT_VERSION (Rescue & Sterile Edition)"
 TARGET_FILE = "/usr/local/bin/kali_pro"
 INSTALL_FLAGS = "-y --no-install-recommends"
