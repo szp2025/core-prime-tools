@@ -3,7 +3,7 @@ import os
 import sys
 import subprocess
 
-VERSION = "8.5.1"
+VERSION = "8.5.3"
 
 def show_menu():
     os.system('clear')
