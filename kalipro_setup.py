@@ -1,6 +1,6 @@
 cat << 'EOF' > /usr/local/bin/kali_pro
 #!/bin/bash
-# VERSION=8.5.6
+# VERSION=8.5.7
 
 # --- ЦВЕТА И НАСТРОЙКИ ---
 RED='\033[0;31m'
