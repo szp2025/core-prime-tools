@@ -1,73 +1,99 @@
-#!/usr/bin/env python3
-import os
-import sys
-import subprocess
+cat << 'EOF' > /usr/local/bin/kali_pro
+#!/bin/bash
+# VERSION=8.5.5
 
-# Обновленная версия с исправленной логикой терминала
-VERSION = "8.5.5"
+# --- ЦВЕТА И НАСТРОЙКИ ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+GRAY='\033[0;90m'
+WHITE='\033[1;37m'
+NC='\033[0m'
 
-def show_menu():
-    os.system('clear')
-    print(f"\033[1;32m[+] v{VERSION} Ultra-Precision развернута!\033[0m")
-    print("\033[1;36m--- Core Prime Tools Infrastructure ---\033[0m")
-    print("\033[1;33mДоступные модули фильтрации:\033[0m")
-    print("1. [88] Network Core (Protocol Control)")
-    print("2. [90] Active City Protection ('Ghost' Mode)")
-    print("3. [95] Sterile Channel (Money Operations)")
-    print("4. Обновить арсенал (Nmap, Nikto, Sherlock)")
-    print("18. Terminal (Root Shell)")
-    print("5. Выход")
-    
-    choice = input("\n\033[1;32mВвод > \033[0m")
-    return choice
+LOOT_DIR="$HOME/arsenal_loot"
+mkdir -p "$LOOT_DIR"
 
-def main():
-    while True:
-        choice = show_menu()
-        
-        if choice == '1':
-            print("[*] Запуск Network Core [88]...")
-            # Твоя логика модуля 88 остается здесь
-            input("\nНажмите Enter для возврата...")
-            
-        elif choice == '2':
-            print("[*] Активация Ghost Mode [90]...")
-            # Твоя логика модуля 90 остается здесь
-            input("\nНажмите Enter для возврата...")
-            
-        elif choice == '3':
-            print("[*] Открытие Sterile Channel [95]...")
-            # Твоя логика модуля 95 остается здесь
-            input("\nНажмите Enter для возврата...")
-            
-        elif choice == '4':
-            print("[*] Обновление инструментов...")
-            os.system('apt update && apt upgrade -y')
-            input("\nОбновление завершено. Нажмите Enter...")
-            
-        elif choice == '18':
-            # Исправлено: открываем чистый root shell без мгновенного возврата
-            os.system('clear')
-            print("\033[1;34m[*] Вход в Root Shell (root@kali).")
-            print("[*] Введите 'exit' для возврата в меню Core Prime.\033[0m\n")
-            # Используем bash --login для полной среды root
-            subprocess.call(['/bin/bash', '--login'])
-            
-        elif choice == '5' or choice == '0':
-            # Исправлено: чистый выход в root@localhost
-            os.system('clear')
-            print("\033[1;31m[!] Завершение сессии Core Prime. Возврат в Kali (root@localhost)...\033[0m")
-            sys.exit(0)
-            
-        else:
-            print("\033[1;31m[!] Неверный ввод. Попробуйте снова.\033[0m")
-            import time
-            time.sleep(1)
-
-if __name__ == "__main__":
+# --- СИСТЕМНЫЕ ФУНКЦИИ ---
+run_smart_check() {
+    pgrep cron > /dev/null || cron &>/dev/null
+    apt-get clean >/dev/null 2>&1
+    python3 -c "
+import shutil
+def get_status(path, label):
     try:
-        main()
-    except KeyboardInterrupt:
-        # Тихий выход при Ctrl+C
-        print("\n\033[1;31m[!] Принудительная остановка. Возврат в консоль.\033[0m")
-        sys.exit(0)
+        total, used, free = shutil.disk_usage(path)
+        fmt = lambda b: f'{b/1024**3:.1f}G' if b >= 1024**3 else f'{b//1024**2}MB'
+        status = '\033[0;32mOK' if free > (350*1024**2) else '\033[0;31mLOW'
+        print(f'   \033[0;34m[ {label} ]:\033[0m {fmt(free)} / {fmt(total)} ({status}\033[0m)')
+    except: pass
+get_status('/', 'СИСТЕМА')
+"
+}
+
+# --- ВКЛЮЧАЕМ ВСЕ ТВОИ МОДУЛИ (OSINT, WEB, WIFI и т.д.) ---
+# [Здесь подразумеваются все твои функции: flow_total_recon, flow_web_stack, smart_nmap и т.д.]
+# Ниже приведен исправленный цикл управления:
+
+show_menu() {
+    clear
+    echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│${NC} ${GREEN}    AUTONOMOUS SAMSUNG CORE v8.5.5    ${NC} ${CYAN}│${NC}"
+    echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
+    
+    run_smart_check
+
+    echo -e "${YELLOW} [ AUTONOMOUS OPERATIONS ]${NC}"
+    echo -e " ${CYAN}A.${NC} TOTAL RECON   ${GRAY}- OSINT & Analyt${NC}"
+    echo -e " ${CYAN}B.${NC} WEB ATTACK    ${GRAY}- Scan & Exploit${NC}"
+    echo -e " ${CYAN}C.${NC} NET GUARDIAN  ${GRAY}- Sniff & Conn${NC}"
+    echo -e " ${CYAN}D.${NC} STERILIZER    ${GRAY}- Ghost & Clean${NC}"
+    echo -e " ${CYAN}E.${NC} WIRELESS      ${GRAY}- WiFi & BT-HID${NC}"
+
+    echo -e "\n${GREEN} [ INTERFACE ]${NC}"
+    printf "  %-18s %-18s\n" "18. TERMINAL" "0. EXIT"
+    echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
+}
+
+# Вставь сюда все остальные функции из своего Bash-скрипта (trust_analyzer_unified, flow_antivirus_scan и т.д.)
+# Я сокращаю для краткости, но при запуске используй свой полный набор функций.
+
+# --- ГЛАВНЫЙ ЦИКЛ ---
+while true; do
+    show_menu
+    read -p "Выберите операцию: " opt
+    case $opt in
+        A|a) # Твоя функция flow_total_recon
+             echo "Запуск Recon..." ; sleep 1 ;;
+        B|b) # Твоя функция flow_web_stack
+             echo "Запуск Web Attack..." ; sleep 1 ;;
+        C|c) # Твоя функция flow_network_sniffer
+             echo "Запуск Sniffer..." ; sleep 1 ;;
+        D|d) # Твоя функция flow_system_care
+             echo "Запуск Sterilizer..." ; sleep 1 ;;
+        E|e) # Твоя функция flow_wifi_attack
+             echo "Запуск Wireless..." ; sleep 1 ;;
+
+        18) 
+            # ВОЗВРАТ В ЧИСТЫЙ ROOT@KALI (Интерактивный шелл)
+            clear
+            echo -e "${BLUE}[*] Вход в Root Shell. Введите 'exit' для возврата в Арсенал.${NC}"
+            /bin/bash --login
+            ;;
+        0) 
+            # ПОЛНЫЙ ВЫХОД
+            clear
+            echo -e "${RED}[!] Сессия завершена. Возврат в root@kali.${NC}"
+            exit 0 
+            ;;
+        *) 
+            echo -e "${RED}[!] Ошибка. Доступны только режимы A, B, C, D, E, 18 или 0.${NC}"
+            sleep 1 
+            ;;
+    esac
+done
+EOF
+
+chmod +x /usr/local/bin/kali_pro
+echo "Готово. Напиши 'kali_pro' для запуска."
