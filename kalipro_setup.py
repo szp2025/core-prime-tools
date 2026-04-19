@@ -1,6 +1,6 @@
 cat << 'EOF' > /usr/local/bin/kali_pro
 #!/bin/bash
-# VERSION=8.5.7
+# VERSION=8.5.8
 
 # --- ЦВЕТА И НАСТРОЙКИ ---
 RED='\033[0;31m'
@@ -15,11 +15,11 @@ NC='\033[0m'
 LOOT_DIR="$HOME/arsenal_loot"
 mkdir -p "$LOOT_DIR"
 
-# --- СИСТЕМНЫЕ ФУНКЦИИ ---
+# --- СИСТЕМНЫЕ ФУНКЦИИ (Встроенный Python) ---
 run_smart_check() {
     pgrep cron > /dev/null || cron &>/dev/null
     apt-get clean >/dev/null 2>&1
-    python3 << 'EOF'
+    python3 << 'PY_EOF'
 import shutil
 def get_status(path, label):
     try:
@@ -29,18 +29,13 @@ def get_status(path, label):
         print(f'   \033[0;34m[ {label} ]:\033[0m {fmt(free)} / {fmt(total)} ({status}\033[0m)')
     except: pass
 get_status('/', 'СИСТЕМА')
-EOF
+PY_EOF
 }
-
-
-# --- ВКЛЮЧАЕМ ВСЕ ТВОИ МОДУЛИ (OSINT, WEB, WIFI и т.д.) ---
-# [Здесь подразумеваются все твои функции: flow_total_recon, flow_web_stack, smart_nmap и т.д.]
-# Ниже приведен исправленный цикл управления:
 
 show_menu() {
     clear
     echo -e "${CYAN}┌───────────────────────────────────────────┐${NC}"
-    echo -e "${CYAN}│${NC} ${GREEN}    AUTONOMOUS SAMSUNG CORE v8.5.5    ${NC} ${CYAN}│${NC}"
+    echo -e "${CYAN}│${NC} ${GREEN}    AUTONOMOUS SAMSUNG CORE v8.5.7    ${NC} ${CYAN}│${NC}"
     echo -e "${CYAN}└───────────────────────────────────────────┘${NC}"
     
     run_smart_check
@@ -57,27 +52,19 @@ show_menu() {
     echo -e "\n${CYAN}─────────────────────────────────────────────${NC}"
 }
 
-# Вставь сюда все остальные функции из своего Bash-скрипта (trust_analyzer_unified, flow_antivirus_scan и т.д.)
-# Я сокращаю для краткости, но при запуске используй свой полный набор функций.
-
 # --- ГЛАВНЫЙ ЦИКЛ ---
 while true; do
     show_menu
     read -p "Выберите операцию: " opt
     case $opt in
-        A|a) 
-             echo "Запуск Recon..." ; sleep 1 ;;
-        B|b) 
-             echo "Запуск Web Attack..." ; sleep 1 ;;
-        C|c) # <--- Здесь добавлена пропущенная скобка
-             echo "Запуск Sniffer..." ; sleep 1 ;;
-        D|d) 
-             echo "Запуск Sterilizer..." ; sleep 1 ;;
-        E|e) 
-             echo "Запуск Wireless..." ; sleep 1 ;;
+        A|a) echo -e "${BLUE}[*] Запуск Recon...${NC}" ; sleep 1 ;;
+        B|b) echo -e "${BLUE}[*] Запуск Web Attack...${NC}" ; sleep 1 ;;
+        C|c) echo -e "${BLUE}[*] Запуск Sniffer...${NC}" ; sleep 1 ;;
+        D|d) echo -e "${BLUE}[*] Запуск Sterilizer...${NC}" ; sleep 1 ;;
+        E|e) echo -e "${BLUE}[*] Запуск Wireless...${NC}" ; sleep 1 ;;
         18) 
             clear
-            echo -e "${BLUE}[*] Вход в Root Shell. Введите 'exit' для возврата в Арсенал.${NC}"
+            echo -e "${BLUE}[*] Вход в Root Shell. Введите 'exit' для возврата.${NC}"
             /bin/bash --login
             ;;
         0) 
@@ -86,13 +73,11 @@ while true; do
             exit 0 
             ;;
         *) 
-            echo -e "${RED}[!] Ошибка. Доступны только режимы A, B, C, D, E, 18 или 0.${NC}"
+            echo -e "${RED}[!] Ошибка. Выберите A-E, 18 или 0.${NC}"
             sleep 1 
             ;;
     esac
 done
-
 EOF
 
 chmod +x /usr/local/bin/kali_pro
-echo "Готово. Напиши 'kali_pro' для запуска."
