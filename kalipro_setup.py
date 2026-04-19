@@ -3,7 +3,8 @@ import os
 import sys
 import subprocess
 
-VERSION = "8.5.3"
+# Обновленная версия с исправленной логикой терминала
+VERSION = "8.5.5"
 
 def show_menu():
     os.system('clear')
@@ -25,25 +26,48 @@ def main():
         choice = show_menu()
         
         if choice == '1':
-            print("[*] Запуск Network Core...")
-            # Логика модуля 88
+            print("[*] Запуск Network Core [88]...")
+            # Твоя логика модуля 88 остается здесь
+            input("\nНажмите Enter для возврата...")
+            
         elif choice == '2':
-            print("[*] Активация Ghost Mode...")
-            # Логика модуля 90
+            print("[*] Активация Ghost Mode [90]...")
+            # Твоя логика модуля 90 остается здесь
+            input("\nНажмите Enter для возврата...")
+            
         elif choice == '3':
-            print("[*] Открытие Sterile Channel...")
-            # Логика модуля 95
+            print("[*] Открытие Sterile Channel [95]...")
+            # Твоя логика модуля 95 остается здесь
+            input("\nНажмите Enter для возврата...")
+            
         elif choice == '4':
             print("[*] Обновление инструментов...")
             os.system('apt update && apt upgrade -y')
+            input("\nОбновление завершено. Нажмите Enter...")
+            
         elif choice == '18':
-            print("\033[1;34m[*] Переход в Root Shell. Напишите 'exit' для возврата в меню.\033[0m")
+            # Исправлено: открываем чистый root shell без мгновенного возврата
+            os.system('clear')
+            print("\033[1;34m[*] Вход в Root Shell (root@kali).")
+            print("[*] Введите 'exit' для возврата в меню Core Prime.\033[0m\n")
+            # Используем bash --login для полной среды root
             subprocess.call(['/bin/bash', '--login'])
-        elif choice == '5':
-            print("\033[1;31m[!] Завершение сессии Core Prime. Возврат в Kali...\033[0m")
+            
+        elif choice == '5' or choice == '0':
+            # Исправлено: чистый выход в root@localhost
+            os.system('clear')
+            print("\033[1;31m[!] Завершение сессии Core Prime. Возврат в Kali (root@localhost)...\033[0m")
             sys.exit(0)
+            
         else:
-            print("Неверный ввод.")
+            print("\033[1;31m[!] Неверный ввод. Попробуйте снова.\033[0m")
+            import time
+            time.sleep(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        # Тихий выход при Ctrl+C
+        print("\n\033[1;31m[!] Принудительная остановка. Возврат в консоль.\033[0m")
+        sys.exit(0)
