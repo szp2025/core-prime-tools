@@ -262,7 +262,7 @@ run_update() {
 
     # URL твоего скрипта на GitHub или сервере (замени на свой, если есть)
 
-    local repo_url="https://raw.githubusercontent.com/username/repo/main/prime.sh"
+    local repo_url="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/prime.sh"
 
     
 
