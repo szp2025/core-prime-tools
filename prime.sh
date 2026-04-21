@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="2.6"
+VERSION="2.7"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
@@ -55,37 +55,43 @@ run_tool() {
         cd "$name" || return
         echo -e "${B}[*] Запуск $name...${NC}"
         eval "$cmd"
+        
+        # Если запуск упал из-за библиотек (даже если папка есть)
+        if [ $? -ne 0 ]; then
+            echo -e "${Y}[!] Ошибка запуска. Проверяем зависимости...${NC}"
+            python3 -m pip install --no-cache-dir setuptools requests future
+            echo -e "${G}[+] Зависимости обновлены. Попробуйте запустить снова.${NC}"
+        fi
+        
         echo -e "${Y}>> [Enter] для возврата...${NC}"
         read -r
         cd ..
     else
-        echo -e "${Y}[!] $name не найден. Качаем ZIP...${NC}"
+        echo -e "${Y}[!] $name не найден. Начинаю чистую установку...${NC}"
+        
+        # 1. Скачивание
         local zip_url="${url%.git}/archive/refs/heads/master.zip"
         curl -L "$zip_url" -o "temp.zip"
         
         if [ -f "temp.zip" ]; then
-            echo -e "${B}[*] Распаковка...${NC}"
+            # 2. Распаковка
+            echo -e "${B}[*] Распаковка архива...${NC}"
             unzip -q "temp.zip"
-            # Находим папку, которую создал unzip (например, routersploit-master)
+            
+            # 3. Исправление структуры (убираем матрешку)
             local extracted_dir=$(ls -d */ | grep "${name}" | head -n 1)
-            # Переименовываем её в чистое имя (например, в routersploit)
             mv "$extracted_dir" "$name" 2>/dev/null
             rm "temp.zip"
-            echo -e "${G}[+] Готово! Теперь запусти пункт еще раз.${NC}"
+            
+            # 4. АВТО-УСТАНОВКА ЗАВИСИМОСТЕЙ (То, что ты просил)
+            echo -e "${B}[*] Установка необходимых модулей Python (RAM: $CURRENT_RAM)...${NC}"
+            python3 -m pip install --no-cache-dir setuptools requests future
+            
+            echo -e "${G}[+] Установка завершена успешно!${NC}"
+        else
+            echo -e "${R}[!] Сбой загрузки. Проверь сеть.${NC}"
         fi
         read -p ">> [Enter]..."
-    fi
-}
-
-run_update() {
-    echo -e "${B}[*] Проверка Git...${NC}"
-    REMOTE_V=$(curl -s "$BASE_URL/prime.sh" | grep -oP 'VERSION="\K[^"]+')
-    if [ "$REMOTE_V" != "$VERSION" ] && [ ! -z "$REMOTE_V" ]; then
-        echo -e "${Y}[!] Обновление до v$REMOTE_V...${NC}"
-        curl -L "$BASE_URL/prime.sh" -o "$SELF_PATH" && chmod +x "$SELF_PATH"
-        exec prime
-    else
-        echo -e "${G}[+] Версия актуальна.${NC}"
     fi
 }
 
