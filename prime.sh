@@ -52,59 +52,37 @@ run_tool() {
     local cmd=$3
 
     if [ -d "$name" ]; then
-        echo -e "${G}[+] Инструмент $name найден.${NC}"
         cd "$name" || return
+        echo -e "${B}[*] Запуск $name...${NC}"
         
-        # --- БЛОК ПРОВЕРКИ ЗАВИСИМОСТЕЙ ---
-        # Проверяем наличие ключевых модулей, чтобы не падать с ошибкой
-        echo -e "${B}[*] Проверка окружения Python...${NC}"
-        python3 -c "import setuptools, requests" 2>/dev/null
-        if [ $? -ne 0 ]; then
-            echo -e "${Y}[!] Отсутствуют важные зависимости (setuptools/requests).${NC}"
-            echo -e "${Y}[*] Попытка автоматической установки (экономный режим)...${NC}"
+        # Попытка запуска и захват ошибок
+        output=$(eval "$cmd" 2>&1 | tee /dev/tty)
+        
+        # Если видим ошибку модулей
+        if [[ "$output" == *"ModuleNotFoundError"* || "$output" == *"pkg_resources"* ]]; then
+            echo -e "${Y}[!] Не хватает модулей. Ставим (RAM: $CURRENT_RAM)...${NC}"
             python3 -m pip install --no-cache-dir setuptools requests future
+            echo -e "${G}[+] Готово. Нажми 8 снова.${NC}"
         fi
-
-        echo -e "${B}[*] Исполнение: $cmd${NC}"
-        echo -e "${B}------------------------------------------${NC}"
         
-        # Запуск инструмента
-        eval "$cmd"
-        
-        echo -e "${B}------------------------------------------${NC}"
-        echo -e "${Y}>> Нажми [Enter], чтобы вернуться в меню...${NC}"
+        echo -e "${Y}>> [Enter] для возврата...${NC}"
         read -r
         cd ..
     else
-        echo -e "${Y}[!] $name не найден. Качаем архив (ZIP-метод)...${NC}"
-        
+        echo -e "${Y}[!] $name не найден. Качаем ZIP...${NC}"
         local zip_url="${url%.git}/archive/refs/heads/master.zip"
-        if [[ $(curl -sI "$zip_url" | head -n 1) == *"404"* ]]; then
-            zip_url="${url%.git}/archive/refs/heads/main.zip"
-        fi
-
-        echo -e "${B}[*] Загрузка: $zip_url${NC}"
         curl -L "$zip_url" -o "temp.zip"
         
         if [ -f "temp.zip" ]; then
-            echo -e "${B}[*] Распаковка и исправление структуры...${NC}"
+            echo -e "${B}[*] Распаковка и чистка...${NC}"
             unzip -q "temp.zip"
-            
-            # Устраняем "матрешку": находим распакованную папку (напр. routersploit-master)
-            local unpacked_dir=$(ls -d *-master/ 2>/dev/null || ls -d *-main/ 2>/dev/null)
-            
-            if [ -n "$unpacked_dir" ]; then
-                # Переносим содержимое во временную папку, удаляем корень и ставим как надо
-                mv "$unpacked_dir" "$name"
-                echo -e "${G}[+] Структура выровнена.${NC}"
-            fi
-            
+            # Умное переименование: берем любую созданную папку и называем как надо
+            local extracted_dir=$(ls -d */ | grep "${name}" | head -n 1)
+            mv "$extracted_dir" "$name" 2>/dev/null
             rm "temp.zip"
-            echo -e "${G}[+] Готово! Теперь выбери этот пункт снова.${NC}"
-        else
-            echo -e "${R}[!] Ошибка загрузки архива.${NC}"
+            echo -e "${G}[+] Структура выровнена. Жми пункт еще раз!${NC}"
         fi
-        read -p "Нажми [Enter]..."
+        read -p ">> [Enter]..."
     fi
 }
 
