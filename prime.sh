@@ -54,13 +54,18 @@ run_tool() {
     if [ -d "$name" ]; then
         cd "$name" || return
         echo -e "${B}[*] Запуск $name...${NC}"
+        
+        # Попытка запуска
         eval "$cmd"
         
-        # Если запуск упал из-за библиотек (даже если папка есть)
+        # Если запуск упал (код не 0) — пробуем лечить зависимости
         if [ $? -ne 0 ]; then
-            echo -e "${Y}[!] Ошибка запуска. Проверяем зависимости...${NC}"
+            echo -e "${Y}[!] Ошибка запуска. Проверяем библиотеки...${NC}"
             python3 -m pip install --no-cache-dir setuptools requests future
-            echo -e "${G}[+] Зависимости обновлены. Попробуйте запустить снова.${NC}"
+            if [ -f "requirements.txt" ]; then
+                python3 -m pip install --no-cache-dir -r requirements.txt
+            fi
+            echo -e "${G}[+] Зависимости обновлены. Попробуй запустить снова.${NC}"
         fi
         
         echo -e "${Y}>> [Enter] для возврата...${NC}"
@@ -69,27 +74,44 @@ run_tool() {
     else
         echo -e "${Y}[!] $name не найден. Начинаю чистую установку...${NC}"
         
-        # 1. Скачивание
+        # 1. Формируем ссылку на ZIP (пробуем master, потом main)
         local zip_url="${url%.git}/archive/refs/heads/master.zip"
+        
+        echo -e "${B}[*] Загрузка архива...${NC}"
         curl -L "$zip_url" -o "temp.zip"
         
         if [ -f "temp.zip" ]; then
             # 2. Распаковка
-            echo -e "${B}[*] Распаковка архива...${NC}"
+            echo -e "${B}[*] Распаковка...${NC}"
             unzip -q "temp.zip"
             
-            # 3. Исправление структуры (убираем матрешку)
-            local extracted_dir=$(ls -d */ | grep "${name}" | head -n 1)
-            mv "$extracted_dir" "$name" 2>/dev/null
-            rm "temp.zip"
-            
-            # 4. АВТО-УСТАНОВКА ЗАВИСИМОСТЕЙ (То, что ты просил)
-            echo -e "${B}[*] Установка необходимых модулей Python (RAM: $CURRENT_RAM)...${NC}"
-            python3 -m pip install --no-cache-dir setuptools requests future
-            
-            echo -e "${G}[+] Установка завершена успешно!${NC}"
+            # 3. Выравнивание структуры
+            # Ищем распакованную папку (она обычно называется name-master или name-main)
+            local extracted_dir=$(ls -d */ | grep -i "${name}" | head -n 1)
+            if [ -n "$extracted_dir" ]; then
+                mv "$extracted_dir" "$name" 2>/dev/null
+                rm "temp.zip"
+                cd "$name" || return
+                
+                # 4. АВТО-УСТАНОВКА ЗАВИСИМОСТЕЙ (Универсальная)
+                echo -e "${B}[*] Установка модулей Python (RAM: $CURRENT_RAM)...${NC}"
+                # Ставим базу
+                python3 -m pip install --no-cache-dir setuptools requests future
+                
+                # Если у инструмента есть свой список требований — ставим его
+                if [ -f "requirements.txt" ]; then
+                    echo -e "${B}[*] Установка специфичных модулей из requirements.txt...${NC}"
+                    python3 -m pip install --no-cache-dir -r requirements.txt
+                fi
+                
+                cd ..
+                echo -e "${G}[+] Установка $name и всех зависимостей завершена!${NC}"
+            else
+                echo -e "${R}[!] Ошибка: Не удалось найти распакованную папку.${NC}"
+                rm "temp.zip"
+            fi
         else
-            echo -e "${R}[!] Сбой загрузки. Проверь сеть.${NC}"
+            echo -e "${R}[!] Сбой загрузки. Проверь сеть или URL.${NC}"
         fi
         read -p ">> [Enter]..."
     fi
