@@ -11,18 +11,27 @@ Y='\033[1;33m'
 R='\033[0;31m'
 NC='\033[0m'
 
-# [ЭВРИСТИКА] Мониторинг ресурсов
+# [ЭВРИСТИКА] Мониторинг ресурсов: ОЗУ + Накопители
 check_resources() {
+    # ОЗУ
     RAM=$(free -m | awk '/Mem:/ { print $4 }')
+    # Внутренняя память (/)
+    DISK_INT=$(df -h / | awk 'NR==2 {print $4}')
+    # SD-карта (ищем по стандартным путям Android)
+    SD_PATH=$(df -h | grep -E '/storage/|/sdcard|/mnt/media_rw' | awk 'NR==1 {print $4}')
+    [ -z "$SD_PATH" ] && SD_PATH="Not Found"
+
     BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "100")
     
     echo -e "${B}=========================================="
     echo -e "   PRIME ULTRA CONSOLE - AUTONOMOUS"
     echo -e "==========================================${NC}"
     echo -e "${Y}📊 RAM:${NC} ${RAM}MB free | ${Y}BATT:${NC} ${BATT}%"
+    echo -e "${Y}💾 Internal:${NC} ${DISK_INT} free | ${Y}SD-Card:${NC} ${SD_PATH}"
     
-    if [ "$RAM" -lt 60 ]; then
-        echo -e "${R}[!] ОПАСНО: Мало памяти. Авто-очистка...${NC}"
+    # Авто-очистка при критическом лимите RAM
+    if [ "$RAM" -lt 50 ]; then
+        echo -e "${R}[!] ВНИМАНИЕ: Очистка кэша (RAM low)...${NC}"
         apt-get clean > /dev/null 2>&1
     fi
 }
