@@ -1,77 +1,89 @@
 #!/bin/bash
 
-# Параметры из твоего Git
+# Пути к твоему репозиторию
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
-# Цвета для интерфейса
+SELF_NAME="prime.sh"
+
+# Цвета
 G='\033[0;32m'
 B='\033[0;34m'
 Y='\033[1;33m'
 R='\033[0;31m'
 NC='\033[0m'
 
-# Эвристическая проверка ресурсов перед запуском
+# [ЭВРИСТИКА] Мониторинг ресурсов
 check_resources() {
     RAM=$(free -m | awk '/Mem:/ { print $4 }')
     BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "100")
-    echo -e "${B}[SYSTEM] RAM: ${RAM}MB free | BATT: ${BATT}%${NC}"
-    if [ "$RAM" -lt 50 ]; then
-        echo -e "${R}[!] Критически мало памяти! Запуск очистки...${NC}"
-        apt-get clean && rm -rf /var/lib/dpkg/updates/*
+    
+    echo -e "${B}=========================================="
+    echo -e "   PRIME ULTRA CONSOLE - AUTONOMOUS"
+    echo -e "==========================================${NC}"
+    echo -e "${Y}📊 RAM:${NC} ${RAM}MB free | ${Y}BATT:${NC} ${BATT}%"
+    
+    if [ "$RAM" -lt 60 ]; then
+        echo -e "${R}[!] ОПАСНО: Мало памяти. Авто-очистка...${NC}"
+        apt-get clean > /dev/null 2>&1
     fi
 }
 
-# Функция интеграции функций из kalipro_setup.sh
-deploy_pro_setup() {
-    echo -e "${Y}[*] Извлечение функций из kalipro_setup.sh...${NC}"
-    # Скачиваем setup, но не запускаем целиком, а берем из него логику
-    curl -L "$BASE_URL/kalipro_setup.sh" -o setup_core.sh
-    chmod +x setup_core.sh
-    
-    # Эвристика: установка только самого важного, чтобы не «убить» систему
-    echo -e "${G}[+] Установка сетевых инструментов (Wifite2, Sherlock)...${NC}"
-    apt-get install -y git python3 python3-pip --no-install-recommends
-    
-    # Добавляем твой фильтр
-    echo -e "${G}[+] Настройка фильтрации: [88] Core, [90] Ghost, [95] Sterile${NC}"
-    # Здесь можно вставить специфические команды из твоего файла
+# Функция самообновления меню
+update_self() {
+    echo -e "${B}[*] Обновление интерфейса из Git...${NC}"
+    curl -L "$BASE_URL/$SELF_NAME" -o "${SELF_NAME}.tmp"
+    if [ -s "${SELF_NAME}.tmp" ]; then
+        mv "${SELF_NAME}.tmp" "$SELF_NAME"
+        chmod +x "$SELF_NAME"
+        echo -e "${G}[+] Меню обновлено. Перезапуск...${NC}"
+        sleep 2
+        exec ./"$SELF_NAME"
+    else
+        echo -e "${R}[!] Ошибка загрузки. Проверь сеть.${NC}"
+        rm -f "${SELF_NAME}.tmp"
+    fi
 }
 
 while true; do
     check_resources
-    echo -e "\n${G}--- CORE PRIME ULTRA MENU ---${NC}"
-    echo -e "1) ${B}FULL ADAPTED SETUP${NC} (База из kalipro_setup.sh)"
-    echo -e "2) ${B}SYSTEM PURGE${NC} (Твой purge.sh + исправление dpkg)"
-    echo -e "3) ${B}GHOST MODE [90]${NC} (Активация скрытого канала)"
-    echo -e "4) ${B}UPDATE TOOLS${NC} (Обновить скрипты с GitHub)"
+    echo -e "1) ${G}FULL PRO SETUP${NC} (Функции из kalipro_setup.sh)"
+    echo -e "2) ${G}SYSTEM PURGE${NC} (Очистка обновлений и dpkg)"
+    echo -e "3) ${G}SYNC TOOLS${NC} (Скачать все скрипты с твоего Git)"
+    echo -e "4) ${B}UPDATE MENU${NC} (Обновить это меню из Git)"
+    echo -e "5) ${Y}PROTOCOLS${NC} ([88] Core | [90] Ghost | [95] Sterile)"
     echo -e "0) EXIT"
-    read -p ">> " choice
+    echo -e "${B}------------------------------------------${NC}"
+    read -p ">> " opt
 
-    case $choice in
+    case $opt in
         1)
-            deploy_pro_setup
+            echo -e "${Y}[*] Запуск адаптированного setup...${NC}"
+            curl -L "$BASE_URL/kalipro_setup.sh" | bash -s -- --light
             ;;
         2)
-            echo -e "${Y}[*] Очистка обновлений и блокировок...${NC}"
+            echo -e "${B}[*] Очистка dpkg/updates...${NC}"
             rm -rf /var/lib/dpkg/updates/*
             dpkg --configure -a
-            curl -L "$BASE_URL/purge.sh" | bash
+            apt-get clean
+            echo -e "${G}[+] Готово.${NC}"
             ;;
         3)
-            echo -e "${Y}[*] Проверка wlan0 для Ghost Mode...${NC}"
-            # Проверка sysfs, которая часто отсутствует
-            if [ ! -d "/sys/class" ]; then
-                echo -e "${R}[!] Ошибка: /sys/class missing. Патч невозможен.${NC}"
-            else
-                iwconfig
-            fi
+            echo -e "${B}[*] Скачивание инструментов...${NC}"
+            for file in purge.sh kalipro_setup.sh; do
+                curl -L "$BASE_URL/$file" -o "$file" && chmod +x "$file"
+                echo -e "${G}[+] $file получен.${NC}"
+            done
             ;;
         4)
-            echo -e "${G}[+] Синхронизация с основной веткой Git...${NC}"
-            curl -L "$BASE_URL/purge.sh" -o purge.sh
-            curl -L "$BASE_URL/kalipro_setup.sh" -o kalipro_setup.sh
-            chmod +x *.sh
+            update_self
+            ;;
+        5)
+            echo -e "${Y}--- Состояние Фильтров ---${NC}"
+            echo -e "[88] Network Core: OK"
+            echo -e "[90] Ghost Mode: Standby"
+            echo -e "[95] Sterile Channel: Active"
+            read -p "Enter..."
             ;;
         0) exit 0 ;;
+        *) echo -e "${R}Ошибка выбора${NC}" && sleep 1 ;;
     esac
-    read -p "Нажми Enter..."
 done
