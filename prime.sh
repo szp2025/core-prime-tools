@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="2.3"
+VERSION="2.4"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
@@ -53,17 +53,31 @@ run_tool() {
     if [ -d "$name" ]; then
         echo -e "${G}[+] Инструмент $name найден.${NC}"
         cd "$name" || return
+        
+        # --- БЛОК ПРОВЕРКИ ЗАВИСИМОСТЕЙ ---
+        # Проверяем наличие ключевых модулей, чтобы не падать с ошибкой
+        echo -e "${B}[*] Проверка окружения Python...${NC}"
+        python3 -c "import setuptools, requests" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo -e "${Y}[!] Отсутствуют важные зависимости (setuptools/requests).${NC}"
+            echo -e "${Y}[*] Попытка автоматической установки (экономный режим)...${NC}"
+            python3 -m pip install --no-cache-dir setuptools requests future
+        fi
+
         echo -e "${B}[*] Исполнение: $cmd${NC}"
+        echo -e "${B}------------------------------------------${NC}"
+        
+        # Запуск инструмента
         eval "$cmd"
+        
+        echo -e "${B}------------------------------------------${NC}"
         echo -e "${Y}>> Нажми [Enter], чтобы вернуться в меню...${NC}"
         read -r
         cd ..
     else
         echo -e "${Y}[!] $name не найден. Качаем архив (ZIP-метод)...${NC}"
         
-        # Превращаем ссылку GitHub в ссылку на ZIP-архив
         local zip_url="${url%.git}/archive/refs/heads/master.zip"
-        # На случай если ветка называется 'main'
         if [[ $(curl -sI "$zip_url" | head -n 1) == *"404"* ]]; then
             zip_url="${url%.git}/archive/refs/heads/main.zip"
         fi
@@ -72,13 +86,20 @@ run_tool() {
         curl -L "$zip_url" -o "temp.zip"
         
         if [ -f "temp.zip" ]; then
-            echo -e "${B}[*] Распаковка...${NC}"
+            echo -e "${B}[*] Распаковка и исправление структуры...${NC}"
             unzip -q "temp.zip"
-            # Удаляем архив и переименовываем папку (из 'name-master' в 'name')
-            rm "temp.zip"
-            mv "${name}-"* "$name" 2>/dev/null || mv "routersploit-master" "$name" 2>/dev/null || mv "social-engineer-toolkit-main" "$name" 2>/dev/null
             
-            echo -e "${G}[+] Готово! Попробуй запустить снова.${NC}"
+            # Устраняем "матрешку": находим распакованную папку (напр. routersploit-master)
+            local unpacked_dir=$(ls -d *-master/ 2>/dev/null || ls -d *-main/ 2>/dev/null)
+            
+            if [ -n "$unpacked_dir" ]; then
+                # Переносим содержимое во временную папку, удаляем корень и ставим как надо
+                mv "$unpacked_dir" "$name"
+                echo -e "${G}[+] Структура выровнена.${NC}"
+            fi
+            
+            rm "temp.zip"
+            echo -e "${G}[+] Готово! Теперь выбери этот пункт снова.${NC}"
         else
             echo -e "${R}[!] Ошибка загрузки архива.${NC}"
         fi
