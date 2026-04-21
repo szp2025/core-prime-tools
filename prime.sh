@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="2.4"
+VERSION="2.5"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
