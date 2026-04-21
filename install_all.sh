@@ -39,7 +39,7 @@ install_tool() {
     repair_and_clean
 }
 
-# Список инструментов (добавлен Anonym8)
+# --- СПИСОК ИНСТРУМЕНТОВ ---
 TOOLS=(
     "zphisher;https://github.com/htr-tech/zphisher/archive/refs/heads/master.zip;zphisher.sh;"
     "seeker;https://github.com/thewhiteh4t/seeker/archive/refs/heads/master.zip;seeker.py;safe_pip -r requirements.txt"
@@ -56,10 +56,10 @@ TOOLS=(
 
 # --- СТАРТ УСТАНОВКИ ---
 clear
-echo -e "${R}[*] PRIME v14.5: РАЗВЕРТЫВАНИЕ ПОЛНОГО КОМПЛЕКСА...${NC}"
+echo -e "${R}[*] PRIME v15.3: СБОРКА ПОЛНОГО КОМПЛЕКСА...${NC}"
+mkdir -p /root/share
 repair_and_clean
 apt-get update >/dev/null 2>&1
-# Добавлены flask для AV-Hub и tor для анонимности
 apt-get install -y php curl unzip python3-pip python3-flask nmap foremost tshark aircrack-ng chkrootkit whatweb htop bluez clamav tor >/dev/null 2>&1
 
 for entry in "${TOOLS[@]}"; do
@@ -67,200 +67,134 @@ for entry in "${TOOLS[@]}"; do
     install_tool "$t_name" "$t_url" "$t_exec" "$t_extra"
 done
 
-# --- ГЕНЕРАЦИЯ СЕРВЕРА АНТИВИРУСА ---
+# --- ГЕНЕРАЦИЯ ВСЕХ СЕРВЕРОВ ---
+
+# 1. AV-Server
 cat << 'EOF' > /root/av_server.py
 from flask import Flask, request, render_template_string
 import subprocess, os
-
 app = Flask(__name__)
-
-# Легкий HTML-интерфейс прямо в коде (минимализм для 51MB RAM)
-HTML_PAGE = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>PRIME AV-HUB</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { background: #000; color: #0f0; font-family: monospace; padding: 20px; }
-        input { background: #111; color: #0f0; border: 1px solid #0f0; padding: 10px; width: 100%; margin-bottom: 10px; }
-        button { background: #0f0; color: #000; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; }
-        .result { border: 1px dashed #0f0; padding: 15px; margin-top: 20px; white-space: pre-wrap; }
-    </style>
-</head>
-<body>
-    <h2>>>> PRIME AV-SCANNER <<<</h2>
-    <form method="post" action="/scan" enctype="multipart/form-data">
-        <input type="file" name="file">
-        <button type="submit">ЗАПУСТИТЬ СКАН</button>
-    </form>
-</body>
-</html>
-'''
-
+HTML = '<body style="background:#000;color:#0f0;font-family:monospace;padding:20px;"><h2>>>> AV-SCAN <<<</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file"><br><br><button type="submit">SCAN</button></form></body>'
 @app.route('/')
-def index():
-    return render_template_string(HTML_PAGE)
-
+def index(): return render_template_string(HTML)
 @app.route('/scan', methods=['POST'])
 def scan():
-    if 'file' not in request.files: return "Файл не выбран", 400
     f = request.files['file']
-    if f.filename == '': return "Файл не выбран", 400
-    
-    save_path = os.path.join('/tmp', f.filename)
-    f.save(save_path)
-    
-    # Запуск ClamAV
-    res = subprocess.run(['clamscan', '--no-summary', save_path], capture_output=True, text=True)
-    
-    os.remove(save_path) # Удаление следа
-    
-    # Возвращаем результат в стиле терминала
-    return f"<html><body style='background:#000;color:#0f0;font-family:monospace;'><pre>РЕЗУЛЬТАТ ДЛЯ {f.filename}:\n\n{res.stdout}\n\n<a href='/' style='color:#fff'>[ Назад ]</a></pre></body></html>"
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    path = os.path.join('/tmp', f.filename)
+    f.save(path)
+    res = subprocess.run(['clamscan', '--no-summary', path], capture_output=True, text=True)
+    os.remove(path)
+    return f"<body style='background:#000;color:#0f0;font-family:monospace;'><pre>{res.stdout}</pre><br><a href='/' style='color:#fff'>Назад</a></body>"
+if __name__ == '__main__': app.run(host='0.0.0.0', port=5000)
 EOF
 
+# 2. Share-Server
 cat << 'EOF' > /root/share_server.py
 from flask import Flask, render_template_string, send_from_directory
 import os
-
 app = Flask(__name__)
 SHARE_DIR = '/root/share'
-
-HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>PRIME SHARE</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { background: #1a1a1a; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
-        .file-card { background: #333; border-radius: 8px; padding: 15px; margin: 10px auto; max-width: 400px; border-left: 5px solid #0f0; }
-        a { color: #0f0; text-decoration: none; font-weight: bold; font-size: 1.2em; }
-        .info { font-size: 0.8em; color: #888; margin-top: 5px; }
-    </style>
-</head>
-<body>
-    <h2>📁 Доступные файлы</h2>
-    <p>Нажмите на файл для просмотра или загрузки</p>
-    {% for f in files %}
-        <div class="file-card">
-            <a href="/get/{{ f }}">{{ f }}</a>
-            <div class="info">Shared from Mobile Node</div>
-        </div>
-    {% endfor %}
-    {% if not files %}<p>Список пуст</p>{% endif %}
-</body>
-</html>
-'''
-
+HTML = '<body style="background:#1a1a1a;color:#eee;text-align:center;padding:20px;"><h2>📁 Files</h2>{% for f in files %}<div style="background:#333;margin:10px;padding:10px;"><a href="/get/{{f}}" style="color:#0f0;">{{f}}</a></div>{% endfor %}</body>'
 @app.route('/')
-def index():
-    files = os.listdir(SHARE_DIR)
-    return render_template_string(HTML, files=files)
-
+def index(): return render_template_string(HTML, files=os.listdir(SHARE_DIR))
 @app.route('/get/<filename>')
-def get_file(filename):
-    return send_from_directory(SHARE_DIR, filename)
+def get_file(filename): return send_from_directory(SHARE_DIR, filename)
+if __name__ == '__main__': app.run(host='0.0.0.0', port=5000)
+EOF
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+# 3. Upload-Server
+cat << 'EOF' > /root/upload_server.py
+from flask import Flask, request, render_template_string
+import os
+app = Flask(__name__)
+EXT_SD = next((os.path.join('/storage', d) for d in os.listdir('/storage') if d not in ['self', 'emulated', 'knox']), '/storage/emulated/0')
+UPLOAD_DIR = os.path.join(EXT_SD, 'PRIME_INBOX')
+if not os.path.exists(UPLOAD_DIR): os.makedirs(UPLOAD_DIR)
+HTML = '<body style="background:#0a0a0a;color:#0f0;font-family:monospace;text-align:center;padding:50px;"><h2>>>> DROP BOX <<<</h2><form method="post" action="/upload" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit">UPLOAD</button></form></body>'
+@app.route('/')
+def index(): return render_template_string(HTML)
+@app.route('/upload', methods=['POST'])
+def upload():
+    f = request.files['file']
+    f.save(os.path.join(UPLOAD_DIR, f.filename))
+    return "<h2>FILE RECEIVED</h2><br><a href='/'>Back</a>"
+if __name__ == '__main__': app.run(host='0.0.0.0', port=5001)
 EOF
 
 # --- ГЕНЕРАЦИЯ LAUNCHER ---
 cat << 'EOF' > /root/launcher.sh
 #!/bin/bash
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
-repair() { sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true; rm -f /root/*.log 2>/dev/null; }
-pause() { echo -ne "\n${B}[Enter] для возврата...${NC}"; read; }
+repair() { sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true; }
+pause() { echo -ne "\n${B}[Enter]...${NC}"; read; }
 
-mod_osint() {
-    clear; echo -e "${Y}>>> [ SMART OSINT DETECTOR ] <<<${NC}"
-    echo -ne "Ввод (Ник, Email, +Тел или IP): "; read input
-    [ -z "$input" ] && return
-    repair
-    if [[ "$input" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$ ]]; then
-        cd /root/infoga && python3 infoga.py --domain all --source all --target "$input"
-    elif [[ "$input" =~ ^\+[0-9]{10,15}$ ]]; then
-        cd /root/phoneinfoga && python3 phoneinfoga.py -n "$input"
-    elif [[ "$input" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        trace -t "$input"
+run_ghost_scan() {
+    repair; clear; echo -e "${R}>>> [ GHOST SCAN ] <<<${NC}"
+    echo -ne "Target: "; read t; [ -z "$t" ] && return
+    if [[ "$t" =~ [a-zA-Z] ]]; then
+        whatweb -a 1 "$t" --color=never | grep -E "HTTPS?|Direct"
+        nmap -sV -T4 -p80,443 "$t" | grep -vE "Starting|Raw"
     else
-        python3 /root/sherlock/sherlock/sherlock.py "$input" --timeout 1 --print-found
+        nmap -sV -T4 -Pn --top-ports 100 "$t" | grep -E "PORT|STATE|SERVICE|VERSION|^[0-9]"
     fi
     pause
 }
 
-run_ghost_scan() {
-    repair; clear; echo -e "${R}>>> [ SMART GHOST SCAN ] <<<${NC}"
-    echo -ne "Цель: "; read target; [ -z "$target" ] && return
-    if [[ "$target" =~ [a-zA-Z] ]]; then
-        whatweb -a 1 "$target" --color=never | grep -E "HTTPS?|Direct"
-        nmap -sV -T4 -p80,443 --script http-enum --script-args http.useragent="Mozilla/5.0" "$target" | grep -vE "Starting|Raw|Read"
-    else
-        nmap -sV -T4 -Pn --top-ports 100 "$target" | grep -E "PORT|STATE|SERVICE|VERSION|^[0-9]"
-    fi
+mod_osint() {
+    clear; echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
+    echo -ne "Input: "; read i; [ -z "$i" ] && return
+    repair
+    if [[ "$i" =~ @ ]]; then cd /root/infoga && python3 infoga.py --target "$i"
+    elif [[ "$i" =~ ^\+ ]]; then cd /root/phoneinfoga && python3 phoneinfoga.py -n "$i"
+    else python3 /root/sherlock/sherlock/sherlock.py "$i" --timeout 1 --print-found; fi
     pause
 }
 
 mod_device_hack() {
-    clear; echo -e "${R}>>> [ SMART DEVICE EXPLOIT ] <<<${NC}"
-    echo -e "1) Bluetooth Scan\n2) Android ADB (PhoneSploit)\n3) Deep Grep (Пароли/Токены)\n0) Назад"
+    clear; echo -e "${R}>>> [ DEVICE HACK ] <<<${NC}"
+    echo -e "1) BT Scan\n2) ADB PhoneSploit\n3) Deep Grep (Secrets)\n0) Back"
     read -p ">> " m4
     case $m4 in
-        1) hciconfig hci0 up 2>/dev/null; hcitool scan; pause ;;
+        1) hcitool scan; pause ;;
         2) cd /root/phonesploit && python3 phonesploitpython.py ;;
-        3) echo -n "Путь: "; read p; grep -rnE "password|token|secret|login|pwd" "$p" 2>/dev/null | grep -vE "\.html|\.js" | head -n 20; pause ;;
+        3) read -p "Path: " p; grep -rnE "password|token|secret" "$p" 2>/dev/null | head -n 20; pause ;;
     esac
 }
 
 mod_security() {
-    clear
-    echo -e "${G}>>> [ SECURITY & DATA HUB ] <<<${NC}"
-    echo -e "1) VPN/TOR (On/Off)"
-    echo -e "2) AV-HUB (Твой личный антивирус)"
-    echo -e "3) SHARE-HUB (Раздать файлы по IP)"
-    echo -e "4) Проверка текущего IP"
-    echo -e "0) Назад"
+    clear; echo -e "${G}>>> [ SECURITY HUB ] <<<${NC}"
+    echo -e "1) VPN/TOR\n2) AV-HUB\n3) SHARE-HUB\n4) UPLOAD-HUB\n5) My IP\n0) Back"
     read -p ">> " m5
     case $m5 in
-        1) # ... (код VPN из предыдущей версии) ... ;;
-        2) 
-            repair
-            python3 /root/av_server.py ;;
-        3)
-            repair
+        1) a8 status; echo "a)Start b)Stop"; read x; [[ $x == "a" ]] && a8 start || a8 stop; pause ;;
+        2) python3 /root/av_server.py ;;
+        3) 
+            EXT_SD=$(ls -d /storage/* 2>/dev/null | grep -vE "self|emulated" | head -n 1)
+            BASE=${EXT_SD:-"/storage/emulated/0"}
+            cp -r "$BASE/shared"/. /root/share/ 2>/dev/null
             ip=$(hostname -I | awk '{print $1}')
-            echo -e "${G}[!] SHARE-HUB ЗАПУЩЕН${NC}"
-            echo -e "${Y}Передай эту ссылку: http://$ip:5000${NC}"
-            echo -e "${B}[*] Положи файлы в /root/share чтобы они появились там.${NC}"
-            python3 /root/share_server.py ;;
-        4) curl -s https://ifconfig.me; pause ;;
+            echo "http://$ip:5000"; python3 /root/share_server.py
+            rm -rf /root/share/*; pause ;;
+        4) ip=$(hostname -I | awk '{print $1}')
+           echo "http://$ip:5001"; python3 /root/upload_server.py; pause ;;
+        5) curl -s https://ifconfig.me; echo; pause ;;
     esac
 }
 
 while true; do
     repair; clear
-    echo -e "${R}========== [ PRIME MASTER v14.5 ] ==========${NC}"
-    echo -e "G) ${R}[ GHOST SCAN ]${NC}  1) ${G}[ SOCIAL ENG ]${NC}"
-    echo -e "2) ${G}[ AUTO-EXPLOIT ]${NC} 3) ${Y}[ SMART OSINT ]${NC}"
-    echo -e "4) ${B}[ DEVICE HACK ]${NC}  5) ${B}[ SECURITY ]${NC}"
-    echo -e "--------------------------------------------"
-    echo -e "s) MONITOR (HTOP)    0) EXIT"
-    echo -ne "\n${Y}>> Вектор: ${NC}"
+    echo -e "${R}========== [ PRIME MASTER v15.3 ] ==========${NC}"
+    echo -e "G) [ GHOST SCAN ]  1) [ SOCIAL ENG ]"
+    echo -e "2) [ SQLMAP ]      3) [ SMART OSINT ]"
+    echo -e "4) [ DEVICE HACK ] 5) [ SECURITY HUB ]"
+    echo -e "s) MONITOR (HTOP)  0) EXIT"
+    echo -ne "\n${Y}>> Vector: ${NC}"
     read opt
     case $opt in
-        g|G) run_ghost_scan ;;
-        1) cd /root/zphisher && ./zphisher.sh ;;
+        g|G) run_ghost_scan ;; 1) cd /root/zphisher && ./zphisher.sh ;;
         2) cd /root/sqlmap && python3 sqlmap.py --wizard ;;
-        3) mod_osint ;;
-        4) mod_device_hack ;;
-        5) mod_security ;;
-        s) htop ;;
-        0) clear; exit 0 ;;
+        3) mod_osint ;; 4) mod_device_hack ;; 5) mod_security ;;
+        s) htop ;; 0) exit 0 ;;
     esac
 done
 EOF
@@ -268,4 +202,4 @@ EOF
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
-echo -e "\n${G}[✔] PRIME v14.5 ПОЛНОСТЬЮ ЗАРЯЖЕН. Введи: launcher${NC}"
+echo -e "\n${G}[✔] PRIME v15.3 ПОЛНЫЙ КОМПЛЕКС ГОТОВ. Введи: launcher${NC}"
