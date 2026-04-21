@@ -103,23 +103,30 @@ def get_file(filename): return send_from_directory(SHARE_DIR, filename)
 if __name__ == '__main__': app.run(host='0.0.0.0', port=5000)
 EOF
 
-# 3. Upload-Server
 cat << 'EOF' > /root/upload_server.py
 from flask import Flask, request, render_template_string
 import os
 app = Flask(__name__)
-EXT_SD = next((os.path.join('/storage', d) for d in os.listdir('/storage') if d not in ['self', 'emulated', 'knox']), '/storage/emulated/0')
-UPLOAD_DIR = os.path.join(EXT_SD, 'PRIME_INBOX')
-if not os.path.exists(UPLOAD_DIR): os.makedirs(UPLOAD_DIR)
-HTML = '<body style="background:#0a0a0a;color:#0f0;font-family:monospace;text-align:center;padding:50px;"><h2>>>> DROP BOX <<<</h2><form method="post" action="/upload" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit">UPLOAD</button></form></body>'
+
+# Универсальный путь: пробуем /sdcard, иначе используем локальную папку
+UPLOAD_DIR = '/sdcard/PRIME_INBOX' if os.path.exists('/sdcard') else '/root/PRIME_INBOX'
+if not os.path.exists(UPLOAD_DIR): os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+HTML = '<body style="background:#000;color:#0f0;font-family:monospace;text-align:center;padding:50px;"><h2>>>> DROP BOX <<<</h2><form method="post" action="/upload" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#0f0;color:#000;border:none;padding:10px 20px;font-weight:bold;cursor:pointer;">UPLOAD</button></form><p style="color:#555;">Save to: ' + UPLOAD_DIR + '</p></body>'
+
 @app.route('/')
 def index(): return render_template_string(HTML)
+
 @app.route('/upload', methods=['POST'])
 def upload():
+    if 'file' not in request.files: return "No file", 400
     f = request.files['file']
+    if f.filename == '': return "No file", 400
     f.save(os.path.join(UPLOAD_DIR, f.filename))
-    return "<h2>FILE RECEIVED</h2><br><a href='/'>Back</a>"
-if __name__ == '__main__': app.run(host='0.0.0.0', port=5001)
+    return "<html><body style='background:#000;color:#0f0;text-align:center;padding:50px;'><h2>FILE RECEIVED!</h2><br><a href='/' style='color:#fff'>[ Back ]</a></body></html>"
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001)
 EOF
 
 # --- ГЕНЕРАЦИЯ LAUNCHER ---
