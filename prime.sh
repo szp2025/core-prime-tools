@@ -1,32 +1,34 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="1.5"  # Текущая версия
+VERSION="1.6"  # Текущая версия
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 G='\033[0;32m'; B='\033[0;34m'; Y='\033[1;33m'; R='\033[0;31m'; NC='\033[0m'
 
 check_resources() {
+    # Получаем данные
     RAM=$(free -m | awk '/Mem:/ { print $4 }')
-    BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "100")
+    BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "0")
     
-    # Эвристика: если памяти критически мало, чистим не дожидаясь выбора пользователя
-    if [ "$RAM" -lt 50 ]; then
-        # Тихая очистка кэша пакетов и временных файлов
-        apt-get clean > /dev/null 2>&1
-        sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
-    fi
+    # Эвристика цветов для Батареи
+    if [ "$BATT" -gt 70 ]; then BATT_COL=$G;    # Зеленый: Всё отлично
+    elif [ "$BATT" -gt 30 ]; then BATT_COL=$Y;  # Желтый: Внимание
+    else BATT_COL=$R; fi                        # Красный: Срочно на зарядку!
+
+    # Эвристика цветов для ОЗУ (наши текущие 51MB - это желтая зона)
+    if [ "$RAM" -gt 100 ]; then RAM_COL=$G; 
+    elif [ "$RAM" -gt 45 ]; then RAM_COL=$Y; 
+    else RAM_COL=$R; fi
 
     DISK_INT=$(df -h /system | awk 'NR==2 {print $4}')
-    
-    # Упрощаем вывод для экономии места на экране Wiko
-    echo -e "${B}=========================================="
-    echo -e "   PRIME ULTRA CONSOLE v$VERSION - ADAPTED"
-    echo -e "==========================================${NC}"
-    echo -e "📊 ${Y}RAM:${NC} ${RAM}MB (Low) | ${Y}BATT:${NC} ${BATT}%"
-    echo -e "💾 ${Y}Sys:${NC} ${DISK_INT} free | ${Y}SD:${NC} ${R}Hidden${NC}"
-}
 
+    echo -e "${B}=========================================="
+    echo -e "   PRIME ULTRA v$VERSION | BATT: ${BATT_COL}${BATT}%${NC}"
+    echo -e "   STATUS: $([ "$RAM" -lt 50 ] && echo -e "${R}CRITICAL${NC}" || echo -e "${G}STABLE${NC}") | RAM: ${RAM_COL}${RAM}MB${NC}"
+    echo -e "==========================================${NC}"
+    echo -e "💾 Внутренняя: ${DISK_INT} free"
+}
 # [ЭВРИСТИКА] Умное обновление по версии
 update_logic() {
     echo -e "${B}[*] Проверка обновлений на GitHub...${NC}"
