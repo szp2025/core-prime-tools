@@ -69,20 +69,44 @@ install_tool "cupp" "https://github.com/Mebus/cupp/archive/refs/heads/master.zip
 # --- СОЗДАНИЕ / ОБНОВЛЕНИЕ LAUNCHER.SH С ФУНКЦИЯМИ ---
 echo -e "${B}[*] Генерирую модульный launcher.sh...${NC}"
 
-# --- ГЕНЕРАЦИЯ МОДУЛЬНОГО LAUNCHER ---
+# --- ГЕНЕРАЦИЯ МОДУЛЬНОГО LAUNCHER v13.5 ---
 cat << 'EOF' > /root/launcher.sh
 #!/bin/bash
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
 repair() { sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true; }
-pause() { echo -e "\n${B}------------------------------------${NC}"; read -p "Нажми [Enter] для возврата..."; }
+pause() { echo -e "\n${B}------------------------------------${NC}"; read -p "Нажми [Enter]..."; }
 
-# --- МОДУЛЬ 1: СОЦИАЛЬНАЯ ИНЖЕНЕРИЯ ---
+# --- ЭВРИСТИЧЕСКИЙ МОДУЛЬ "GHOST" ---
+run_ghost_scan() {
+    repair; clear
+    echo -e "${R}>>> [ SMART GHOST SCAN ] <<<${NC}"
+    echo -ne "${Y}Введите цель (example.com): ${NC}"
+    read target
+    [ -z "$target" ] && return
+
+    echo -e "\n${B}[1/3] Пассивный эвристический анализ (WhatWeb)...${NC}"
+    # WhatWeb определяет систему без агрессивного сканирования
+    whatweb -a 1 "$target" --color=never
+
+    echo -e "\n${B}[2/3] Поиск уязвимых конфигураций (Fingerprinting)...${NC}"
+    # Nmap с подменой User-Agent под обычный Chrome, чтобы не спалиться
+    nmap -sV -p80,443 --script http-title,http-headers,http-robots.txt \
+    --script-args http.useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "$target"
+
+    echo -e "\n${B}[3/3] Автоматический поиск векторов (Smart Enum)...${NC}"
+    # Сканируем только самые вероятные пути (эвристика)
+    nmap -p80,443 --script http-enum --script-args http-enum.fingerprintfile="default" "$target"
+
+    pause
+}
+
+# --- МОДУЛЬ 1: СОЦ. ИНЖЕНЕРИЯ (Автоматизация) ---
 mod_social() {
     clear
-    echo -e "${B}>>> МОДУЛЬ: СОЦИАЛЬНАЯ ИНЖЕНЕРИЯ${NC}"
-    echo -e "1) Zphisher (Фишинг)"
-    echo -e "2) Seeker (Геолокация)"
+    echo -e "${B}>>> СОЦИАЛЬНАЯ ИНЖЕНЕРИЯ${NC}"
+    echo -e "1) Zphisher (Auto-Phish)"
+    echo -e "2) Seeker (Smart Geo-Track)"
     echo -e "0) Назад"
     read -p ">> " m1
     case $m1 in
@@ -91,67 +115,40 @@ mod_social() {
     esac
 }
 
-# --- МОДУЛЬ 2: СЕТИ И ЭКСПЛОЙТЫ ---
-mod_net_exploit() {
+# --- МОДУЛЬ 2: АВТО-ВЗЛОМ (SQL & Wi-Fi) ---
+mod_exploit() {
     clear
-    echo -e "${B}>>> МОДУЛЬ: СЕТИ И ЭКСПЛОЙТЫ${NC}"
-    echo -e "1) Wifite2 (Wi-Fi аудит)"
-    echo -e "2) Routersploit (Роутеры)"
-    echo -e "3) SQLMap (Взлом БД)"
+    echo -e "${B}>>> СЕТИ И ЭКСПЛОЙТЫ${NC}"
+    echo -e "1) Wifite2 (Auto-Wifi)"
+    echo -e "2) SQLMap (Smart DB Exploit)"
+    echo -e "3) Routersploit (Auto-Router)"
     echo -e "0) Назад"
     read -p ">> " m2
     case $m2 in
-        1) repair && wifite ;;
-        2) repair && cd /root/routersploit && python3 rsf.py ;;
-        3) repair && cd /root/sqlmap && python3 sqlmap.py --wizard && pause ;;
-    esac
-}
-
-# --- МОДУЛЬ 3: OSINT И РАЗВЕДКА ---
-mod_osint() {
-    clear
-    echo -e "${B}>>> МОДУЛЬ: OSINT${NC}"
-    echo -e "1) Sherlock (Поиск по нику)"
-    echo -e "2) IP-Tracer (Данные по IP)"
-    echo -e "0) Назад"
-    read -p ">> " m3
-    case $m3 in
-        1) repair && echo -n "Ник: " && read n && python3 /root/sherlock/sherlock/sherlock.py "$n" && pause ;;
-        2) repair && trace -h && pause ;;
-    esac
-}
-
-# --- МОДУЛЬ 4: ПАРОЛИ И СИСТЕМА ---
-mod_sys() {
-    clear
-    echo -e "${B}>>> МОДУЛЬ: СИСТЕМА И ПАРОЛИ${NC}"
-    echo -e "1) CUPP (Генератор словарей)"
-    echo -e "2) Chkrootkit (Аудит безопасности)"
-    echo -e "0) Назад"
-    read -p ">> " m4
-    case $m4 in
-        1) repair && cd /root/cupp && python3 cupp.py -i && pause ;;
-        2) repair && chkrootkit && pause ;;
+        1) repair && wifite --kill --dict /root/cupp/passwords.txt ;;
+        2) repair && cd /root/sqlmap && python3 sqlmap.py --wizard ;;
+        3) repair && cd /root/routersploit && python3 rsf.py ;;
     esac
 }
 
 # --- ГЛАВНОЕ МЕНЮ ---
 while true; do
     repair; clear
-    echo -e "${B}========== [ PRIME MASTER v13.0 ] ==========${NC}"
-    echo -e "1) ${G}[ СОЦ. ИНЖЕНЕРИЯ ]${NC} -> Zphisher, Seeker"
-    echo -e "2) ${G}[ СЕТИ И ВЗЛОМ ]${NC}   -> Wifite, SQLMap, RSF"
-    echo -e "3) ${Y}[ OSINT РАЗВЕДКА ]${NC} -> Sherlock, IP-Tracer"
-    echo -e "4) ${Y}[ ПАРОЛИ И АУДИТ ]${NC} -> CUPP, Chkrootkit"
+    echo -e "${R}========== [ PRIME MASTER v13.5 ] ==========${NC}"
+    echo -e "G) ${R}[ GHOST SCAN ]${NC}  -> Тихое эвристическое сканирование"
     echo -e "--------------------------------------------"
-    echo -e "s) ${B}СИСТЕМНЫЙ HTOP${NC}    0) ${R}ВЫХОД${NC}"
-    echo -ne "\n${Y}>> Вектор атаки: ${NC}"
+    echo -e "1) ${G}[ СОЦ. ИНЖЕНЕРИЯ ]${NC}"
+    echo -e "2) ${G}[ АВТО-ВЗЛОМ ]${NC}"
+    echo -e "3) ${Y}[ OSINT РАЗВЕДКА ]${NC}"
+    echo -e "4) ${Y}[ ПАРОЛИ / АУДИТ ]${NC}"
+    echo -e "--------------------------------------------"
+    echo -e "s) СИСТЕМА (HTOP)    0) ВЫХОД"
+    echo -ne "\n${Y}>> Вектор: ${NC}"
     read opt
     case $opt in
+        g|G) run_ghost_scan ;;
         1) mod_social ;;
-        2) mod_net_exploit ;;
-        3) mod_osint ;;
-        4) mod_sys ;;
+        2) mod_exploit ;;
         s) htop ;;
         0) clear; break ;;
     esac
