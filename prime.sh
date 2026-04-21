@@ -1,33 +1,38 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="1.2"  # Текущая версия
+VERSION="1.3"  # Текущая версия
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 G='\033[0;32m'; B='\033[0;34m'; Y='\033[1;33m'; R='\033[0;31m'; NC='\033[0m'
 
 check_resources() {
+    # ОЗУ и Батарея
     RAM=$(free -m | awk '/Mem:/ { print $4 }')
-    DISK_INT=$(df -h / | awk 'NR==2 {print $4}')
-    
-    # Эвристический поиск SD-карты
-    # Ищем разделы, которые не являются системными и имеют размер
-    SD_PATH=$(df -h | grep -E '/storage/[A-Z0-9]{4}-|/sdcard1|/mnt/sdcard' | awk '{print $4 " (" $6 ")"}' | head -n 1)
-    
-    if [ -z "$SD_PATH" ]; then
-        # Если не нашли, пробуем стандартный эмулированный путь
-        SD_PATH=$(df -h /storage/emulated/0 2>/dev/null | awk 'NR==2 {print $4 " (Internal Shared)"}')
-        [ -z "$SD_PATH" ] && SD_PATH="${R}Not Found${NC}"
-    fi
-
     BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "100")
     
+    # Внутренняя память (берем из /system, так как у тебя она смонтирована на 8.0G free)
+    DISK_INT=$(df -h /system | awk 'NR==2 {print $4}')
+    
+    # Эвристический поиск SD-карты по всем фронтам
+    # Проверяем стандартные точки и ищем в выводе mount
+    SD_PATH=$(mount | grep -iE 'sdcard1|external_sd|mmcblk1p1' | awk '{print $3}' | head -n 1)
+    
+    if [ -z "$SD_PATH" ]; then
+        # Если mount не помог, ищем по доступному объему в /storage
+        SD_VAL=$(df -h | grep -iE '/storage/|/mnt/' | grep -v 'emulated' | awk '{print $4}' | head -n 1)
+        [ -z "$SD_VAL" ] && SD_PATH="${R}Not Found${NC}" || SD_PATH="$SD_VAL (External)"
+    else
+        SD_VAL=$(df -h "$SD_PATH" | awk 'NR==2 {print $4}')
+        SD_PATH="$SD_VAL ($SD_PATH)"
+    fi
+
     echo -e "${B}=========================================="
     echo -e "   PRIME ULTRA CONSOLE v$VERSION - AUTONOMOUS"
     echo -e "==========================================${NC}"
-    echo -e "${Y}📊 RAM:${NC} ${RAM}MB free | ${Y}BATT:${NC} ${BATT}%"
-    echo -e "${Y}💾 Internal:${NC} ${DISK_INT} free"
-    echo -e "${Y}📂 SD-Card:${NC} ${SD_PATH}"
+    echo -e "📊 ${Y}RAM:${NC} ${RAM}MB free | ${Y}BATT:${NC} ${BATT}%"
+    echo -e "💾 ${Y}Internal:${NC} ${DISK_INT} free"
+    echo -e "📂 ${Y}SD-Card:${NC} $SD_PATH"
 }
 
 # [ЭВРИСТИКА] Умное обновление по версии
