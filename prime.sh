@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="2.5"
+VERSION="2.6"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
@@ -54,17 +54,7 @@ run_tool() {
     if [ -d "$name" ]; then
         cd "$name" || return
         echo -e "${B}[*] Запуск $name...${NC}"
-        
-        # Попытка запуска и захват ошибок
-        output=$(eval "$cmd" 2>&1 | tee /dev/tty)
-        
-        # Если видим ошибку модулей
-        if [[ "$output" == *"ModuleNotFoundError"* || "$output" == *"pkg_resources"* ]]; then
-            echo -e "${Y}[!] Не хватает модулей. Ставим (RAM: $CURRENT_RAM)...${NC}"
-            python3 -m pip install --no-cache-dir setuptools requests future
-            echo -e "${G}[+] Готово. Нажми 8 снова.${NC}"
-        fi
-        
+        eval "$cmd"
         echo -e "${Y}>> [Enter] для возврата...${NC}"
         read -r
         cd ..
@@ -74,13 +64,14 @@ run_tool() {
         curl -L "$zip_url" -o "temp.zip"
         
         if [ -f "temp.zip" ]; then
-            echo -e "${B}[*] Распаковка и чистка...${NC}"
+            echo -e "${B}[*] Распаковка...${NC}"
             unzip -q "temp.zip"
-            # Умное переименование: берем любую созданную папку и называем как надо
+            # Находим папку, которую создал unzip (например, routersploit-master)
             local extracted_dir=$(ls -d */ | grep "${name}" | head -n 1)
+            # Переименовываем её в чистое имя (например, в routersploit)
             mv "$extracted_dir" "$name" 2>/dev/null
             rm "temp.zip"
-            echo -e "${G}[+] Структура выровнена. Жми пункт еще раз!${NC}"
+            echo -e "${G}[+] Готово! Теперь запусти пункт еще раз.${NC}"
         fi
         read -p ">> [Enter]..."
     fi
