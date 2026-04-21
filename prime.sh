@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="2.2"
+VERSION="2.3"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
@@ -50,57 +50,39 @@ run_tool() {
     local url=$2
     local cmd=$3
 
-    # 1. Проверяем, существует ли папка
     if [ -d "$name" ]; then
         echo -e "${G}[+] Инструмент $name найден.${NC}"
         cd "$name" || return
-        
-        # 2. Эвристика: Проверяем, есть ли запускаемый файл перед стартом
-        # Извлекаем первое слово из команды (например, 'python3' или 'bash')
-        # и проверяем наличие скрипта (например, 'rsf.py')
-        local script_file=$(echo "$cmd" | awk '{print $2}')
-        
-        if [[ -n "$script_file" && ! -f "$script_file" ]]; then
-            echo -e "${R}[!] Ошибка: Файл $script_file не найден в директории $name.${NC}"
-            echo -e "${Y}[*] Возможно, установка прошла некорректно.${NC}"
-        else
-            echo -e "${B}[*] Исполнение: $cmd${NC}"
-            echo -e "${B}------------------------------------------${NC}"
-            
-            # Запуск инструмента
-            eval "$cmd"
-            
-            # Сохраняем код выхода
-            local exit_code=$?
-            echo -e "${B}------------------------------------------${NC}"
-            
-            if [ $exit_code -ne 0 ]; then
-                echo -e "${R}[!] Процесс завершился с ошибкой (Code: $exit_code).${NC}"
-            else
-                echo -e "${G}[+] Процесс успешно завершен.${NC}"
-            fi
-        fi
-
-        # 3. КРИТИЧЕСКИ ВАЖНО: Пауза, чтобы ты успел прочитать лог
+        echo -e "${B}[*] Исполнение: $cmd${NC}"
+        eval "$cmd"
         echo -e "${Y}>> Нажми [Enter], чтобы вернуться в меню...${NC}"
         read -r
         cd ..
     else
-        # 4. Если папки нет — предлагаем скачать
-        echo -e "${Y}[!] $name не найден. Установить в текущую папку? (y/n)${NC}"
-        read -p ">> " confirm
-        if [[ $confirm == [yY] ]]; then
-            echo -e "${B}[*] Клонирование $url (depth 1)...${NC}"
-            git clone --depth 1 "$url" "$name"
-            
-            if [ $? -eq 0 ]; then
-                echo -e "${G}[+] Установка $name завершена успешно.${NC}"
-                echo -e "${Y}[*] Теперь выберите этот пункт снова для запуска.${NC}"
-            else
-                echo -e "${R}[!] Ошибка при клонировании. Проверьте интернет или RAM.${NC}"
-            fi
-            read -p "Нажми [Enter]..."
+        echo -e "${Y}[!] $name не найден. Качаем архив (ZIP-метод)...${NC}"
+        
+        # Превращаем ссылку GitHub в ссылку на ZIP-архив
+        local zip_url="${url%.git}/archive/refs/heads/master.zip"
+        # На случай если ветка называется 'main'
+        if [[ $(curl -sI "$zip_url" | head -n 1) == *"404"* ]]; then
+            zip_url="${url%.git}/archive/refs/heads/main.zip"
         fi
+
+        echo -e "${B}[*] Загрузка: $zip_url${NC}"
+        curl -L "$zip_url" -o "temp.zip"
+        
+        if [ -f "temp.zip" ]; then
+            echo -e "${B}[*] Распаковка...${NC}"
+            unzip -q "temp.zip"
+            # Удаляем архив и переименовываем папку (из 'name-master' в 'name')
+            rm "temp.zip"
+            mv "${name}-"* "$name" 2>/dev/null || mv "routersploit-master" "$name" 2>/dev/null || mv "social-engineer-toolkit-main" "$name" 2>/dev/null
+            
+            echo -e "${G}[+] Готово! Попробуй запустить снова.${NC}"
+        else
+            echo -e "${R}[!] Ошибка загрузки архива.${NC}"
+        fi
+        read -p "Нажми [Enter]..."
     fi
 }
 
