@@ -125,6 +125,38 @@ run_tool() {
     fi
 }
 
+
+run_update() {
+    echo -e "${B}[*] Проверка обновлений для PRIME...${NC}"
+    
+    # URL твоего скрипта на GitHub или сервере (замени на свой, если есть)
+    local repo_url="https://raw.githubusercontent.com/username/repo/main/prime.sh"
+    
+    # Резервная копия перед обновлением
+    cp "$0" "${0}.bak"
+    
+    echo -e "${Y}[!] Загрузка свежей версии...${NC}"
+    curl -L -s "$repo_url" -o "${0}.tmp"
+    
+    if [ -s "${0}.tmp" ]; then
+        # Проверяем, не пустой ли файл и нет ли там ошибок 404
+        if ! grep -q "404: Not Found" "${0}.tmp"; then
+            mv "${0}.tmp" "$0"
+            chmod +x "$0"
+            echo -e "${G}[+] Обновление успешно! Перезапустите скрипт.${NC}"
+            exit 0
+        else
+            echo -e "${R}[!] Ошибка: Файл не найден на сервере (404).${NC}"
+            mv "${0}.bak" "$0"
+        fi
+    else
+        echo -e "${R}[!] Ошибка: Не удалось скачать файл. Проверь сеть.${NC}"
+        [ -f "${0}.bak" ] && mv "${0}.bak" "$0"
+    fi
+    read -p ">> [Enter]..."
+}
+
+
 manage_files() {
     echo -e "\n${R}--- [ УПРАВЛЕНИЕ РЕСУРСАМИ ] ---${NC}"
     echo -e "${B}Текущие инструменты в директории:${NC}"
