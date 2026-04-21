@@ -3,38 +3,32 @@
 # --- КОНФИГУРАЦИЯ ---
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
-# Функция тотальной реанимации и очистки
+# Функция очистки памяти
 repair_and_clean() {
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
-    apt-get clean
-    rm -f /root/*.zip
-    rm -rf ~/.cache/pip
+    rm -f /root/*.zip /root/*.tmp
+    apt-get clean && rm -rf ~/.cache/pip
 }
 
-# Силовая установка Python-пакетов
+# Силовая установка Python
 safe_pip() {
     python3 -m pip install --no-cache-dir --break-system-packages "$@"
     repair_and_clean
 }
 
-# Умный установщик с проверкой на существование
+# Умный установщик
 install_tool() {
     local name=$1; local url=$2; local exec_file=$3; local extra_cmd=$4
-
     echo -e "${B}[*] Проверка: $name...${NC}"
 
-    # ПРОВЕРКА: Если папка существует И исполняемый файл внутри на месте
-    if [ -f "$name/$exec_file" ] || [ -d "/usr/local/share/$name" ]; then
-        echo -e "${G}[-] $name уже установлен. Пропускаю.${NC}"
-        [ -f "$name/$exec_file" ] && chmod +x "$name/$exec_file" 2>/dev/null
+    if [ -f "$name/$exec_file" ] || command -v "$name" &> /dev/null; then
+        echo -e "${G}[- ] $name уже в системе.${NC}"
         return 0
     fi
 
-    # Если папка есть, но она пустая или битая — удаляем перед переустановкой
     [ -d "$name" ] && rm -rf "$name"
-
-    echo -e "${Y}[+] Установка $name (Direct ZIP)...${NC}"
-    curl -L "$url" -o "temp.zip"
+    echo -e "${Y}[+] Установка $name...${NC}"
+    curl -L -f "$url" -o "temp.zip"
     
     if [ -s "temp.zip" ]; then
         unzip -q "temp.zip"
@@ -42,58 +36,127 @@ install_tool() {
         if [ -n "$extracted_dir" ]; then
             mv "$extracted_dir" "$name"
             rm -f "temp.zip"
-            if [ -n "$extra_cmd" ]; then
-                echo -e "${B}[*] Конфигурация $name...${NC}"
-                cd "$name" && eval "$extra_cmd" && cd ..
-            fi
+            [ -n "$extra_cmd" ] && (cd "$name" && eval "$extra_cmd")
             [ -f "$name/$exec_file" ] && chmod +x "$name/$exec_file"
         fi
     fi
     repair_and_clean
 }
 
-# --- СТАРТ ---
+# --- СТАРТ РАЗВЕРТЫВАНИЯ ---
+clear
 echo -e "${B}=========================================="
-echo -e "${R}    PRIME v12.6 MASTER (SMART DEPLOY)"
+echo -e "${R}    PRIME v12.9 MASTER (AUTO-INSTALLER)"
 echo -e "${B}==========================================${NC}"
 
 repair_and_clean
 
-# Системное ядро (apt само проверяет наличие пакетов, так что это безопасно)
-echo -e "${B}[*] Проверка системных компонентов...${NC}"
+# Системное ядро
+echo -e "${B}[*] Обновление системных компонентов...${NC}"
 apt-get update
-for pkg in php curl unzip python3-pip nmap whois nikto chntpw clamav ntfs-3g john \
-            sleuthkit foremost steghide tshark fcrackzip libimage-exiftool-perl htop; do
-    apt-get install -y $pkg > /dev/null 2>&1
-done
+apt-get install -y php curl unzip python3-pip nmap foremost tshark aircrack-ng chkrootkit
 
-# --- 1. СОЦИАЛЬНАЯ ИНЖЕНЕРИЯ ---
+# Установка инструментов
 install_tool "zphisher" "https://github.com/htr-tech/zphisher/archive/refs/heads/master.zip" "zphisher.sh"
 install_tool "seeker" "https://github.com/thewhiteh4t/seeker/archive/refs/heads/master.zip" "seeker.py" "safe_pip -r requirements.txt"
-install_tool "setoolkit" "https://github.com/trustedsec/social-engineer-toolkit/archive/refs/heads/master.zip" "setup.py" "python3 setup.py install --break-system-packages"
-
-# --- 2. СЕТЕВОЙ АНАЛИЗ ---
-install_tool "redhawk" "https://github.com/Tuhinshubhra/RED_HAWK/archive/refs/heads/master.zip" "rhawk.php"
 install_tool "wifite2" "https://github.com/derv82/wifite2/archive/refs/heads/master.zip" "wifite.py" "python3 setup.py install --break-system-packages"
 install_tool "routersploit" "https://github.com/threat9/routersploit/archive/refs/heads/master.zip" "rsf.py" "safe_pip -r requirements.txt"
-
-# --- 3. ЭКСПЛОЙТЫ ---
-install_tool "ghost" "https://github.com/Professor-K-99/Ghost-Hub/archive/refs/heads/main.zip" "ghost-hub.sh"
-install_tool "phoneSploit" "https://github.com/Tebogo404/PhoneSploit-Reborn/archive/refs/heads/main.zip" "phonesploitpython.py" "safe_pip -r requirements.txt"
-install_tool "exploits" "https://github.com/1RaY-1/Termux-Exploit/archive/refs/heads/master.zip" "install.py"
-
-# --- 4. OSINT ---
 install_tool "sherlock" "https://github.com/sherlock-project/sherlock/archive/refs/heads/master.zip" "sherlock/sherlock.py" "safe_pip -r requirements.txt"
 install_tool "ip-tracer" "https://github.com/rajkumardusad/IP-Tracer/archive/refs/heads/master.zip" "ip-tracer" "chmod +x install && ./install"
-install_tool "infoga" "https://github.com/m4ll0k/Infoga/archive/refs/heads/master.zip" "infoga.py" "safe_pip -r requirements.txt"
-
-# --- 5. ПАРОЛИ И БД ---
-install_tool "cupp" "https://github.com/Mebus/cupp/archive/refs/heads/master.zip" "cupp.py"
-install_tool "admin-panel-finder" "https://github.com/the-c0d3r/admin-panel-finder/archive/refs/heads/master.zip" "admin_panel_finder.py"
 install_tool "sqlmap" "https://github.com/sqlmapproject/sqlmap/archive/refs/heads/master.zip" "sqlmap.py"
+install_tool "cupp" "https://github.com/Mebus/cupp/archive/refs/heads/master.zip" "cupp.py"
 
-# --- 6. БЕЗОПАСНОСТЬ ---
-install_tool "chkrootkit" "https://github.com/MageSlayer/chkrootkit/archive/refs/heads/master.zip" "chkrootkit" "make"
+# --- СОЗДАНИЕ / ОБНОВЛЕНИЕ LAUNCHER.SH С ФУНКЦИЯМИ ---
+echo -e "${B}[*] Генерирую модульный launcher.sh...${NC}"
 
-repair_and_clean
-echo -e "\n${G}[!!!] PRIME v12.6 MASTER: ПРОВЕРКА ЗАВЕРШЕНА. СИСТЕМА В НОРМЕ.${NC}"
+# --- ГЕНЕРАЦИЯ МОДУЛЬНОГО LAUNCHER ---
+cat << 'EOF' > /root/launcher.sh
+#!/bin/bash
+G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
+
+repair() { sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true; }
+pause() { echo -e "\n${B}------------------------------------${NC}"; read -p "Нажми [Enter] для возврата..."; }
+
+# --- МОДУЛЬ 1: СОЦИАЛЬНАЯ ИНЖЕНЕРИЯ ---
+mod_social() {
+    clear
+    echo -e "${B}>>> МОДУЛЬ: СОЦИАЛЬНАЯ ИНЖЕНЕРИЯ${NC}"
+    echo -e "1) Zphisher (Фишинг)"
+    echo -e "2) Seeker (Геолокация)"
+    echo -e "0) Назад"
+    read -p ">> " m1
+    case $m1 in
+        1) repair && cd /root/zphisher && ./zphisher.sh ;;
+        2) repair && cd /root/seeker && python3 seeker.py ;;
+    esac
+}
+
+# --- МОДУЛЬ 2: СЕТИ И ЭКСПЛОЙТЫ ---
+mod_net_exploit() {
+    clear
+    echo -e "${B}>>> МОДУЛЬ: СЕТИ И ЭКСПЛОЙТЫ${NC}"
+    echo -e "1) Wifite2 (Wi-Fi аудит)"
+    echo -e "2) Routersploit (Роутеры)"
+    echo -e "3) SQLMap (Взлом БД)"
+    echo -e "0) Назад"
+    read -p ">> " m2
+    case $m2 in
+        1) repair && wifite ;;
+        2) repair && cd /root/routersploit && python3 rsf.py ;;
+        3) repair && cd /root/sqlmap && python3 sqlmap.py --wizard && pause ;;
+    esac
+}
+
+# --- МОДУЛЬ 3: OSINT И РАЗВЕДКА ---
+mod_osint() {
+    clear
+    echo -e "${B}>>> МОДУЛЬ: OSINT${NC}"
+    echo -e "1) Sherlock (Поиск по нику)"
+    echo -e "2) IP-Tracer (Данные по IP)"
+    echo -e "0) Назад"
+    read -p ">> " m3
+    case $m3 in
+        1) repair && echo -n "Ник: " && read n && python3 /root/sherlock/sherlock/sherlock.py "$n" && pause ;;
+        2) repair && trace -h && pause ;;
+    esac
+}
+
+# --- МОДУЛЬ 4: ПАРОЛИ И СИСТЕМА ---
+mod_sys() {
+    clear
+    echo -e "${B}>>> МОДУЛЬ: СИСТЕМА И ПАРОЛИ${NC}"
+    echo -e "1) CUPP (Генератор словарей)"
+    echo -e "2) Chkrootkit (Аудит безопасности)"
+    echo -e "0) Назад"
+    read -p ">> " m4
+    case $m4 in
+        1) repair && cd /root/cupp && python3 cupp.py -i && pause ;;
+        2) repair && chkrootkit && pause ;;
+    esac
+}
+
+# --- ГЛАВНОЕ МЕНЮ ---
+while true; do
+    repair; clear
+    echo -e "${B}========== [ PRIME MASTER v13.0 ] ==========${NC}"
+    echo -e "1) ${G}[ СОЦ. ИНЖЕНЕРИЯ ]${NC} -> Zphisher, Seeker"
+    echo -e "2) ${G}[ СЕТИ И ВЗЛОМ ]${NC}   -> Wifite, SQLMap, RSF"
+    echo -e "3) ${Y}[ OSINT РАЗВЕДКА ]${NC} -> Sherlock, IP-Tracer"
+    echo -e "4) ${Y}[ ПАРОЛИ И АУДИТ ]${NC} -> CUPP, Chkrootkit"
+    echo -e "--------------------------------------------"
+    echo -e "s) ${B}СИСТЕМНЫЙ HTOP${NC}    0) ${R}ВЫХОД${NC}"
+    echo -ne "\n${Y}>> Вектор атаки: ${NC}"
+    read opt
+    case $opt in
+        1) mod_social ;;
+        2) mod_net_exploit ;;
+        3) mod_osint ;;
+        4) mod_sys ;;
+        s) htop ;;
+        0) clear; break ;;
+    esac
+done
+EOF
+
+chmod +x /root/launcher.sh
+ln -sf /root/launcher.sh /usr/local/bin/launcher
