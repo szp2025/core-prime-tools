@@ -69,18 +69,58 @@ done
 
 # --- ГЕНЕРАЦИЯ СЕРВЕРА АНТИВИРУСА ---
 cat << 'EOF' > /root/av_server.py
-from flask import Flask, request
+from flask import Flask, request, render_template_string
 import subprocess, os
+
 app = Flask(__name__)
+
+# Легкий HTML-интерфейс прямо в коде (минимализм для 51MB RAM)
+HTML_PAGE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PRIME AV-HUB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; padding: 20px; }
+        input { background: #111; color: #0f0; border: 1px solid #0f0; padding: 10px; width: 100%; margin-bottom: 10px; }
+        button { background: #0f0; color: #000; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; }
+        .result { border: 1px dashed #0f0; padding: 15px; margin-top: 20px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h2>>>> PRIME AV-SCANNER <<<</h2>
+    <form method="post" action="/scan" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <button type="submit">ЗАПУСТИТЬ СКАН</button>
+    </form>
+</body>
+</html>
+'''
+
+@app.route('/')
+def index():
+    return render_template_string(HTML_PAGE)
+
 @app.route('/scan', methods=['POST'])
 def scan():
-    if 'file' not in request.files: return "No file", 400
+    if 'file' not in request.files: return "Файл не выбран", 400
     f = request.files['file']
-    f.save('tmp_scan')
-    res = subprocess.run(['clamscan', '--no-summary', 'tmp_scan'], capture_output=True, text=True)
-    os.remove('tmp_scan')
-    return f"Verdict: {res.stdout}"
-if __name__ == '__main__': app.run(host='0.0.0.0', port=5000)
+    if f.filename == '': return "Файл не выбран", 400
+    
+    save_path = os.path.join('/tmp', f.filename)
+    f.save(save_path)
+    
+    # Запуск ClamAV
+    res = subprocess.run(['clamscan', '--no-summary', save_path], capture_output=True, text=True)
+    
+    os.remove(save_path) # Удаление следа
+    
+    # Возвращаем результат в стиле терминала
+    return f"<html><body style='background:#000;color:#0f0;font-family:monospace;'><pre>РЕЗУЛЬТАТ ДЛЯ {f.filename}:\n\n{res.stdout}\n\n<a href='/' style='color:#fff'>[ Назад ]</a></pre></body></html>"
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
 EOF
 
 # --- ГЕНЕРАЦИЯ LAUNCHER ---
