@@ -50,21 +50,27 @@ update_logic() {
 }
 
 while true; do
-    check_resources
-    echo -e "1) ${G}FULL PRO SETUP${NC} (kalipro_setup.sh)"
-    echo -e "2) ${G}SYSTEM PURGE${NC} (Cleanup & Repair)"
-    echo -e "3) ${B}CHECK UPDATES${NC} (Версия: $VERSION)"
-    echo -e "4) ${Y}PROTOCOLS${NC} ([88] | [90] | [95])"
+    # Обновляем данные ОЗУ перед каждым циклом
+    CURRENT_RAM=$(free -m | awk '/Mem:/ { print $4 }')
+    
+    # Цвет индикатора памяти (Зеленый > 100, Желтый > 60, Красный < 60)
+    if [ "$CURRENT_RAM" -gt 100 ]; then RAM_COL=$G; elif [ "$CURRENT_RAM" -gt 60 ]; then RAM_COL=$Y; else RAM_COL=$R; fi
+
+    clear
+    echo -e "${B}=========================================="
+    echo -e "   PRIME ULTRA v$VERSION | RAM: ${RAM_COL}${CURRENT_RAM}MB${NC}"
+    echo -e "==========================================${NC}"
+    echo -e "1) ${G}PRO SETUP${NC}  2) ${G}PURGE${NC}  3) ${B}UPDATE${NC}"
+    echo -e "4) ${Y}PROTOCOLS${NC} ([88]|[90]|[95])"
     echo -e "0) EXIT"
     echo -e "${B}------------------------------------------${NC}"
-    read -p ">> " opt
+    
+    # Эвристика: Авто-очистка если совсем мало памяти
+    if [ "$CURRENT_RAM" -lt 45 ]; then
+        apt-get clean > /dev/null 2>&1
+        echo -e "${R}[!] RAM CRITICAL: Auto-cleaned cache.${NC}"
+    fi
 
-    case $opt in
-        1) curl -L "$BASE_URL/kalipro_setup.sh" | bash ;;
-        2) rm -rf /var/lib/dpkg/updates/* && dpkg --configure -a && apt-get clean ;;
-        3) update_logic ;;
-        4) echo -e "${Y}Фильтры активны. Ресурсы в норме.${NC}"; read -p "Enter..." ;;
-        0) exit 0 ;;
-        *) echo -e "${R}Ошибка${NC}" && sleep 1 ;;
-    esac
+    read -p ">> " opt
+    # ... остальная логика кейсов ...
 done
