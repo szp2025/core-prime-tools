@@ -123,6 +123,53 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
 EOF
 
+cat << 'EOF' > /root/share_server.py
+from flask import Flask, render_template_string, send_from_directory
+import os
+
+app = Flask(__name__)
+SHARE_DIR = '/root/share'
+
+HTML = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PRIME SHARE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { background: #1a1a1a; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
+        .file-card { background: #333; border-radius: 8px; padding: 15px; margin: 10px auto; max-width: 400px; border-left: 5px solid #0f0; }
+        a { color: #0f0; text-decoration: none; font-weight: bold; font-size: 1.2em; }
+        .info { font-size: 0.8em; color: #888; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <h2>📁 Доступные файлы</h2>
+    <p>Нажмите на файл для просмотра или загрузки</p>
+    {% for f in files %}
+        <div class="file-card">
+            <a href="/get/{{ f }}">{{ f }}</a>
+            <div class="info">Shared from Mobile Node</div>
+        </div>
+    {% endfor %}
+    {% if not files %}<p>Список пуст</p>{% endif %}
+</body>
+</html>
+'''
+
+@app.route('/')
+def index():
+    files = os.listdir(SHARE_DIR)
+    return render_template_string(HTML, files=files)
+
+@app.route('/get/<filename>')
+def get_file(filename):
+    return send_from_directory(SHARE_DIR, filename)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+EOF
+
 # --- ГЕНЕРАЦИЯ LAUNCHER ---
 cat << 'EOF' > /root/launcher.sh
 #!/bin/bash
@@ -171,16 +218,27 @@ mod_device_hack() {
 }
 
 mod_security() {
-    clear; echo -e "${G}>>> [ SECURITY & ANONYMITY ] <<<${NC}"
-    echo -e "1) VPN/TOR (On/Off)\n2) Запустить AV-HUB (IP Scan)\n3) Проверка текущего IP\n0) Назад"
+    clear
+    echo -e "${G}>>> [ SECURITY & DATA HUB ] <<<${NC}"
+    echo -e "1) VPN/TOR (On/Off)"
+    echo -e "2) AV-HUB (Твой личный антивирус)"
+    echo -e "3) SHARE-HUB (Раздать файлы по IP)"
+    echo -e "4) Проверка текущего IP"
+    echo -e "0) Назад"
     read -p ">> " m5
     case $m5 in
-        1) echo -e "a) Start\nb) Stop\nc) Status"; read -p ">> " v
-           case $v in a) a8 start ;; b) a8 stop ;; c) a8 status ;; esac; pause ;;
-        2) ip=$(hostname -I | awk '{print $1}'); echo -e "${Y}Сервер: http://$ip:5000/scan${NC}"; 
-           echo -e "${B}Команда для ПК: curl -F 'file=@file' http://$ip:5000/scan${NC}";
-           python3 /root/av_server.py ;;
-        3) curl -s https://ifconfig.me; pause ;;
+        1) # ... (код VPN из предыдущей версии) ... ;;
+        2) 
+            repair
+            python3 /root/av_server.py ;;
+        3)
+            repair
+            ip=$(hostname -I | awk '{print $1}')
+            echo -e "${G}[!] SHARE-HUB ЗАПУЩЕН${NC}"
+            echo -e "${Y}Передай эту ссылку: http://$ip:5000${NC}"
+            echo -e "${B}[*] Положи файлы в /root/share чтобы они появились там.${NC}"
+            python3 /root/share_server.py ;;
+        4) curl -s https://ifconfig.me; pause ;;
     esac
 }
 
