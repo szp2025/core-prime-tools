@@ -11,7 +11,8 @@ G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
 # --- СИСТЕМНОЕ ЯДРО (Survival Mode) ---
 repair_and_clean() {
-    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || echo -e "${Y}[!] Пропуск очистки ядра (нет доступа)${NC}"
+
     rm -f /root/*.zip /root/*.tmp /root/*.log /root/pip-log.txt 2>/dev/null
     apt-get clean && rm -rf ~/.cache/pip
 }
