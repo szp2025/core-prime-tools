@@ -48,6 +48,8 @@ draw_menu() {
     echo -e "5) ${Y}SHERLOCK${NC}       - Запуск/Установка OSINT"
     echo -e "6) ${Y}WIFITE2${NC}        - Запуск/Установка аудита"
     echo -e "7) ${Y}PROTOCOLS${NC}      - Статус [88]|[90]|[95]"
+    echo -e "8) ${Y}ROUTERSPLOIT${NC}   - Эксплуатация роутеров"
+    echo -e "9) ${Y}SET-TOOLKIT${NC}    - Social Engineering"
     echo -e "0) ${R}EXIT${NC}"
     echo -e "${B}------------------------------------------${NC}"
 }
@@ -123,6 +125,8 @@ while true; do
             echo -e "[90] Active City Protection: GHOST"
             echo -e "[95] Sterile Channel: READY"
             read -p "Нажми Enter..." ;;
+      8) run_tool "routersploit" "https://github.com/threat9/routersploit.git" "python3 rsf.py" ;;
+      9) run_tool "setoolkit" "https://github.com/trustedsec/social-engineer-toolkit.git" "python3 setup.py install && setoolkit" ;;
         0) echo "Выход из Prime Ultra..."; exit 0 ;;
         *) echo -e "${R}Неверный выбор${NC}"; sleep 1 ;;
     esac
