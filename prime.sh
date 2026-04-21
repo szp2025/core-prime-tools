@@ -39,6 +39,7 @@ draw_menu() {
     echo -e "1) ${G}FULL PRO SETUP${NC}  2) ${G}SYSTEM PURGE${NC}  3) ${B}UPDATE MENU${NC}"
     echo -e "4) ${Y}ZPHISHER${NC}       5) ${Y}SHERLOCK${NC}      6) ${Y}WIFITE2${NC}"
     echo -e "8) ${Y}ROUTERSPLOIT${NC}   9) ${Y}SET-TOOLKIT${NC}   7) ${Y}PROTOCOLS${NC}"
+    echo -e "R) ${R}RESET TOOLS${NC}     - Удалить Routersploit и SET"
     echo -e "0) ${R}EXIT${NC}"
     echo -e "${B}>> Выберите действие:${NC}"
 }
@@ -119,6 +120,39 @@ run_update() {
     fi
 }
 
+manage_files() {
+    echo -e "\n${R}--- [ УПРАВЛЕНИЕ РЕСУРСАМИ ] ---${NC}"
+    echo -e "${B}Текущие инструменты в директории:${NC}"
+    
+    # Считаем количество папок и выводим их списком с размером
+    local folders=$(ls -d */ 2>/dev/null)
+    if [ -z "$folders" ]; then
+        echo -e "${Y}[!] Папки инструментов не найдены.${NC}"
+    else
+        # Выводим список папок с их размером в человекочитаемом виде
+        du -sh */ 2>/dev/null | sed 's/\///'
+    fi
+
+    echo -e "\n${Y}Введите имя папки для УДАЛЕНИЯ (например: routersploit)${NC}"
+    echo -e "${Y}Введите 'ALL' для полной очистки или 'Enter' для отмены:${NC}"
+    read -p ">> " target
+
+    if [[ "$target" == "ALL" ]]; then
+        echo -e "${R}[!] ВНИМАНИЕ: Удаление всех инструментов...${NC}"
+        rm -rf routersploit setoolkit zphisher sherlock wifite2
+        echo -e "${G}[+] Система очищена.${NC}"
+    elif [[ -d "$target" ]]; then
+        echo -e "${R}[!] Удаление папки $target...${NC}"
+        rm -rf "$target"
+        echo -e "${G}[+] Объект $target стерт.${NC}"
+    elif [[ -z "$target" ]]; then
+        echo -e "${B}[*] Отмена операции.${NC}"
+    else
+        echo -e "${R}[!] Ошибка: Папка '$target' не существует.${NC}"
+    fi
+    read -p "Нажми [Enter] для возврата в меню..."
+}
+
 # --- 4. ЦИКЛ ---
 
 while true; do
@@ -141,6 +175,7 @@ while true; do
         6) run_tool "wifite2" "https://github.com/derv82/wifite2.git" "python3 wifite.py" ;;
         8) run_tool "routersploit" "https://github.com/threat9/routersploit.git" "python3 rsf.py" ;;
         9) run_tool "setoolkit" "https://github.com/trustedsec/social-engineer-toolkit.git" "python3 setup.py" ;;
+        10) manage_files ;;
         7) echo -e "${Y}[88] Core | [90] Protection | [95] Sterile${NC}" ;;
         0) exit 0 ;;
         *) echo -e "${R}Ошибка выбора.${NC}" ;;
