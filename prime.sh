@@ -7,33 +7,24 @@ SELF_PATH="/usr/local/bin/prime"
 G='\033[0;32m'; B='\033[0;34m'; Y='\033[1;33m'; R='\033[0;31m'; NC='\033[0m'
 
 check_resources() {
-    # ОЗУ и Батарея
     RAM=$(free -m | awk '/Mem:/ { print $4 }')
     BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "100")
     
-    # Внутренняя память
-    DISK_INT=$(df -h /system | awk 'NR==2 {print $4}')
-    
-    # [ЭВРИСТИКА] Поиск всех внешних накопителей в /storage
-    # Исключаем emulated и self, оставляем реальные разделы (типа 7413-1CE9)
-    SD_INFO=$(df -h | grep "/storage/" | grep -vE "emulated|self" | awk '{print $4 " (" $6 ")"}' | xargs)
-    
-    # Если df внутри Kali не видит /storage, пробуем найти папку напрямую
-    if [ -z "$SD_INFO" ]; then
-        if [ -d "/storage/7413-1CE9" ]; then
-             SD_SIZE=$(df -h /storage/7413-1CE9 2>/dev/null | awk 'NR==2 {print $4}')
-             SD_INFO="${SD_SIZE:-Ready} (/storage/7413-1CE9)"
-        else
-             SD_INFO="${R}Not Found in Kali${NC}"
-        fi
+    # Эвристика: если памяти критически мало, чистим не дожидаясь выбора пользователя
+    if [ "$RAM" -lt 50 ]; then
+        # Тихая очистка кэша пакетов и временных файлов
+        apt-get clean > /dev/null 2>&1
+        sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
     fi
 
+    DISK_INT=$(df -h /system | awk 'NR==2 {print $4}')
+    
+    # Упрощаем вывод для экономии места на экране Wiko
     echo -e "${B}=========================================="
-    echo -e "   PRIME ULTRA CONSOLE v$VERSION"
+    echo -e "   PRIME ULTRA CONSOLE v$VERSION - ADAPTED"
     echo -e "==========================================${NC}"
-    echo -e "📊 ${Y}RAM:${NC} ${RAM}MB free | ${Y}BATT:${NC} ${BATT}%"
-    echo -e "💾 ${Y}Internal:${NC} ${DISK_INT} free"
-    echo -e "📂 ${Y}SD-Card:${NC} $SD_INFO"
+    echo -e "📊 ${Y}RAM:${NC} ${RAM}MB (Low) | ${Y}BATT:${NC} ${BATT}%"
+    echo -e "💾 ${Y}Sys:${NC} ${DISK_INT} free | ${Y}SD:${NC} ${R}Hidden${NC}"
 }
 
 # [ЭВРИСТИКА] Умное обновление по версии
