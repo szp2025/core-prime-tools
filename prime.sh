@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="2.0"
+VERSION="2.1"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
@@ -50,19 +50,56 @@ run_tool() {
     local url=$2
     local cmd=$3
 
+    # 1. Проверяем, существует ли папка
     if [ -d "$name" ]; then
-        echo -e "${G}[+] Вход в директорию $name...${NC}"
+        echo -e "${G}[+] Инструмент $name найден.${NC}"
         cd "$name" || return
-        echo -e "${B}[*] Запуск: $cmd${NC}"
-        eval "$cmd"
+        
+        # 2. Эвристика: Проверяем, есть ли запускаемый файл перед стартом
+        # Извлекаем первое слово из команды (например, 'python3' или 'bash')
+        # и проверяем наличие скрипта (например, 'rsf.py')
+        local script_file=$(echo "$cmd" | awk '{print $2}')
+        
+        if [[ -n "$script_file" && ! -f "$script_file" ]]; then
+            echo -e "${R}[!] Ошибка: Файл $script_file не найден в директории $name.${NC}"
+            echo -e "${Y}[*] Возможно, установка прошла некорректно.${NC}"
+        else
+            echo -e "${B}[*] Исполнение: $cmd${NC}"
+            echo -e "${B}------------------------------------------${NC}"
+            
+            # Запуск инструмента
+            eval "$cmd"
+            
+            # Сохраняем код выхода
+            local exit_code=$?
+            echo -e "${B}------------------------------------------${NC}"
+            
+            if [ $exit_code -ne 0 ]; then
+                echo -e "${R}[!] Процесс завершился с ошибкой (Code: $exit_code).${NC}"
+            else
+                echo -e "${G}[+] Процесс успешно завершен.${NC}"
+            fi
+        fi
+
+        # 3. КРИТИЧЕСКИ ВАЖНО: Пауза, чтобы ты успел прочитать лог
+        echo -e "${Y}>> Нажми [Enter], чтобы вернуться в меню...${NC}"
+        read -r
         cd ..
     else
-        echo -e "${Y}[!] $name не найден. Установить? (y/n)${NC}"
+        # 4. Если папки нет — предлагаем скачать
+        echo -e "${Y}[!] $name не найден. Установить в текущую папку? (y/n)${NC}"
         read -p ">> " confirm
         if [[ $confirm == [yY] ]]; then
-            echo -e "${B}[*] Клонирование (depth 1)...${NC}"
+            echo -e "${B}[*] Клонирование $url (depth 1)...${NC}"
             git clone --depth 1 "$url" "$name"
-            echo -e "${G}[+] Успешно. Теперь запустите еще раз из меню.${NC}"
+            
+            if [ $? -eq 0 ]; then
+                echo -e "${G}[+] Установка $name завершена успешно.${NC}"
+                echo -e "${Y}[*] Теперь выберите этот пункт снова для запуска.${NC}"
+            else
+                echo -e "${R}[!] Ошибка при клонировании. Проверьте интернет или RAM.${NC}"
+            fi
+            read -p "Нажми [Enter]..."
         fi
     fi
 }
