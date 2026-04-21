@@ -1,23 +1,31 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="1.3"  # Текущая версия
+VERSION="1.4"  # Текущая версия
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 G='\033[0;32m'; B='\033[0;34m'; Y='\033[1;33m'; R='\033[0;31m'; NC='\033[0m'
 
 check_resources() {
+    # ОЗУ и Батарея
     RAM=$(free -m | awk '/Mem:/ { print $4 }')
-    DISK_INT=$(df -h /system | awk 'NR==2 {print $4}')
     BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "100")
     
-    # Эвристика: ищем SD-карту по факту наличия файлов в типичных точках
-    if [ -d "/mnt/sdcard" ] && [ "$(ls -A /mnt/sdcard)" ]; then
-        SD_PATH=$(df -h /mnt/sdcard | awk 'NR==2 {print $4 " (Mounted)"}')
-    elif [ -d "/sdcard" ] && [ "$(ls -A /sdcard)" ]; then
-        SD_PATH=$(df -h /sdcard | awk 'NR==2 {print $4 " (Internal/SD)"}')
-    else
-        SD_PATH="${R}Not Mounted${NC}"
+    # Внутренняя память
+    DISK_INT=$(df -h /system | awk 'NR==2 {print $4}')
+    
+    # [ЭВРИСТИКА] Поиск всех внешних накопителей в /storage
+    # Исключаем emulated и self, оставляем реальные разделы (типа 7413-1CE9)
+    SD_INFO=$(df -h | grep "/storage/" | grep -vE "emulated|self" | awk '{print $4 " (" $6 ")"}' | xargs)
+    
+    # Если df внутри Kali не видит /storage, пробуем найти папку напрямую
+    if [ -z "$SD_INFO" ]; then
+        if [ -d "/storage/7413-1CE9" ]; then
+             SD_SIZE=$(df -h /storage/7413-1CE9 2>/dev/null | awk 'NR==2 {print $4}')
+             SD_INFO="${SD_SIZE:-Ready} (/storage/7413-1CE9)"
+        else
+             SD_INFO="${R}Not Found in Kali${NC}"
+        fi
     fi
 
     echo -e "${B}=========================================="
@@ -25,7 +33,7 @@ check_resources() {
     echo -e "==========================================${NC}"
     echo -e "📊 ${Y}RAM:${NC} ${RAM}MB free | ${Y}BATT:${NC} ${BATT}%"
     echo -e "💾 ${Y}Internal:${NC} ${DISK_INT} free"
-    echo -e "📂 ${Y}SD-Card:${NC} $SD_PATH"
+    echo -e "📂 ${Y}SD-Card:${NC} $SD_INFO"
 }
 
 # [ЭВРИСТИКА] Умное обновление по версии
