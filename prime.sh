@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="2.8"
+VERSION="2.9"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
@@ -23,7 +23,7 @@ check_auto_purge() {
     if [ "$CURRENT_RAM" -lt 45 ]; then
         echo -e "${R}[!] Low RAM detected ($CURRENT_RAM MB). Cleaning...${NC}"
         apt-get clean > /dev/null 2>&1
-        sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+        sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
     fi
 }
 
@@ -53,65 +53,73 @@ run_tool() {
 
     if [ -d "$name" ]; then
         cd "$name" || return
+        
+        # ЛЕЧИМ МАТРЕШКУ: Если внутри папки есть папка с тем же именем
+        if [ -d "$name" ]; then
+             echo -e "${Y}[!] Исправление вложенности папок...${NC}"
+             mv "$name"/* . 2>/dev/null
+             rm -rf "$name"
+        fi
+
         echo -e "${B}[*] Запуск $name...${NC}"
         
-        # Попытка запуска
-        eval "$cmd"
-        
-        # Если запуск упал (код не 0) — пробуем лечить зависимости
-        if [ $? -ne 0 ]; then
-            echo -e "${Y}[!] Ошибка запуска. Проверяем библиотеки...${NC}"
-            python3 -m pip install --no-cache-dir setuptools requests future
+        # Попытка запуска (перенаправляем ошибки в переменную для анализа)
+        error_log=$(eval "$cmd" 2>&1 | tee /dev/tty)
+
+        # Если упало или не хватает модулей
+        if [[ $? -ne 0 || "$error_log" == *"ModuleNotFoundError"* || "$error_log" == *"pkg_resources"* ]]; then
+            echo -e "${Y}[!] Проблема с запуском или модулями. Лечим...${NC}"
+            # Ставим базу с обходом защиты PEP 668
+            python3 -m pip install --no-cache-dir --break-system-packages setuptools requests future pyelftools
+            
             if [ -f "requirements.txt" ]; then
-                python3 -m pip install --no-cache-dir -r requirements.txt
+                echo -e "${B}[*] Доставляем пакеты из requirements...${NC}"
+                python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
             fi
-            echo -e "${G}[+] Зависимости обновлены. Попробуй запустить снова.${NC}"
+            echo -e "${G}[+] Готово. Попробуй нажать кнопку еще раз.${NC}"
         fi
-        
+
         echo -e "${Y}>> [Enter] для возврата...${NC}"
         read -r
         cd ..
     else
-        echo -e "${Y}[!] $name не найден. Начинаю чистую установку...${NC}"
+        echo -e "${Y}[!] $name не найден. Качаем архив...${NC}"
         
-        # 1. Формируем ссылку на ZIP (пробуем master, потом main)
+        # Пробуем master, если упадет - попробуем main
         local zip_url="${url%.git}/archive/refs/heads/master.zip"
-        
-        echo -e "${B}[*] Загрузка архива...${NC}"
         curl -L "$zip_url" -o "temp.zip"
         
+        if [ ! -s "temp.zip" ]; then
+            zip_url="${url%.git}/archive/refs/heads/main.zip"
+            curl -L "$zip_url" -o "temp.zip"
+        fi
+
         if [ -f "temp.zip" ]; then
-            # 2. Распаковка
             echo -e "${B}[*] Распаковка...${NC}"
             unzip -q "temp.zip"
             
-            # 3. Выравнивание структуры
-            # Ищем распакованную папку (она обычно называется name-master или name-main)
-            local extracted_dir=$(ls -d */ | grep -i "${name}" | head -n 1)
+            # Ищем любую новую папку, которая появилась после unzip
+            local extracted_dir=$(ls -d */ | grep -E "${name}|master|main" | head -n 1)
+            
             if [ -n "$extracted_dir" ]; then
                 mv "$extracted_dir" "$name" 2>/dev/null
                 rm "temp.zip"
                 cd "$name" || return
                 
-                # 4. АВТО-УСТАНОВКА ЗАВИСИМОСТЕЙ (Универсальная)
-                echo -e "${B}[*] Установка модулей Python (RAM: $CURRENT_RAM)...${NC}"
-                # Ставим базу
-                python3 -m pip install --no-cache-dir setuptools requests future
+                # Установка зависимостей СРАЗУ с флагом обхода
+                echo -e "${B}[*] Настройка окружения (PEP 668 Bypass)...${NC}"
+                python3 -m pip install --no-cache-dir --break-system-packages setuptools requests future
                 
-                # Если у инструмента есть свой список требований — ставим его
                 if [ -f "requirements.txt" ]; then
-                    echo -e "${B}[*] Установка специфичных модулей из requirements.txt...${NC}"
-                    python3 -m pip install --no-cache-dir -r requirements.txt
+                    python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
                 fi
                 
                 cd ..
-                echo -e "${G}[+] Установка $name и всех зависимостей завершена!${NC}"
+                echo -e "${G}[+] Инструмент $name готов к работе!${NC}"
             else
-                echo -e "${R}[!] Ошибка: Не удалось найти распакованную папку.${NC}"
+                echo -e "${R}[!] Ошибка структуры архива.${NC}"
                 rm "temp.zip"
             fi
-        else
-            echo -e "${R}[!] Сбой загрузки. Проверь сеть или URL.${NC}"
         fi
         read -p ">> [Enter]..."
     fi
