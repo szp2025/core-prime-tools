@@ -1,60 +1,49 @@
 #!/bin/bash
 
 # --- КОНФИГУРАЦИЯ ---
-VERSION="1.9"
+VERSION="2.0"
 BASE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main"
 SELF_PATH="/usr/local/bin/prime"
 
-# Цвета для интерфейса
+# Цвета
 G='\033[0;32m'; B='\033[0;34m'; Y='\033[1;33m'; R='\033[0;31m'; NC='\033[0m'
 
-# --- 1. МОНИТОРИНГ И ЭВРИСТИКА ---
+# --- 1. МОНИТОРИНГ ---
 
 get_resources() {
-    # Получаем RAM и Батарею
     CURRENT_RAM=$(free -m | awk '/Mem:/ { print $4 }')
     BATT=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null || echo "0")
     DISK_INT=$(df -h /system | awk 'NR==2 {print $4}')
     
-    # Динамические цвета
-    if [ "$CURRENT_RAM" -gt 100 ]; then RAM_COL=$G; elif [ "$CURRENT_RAM" -gt 55 ]; then RAM_COL=$Y; else RAM_COL=$R; fi
-    if [ "$BATT" -gt 70 ]; then BATT_COL=$G; elif [ "$BATT" -gt 30 ]; then BATT_COL=$Y; else BATT_COL=$R; fi
+    [ "$CURRENT_RAM" -gt 100 ] && RAM_COL=$G || RAM_COL=$R
+    [ "$BATT" -gt 70 ] && BATT_COL=$G || BATT_COL=$Y
 }
 
 check_auto_purge() {
-    # Эвристика: если памяти критически мало (<45MB), принудительно сбрасываем кэш
     if [ "$CURRENT_RAM" -lt 45 ]; then
+        echo -e "${R}[!] Low RAM detected ($CURRENT_RAM MB). Cleaning...${NC}"
         apt-get clean > /dev/null 2>&1
         sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
     fi
 }
 
-# --- 2. ИНТЕРФЕЙС ---
+# --- 2. ИНТЕРФЕЙС (БЕЗ CLEAR) ---
 
 draw_header() {
-    clear
-    echo -e "${B}=========================================="
-    echo -e "   PRIME ULTRA v$VERSION | BATT: ${BATT_COL}${BATT}%${NC}"
-    echo -e "   RAM: ${RAM_COL}${CURRENT_RAM}MB${NC} | DISK: ${Y}${DISK_INT}${NC}"
-    echo -e "==========================================${NC}"
-}
-
-draw_menu() {
-    echo -e "1) ${G}FULL PRO SETUP${NC}  - Запуск kalipro_setup.sh"
-    echo -e "2) ${G}SYSTEM PURGE${NC}    - Глубокая очистка RAM/DPKG"
-    echo -e "3) ${B}UPDATE MENU${NC}     - Проверить обновление v$VERSION"
-    echo -e "------------------------------------------"
-    echo -e "4) ${Y}ZPHISHER${NC}       - Запуск/Установка фишинга"
-    echo -e "5) ${Y}SHERLOCK${NC}       - Запуск/Установка OSINT"
-    echo -e "6) ${Y}WIFITE2${NC}        - Запуск/Установка аудита"
-    echo -e "7) ${Y}PROTOCOLS${NC}      - Статус [88]|[90]|[95]"
-    echo -e "8) ${Y}ROUTERSPLOIT${NC}   - Эксплуатация роутеров"
-    echo -e "9) ${Y}SET-TOOLKIT${NC}    - Social Engineering"
-    echo -e "0) ${R}EXIT${NC}"
+    echo -e "\n${B}--- LOG SESSION START v$VERSION ---${NC}"
+    echo -e "${B}BATT:${NC} ${BATT_COL}${BATT}%${NC} | ${B}RAM:${NC} ${RAM_COL}${CURRENT_RAM}MB${NC} | ${B}DISK:${NC} ${Y}${DISK_INT}${NC}"
     echo -e "${B}------------------------------------------${NC}"
 }
 
-# --- 3. ЛОГИКА ИНСТРУМЕНТОВ ---
+draw_menu() {
+    echo -e "1) ${G}FULL PRO SETUP${NC}  2) ${G}SYSTEM PURGE${NC}  3) ${B}UPDATE MENU${NC}"
+    echo -e "4) ${Y}ZPHISHER${NC}       5) ${Y}SHERLOCK${NC}      6) ${Y}WIFITE2${NC}"
+    echo -e "8) ${Y}ROUTERSPLOIT${NC}   9) ${Y}SET-TOOLKIT${NC}   7) ${Y}PROTOCOLS${NC}"
+    echo -e "0) ${R}EXIT${NC}"
+    echo -e "${B}>> Выберите действие:${NC}"
+}
+
+# --- 3. ЛОГИКА ---
 
 run_tool() {
     local name=$1
@@ -62,43 +51,35 @@ run_tool() {
     local cmd=$3
 
     if [ -d "$name" ]; then
-        echo -e "${G}[+] Запуск $name...${NC}"
+        echo -e "${G}[+] Вход в директорию $name...${NC}"
         cd "$name" || return
+        echo -e "${B}[*] Запуск: $cmd${NC}"
         eval "$cmd"
         cd ..
-        echo -e "${B}[*] Возврат в меню...${NC}"
-        sleep 2
     else
         echo -e "${Y}[!] $name не найден. Установить? (y/n)${NC}"
         read -p ">> " confirm
         if [[ $confirm == [yY] ]]; then
-            echo -e "${B}[*] Клонирование (depth 1 для экономии RAM)...${NC}"
+            echo -e "${B}[*] Клонирование (depth 1)...${NC}"
             git clone --depth 1 "$url" "$name"
-            echo -e "${G}[+] Готово. Теперь запустите еще раз.${NC}"
-            sleep 2
+            echo -e "${G}[+] Успешно. Теперь запустите еще раз из меню.${NC}"
         fi
     fi
 }
 
 run_update() {
-    echo -e "${B}[*] Проверка версии на GitHub...${NC}"
+    echo -e "${B}[*] Проверка Git...${NC}"
     REMOTE_V=$(curl -s "$BASE_URL/prime.sh" | grep -oP 'VERSION="\K[^"]+')
-    
-    if [ -z "$REMOTE_V" ]; then
-        echo -e "${R}[!] Ошибка сети.${NC}"
-    elif [ "$REMOTE_V" != "$VERSION" ]; then
-        echo -e "${Y}[!] Найдена v$REMOTE_V. Обновляемся...${NC}"
+    if [ "$REMOTE_V" != "$VERSION" ] && [ ! -z "$REMOTE_V" ]; then
+        echo -e "${Y}[!] Обновление до v$REMOTE_V...${NC}"
         curl -L "$BASE_URL/prime.sh" -o "$SELF_PATH" && chmod +x "$SELF_PATH"
-        echo -e "${G}[+] Перезапуск...${NC}"
-        sleep 1
         exec prime
     else
-        echo -e "${G}[+] У вас актуальная версия.${NC}"
+        echo -e "${G}[+] Версия актуальна.${NC}"
     fi
-    sleep 1
 }
 
-# --- 4. ГЛАВНЫЙ ЦИКЛ ---
+# --- 4. ЦИКЛ ---
 
 while true; do
     get_resources
@@ -110,24 +91,18 @@ while true; do
     case $opt in
         1) curl -L "$BASE_URL/kalipro_setup.sh" | bash ;;
         2) 
-            echo -e "${B}[*] Исправление DPKG и очистка...${NC}"
+            echo -e "${B}[*] Очистка кэша и DPKG...${NC}"
             rm -rf /var/lib/dpkg/updates/* && dpkg --configure -a
             apt-get clean && apt-get autoremove -y
-            echo -e "${G}[+] Завершено.${NC}"
-            sleep 1 ;;
+            echo -e "${G}[+] Операция завершена.${NC}" ;;
         3) run_update ;;
         4) run_tool "zphisher" "https://github.com/htr-tech/zphisher.git" "bash zphisher.sh" ;;
         5) run_tool "sherlock" "https://github.com/sherlock-project/sherlock.git" "python3 sherlock --help" ;;
         6) run_tool "wifite2" "https://github.com/derv82/wifite2.git" "python3 wifite.py" ;;
-        7) 
-            echo -e "${Y}--- СТАТУС ФИЛЬТРОВ ---${NC}"
-            echo -e "[88] Network Core: ACTIVE"
-            echo -e "[90] Active City Protection: GHOST"
-            echo -e "[95] Sterile Channel: READY"
-            read -p "Нажми Enter..." ;;
-      8) run_tool "routersploit" "https://github.com/threat9/routersploit.git" "python3 rsf.py" ;;
-      9) run_tool "setoolkit" "https://github.com/trustedsec/social-engineer-toolkit.git" "python3 setup.py install && setoolkit" ;;
-        0) echo "Выход из Prime Ultra..."; exit 0 ;;
-        *) echo -e "${R}Неверный выбор${NC}"; sleep 1 ;;
+        8) run_tool "routersploit" "https://github.com/threat9/routersploit.git" "python3 rsf.py" ;;
+        9) run_tool "setoolkit" "https://github.com/trustedsec/social-engineer-toolkit.git" "python3 setup.py" ;;
+        7) echo -e "${Y}[88] Core | [90] Protection | [95] Sterile${NC}" ;;
+        0) exit 0 ;;
+        *) echo -e "${R}Ошибка выбора.${NC}" ;;
     esac
 done
