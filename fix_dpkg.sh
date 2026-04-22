@@ -1,28 +1,35 @@
 #!/bin/bash
 
 # ==========================================
-# AUTO FIX DPKG LOCK & UPDATES (NetHunter)
+# AUTO HEAL DPKG (ANTI-CORRUPTION)
 # ==========================================
 
-echo "[*] Проверка блокировок dpkg..."
+DPKG_DIR="/var/lib/dpkg"
 
-# Удаление lock файлов
-rm -f /var/lib/dpkg/lock
-rm -f /var/lib/dpkg/lock-frontend
-rm -f /var/cache/apt/archives/lock
+echo "[*] Проверка dpkg..."
 
-# Очистка битых updates
-if [ -d "/var/lib/dpkg/updates" ]; then
-    echo "[*] Очистка updates..."
-    rm -rf /var/lib/dpkg/updates/*
+# Если нет папки updates → восстановить
+if [ ! -d "$DPKG_DIR/updates" ]; then
+    echo "[!] dpkg сломан — восстановление..."
+    mkdir -p $DPKG_DIR/{updates,info,parts,triggers}
 fi
 
-# Восстановление dpkg
-echo "[*] Восстановление dpkg..."
-dpkg --configure -a
+# Права
+chmod 755 $DPKG_DIR
+chmod -R 755 $DPKG_DIR/updates 2>/dev/null
 
-# Исправление зависимостей
-echo "[*] Исправление зависимостей..."
-apt -f install -y
+# Удаление lock
+rm -f $DPKG_DIR/lock*
+rm -f /var/cache/apt/archives/lock
 
-echo "[✔] Готово"
+# Проверка status
+if [ ! -s "$DPKG_DIR/status" ]; then
+    echo "[!] status поврежден — пересоздание"
+    touch $DPKG_DIR/status
+fi
+
+# Финальный фикс
+dpkg --configure -a >/dev/null 2>&1
+apt -f install -y >/dev/null 2>&1
+
+echo "[✔] dpkg OK"
