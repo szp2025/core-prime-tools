@@ -324,25 +324,21 @@ run_phishing() {
 }
 
 run_ghost_scan() {
-    clear
+    repair
     echo -e "${G}>>> [ GHOST PORT SCANNER ] <<<${NC}"
-    echo -ne "${Y}Введи цель (IP или Domain): ${NC}"
-    read t
-    
-    # Проверка на пустой ввод
-    if [ -z "$t" ]; then
-        echo -e "${R}[!] Ошибка: Цель не указана.${NC}"
-        sleep 1
-        return
-    fi
-
-    echo -e "${G}[*] Запуск сканирования версий для: $t...${NC}"
-    # Сканируем с выводом версий (-sV)
-    nmap -sV "$t"
-    
-    echo -e "\n${Y}Сканирование завершено. Нажми Enter...${NC}"
-    read
+    read -p "Target IP/Domain: " t
+    [ -z "$t" ] && return
+    echo -e "1) Fast Scan (-F)\n2) Version Scan (-sV)\n3) Aggressive (-A)\nB) Back"
+    read -p ">> " m
+    case $m in
+        1) nmap -F -T4 "$t" ;;
+        2) nmap -sV "$t" ;;
+        3) nmap -A -v "$t" ;;
+        *) return ;;
+    esac
+    read -p "Press Enter..."
 }
+
 
 run_sqlmap() {
     clear
