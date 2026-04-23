@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="15.9"
+CURRENT_VERSION="16.0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -201,19 +201,28 @@ TOOLS_DATA=(
 )
 
 run_osint() {
-    repair; echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
-    echo -ne "Input (mail/username): "; read i
+    clear
+    echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
+    echo -ne "Input (mail/username): "
+    read i
     [ -z "$i" ] && return
     
     if [[ "$i" =~ "@" ]]; then 
-        echo -e "${G}[*] Email detected. Running Mosint/Infoga...${NC}"
-        cd /root/infoga && python3 infoga.py --target "$i"
+        echo -e "${G}[*] Email detected. Running Mosint...${NC}"
+        # Проверяем правильный путь (в новых версиях это mosint.py)
+        if [ -f "/root/infoga/mosint.py" ]; then
+            python3 /root/infoga/mosint.py "$i"
+        elif [ -f "/root/infoga/infoga.py" ]; then
+            python3 /root/infoga/infoga.py --target "$i"
+        else
+            echo -e "${R}[!] Инструмент для Email не найден в /root/infoga${NC}"
+        fi
     else 
         echo -e "${G}[*] Username detected. Running Sherlock...${NC}"
-        # Запуск Sherlock как модуля (исправляет твою ошибку)
         python3 -m sherlock "$i" --timeout 2 --print-found
     fi
-    pause
+    echo -e "\n${Y}Нажми Enter для продолжения...${NC}"
+    read # Это замена сломанному 'pause'
 }
 
 update_prime() {
