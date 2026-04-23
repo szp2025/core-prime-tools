@@ -200,12 +200,29 @@ TOOLS_DATA=(
     "instashell;https://github.com/thelinuxchoice/instashell/archive/refs/heads/master.zip;instashell.sh;chmod +x install.sh && ./install.sh"
 )
 
+run_osint() {
+    repair; echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
+    echo -ne "Input (mail/username): "; read i
+    [ -z "$i" ] && return
+    
+    if [[ "$i" =~ "@" ]]; then 
+        echo -e "${G}[*] Email detected. Running Mosint/Infoga...${NC}"
+        cd /root/infoga && python3 infoga.py --target "$i"
+    else 
+        echo -e "${G}[*] Username detected. Running Sherlock...${NC}"
+        # Запуск Sherlock как модуля (исправляет твою ошибку)
+        python3 -m sherlock "$i" --timeout 2 --print-found
+    fi
+    pause
+}
+
+
 # --- ЛОГИКА МЕНЮ ---
 # (Тут твои функции run_ghost_scan, run_osint, run_device_hack и т.д. без изменений)
 # [Для краткости использую твой оригинальный switch-case]
 
 while true; do
-    repair; clear
+    repair; 
     echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
     get_stats
     echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG\n2) SQLMAP       3) SMART OSINT\n4) DEVICE HACK  5) SECURITY HUB\nU) UPDATE CORE  I) SERVICE HUB\n0) EXIT${NC}"
@@ -214,7 +231,7 @@ while true; do
         g|G) read -p "Target: " t; nmap -sV "$t"; read ;;
         1) cd /root/zphisher && ./zphisher.sh ;;
         2) sqlmap --wizard ;;
-        3) read -p "User: " u; python3 /root/sherlock/sherlock_project/sherlock.py "$u" --print-found; read ;;
+        3) run_osint() ;;
         4) clear; echo "1) PhoneSploit 2) BT Scan"; read dh; [ $dh == "1" ] && (cd /root/phonesploit && python3 phonesploitpython.py); [ $dh == "2" ] && hcitool scan; read ;;
         5) # Security Hub (AV, Share, Upload)
            clear; echo "V) AV Srv  S) Share  U) Upload"; read sh;
