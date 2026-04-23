@@ -190,7 +190,7 @@ mod_security() {
 }
 
 while true; do
-    repair; clear
+    repair; 
     echo -e "${R}========== [ PRIME MASTER v15.3 ] ==========${NC}"
     echo -e "G) [ GHOST SCAN ]  1) [ SOCIAL ENG ]"
     echo -e "2) [ SQLMAP ]      3) [ SMART OSINT ]"
