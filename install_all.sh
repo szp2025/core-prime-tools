@@ -200,7 +200,7 @@ while true; do
     read opt
     case $opt in
         g|G) run_ghost_scan ;; 1) cd /root/zphisher && ./zphisher.sh ;;
-        2) cd /root/sqlmap && python3 sqlmap.py --wizard ;;
+        2) sqlmap --wizard ;;
         3) mod_osint ;; 4) mod_device_hack ;; 5) mod_security ;;
         s) htop ;; 0) exit 0 ;;
     esac
