@@ -219,7 +219,10 @@ run_osint() {
         fi
     else 
         echo -e "${G}[*] Username detected. Running Sherlock...${NC}"
-        python3 -m sherlock "$i" --timeout 2 --print-found
+        
+# Новая команда для твоего скрипта-меню
+sherlock "$i" --timeout 2 --print-found
+
     fi
     echo -e "\n${Y}Нажми Enter для продолжения...${NC}"
     read # Это замена сломанному 'pause'
