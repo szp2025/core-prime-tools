@@ -231,7 +231,7 @@ while true; do
         g|G) read -p "Target: " t; nmap -sV "$t"; read ;;
         1) cd /root/zphisher && ./zphisher.sh ;;
         2) sqlmap --wizard ;;
-        3) run_osint() ;;
+        3) run_osint ;;
         4) clear; echo "1) PhoneSploit 2) BT Scan"; read dh; [ $dh == "1" ] && (cd /root/phonesploit && python3 phonesploitpython.py); [ $dh == "2" ] && hcitool scan; read ;;
         5) # Security Hub (AV, Share, Upload)
            clear; echo "V) AV Srv  S) Share  U) Upload"; read sh;
