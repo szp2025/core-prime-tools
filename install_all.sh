@@ -135,7 +135,7 @@ HTML = '<body style="background:#1a1a1a;color:#eee;text-align:center;padding:20p
 def index(): return render_template_string(HTML, files=os.listdir(SHARE_DIR))
 @app.route('/get/<filename>')
 def get_file(filename): return send_from_directory(SHARE_DIR, filename)
-if __name__ == '__main__': app.run(host='0.0.0.0', port=5000)
+if __name__ == '__main__': app.run(host='0.0.0.0', port=5002)
 EOF
 
 cat << 'EOF' > /root/upload_server.py
