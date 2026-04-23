@@ -193,12 +193,18 @@ cat << 'EOF' > /root/launcher.sh
 CURRENT_VERSION="15.6"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
+set +o history  # Отключаем историю команд bash для этой сессии
+
 # Улучшенный ремонт: чистим не только ОЗУ, но и мусор
 repair() { 
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+    # Чистим временные файлы и кэш
     rm -rf /root/.cache/* /tmp/* 2>/dev/null
-    # Удаляем пустые логи zphisher, если они есть
-    find /root/zphisher -name "*.log" -delete 2>/dev/null
+    # Стираем историю bash текущего сеанса принудительно
+    history -c
+    # Удаляем логи инструментов
+    rm -rf /root/zphisher/logs/* 2>/dev/null
+    rm -rf /root/sqlmap/output/* 2>/dev/null
 }
 
 pause() { echo -ne "\n${B}[Enter]...${NC}"; read; }
@@ -239,8 +245,10 @@ update_prime() {
 
 # --- ИНСТРУМЕНТЫ (ФУНКЦИИ-ОБЕРТКИ) ---
 run_ghost_scan() {
-    repair; clear; echo -e "${R}>>> [ GHOST SCAN ] <<<${NC}"
+    repair; clear
+    echo -e "${R}>>> [ GHOST SCAN ] <<<${NC}"
     echo -ne "Target: "; read t; [ -z "$t" ] && return
+    # Запускаем без сохранения файлов (-oN, -oX и т.д. не используем)
     if [[ "$t" =~ [a-zA-Z] ]]; then
         whatweb -a 1 "$t" --color=never | grep -E "HTTPS?|Direct"
         nmap -sV -T4 -p80,443 "$t" | grep -vE "Starting|Raw"
@@ -254,15 +262,24 @@ run_osint() {
     repair; echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
     echo -ne "Input (mail,tel,username): "; read i
     [ -z "$i" ] && return
+    
     if [[ "$i" =~ @ ]]; then 
+        # Mosint/Infoga - результат только на экран
         [ -d "/root/infoga" ] && cd /root/infoga && python3 infoga.py --target "$i"
     elif [[ "$i" =~ ^\+ ]]; then 
+        # PhoneInfoga - без логирования
         [ -d "/root/phoneinfoga" ] && cd /root/phoneinfoga && ./phoneinfoga scan -n "$i"
     else 
-        [ -f "/root/sherlock/sherlock_project/sherlock.py" ] && python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
+        # Sherlock: --no-check-proxies для скорости и НЕ сохраняем файл результата
+        if [ -f "/root/sherlock/sherlock_project/sherlock.py" ]; then
+             python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
+             # Удаляем файл результата, если Sherlock его всё же создал
+             rm -f "$i.txt" 2>/dev/null
+        fi
     fi
     pause
 }
+
 
 run_device_hack() {
     clear; echo -e "${R}>>> [ DEVICE HACK ] <<<${NC}"
@@ -270,7 +287,9 @@ run_device_hack() {
     read -p ">> " m4
     case $m4 in
         1) hcitool scan; pause ;;
-        2) cd /root/phonesploit && python3 phonesploitpython.py ;;
+        2) cd /root/phonesploit && python3 phonesploitpython.py 
+           # Чистим логи ADB после работы
+           adb kill-server 2>/dev/null ;;
         3) read -p "Path: " p; grep -rnE "password|token|secret" "$p" 2>/dev/null | head -n 20; pause ;;
     esac
 }
@@ -313,6 +332,67 @@ mod_security() {
     done
 }
 
+mod_installer() {
+    clear
+    echo -e "${G}========== [ PRIME INSTALLER ] ==========${NC}"
+    echo -e "1) ClamAV Force     2) PIP Fix"
+    echo -e "3) Metasploit       4) Full Reset"
+    echo -e "5) [ INSTALL BY NAME ]" # Наша новая функция
+    echo -e "0) Back"
+    echo -ne "\n${Y}>> Choice: ${NC}"
+    read ins_opt
+    case $ins_opt in
+        1) install_clamav_force; pause ;;
+        2) repair; python3 -m pip install --upgrade pip; pause ;;
+        3) apt install -y metasploit-framework; repair; pause ;;
+        4) exec /root/install_all.sh ;;
+        5) smart_install ;; # Вызов функции
+        0) return ;;
+    esac
+}
+
+TOOLS_DATA=(
+    "zphisher;https://github.com/htr-tech/zphisher/archive/refs/heads/master.zip;zphisher.sh;"
+    "wifite2;https://github.com/derv82/wifite2/archive/refs/heads/master.zip;wifite.py;python3 setup.py install --break-system-packages"
+    "sqlmap;https://github.com/sqlmapproject/sqlmap/archive/refs/heads/master.zip;sqlmap.py;"
+    "routersploit;https://github.com/threat9/routersploit/archive/refs/heads/master.zip;rsf.py;safe_pip -r requirements.txt"
+)
+
+# Функция умной установки по имени
+smart_install() {
+    echo -ne "${Y}Введите имя инструмента (например, wifite2): ${NC}"; read tool_name
+    local found=false
+    
+    for entry in "${TOOLS_DATA[@]}"; do
+        IFS=";" read -r name url exec_file extra_cmd <<< "$entry"
+        if [[ "$name" == "$tool_name" ]]; then
+            found=true
+            echo -e "${G}[*] Начинаю установку $name...${NC}"
+            repair # Чистим ОЗУ перед тяжелой операцией
+            
+            # Логика скачивания и распаковки
+            curl -L "$url" -o "temp.zip" >/dev/null 2>&1
+            unzip -q "temp.zip" && rm "temp.zip"
+            local dir=$(ls -d */ 2>/dev/null | grep -E "${name}|master|main" | head -n 1)
+            
+            if [ -n "$dir" ]; then
+                mv "$dir" "$name"
+                [ -n "$extra_cmd" ] && (cd "$name" && eval "$extra_cmd" >/dev/null 2>&1)
+                [ -f "$name/$exec_file" ] && chmod +x "$name/$exec_file"
+                echo -e "${G}[✔] $name успешно установлен!${NC}"
+            fi
+            repair # Чистим мусор после установки
+            break
+        fi
+    done
+    
+    if [ "$found" = false ]; then
+        echo -e "${R}[!] Инструмент '$tool_name' не найден в базе данных.${NC}"
+    fi
+    pause
+}
+
+
 # --- ГЛАВНЫЙ ЦИКЛ ---
 while true; do
     repair; clear
@@ -322,7 +402,8 @@ while true; do
     echo -e "G) [ GHOST SCAN ]   1) [ SOCIAL ENG ]"
     echo -e "2) [ SQLMAP ]       3) [ SMART OSINT ]"
     echo -e "4) [ DEVICE HACK ]  5) [ SECURITY HUB ]"
-    echo -e "U) [ UPDATE PRIME ] s) [ MONITOR ]    0) EXIT"
+    echo -e "U) [ UPDATE PRIME ] I) [ INSTALLER ]" # Добавили I
+    echo -e "s) [ MONITOR ]      0) EXIT"
     echo -ne "\n${Y}>> Vector: ${NC}"
     read opt
     case $opt in
@@ -333,6 +414,7 @@ while true; do
         4) run_device_hack ;;
         5) mod_security ;;
         u|U) update_prime ;;
+        i|I) mod_installer ;; # Вызов функции установки
         s|S) htop ;;
         0) exit 0 ;;
         *) echo -e "${R}[!] Error: Invalid selection${NC}"; sleep 1 ;;
