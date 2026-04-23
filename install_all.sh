@@ -216,6 +216,147 @@ run_osint() {
     pause
 }
 
+update_prime() {
+    clear
+    echo -e "${B}[ PRIME MASTER UPDATE ]${NC}"
+    echo -e "${Y}[*] Подключение к серверу обновлений...${NC}"
+    
+    # Ссылка на твой скрипт
+    local UP_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
+    
+    # Проверка интернета (timeout 5 секунд)
+    if curl -Is --connect-timeout 5 https://github.com > /dev/null; then
+        echo -e "${G}[+] Сервер доступен. Качаем install_all.sh...${NC}"
+        
+        # Скачиваем с флагом -k для обхода проблем с SSL на старых ядрах
+        if curl -L -k "$UP_URL" -o /root/install_all.sh; then
+            chmod +x /root/install_all.sh
+            echo -e "${G}[✔] Скрипт обновлен. Запуск тотальной сборки через 2 сек...${NC}"
+            sleep 2
+            exec /root/install_all.sh
+        else
+            echo -e "${R}[!] Ошибка при скачивании файла.${NC}"
+            sleep 2
+        fi
+    else
+        echo -e "${R}[!] Нет сети или GitHub недоступен.${NC}"
+        sleep 2
+    fi
+}
+
+run_servers() {
+    repair
+    echo -e "${B}>>> [ SECURITY & DATA HUB ] <<<${NC}"
+    echo -e "${G}V)${NC} AV-Scanner Server (Port 5000)"
+    echo -e "${G}S)${NC} Share-File Server (Port 5001)"
+    echo -e "${G}U)${NC} Upload-Inbound Server (Port 5002)"
+    echo -e "${R}B)${NC} Назад в меню"
+    echo -ne "\n${Y}Выбери режим: ${NC}"
+    read srv_opt
+    
+    case $srv_opt in
+        [vV]) 
+            echo -e "${G}[*] Запуск AV-Scanner...${NC}"
+            python3 /root/av_server.py ;;
+        [sS]) 
+            echo -e "${G}[*] Запуск Share-Server...${NC}"
+            python3 /root/share_server.py ;;
+        [uU]) 
+            echo -e "${G}[*] Запуск Upload-Server...${NC}"
+            python3 /root/upload_server.py ;;
+        [bB]) 
+            return ;;
+        *) 
+            echo -e "${R}[!] Ошибка: Неверный выбор${NC}"
+            sleep 1 ; run_servers ;;
+    esac
+}
+
+run_device_hack() {
+    clear
+    echo -e "${B}>>> [ DEVICE EXPLOIT HUB ] <<<${NC}"
+    echo -e "${G}1)${NC} PhoneSploit (ADB Remote Control)"
+    echo -e "${G}2)${NC} Bluetooth Scan (hcitool)"
+    echo -e "${R}B)${NC} Назад в меню"
+    echo -ne "\n${Y}Выбери инструмент: ${NC}"
+    read dh
+    
+    case $dh in
+        1) 
+            echo -e "${G}[*] Запуск PhoneSploit...${NC}"
+            cd /root/phonesploit && python3 phonesploitpython.py ;;
+        2) 
+            echo -e "${G}[*] Сканирование Bluetooth...${NC}"
+            hcitool scan ;;
+        [bB]) 
+            return ;;
+        *) 
+            echo -e "${R}[!] Неверный ввод${NC}"
+            sleep 1 ; run_device_hack ;;
+    esac
+    echo -e "\n${Y}Нажми Enter, чтобы вернуться...${NC}"
+    read
+}
+
+
+run_phishing() {
+    clear
+    echo -e "${R}>>> [ SOCIAL ENGINEERING HUB ] <<<${NC}"
+    echo -e "${Y}[*] Запуск Zphisher...${NC}"
+    
+    # Проверка наличия директории перед переходом
+    if [ -d "/root/zphisher" ]; then
+        cd /root/zphisher && ./zphisher.sh
+    else
+        echo -e "${R}[!] Ошибка: Директория /root/zphisher не найдена.${NC}"
+        echo -e "${Y}[*] Попробуй запустить Update (U), чтобы восстановить инструменты.${NC}"
+        sleep 3
+    fi
+}
+
+run_ghost_scan() {
+    clear
+    echo -e "${G}>>> [ GHOST PORT SCANNER ] <<<${NC}"
+    echo -ne "${Y}Введи цель (IP или Domain): ${NC}"
+    read t
+    
+    # Проверка на пустой ввод
+    if [ -z "$t" ]; then
+        echo -e "${R}[!] Ошибка: Цель не указана.${NC}"
+        sleep 1
+        return
+    fi
+
+    echo -e "${G}[*] Запуск сканирования версий для: $t...${NC}"
+    # Сканируем с выводом версий (-sV)
+    nmap -sV "$t"
+    
+    echo -e "\n${Y}Сканирование завершено. Нажми Enter...${NC}"
+    read
+}
+
+run_sqlmap() {
+    clear
+    echo -e "${Y}>>> [ SQL INJECTION EXPLOTATION ] <<<${NC}"
+    echo -e "${G}[*] Запуск SQLmap Wizard...${NC}"
+    
+    # Проверка, установлен ли sqlmap в системе
+    if command -v sqlmap >/dev/null 2>&1; then
+        sqlmap --wizard
+    elif [ -f "/root/sqlmap/sqlmap.py" ]; then
+        python3 /root/sqlmap/sqlmap.py --wizard
+    else
+        echo -e "${R}[!] Ошибка: SQLmap не найден.${NC}"
+        echo -e "${Y}[*] Попробуй запустить установку через пункт U.${NC}"
+        sleep 3
+        return
+    fi
+    
+    echo -e "\n${Y}Работа завершена. Нажми Enter...${NC}"
+    read
+}
+
+
 
 # --- ЛОГИКА МЕНЮ ---
 # (Тут твои функции run_ghost_scan, run_osint, run_device_hack и т.д. без изменений)
@@ -228,17 +369,15 @@ while true; do
     echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG\n2) SQLMAP       3) SMART OSINT\n4) DEVICE HACK  5) SECURITY HUB\nU) UPDATE CORE  I) SERVICE HUB\n0) EXIT${NC}"
     read -p ">> " opt
     case $opt in
-        g|G) read -p "Target: " t; nmap -sV "$t"; read ;;
-        1) cd /root/zphisher && ./zphisher.sh ;;
-        2) sqlmap --wizard ;;
+       g|G) run_ghost_scan ;; # ЧИСТО
+        1) run_phishing ;;     # ЧИСТО
+        2) run_sqlmap ;;      # ЧИСТО
         3) run_osint ;;
-        4) clear; echo "1) PhoneSploit 2) BT Scan"; read dh; [ $dh == "1" ] && (cd /root/phonesploit && python3 phonesploitpython.py); [ $dh == "2" ] && hcitool scan; read ;;
-        5) # Security Hub (AV, Share, Upload)
-           clear; echo "V) AV Srv  S) Share  U) Upload"; read sh;
-           [ $sh == "V" ] && python3 /root/av_server.py; [ $sh == "S" ] && python3 /root/share_server.py; [ $sh == "U" ] && python3 /root/upload_server.py ;;
+        4) run_device_hack ;;  # ЧИСТО: Вызов функции вместо кучи условий
+          5) run_servers ;;  # ТЕПЕРЬ ТУТ ЧИСТО: просто вызываем твою новую функцию
         i|I) # Твой оригинальный mod_service с unified_installer
            exec /root/launcher.sh ;; # Упрощенный вызов
-        u|U) curl -L "$UPDATE_URL" > /root/install_all.sh && chmod +x /root/install_all.sh && exec /root/install_all.sh ;;
+        u|U) update_prime ;;
         0) exit 0 ;;
     esac
 done
