@@ -1,5 +1,28 @@
 #!/bin/bash
 
+# --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
+CURRENT_VERSION="15.4"
+UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
+
+check_update() {
+    echo -e "${B}[*] Проверка обновлений...${NC}"
+    # Скачиваем только номер версии из удаленного файла
+    REMOTE_VERSION=$(curl -s $UPDATE_URL | grep "CURRENT_VERSION=" | head -n 1 | cut -d'"' -f2)
+    
+    if [ "$REMOTE_VERSION" != "$CURRENT_VERSION" ] && [ -n "$REMOTE_VERSION" ]; then
+        echo -e "${Y}[!] Доступна новая версия: $REMOTE_VERSION (У тебя $CURRENT_VERSION)${NC}"
+        echo -ne "${G}>>> Обновить скрипт? (y/n): ${NC}"; read up_choice
+        if [[ $up_choice == "y" ]]; then
+            echo -e "${Y}[*] Обновляюсь...${NC}"
+            curl -L -o "$0" "$UPDATE_URL"
+            echo -e "${G}[✔] Обновлено! Перезапусти скрипт.${NC}"
+            exit 0
+        fi
+    else
+        echo -e "${G}[✔] У тебя актуальная версия ($CURRENT_VERSION)${NC}"
+    fi
+}
+
 # --- ПРОВЕРКА ПРАВ ---
 if [ "$EUID" -ne 0 ]; then 
   echo -e "\033[0;31m[!] Ошибка: Запустите от имени root\033[0m"
@@ -167,9 +190,39 @@ EOF
 # --- ГЕНЕРАЦИЯ LAUNCHER ---
 cat << 'EOF' > /root/launcher.sh
 #!/bin/bash
+CURRENT_VERSION="15.4"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
+
 repair() { sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true; }
 pause() { echo -ne "\n${B}[Enter]...${NC}"; read; }
+
+# Динамическая информация о системе
+get_stats() {
+    # RAM: Свободно / Всего
+    local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
+    # ROM: Свободно на системном разделе
+    local rom=$(df -h / | awk 'NR==2 {print $4}')
+    # SD: Поиск внешней карты памяти
+    local sd_path=$(ls -d /storage/* 2>/dev/null | grep -vE "self|emulated" | head -n 1)
+    local sd_info="N/A"
+    [ -n "$sd_path" ] && sd_info=$(df -h "$sd_path" | awk 'NR==2 {print $4}')
+    
+    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom ${Y}| SD: ${G}$sd_info${NC}"
+}
+
+# Функция мгновенного обновления комплекса
+update_prime() {
+    clear
+    echo -e "${Y}[*] Подготовка к обновлению системы...${NC}"
+    local url="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
+    # Скачиваем новый установщик и сразу передаем его интерпретатору bash
+    # Это обновит все файлы, включая этот лаунчер
+    curl -L "$url" > /root/install_all.sh
+    chmod +x /root/install_all.sh
+    echo -e "${G}[✔] Пакет обновления загружен. Перезапуск...${NC}"
+    sleep 1
+    exec /root/install_all.sh
+}
 
 run_ghost_scan() {
     repair; clear; echo -e "${R}>>> [ GHOST SCAN ] <<<${NC}"
@@ -184,35 +237,20 @@ run_ghost_scan() {
 }
 
 mod_osint() {
-    # Ремонт базы и очистка памяти перед запуском тяжелых скриптов
     repair 
     echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
-    # Твоя новая строка с подсказкой
     echo -ne "Input (mail,tel,username): "; read i
     [ -z "$i" ] && return
-
     if [[ "$i" =~ @ ]]; then 
-        # Поиск по EMAIL (Infoga)
-        echo -e "${G}[*] Searching email: $i...${NC}"
-        [ -d "/root/infoga" ] && cd /root/infoga && python3 infoga.py --target "$i" || echo -e "${R}Error: Infoga folder not found${NC}"
-    
+        echo -e "${G}[*] Searching email...${NC}"
+        [ -d "/root/infoga" ] && cd /root/infoga && python3 infoga.py --target "$i"
     elif [[ "$i" =~ ^\+ ]]; then 
-        # Поиск по ТЕЛЕФОНУ (PhoneInfoga)
-        echo -e "${G}[*] Scanning phone: $i...${NC}"
-        # Так как ставим из .zip (исходники), используем python3
-        [ -d "/root/phoneinfoga" ] && cd /root/phoneinfoga && python3 phoneinfoga.py scan -n "$i" || echo -e "${R}Error: PhoneInfoga not found${NC}"
-    
+        echo -e "${G}[*] Scanning phone...${NC}"
+        [ -d "/root/phoneinfoga" ] && cd /root/phoneinfoga && ./phoneinfoga scan -n "$i"
     else 
-        # Поиск по НИКНЕЙМУ (Sherlock)
-        echo -e "${G}[*] Hunting username: $i...${NC}"
-        # Путь в соответствии с твоим TOOLS: /root/sherlock/sherlock_project/sherlock.py
-        if [ -f "/root/sherlock/sherlock_project/sherlock.py" ]; then
-            python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
-        else
-            echo -e "${R}Error: Sherlock script not found${NC}"
-        fi
+        echo -e "${G}[*] Hunting username...${NC}"
+        [ -f "/root/sherlock/sherlock_project/sherlock.py" ] && python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
     fi
-    
     pause
 }
 
@@ -227,99 +265,77 @@ mod_device_hack() {
     esac
 }
 
-# 1. Управление анонимностью
-run_anonymity() {
-    a8 status
-    echo -ne "${Y}a) Start  b) Stop  Any) Cancel: ${NC}"; read x
-    if [[ $x == "a" ]]; then a8 start; elif [[ $x == "b" ]]; then a8 stop; fi
-    pause
-}
+run_anonymity() { a8 status; echo -ne "${Y}a) Start  b) Stop  Any) Cancel: ${NC}"; read x; [[ $x == "a" ]] && a8 start; [[ $x == "b" ]] && a8 stop; pause; }
 
-# 2. AV-Сервер
 run_av_hub() {
     local ip=$(hostname -I | awk '{print $1}')
-    echo -e "${G}[*] AV-Server starting at http://$ip:5000${NC}"
+    echo -e "${G}[*] AV-Server: http://$ip:5000${NC}"
     python3 /root/av_server.py
     pause
 }
 
-# 3. Share-Сервер (Раздача)
 run_share_hub() {
-    repair
-    local ext_sd=$(ls -d /storage/* 2>/dev/null | grep -vE "self|emulated" | head -n 1)
-    local base=${ext_sd:-"/storage/emulated/0"}
-    
-    if [ -d "$base/shared" ]; then
-        echo -e "${Y}[*] Syncing files from $base/shared...${NC}"
-        cp -r "$base/shared"/. /root/share/ 2>/dev/null
-    else
-        echo -e "${R}[!] Source folder $base/shared not found!${NC}"
-    fi
-    
-    local ip=$(hostname -I | awk '{print $1}')
+    repair; local ip=$(hostname -I | awk '{print $1}')
     echo -e "${G}[*] Share-Server: http://$ip:5002${NC}"
-    python3 /root/share_server.py
-    rm -rf /root/share/*; pause
+    python3 /root/share_server.py; pause
 }
 
-# 4. Upload-Сервер (Прием)
 run_upload_hub() {
     local ip=$(hostname -I | awk '{print $1}')
     echo -e "${G}[*] Upload-Server: http://$ip:5001${NC}"
-    python3 /root/upload_server.py
-    pause
+    python3 /root/upload_server.py; pause
 }
 
-# 5. Проверка IP
-run_my_ip() {
-    echo -ne "${Y}External IP: ${NC}"
-    curl -s --connect-timeout 5 https://ifconfig.me || echo "Timeout"
-    echo; pause
-}
+run_my_ip() { echo -ne "${Y}External IP: ${NC}"; curl -s --connect-timeout 5 https://ifconfig.me || echo "Timeout"; echo; pause; }
 
 mod_security() {
     while true; do
-        repair 
-        clear
+        repair; clear
         echo -e "${G}========== [ SECURITY HUB ] ==========${NC}"
         echo -e "A) [ ANONYMITY ]    V) [ AV-SCANNER ]"
         echo -e "S) [ SHARE-HUB ]    U) [ UPLOAD-HUB ]"
         echo -e "I) [ MY IP ]        0) [ BACK ]"
         echo -e "${G}--------------------------------------${NC}"
-        echo -e "${Y}Ports: AV:5000 | Share:5002 | Drop:5001${NC}"
+        get_stats
         echo -ne "\n${Y}>> Security Vector: ${NC}"
         read m5
-        
         case $m5 in
-            a|A) run_anonymity ;;
-            v|V) run_av_hub ;;
-            s|S) run_share_hub ;;
-            u|U) run_upload_hub ;;
-            i|I) run_my_ip ;;
-            0) break ;;
-            *) echo -e "${R}[!] Неверный выбор${NC}"; sleep 1 ;;
+            a|A) run_anonymity ;; v|V) run_av_hub ;; s|S) run_share_hub ;; u|U) run_upload_hub ;; i|I) run_my_ip ;; 0) break ;;
         esac
     done
 }
 
+# Функции-обертки для инструментов
+run_zphisher() { repair; cd /root/zphisher && ./zphisher.sh; }
+run_sqlmap() { repair; sqlmap --wizard; }
+run_htop() { htop; }
 
+# Основной цикл меню
 while true; do
-    repair; 
-    echo -e "${R}========== [ PRIME MASTER v15.3 ] ==========${NC}"
-    echo -e "G) [ GHOST SCAN ]  1) [ SOCIAL ENG ]"
-    echo -e "2) [ SQLMAP ]      3) [ SMART OSINT ]"
-    echo -e "4) [ DEVICE HACK ] 5) [ SECURITY HUB ]"
-    echo -e "s) MONITOR (HTOP)  0) EXIT"
+    repair; clear
+    echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
+    get_stats
+    echo -e "${G}----------------------------------------------${NC}"
+    echo -e "G) [ GHOST SCAN ]   1) [ SOCIAL ENG ]"
+    echo -e "2) [ SQLMAP ]       3) [ SMART OSINT ]"
+    echo -e "4) [ DEVICE HACK ]  5) [ SECURITY HUB ]"
+    echo -e "U) [ UPDATE PRIME ] s) MONITOR (HTOP)  0) EXIT"
     echo -ne "\n${Y}>> Vector: ${NC}"
     read opt
+
     case $opt in
-        g|G) run_ghost_scan ;; 1) cd /root/zphisher && ./zphisher.sh ;;
-        2) sqlmap --wizard ;;
-        3) mod_osint ;; 4) mod_device_hack ;; 5) mod_security ;;
-        s) htop ;; 0) exit 0 ;;
+        g|G) run_ghost_scan ;;
+        1)   run_zphisher ;;
+        2)   run_sqlmap ;;
+        3)   mod_osint ;;
+        4)   mod_device_hack ;;
+        5)   mod_security ;;
+        u|U) update_prime ;;
+        s|S) run_htop ;;
+        0)   exit 0 ;;
+        *)   echo -e "${R}[!] Неверный ввод${NC}"; sleep 1 ;;
     esac
 done
-EOF
 
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
