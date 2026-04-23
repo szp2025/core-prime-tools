@@ -9,13 +9,22 @@ fi
 # --- КОНФИГУРАЦИЯ ЦВЕТОВ ---
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
-# --- СИСТЕМНОЕ ЯДРО (Survival Mode) ---
 repair_and_clean() {
-    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || echo -e "${Y}[!] Пропуск очистки ядра (нет доступа)${NC}"
+    # 1. Исправляем базу dpkg (удаляем виновника Error 1)
+    # Делаем это ПЕРЕД любыми операциями, чтобы apt всегда был готов
+    [ -f /var/lib/dpkg/status ] && sed -i '/Package: php8/,/^$/d' /var/lib/dpkg/status 2>/dev/null
 
+    # 2. Очистка кэша ОЗУ (Survival Mode для 1GB RAM)
+    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || echo -e "${Y}[!] Пропуск очистки ядра${NC}"
+
+    # 3. Удаление мусора (логи, временные архивы)
     rm -f /root/*.zip /root/*.tmp /root/*.log /root/pip-log.txt 2>/dev/null
+    
+    # 4. Очистка кэша пакетов и pip
     apt-get clean && rm -rf ~/.cache/pip
 }
+
+
 
 safe_pip() {
     python3 -m pip install --no-cache-dir --break-system-packages "$@" >/dev/null 2>&1
