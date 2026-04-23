@@ -10,31 +10,37 @@ fi
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
 repair_and_clean() {
-    # 1. Исправляем базу dpkg (удаляем виновника Error 1)
-    # Делаем это ПЕРЕД любыми операциями, чтобы apt всегда был готов
+    # Исправляем базу dpkg ( Error 1 PHP Fix)
     [ -f /var/lib/dpkg/status ] && sed -i '/Package: php8/,/^$/d' /var/lib/dpkg/status 2>/dev/null
-
-    # 2. Очистка кэша ОЗУ (Survival Mode для 1GB RAM)
-    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || echo -e "${Y}[!] Пропуск очистки ядра${NC}"
-
-    # 3. Удаление мусора (логи, временные архивы)
-    rm -f /root/*.zip /root/*.tmp /root/*.log /root/pip-log.txt 2>/dev/null
-    
-    # 4. Очистка кэша пакетов и pip
+    # Очистка кэша ОЗУ для 1GB RAM
+    sync && echo 3 | tee /proc/sys/vm/drop_caches >/dev/null 2>&1
+    # Удаление мусора
+    rm -f /root/*.zip /root/*.tmp /root/*.log /root/*.deb 2>/dev/null
     apt-get clean && rm -rf ~/.cache/pip
 }
-
-
 
 safe_pip() {
     python3 -m pip install --no-cache-dir --break-system-packages "$@" >/dev/null 2>&1
     repair_and_clean
 }
 
+# --- ФУНКЦИЯ ПРИНУДИТЕЛЬНОЙ УСТАНОВКИ CLAMAV ---
+install_clamav_force() {
+    echo -e "${Y}[*] Инъекция ClamAV (Force Install)...${NC}"
+    repair_and_clean
+    apt-get update >/dev/null 2>&1
+    cd /root
+    apt-get download clamav clamav-base clamav-freshclam libclamav* >/dev/null 2>&1
+    dpkg -i --force-all *.deb >/dev/null 2>&1
+    mkdir -p /var/lib/clamav
+    touch /var/lib/clamav/main.cvd /var/lib/clamav/daily.cvd
+    rm -f *.deb
+}
+
 install_tool() {
     local name=$1; local url=$2; local exec_file=$3; local extra_cmd=$4
-    if [ -f "$name/$exec_file" ] || command -v "$name" &> /dev/null; then return 0; fi
-    [ -d "$name" ] && rm -rf "$name"
+    if [ -d "$name" ]; then return 0; fi
+    echo -e "${G}[*] Installing $name...${NC}"
     curl -L -f "$url" -o "temp.zip" >/dev/null 2>&1
     if [ -s "temp.zip" ]; then
         unzip -q "temp.zip"
@@ -48,6 +54,20 @@ install_tool() {
     fi
     repair_and_clean
 }
+
+# --- СТАРТ ---
+clear
+echo -e "${R}[*] PRIME v15.4: ТОТАЛЬНАЯ СБОРКА...${NC}"
+mkdir -p /root/share /root/PRIME_INBOX
+repair_and_clean
+
+# Системные пакеты (убрали clamav из списка apt, ставим отдельно)
+apt-get update >/dev/null 2>&1
+apt-get install -y php curl unzip python3-pip python3-flask nmap foremost tshark aircrack-ng chkrootkit whatweb htop bluez tor >/dev/null 2>&1
+
+# Принудительный ClamAV
+install_clamav_force
+
 
 # --- СПИСОК ИНСТРУМЕНТОВ ---
 TOOLS=(
@@ -64,18 +84,24 @@ TOOLS=(
     "anonym8;https://github.com/HiroshiSama/anonym8/archive/refs/heads/master.zip;anonym8;chmod +x install.sh && ./install.sh"
 )
 
-# --- СТАРТ УСТАНОВКИ ---
-clear
-echo -e "${R}[*] PRIME v15.3: СБОРКА ПОЛНОГО КОМПЛЕКСА...${NC}"
-mkdir -p /root/share
-repair_and_clean
-apt-get update >/dev/null 2>&1
-apt-get install -y php curl unzip python3-pip python3-flask nmap foremost tshark aircrack-ng chkrootkit whatweb htop bluez clamav tor >/dev/null 2>&1
-
 for entry in "${TOOLS[@]}"; do
     IFS=";" read -r t_name t_url t_exec t_extra <<< "$entry"
     install_tool "$t_name" "$t_url" "$t_exec" "$t_extra"
 done
+
+# Специальная установка для PhoneInfoga (Binary ARM)
+if [ ! -d "/root/phoneinfoga" ]; then
+    mkdir /root/phoneinfoga && cd /root/phoneinfoga
+    curl -L https://github.com/sundowndev/phoneinfoga/releases/download/v2.10.8/phoneinfoga_Linux_armv7.tar.gz | tar xz
+    chmod +x phoneinfoga
+fi
+
+# Специальная установка для Mosint (Email OSINT)
+if [ ! -d "/root/infoga" ]; then
+    git clone --depth=1 https://github.com/alpkeskin/mosint.git /root/infoga
+    cd /root/infoga && safe_pip -r requirements.txt
+fi
+
 
 # --- ГЕНЕРАЦИЯ ВСЕХ СЕРВЕРОВ ---
 
@@ -298,4 +324,4 @@ EOF
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
-echo -e "\n${G}[✔] PRIME v15.3 ПОЛНЫЙ КОМПЛЕКС ГОТОВ. Введи: launcher${NC}"
+echo -e "\n${G}[✔] PRIME v15.4 ПОЛНЫЙ КОМПЛЕКС ГОТОВ. Введи: launcher${NC}"
