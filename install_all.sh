@@ -47,7 +47,7 @@ TOOLS=(
     "wifite2;https://github.com/derv82/wifite2/archive/refs/heads/master.zip;wifite.py;python3 setup.py install --break-system-packages"
     "sqlmap;https://github.com/sqlmapproject/sqlmap/archive/refs/heads/master.zip;sqlmap.py;"
     "routersploit;https://github.com/threat9/routersploit/archive/refs/heads/master.zip;rsf.py;safe_pip -r requirements.txt"
-    "sherlock;https://github.com/sherlock-project/sherlock/archive/refs/heads/master.zip;sherlock/sherlock.py;safe_pip -r requirements.txt"
+    "sherlock;https://github.com/sherlock-project/sherlock/archive/refs/heads/master.zip;sherlock_project/sherlock.py;safe_pip -r requirements.txt"
     "phoneinfoga;https://github.com/sundowndev/phoneinfoga/archive/refs/heads/master.zip;phoneinfoga.py;safe_pip -r requirements.txt"
     "infoga;https://github.com/m4ll0k/Infoga/archive/refs/heads/master.zip;infoga.py;safe_pip -r requirements.txt"
     "phonesploit;https://github.com/Zucccs/PhoneSploit-Python/archive/refs/heads/main.zip;phonesploitpython.py;safe_pip -r requirements.txt"
@@ -149,25 +149,33 @@ run_ghost_scan() {
 }
 
 mod_osint() {
-    # clear; # Убрали, чтобы видеть ошибки если что-то пойдет не так
+    # Ремонт базы и очистка памяти перед запуском тяжелых скриптов
+    repair 
     echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
-    echo -ne "Input (Nick, @email or +phone): "; read i
+    # Твоя новая строка с подсказкой
+    echo -ne "Input (mail,tel,username): "; read i
     [ -z "$i" ] && return
-    
-    repair # Твоя функция исправления dpkg/базы
 
     if [[ "$i" =~ @ ]]; then 
-        # OSINT по Email
-        [ -d "/root/infoga" ] && cd /root/infoga && python3 infoga.py --target "$i" || echo "Infoga not found"
+        # Поиск по EMAIL (Infoga)
+        echo -e "${G}[*] Searching email: $i...${NC}"
+        [ -d "/root/infoga" ] && cd /root/infoga && python3 infoga.py --target "$i" || echo -e "${R}Error: Infoga folder not found${NC}"
     
     elif [[ "$i" =~ ^\+ ]]; then 
-        # OSINT по Номеру телефона
-        [ -d "/root/phoneinfoga" ] && cd /root/phoneinfoga && ./phoneinfoga scan -n "$i" || echo "PhoneInfoga not found"
+        # Поиск по ТЕЛЕФОНУ (PhoneInfoga)
+        echo -e "${G}[*] Scanning phone: $i...${NC}"
+        # Так как ставим из .zip (исходники), используем python3
+        [ -d "/root/phoneinfoga" ] && cd /root/phoneinfoga && python3 phoneinfoga.py scan -n "$i" || echo -e "${R}Error: PhoneInfoga not found${NC}"
     
     else 
-        # OSINT по Никнейму (Sherlock)
-        # Путь теперь точно соответствует твоей установке
-        python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
+        # Поиск по НИКНЕЙМУ (Sherlock)
+        echo -e "${G}[*] Hunting username: $i...${NC}"
+        # Путь в соответствии с твоим TOOLS: /root/sherlock/sherlock_project/sherlock.py
+        if [ -f "/root/sherlock/sherlock_project/sherlock.py" ]; then
+            python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
+        else
+            echo -e "${R}Error: Sherlock script not found${NC}"
+        fi
     fi
     
     pause
@@ -184,25 +192,81 @@ mod_device_hack() {
     esac
 }
 
-mod_security() {
-    clear; echo -e "${G}>>> [ SECURITY HUB ] <<<${NC}"
-    echo -e "1) VPN/TOR\n2) AV-HUB\n3) SHARE-HUB\n4) UPLOAD-HUB\n5) My IP\n0) Back"
-    read -p ">> " m5
-    case $m5 in
-        1) a8 status; echo "a)Start b)Stop"; read x; [[ $x == "a" ]] && a8 start || a8 stop; pause ;;
-        2) python3 /root/av_server.py ;;
-        3) 
-            EXT_SD=$(ls -d /storage/* 2>/dev/null | grep -vE "self|emulated" | head -n 1)
-            BASE=${EXT_SD:-"/storage/emulated/0"}
-            cp -r "$BASE/shared"/. /root/share/ 2>/dev/null
-            ip=$(hostname -I | awk '{print $1}')
-            echo "http://$ip:5000"; python3 /root/share_server.py
-            rm -rf /root/share/*; pause ;;
-        4) ip=$(hostname -I | awk '{print $1}')
-           echo "http://$ip:5001"; python3 /root/upload_server.py; pause ;;
-        5) curl -s https://ifconfig.me; echo; pause ;;
-    esac
+# 1. Управление анонимностью
+run_anonymity() {
+    a8 status
+    echo -ne "${Y}a) Start  b) Stop  Any) Cancel: ${NC}"; read x
+    if [[ $x == "a" ]]; then a8 start; elif [[ $x == "b" ]]; then a8 stop; fi
+    pause
 }
+
+# 2. AV-Сервер
+run_av_hub() {
+    local ip=$(hostname -I | awk '{print $1}')
+    echo -e "${G}[*] AV-Server starting at http://$ip:5000${NC}"
+    python3 /root/av_server.py
+    pause
+}
+
+# 3. Share-Сервер (Раздача)
+run_share_hub() {
+    repair
+    local ext_sd=$(ls -d /storage/* 2>/dev/null | grep -vE "self|emulated" | head -n 1)
+    local base=${ext_sd:-"/storage/emulated/0"}
+    
+    if [ -d "$base/shared" ]; then
+        echo -e "${Y}[*] Syncing files from $base/shared...${NC}"
+        cp -r "$base/shared"/. /root/share/ 2>/dev/null
+    else
+        echo -e "${R}[!] Source folder $base/shared not found!${NC}"
+    fi
+    
+    local ip=$(hostname -I | awk '{print $1}')
+    echo -e "${G}[*] Share-Server: http://$ip:5002${NC}"
+    python3 /root/share_server.py
+    rm -rf /root/share/*; pause
+}
+
+# 4. Upload-Сервер (Прием)
+run_upload_hub() {
+    local ip=$(hostname -I | awk '{print $1}')
+    echo -e "${G}[*] Upload-Server: http://$ip:5001${NC}"
+    python3 /root/upload_server.py
+    pause
+}
+
+# 5. Проверка IP
+run_my_ip() {
+    echo -ne "${Y}External IP: ${NC}"
+    curl -s --connect-timeout 5 https://ifconfig.me || echo "Timeout"
+    echo; pause
+}
+
+mod_security() {
+    while true; do
+        repair 
+        clear
+        echo -e "${G}========== [ SECURITY HUB ] ==========${NC}"
+        echo -e "A) [ ANONYMITY ]    V) [ AV-SCANNER ]"
+        echo -e "S) [ SHARE-HUB ]    U) [ UPLOAD-HUB ]"
+        echo -e "I) [ MY IP ]        0) [ BACK ]"
+        echo -e "${G}--------------------------------------${NC}"
+        echo -e "${Y}Ports: AV:5000 | Share:5002 | Drop:5001${NC}"
+        echo -ne "\n${Y}>> Security Vector: ${NC}"
+        read m5
+        
+        case $m5 in
+            a|A) run_anonymity ;;
+            v|V) run_av_hub ;;
+            s|S) run_share_hub ;;
+            u|U) run_upload_hub ;;
+            i|I) run_my_ip ;;
+            0) break ;;
+            *) echo -e "${R}[!] Неверный выбор${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
 
 while true; do
     repair; 
