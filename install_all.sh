@@ -149,12 +149,27 @@ run_ghost_scan() {
 }
 
 mod_osint() {
-    clear; echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
-    echo -ne "Input: "; read i; [ -z "$i" ] && return
-    repair
-    if [[ "$i" =~ @ ]]; then cd /root/infoga && python3 infoga.py --target "$i"
-    elif [[ "$i" =~ ^\+ ]]; then cd /root/phoneinfoga && python3 phoneinfoga.py -n "$i"
-    else python3 /root/sherlock/sherlock/sherlock.py "$i" --timeout 1 --print-found; fi
+    # clear; # Убрали, чтобы видеть ошибки если что-то пойдет не так
+    echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
+    echo -ne "Input (Nick, @email or +phone): "; read i
+    [ -z "$i" ] && return
+    
+    repair # Твоя функция исправления dpkg/базы
+
+    if [[ "$i" =~ @ ]]; then 
+        # OSINT по Email
+        [ -d "/root/infoga" ] && cd /root/infoga && python3 infoga.py --target "$i" || echo "Infoga not found"
+    
+    elif [[ "$i" =~ ^\+ ]]; then 
+        # OSINT по Номеру телефона
+        [ -d "/root/phoneinfoga" ] && cd /root/phoneinfoga && ./phoneinfoga scan -n "$i" || echo "PhoneInfoga not found"
+    
+    else 
+        # OSINT по Никнейму (Sherlock)
+        # Путь теперь точно соответствует твоей установке
+        python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
+    fi
+    
     pause
 }
 
