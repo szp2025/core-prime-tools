@@ -187,43 +187,57 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
 EOF
 
-# --- ГЕНЕРАЦИЯ LAUNCHER ---
+# --- ГЕНЕРАЦИЯ LAUNCHER v15.6 ---
 cat << 'EOF' > /root/launcher.sh
 #!/bin/bash
-CURRENT_VERSION="15.4"
+CURRENT_VERSION="15.6"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
-repair() { sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true; }
+# Улучшенный ремонт: чистим не только ОЗУ, но и мусор
+repair() { 
+    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+    rm -rf /root/.cache/* /tmp/* 2>/dev/null
+    # Удаляем пустые логи zphisher, если они есть
+    find /root/zphisher -name "*.log" -delete 2>/dev/null
+}
+
 pause() { echo -ne "\n${B}[Enter]...${NC}"; read; }
 
-# Динамическая информация о системе
 get_stats() {
-    # RAM: Свободно / Всего
+    # 1. RAM
     local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
-    # ROM: Свободно на системном разделе
+    # 2. ROM & SD
     local rom=$(df -h / | awk 'NR==2 {print $4}')
-    # SD: Поиск внешней карты памяти
     local sd_path=$(ls -d /storage/* 2>/dev/null | grep -vE "self|emulated" | head -n 1)
     local sd_info="N/A"
     [ -n "$sd_path" ] && sd_info=$(df -h "$sd_path" | awk 'NR==2 {print $4}')
     
-    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom ${Y}| SD: ${G}$sd_info${NC}"
+    # 3. Network Status
+    local net="${R}OFFLINE${NC}"
+    ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net="${G}ONLINE${NC}"
+    
+    # 4. Active Servers Check
+    local srv=""
+    pgrep -f "av_server.py" >/dev/null && srv+=" ${G}[AV]${NC}"
+    pgrep -f "share_server.py" >/dev/null && srv+=" ${G}[SH]${NC}"
+    pgrep -f "upload_server.py" >/dev/null && srv+=" ${G}[UP]${NC}"
+    [ -z "$srv" ] && srv="${R}NONE${NC}"
+
+    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom ${Y}| SD: ${G}$sd_info"
+    echo -e "${Y}NET: $net ${Y}| ACTIVE SRV:$srv${NC}"
 }
 
-# Функция мгновенного обновления комплекса
 update_prime() {
     clear
-    echo -e "${Y}[*] Подготовка к обновлению системы...${NC}"
+    echo -e "${Y}[*] Checking GitHub for PRIME v$CURRENT_VERSION updates...${NC}"
     local url="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
-    # Скачиваем новый установщик и сразу передаем его интерпретатору bash
-    # Это обновит все файлы, включая этот лаунчер
-    curl -L "$url" > /root/install_all.sh
-    chmod +x /root/install_all.sh
-    echo -e "${G}[✔] Пакет обновления загружен. Перезапуск...${NC}"
+    curl -L "$url" > /root/install_all.sh && chmod +x /root/install_all.sh
+    echo -e "${G}[✔] System updated. Rebooting installer...${NC}"
     sleep 1
     exec /root/install_all.sh
 }
 
+# --- ИНСТРУМЕНТЫ (ФУНКЦИИ-ОБЕРТКИ) ---
 run_ghost_scan() {
     repair; clear; echo -e "${R}>>> [ GHOST SCAN ] <<<${NC}"
     echo -ne "Target: "; read t; [ -z "$t" ] && return
@@ -236,25 +250,21 @@ run_ghost_scan() {
     pause
 }
 
-mod_osint() {
-    repair 
-    echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
+run_osint() {
+    repair; echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
     echo -ne "Input (mail,tel,username): "; read i
     [ -z "$i" ] && return
     if [[ "$i" =~ @ ]]; then 
-        echo -e "${G}[*] Searching email...${NC}"
         [ -d "/root/infoga" ] && cd /root/infoga && python3 infoga.py --target "$i"
     elif [[ "$i" =~ ^\+ ]]; then 
-        echo -e "${G}[*] Scanning phone...${NC}"
         [ -d "/root/phoneinfoga" ] && cd /root/phoneinfoga && ./phoneinfoga scan -n "$i"
     else 
-        echo -e "${G}[*] Hunting username...${NC}"
         [ -f "/root/sherlock/sherlock_project/sherlock.py" ] && python3 /root/sherlock/sherlock_project/sherlock.py "$i" --timeout 2 --print-found
     fi
     pause
 }
 
-mod_device_hack() {
+run_device_hack() {
     clear; echo -e "${R}>>> [ DEVICE HACK ] <<<${NC}"
     echo -e "1) BT Scan\n2) ADB PhoneSploit\n3) Deep Grep (Secrets)\n0) Back"
     read -p ">> " m4
@@ -269,34 +279,32 @@ run_anonymity() { a8 status; echo -ne "${Y}a) Start  b) Stop  Any) Cancel: ${NC}
 
 run_av_hub() {
     local ip=$(hostname -I | awk '{print $1}')
-    echo -e "${G}[*] AV-Server: http://$ip:5000${NC}"
+    echo -e "${G}[*] AV-Server: http://$ip:5000 (Ctrl+C to stop)${NC}"
     python3 /root/av_server.py
     pause
 }
 
 run_share_hub() {
     repair; local ip=$(hostname -I | awk '{print $1}')
-    echo -e "${G}[*] Share-Server: http://$ip:5002${NC}"
+    echo -e "${G}[*] Share-Server: http://$ip:5002 (Ctrl+C to stop)${NC}"
     python3 /root/share_server.py; pause
 }
 
 run_upload_hub() {
     local ip=$(hostname -I | awk '{print $1}')
-    echo -e "${G}[*] Upload-Server: http://$ip:5001${NC}"
+    echo -e "${G}[*] Upload-Server: http://$ip:5001 (Ctrl+C to stop)${NC}"
     python3 /root/upload_server.py; pause
 }
-
-run_my_ip() { echo -ne "${Y}External IP: ${NC}"; curl -s --connect-timeout 5 https://ifconfig.me || echo "Timeout"; echo; pause; }
 
 mod_security() {
     while true; do
         repair; clear
         echo -e "${G}========== [ SECURITY HUB ] ==========${NC}"
+        get_stats
+        echo -e "${G}--------------------------------------${NC}"
         echo -e "A) [ ANONYMITY ]    V) [ AV-SCANNER ]"
         echo -e "S) [ SHARE-HUB ]    U) [ UPLOAD-HUB ]"
         echo -e "I) [ MY IP ]        0) [ BACK ]"
-        echo -e "${G}--------------------------------------${NC}"
-        get_stats
         echo -ne "\n${Y}>> Security Vector: ${NC}"
         read m5
         case $m5 in
@@ -305,12 +313,7 @@ mod_security() {
     done
 }
 
-# Функции-обертки для инструментов
-run_zphisher() { repair; cd /root/zphisher && ./zphisher.sh; }
-run_sqlmap() { repair; sqlmap --wizard; }
-run_htop() { htop; }
-
-# Основной цикл меню
+# --- ГЛАВНЫЙ ЦИКЛ ---
 while true; do
     repair; clear
     echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
@@ -319,23 +322,23 @@ while true; do
     echo -e "G) [ GHOST SCAN ]   1) [ SOCIAL ENG ]"
     echo -e "2) [ SQLMAP ]       3) [ SMART OSINT ]"
     echo -e "4) [ DEVICE HACK ]  5) [ SECURITY HUB ]"
-    echo -e "U) [ UPDATE PRIME ] s) MONITOR (HTOP)  0) EXIT"
+    echo -e "U) [ UPDATE PRIME ] s) [ MONITOR ]    0) EXIT"
     echo -ne "\n${Y}>> Vector: ${NC}"
     read opt
-
     case $opt in
         g|G) run_ghost_scan ;;
-        1)   run_zphisher ;;
-        2)   run_sqlmap ;;
-        3)   mod_osint ;;
-        4)   mod_device_hack ;;
-        5)   mod_security ;;
+        1) repair; cd /root/zphisher && ./zphisher.sh ;;
+        2) repair; sqlmap --wizard ;;
+        3) run_osint ;;
+        4) run_device_hack ;;
+        5) mod_security ;;
         u|U) update_prime ;;
-        s|S) run_htop ;;
-        0)   exit 0 ;;
-        *)   echo -e "${R}[!] Неверный ввод${NC}"; sleep 1 ;;
+        s|S) htop ;;
+        0) exit 0 ;;
+        *) echo -e "${R}[!] Error: Invalid selection${NC}"; sleep 1 ;;
     esac
 done
+EOF
 
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
