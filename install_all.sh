@@ -142,7 +142,7 @@ import subprocess, os
 app = Flask(__name__)
 
 # АБСОЛЮТНО ТОЧНЫЙ ПУТЬ К ФАЙЛУ
-CLAM_PATH = '/root/clamav/clamscan/clamscan'
+CLAM_PATH = '/root/clamav/clamscan'
 
 STYLE = """
 <style>
