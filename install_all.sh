@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="16.9"
+CURRENT_VERSION="17.0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -146,16 +146,16 @@ STYLE = """
     body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
     .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; min-width: 500px; }
     h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; }
-    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.9em; color: #00ff41; }
-    .infected { color: #ff3e3e; }
-    .clean { color: #00ff41; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em; color: #00ff41; background: #000; padding: 10px; border: 1px solid #222; }
+    .infected { color: #ff3e3e; border-color: #ff3e3e; }
+    .clean { color: #00ff41; border-color: #00ff41; }
     .back-btn { display: inline-block; margin-top: 20px; color: #888; text-decoration: none; }
 </style>
 """
 
 @app.route('/')
 def index():
-    return render_template_string(STYLE + '<div class="container"><h2>> SYSTEM_AV</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit">Execute Scan</button></form></div>')
+    return render_template_string(STYLE + '<div class="container"><h2>> SYSTEM_AV_SCAN</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit">Execute Scan</button></form></div>')
 
 @app.route('/scan', methods=['POST'])
 def scan():
@@ -163,28 +163,26 @@ def scan():
     f = request.files['file']
     if f.filename == '': return "No file", 400
 
-    # Сохраняем файл и принудительно сбрасываем буфер на диск
     path = os.path.join('/tmp', f.filename)
     f.save(path)
-    os.sync() # Гарантируем, что файл записан до запуска clamscan
+    os.sync() 
 
-    # Запускаем расширенный скан:
-    # -v (verbose) покажет детали
-    # --stdout выводит всё в стандартный поток
-    res = subprocess.run(['clamscan', '-v', '--stdout', path], capture_output=True, text=True)
+    # ИСПОЛЬЗУЕМ ТВОЙ ПУТЬ: /root/clamav/clamscan
+    # Добавляем флаг -d если базы лежат в той же папке (обычно они в /var/lib/clamav)
+    try:
+        res = subprocess.run(['/root/clamav/clamscan', '--stdout', path], capture_output=True, text=True)
+        scan_output = res.stdout if res.stdout else res.stderr
+    except Exception as e:
+        scan_output = f"Error executing clamscan: {str(e)}"
     
-    scan_output = res.stdout
-    os.remove(path) # Удаляем после проверки
-
+    os.remove(path)
     res_class = "infected" if "FOUND" in scan_output else "clean"
     
     return render_template_string(STYLE + """
     <div class="container">
         <h2>> SCAN_REPORT</h2>
-        <div style="background:#000; padding:15px; border:1px dashed #333;">
-            <pre class="{{ res_class }}">{{ scan_output }}</pre>
-        </div>
-        <center><a href="/" class="back-btn">[ RETURN TO TERMINAL ]</a></center>
+        <pre class="{{ res_class }}">{{ scan_output }}</pre>
+        <center><a href="/" class="back-btn">[ RETURN ]</a></center>
     </div>
     """, scan_output=scan_output, res_class=res_class)
 
