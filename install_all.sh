@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="17.2"
+CURRENT_VERSION="17.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -141,44 +141,68 @@ import subprocess, os
 
 app = Flask(__name__)
 
-# ИСПРАВЛЕННЫЙ ПУТЬ (указываем на файл внутри папки)
-CLAM_PATH = '/root/clamav/clamscan/clamscan'
+def get_clam_path():
+    # Ищем файл clamscan рекурсивно в папке /root/clamav
+    for root, dirs, files in os.walk('/root/clamav'):
+        if 'clamscan' in files:
+            full_path = os.path.join(root, 'clamscan')
+            if os.path.isfile(full_path) and not os.path.isdir(full_path):
+                return full_path
+    return None
 
 STYLE = """
 <style>
     body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; min-width: 500px; }
-    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em; color: #00ff41; background: #000; padding: 10px; border: 1px solid #222; }
+    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; min-width: 600px; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em; color: #00ff41; background: #000; padding: 15px; border: 1px dashed #333; }
+    .status { color: #888; font-size: 0.7em; margin-bottom: 10px; }
 </style>
 """
 
 @app.route('/')
 def index():
-    return render_template_string(STYLE + '<div class="container"><h2>> SYSTEM_AV_SCAN</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit">Execute Scan</button></form></div>')
+    path = get_clam_path()
+    status = f"Scanner found at: {path}" if path else "SCANNER NOT FOUND!"
+    return render_template_string(STYLE + f"""
+    <div class="container">
+        <h2>> SYSTEM_AV_SCAN</h2>
+        <div class="status">{status}</div>
+        <form method="post" action="/scan" enctype="multipart/form-data">
+            <input type="file" name="file" required><br><br>
+            <button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">START SCAN</button>
+        </form>
+    </div>
+    """)
 
 @app.route('/scan', methods=['POST'])
 def scan():
     f = request.files.get('file')
     if not f: return "No file", 400
     
-    path = os.path.join('/tmp', f.filename)
-    f.save(path)
-    os.sync()
+    clam_path = get_clam_path()
+    if not clam_path:
+        return "Error: clamscan binary not found in /root/clamav", 500
+
+    temp_path = os.path.join('/tmp', f.filename)
+    f.save(temp_path)
+    os.chmod(clam_path, 0o755) # На всякий случай даем права
 
     try:
-        # Проверяем наличие файла перед запуском
-        if not os.path.isfile(CLAM_PATH):
-            scan_output = f"Error: Binary not found at {CLAM_PATH}. Check path!"
-        else:
-            os.chmod(CLAM_PATH, 0o755)
-            res = subprocess.run([CLAM_PATH, '--stdout', path], capture_output=True, text=True)
-            scan_output = res.stdout if res.stdout else res.stderr
+        # Запускаем сканирование
+        res = subprocess.run([clam_path, '--stdout', temp_path], capture_output=True, text=True)
+        output = res.stdout if res.stdout else res.stderr
     except Exception as e:
-        scan_output = f"Critical Error: {str(e)}"
+        output = f"Execution Error: {str(e)}"
     
-    if os.path.exists(path): os.remove(path)
+    if os.path.exists(temp_path): os.remove(temp_path)
     
-    return render_template_string(STYLE + f'<div class="container"><h2>> SCAN_REPORT</h2><pre>{scan_output}</pre><br><a href="/" style="color:#888;">[ RETURN ]</a></div>')
+    return render_template_string(STYLE + f"""
+    <div class="container">
+        <h2>> SCAN_REPORT</h2>
+        <pre>{output}</pre>
+        <br><center><a href="/" style="color:#00ff41; text-decoration:none;">[ RETURN ]</a></center>
+    </div>
+    """)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
