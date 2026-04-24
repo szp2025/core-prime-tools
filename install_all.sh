@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="16.3"
+CURRENT_VERSION="16.4"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -46,21 +46,49 @@ install_clamav_force() {
 
 install_tool() {
     local name=$1; local url=$2; local exec_file=$3; local extra_cmd=$4
-    if [ -d "$name" ]; then return 0; fi
-    echo -e "${G}[*] Installing $name...${NC}"
+    
+    # Проверяем, существует ли папка И исполняемый файл внутри
+    if [ -d "$name" ] && [ -f "$name/$exec_file" ]; then 
+        echo -e "${G}[+] $name уже установлен. Пропускаю...${NC}"
+        return 0 
+    fi
+
+    echo -e "${Y}[*] Installing $name...${NC}"
+    
+    # Очистка перед скачиванием, чтобы temp.zip не конфликтовал
+    rm -f "temp.zip"
+    
     curl -L -f "$url" -o "temp.zip" >/dev/null 2>&1
+    
     if [ -s "temp.zip" ]; then
         unzip -q "temp.zip"
-        local extracted_dir=$(ls -d */ 2>/dev/null | grep -E "${name}|master|main" | head -n 1)
+        # Поиск извлеченной директории (учитываем master, main или имя инструмента)
+        local extracted_dir=$(ls -d */ 2>/dev/null | grep -iE "${name}|master|main" | head -n 1)
+        
         if [ -n "$extracted_dir" ]; then
+            # Если папка уже была, но бинарника не было — удаляем старую перед mv
+            [ -d "$name" ] && rm -rf "$name"
             mv "$extracted_dir" "$name"
             rm -f "temp.zip"
-            [ -n "$extra_cmd" ] && (cd "$name" && eval "$extra_cmd" >/dev/null 2>&1)
-            [ -f "$name/$exec_file" ] && chmod +x "$name/$exec_file"
+            
+            # Выполнение дополнительных команд (сборка, зависимости)
+            if [ -n "$extra_cmd" ]; then
+                (cd "$name" && eval "$extra_cmd" >/dev/null 2>&1)
+            fi
+            
+            # Делаем файл исполняемым
+            if [ -f "$name/$exec_file" ]; then
+                chmod +x "$name/$exec_file"
+                echo -e "${G}[+] $name успешно установлен.${NC}"
+            fi
         fi
+    else
+        echo -e "${R}[!] Ошибка загрузки $name. Проверь сеть.${NC}"
     fi
+    
     repair_and_clean
 }
+
 
 # --- СТАРТ ---
 clear
