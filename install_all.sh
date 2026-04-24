@@ -198,7 +198,7 @@ def scan():
     
     # Запуск clamscan
     # --no-summary убран, чтобы видеть краткий итог, но можно вернуть
-    res = subprocess.run(['clamscan', path], capture_output=True, text=True)
+    res = subprocess.run(['clamscan', '--infected', '--allmatch', path], capture_output=True, text=True)
     
     output = res.stdout
     os.remove(path)
