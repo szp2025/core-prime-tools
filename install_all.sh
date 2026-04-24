@@ -141,66 +141,56 @@ import subprocess, os
 
 app = Flask(__name__)
 
-def get_clam_path():
-    # Ищем файл clamscan рекурсивно в папке /root/clamav
-    for root, dirs, files in os.walk('/root/clamav'):
-        if 'clamscan' in files:
-            full_path = os.path.join(root, 'clamscan')
-            if os.path.isfile(full_path) and not os.path.isdir(full_path):
-                return full_path
-    return None
+# АБСОЛЮТНО ТОЧНЫЙ ПУТЬ К ФАЙЛУ
+CLAM_PATH = '/root/clamav/clamscan/clamscan'
 
 STYLE = """
 <style>
-    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; min-width: 600px; }
-    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em; color: #00ff41; background: #000; padding: 15px; border: 1px dashed #333; }
-    .status { color: #888; font-size: 0.7em; margin-bottom: 10px; }
+    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; width: 80%; max-width: 700px; }
+    h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+    pre { white-space: pre-wrap; font-size: 0.85em; color: #0cf; background: #000; padding: 15px; border: 1px solid #222; }
+    .status-box { padding: 10px; margin-bottom: 15px; font-weight: bold; text-align: center; border: 1px solid; }
+    .infected { color: #ff3e3e; border-color: #ff3e3e; background: rgba(255,62,62,0.1); }
+    .clean { color: #00ff41; border-color: #00ff41; background: rgba(0,255,65,0.1); }
+    .back-link { color: #555; text-decoration: none; font-size: 0.8em; margin-top: 20px; display: block; text-align: center; }
 </style>
 """
 
 @app.route('/')
 def index():
-    path = get_clam_path()
-    status = f"Scanner found at: {path}" if path else "SCANNER NOT FOUND!"
-    return render_template_string(STYLE + f"""
-    <div class="container">
-        <h2>> SYSTEM_AV_SCAN</h2>
-        <div class="status">{status}</div>
-        <form method="post" action="/scan" enctype="multipart/form-data">
-            <input type="file" name="file" required><br><br>
-            <button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">START SCAN</button>
-        </form>
-    </div>
-    """)
+    return render_template_string(STYLE + '<div class="container"><h2>> CLAMAV_SCANNER</h2><p>Upload data for deep analysis...</p><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">START SCAN</button></form></div>')
 
 @app.route('/scan', methods=['POST'])
 def scan():
     f = request.files.get('file')
-    if not f: return "No file", 400
+    if not f: return "No file uploaded", 400
     
-    clam_path = get_clam_path()
-    if not clam_path:
-        return "Error: clamscan binary not found in /root/clamav", 500
-
-    temp_path = os.path.join('/tmp', f.filename)
-    f.save(temp_path)
-    os.chmod(clam_path, 0o755) # На всякий случай даем права
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    os.sync()
 
     try:
-        # Запускаем сканирование
-        res = subprocess.run([clam_path, '--stdout', temp_path], capture_output=True, text=True)
-        output = res.stdout if res.stdout else res.stderr
+        # Принудительно проверяем права перед запуском
+        os.chmod(CLAM_PATH, 0o755)
+        # Запуск сканирования
+        res = subprocess.run([CLAM_PATH, '--no-summary', tmp_path], capture_output=True, text=True)
+        scan_output = res.stdout if res.stdout else res.stderr
     except Exception as e:
-        output = f"Execution Error: {str(e)}"
+        scan_output = f"Execution Error: {str(e)}"
     
-    if os.path.exists(temp_path): os.remove(temp_path)
+    if os.path.exists(tmp_path): os.remove(tmp_path)
     
+    is_infected = "FOUND" in scan_output
+    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "FILE_CLEAN / SECURE"
+    status_class = "infected" if is_infected else "clean"
+
     return render_template_string(STYLE + f"""
     <div class="container">
-        <h2>> SCAN_REPORT</h2>
-        <pre>{output}</pre>
-        <br><center><a href="/" style="color:#00ff41; text-decoration:none;">[ RETURN ]</a></center>
+        <h2>> SCAN_RESULTS</h2>
+        <div class="status-box {status_class}">{status_msg}</div>
+        <pre>{scan_output}</pre>
+        <a href="/" class="back-link">[ RETURN TO DASHBOARD ]</a>
     </div>
     """)
 
