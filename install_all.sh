@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="16.4"
+CURRENT_VERSION="16.7"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -138,51 +138,210 @@ fi
 cat << 'EOF' > /root/av_server.py
 from flask import Flask, request, render_template_string
 import subprocess, os
+
 app = Flask(__name__)
-HTML = '<body style="background:#000;color:#0f0;font-family:monospace;padding:20px;"><h2>>>> AV-SCAN <<<</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file"><br><br><button type="submit">SCAN</button></form></body>'
+
+# Стилизация в стиле Hacker/Cyberpunk
+STYLE = """
+<style>
+    body { background: #0a0a0a; color: #00ff41; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .container { border: 1px solid #00ff41; padding: 30px; box-shadow: 0 0 20px rgba(0, 255, 65, 0.2); background: #111; border-radius: 5px; min-width: 400px; }
+    h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+    input[type="file"] { margin: 20px 0; color: #00ff41; }
+    button { background: transparent; border: 1px solid #00ff41; color: #00ff41; padding: 10px 20px; cursor: pointer; text-transform: uppercase; font-weight: bold; transition: 0.3s; }
+    button:hover { background: #00ff41; color: #000; box-shadow: 0 0 15px #00ff41; }
+    .status { margin-top: 20px; padding: 15px; border: 1px dashed #00ff41; background: #050505; }
+    .infected { color: #ff3e3e; text-shadow: 0 0 5px #ff3e3e; }
+    .clean { color: #00ff41; text-shadow: 0 0 5px #00ff41; }
+    .back-btn { display: inline-block; margin-top: 20px; color: #888; text-decoration: none; font-size: 0.8em; }
+    .back-btn:hover { color: #fff; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+</style>
+"""
+
+HTML_INDEX = STYLE + """
+<div class="container">
+    <h2>> SYSTEM_AV_SCANNER</h2>
+    <p style="font-size: 0.8em; color: #888;">Ready for inbound file stream...</p>
+    <form method="post" action="/scan" enctype="multipart/form-data">
+        <input type="file" name="file" required><br>
+        <button type="submit">Execute Scan</button>
+    </form>
+</div>
+"""
+
+HTML_RESULT = STYLE + """
+<div class="container">
+    <h2>> SCAN_REPORT</h2>
+    <div class="status">
+        <pre class="{{ res_class }}">{{ scan_output }}</pre>
+    </div>
+    <center><a href="/" class="back-btn">[ RETURN TO TERMINAL ]</a></center>
+</div>
+"""
+
 @app.route('/')
-def index(): return render_template_string(HTML)
+def index():
+    return render_template_string(HTML_INDEX)
+
 @app.route('/scan', methods=['POST'])
 def scan():
+    if 'file' not in request.files:
+        return "No file part", 400
+    
     f = request.files['file']
+    if f.filename == '':
+        return "No selected file", 400
+
     path = os.path.join('/tmp', f.filename)
     f.save(path)
-    res = subprocess.run(['clamscan', '--no-summary', path], capture_output=True, text=True)
+    
+    # Запуск clamscan
+    # --no-summary убран, чтобы видеть краткий итог, но можно вернуть
+    res = subprocess.run(['clamscan', path], capture_output=True, text=True)
+    
+    output = res.stdout
     os.remove(path)
-    return f"<body style='background:#000;color:#0f0;font-family:monospace;'><pre>{res.stdout}</pre><br><a href='/' style='color:#fff'>Назад</a></body>"
-if __name__ == '__main__': app.run(host='0.0.0.0', port=5000)
+    
+    # Логика определения цвета (красный если найден вирус)
+    res_class = "infected" if "FOUND" in output else "clean"
+    
+    return render_template_string(HTML_RESULT, scan_output=output, res_class=res_class)
+
+if __name__ == '__main__':
+    # Слушаем на всех интерфейсах (0.0.0.0), порт 5000
+    app.run(host='0.0.0.0', port=5000, debug=True)
 EOF
 
 cat << 'EOF' > /root/share_server.py
 from flask import Flask, render_template_string, send_from_directory
 import os
+
 app = Flask(__name__)
 SHARE_DIR = '/root/share'
-HTML = '<body style="background:#1a1a1a;color:#eee;text-align:center;padding:20px;"><h2>📁 Files</h2>{% for f in files %}<div style="background:#333;margin:10px;padding:10px;"><a href="/get/{{f}}" style="color:#0f0;">{{f}}</a></div>{% endfor %}</body>'
+
+# Убедимся, что папка существует
+if not os.path.exists(SHARE_DIR):
+    os.makedirs(SHARE_DIR)
+
+STYLE = """
+<style>
+    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; padding: 40px; }
+    h2 { text-transform: uppercase; letter-spacing: 3px; border-bottom: 2px solid #00ff41; display: inline-block; padding-bottom: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 30px; }
+    .file-card { 
+        background: #111; border: 1px solid #333; padding: 20px; text-align: center; 
+        transition: 0.3s; text-decoration: none; color: #00ff41; border-radius: 4px;
+        display: flex; flex-direction: column; align-items: center;
+    }
+    .file-card:hover { 
+        border-color: #00ff41; background: #00ff4111; transform: translateY(-5px); 
+        box-shadow: 0 5px 15px rgba(0, 255, 65, 0.2); 
+    }
+    .icon { font-size: 40px; margin-bottom: 10px; }
+    .filename { font-size: 0.9em; word-break: break-all; }
+    .empty { color: #555; font-style: italic; }
+</style>
+"""
+
+HTML = STYLE + """
+<div style="max-width: 1000px; margin: auto;">
+    <h2>> SECURE_FILE_DISTRIBUTION</h2>
+    <p style="color: #555; font-size: 0.8em;">Location: {{ path }}</p>
+    
+    <div class="grid">
+        {% for f in files %}
+        <a href="/get/{{f}}" class="file-card">
+            <div class="icon">📄</div>
+            <div class="filename">{{ f }}</div>
+        </a>
+        {% else %}
+        <p class="empty">No files detected in the transmission sector.</p>
+        {% endfor %}
+    </div>
+</div>
+"""
+
 @app.route('/')
-def index(): return render_template_string(HTML, files=os.listdir(SHARE_DIR))
+def index():
+    files = os.listdir(SHARE_DIR)
+    return render_template_string(HTML, files=files, path=SHARE_DIR)
+
 @app.route('/get/<filename>')
-def get_file(filename): return send_from_directory(SHARE_DIR, filename)
-if __name__ == '__main__': app.run(host='0.0.0.0', port=5002)
+def get_file(filename):
+    return send_from_directory(SHARE_DIR, filename)
+
+if __name__ == '__main__':
+    # Порт 5002, как в твоем запросе
+    app.run(host='0.0.0.0', port=5002)
 EOF
 
 cat << 'EOF' > /root/upload_server.py
 from flask import Flask, request, render_template_string
 import os
+
 app = Flask(__name__)
+
+# Автоматическое определение директории (SD-карта или root)
 UPLOAD_DIR = '/sdcard/PRIME_INBOX' if os.path.exists('/sdcard') else '/root/PRIME_INBOX'
-if not os.path.exists(UPLOAD_DIR): os.makedirs(UPLOAD_DIR, exist_ok=True)
-HTML = '<body style="background:#000;color:#0f0;font-family:monospace;text-align:center;padding:50px;"><h2>>>> DROP BOX <<<</h2><form method="post" action="/upload" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#0f0;color:#000;border:none;padding:10px 20px;font-weight:bold;cursor:pointer;">UPLOAD</button></form><p style="color:#555;">Save to: ' + UPLOAD_DIR + '</p></body>'
+if not os.path.exists(UPLOAD_DIR): 
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+STYLE = """
+<style>
+    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .box { border: 2px dashed #00ff41; padding: 40px; background: #111; box-shadow: 0 0 20px rgba(0, 255, 65, 0.1); border-radius: 10px; text-align: center; max-width: 500px; }
+    h2 { letter-spacing: 5px; text-shadow: 0 0 10px #00ff41; margin-bottom: 30px; }
+    input[type="file"] { background: #1a1a1a; border: 1px solid #333; padding: 10px; color: #00ff41; width: 100%; margin-bottom: 20px; }
+    button { background: #00ff41; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; width: 100%; }
+    button:hover { background: #008f25; box-shadow: 0 0 15px #00ff41; }
+    .path-info { color: #555; font-size: 0.7em; margin-top: 20px; border-top: 1px solid #222; padding-top: 10px; }
+    .success { color: #fff; text-transform: uppercase; animation: blink 1s infinite; }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+</style>
+"""
+
+HTML_INDEX = STYLE + """
+<div class="box">
+    <h2>> INBOUND_DROP_BOX</h2>
+    <p style="font-size: 0.8em; margin-bottom: 20px; color: #888;">Secure uplink established. Ready for transmission.</p>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit">Initiate Upload</button>
+    </form>
+    <div class="path-info">Target: {{ target_dir }}</div>
+</div>
+"""
+
+HTML_SUCCESS = STYLE + """
+<div class="box">
+    <h2 class="success">Data Received</h2>
+    <p style="color: #00ff41;">The file has been successfully written to the secure sector.</p>
+    <br>
+    <a href="/" style="color: #888; text-decoration: none;">[ RETURN TO GATEWAY ]</a>
+</div>
+"""
+
 @app.route('/')
-def index(): return render_template_string(HTML)
+def index():
+    return render_template_string(HTML_INDEX, target_dir=UPLOAD_DIR)
+
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files: return "No file", 400
+    if 'file' not in request.files: 
+        return "Transmission Error: No data", 400
     f = request.files['file']
-    if f.filename == '': return "No file", 400
-    f.save(os.path.join(UPLOAD_DIR, f.filename))
-    return "<html><body style='background:#000;color:#0f0;text-align:center;padding:50px;'><h2>FILE RECEIVED!</h2><br><a href='/' style='color:#fff'>[ Back ]</a></body></html>"
-if __name__ == '__main__': app.run(host='0.0.0.0', port=5001)
+    if f.filename == '': 
+        return "Transmission Error: Empty filename", 400
+    
+    file_path = os.path.join(UPLOAD_DIR, f.filename)
+    f.save(file_path)
+    
+    return render_template_string(HTML_SUCCESS)
+
+if __name__ == '__main__':
+    # Порт 5001 для Upload-сервера
+    app.run(host='0.0.0.0', port=5001)
 EOF
 
 # --- ГЕНЕРАЦИЯ LAUNCHER (Твой оригинал + расширенный TOOLS_DATA) ---
