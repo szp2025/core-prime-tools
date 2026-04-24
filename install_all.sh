@@ -141,15 +141,19 @@ import subprocess, os
 
 app = Flask(__name__)
 
+# Путь к вашему clamscan
+CLAM_PATH = '/root/clamav/clamscan'
+
+# Принудительно ставим права при запуске сервера
+if os.path.exists(CLAM_PATH):
+    os.chmod(CLAM_PATH, 0o755)
+
 STYLE = """
 <style>
     body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
     .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; min-width: 500px; }
-    h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; }
     pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em; color: #00ff41; background: #000; padding: 10px; border: 1px solid #222; }
-    .infected { color: #ff3e3e; border-color: #ff3e3e; }
-    .clean { color: #00ff41; border-color: #00ff41; }
-    .back-btn { display: inline-block; margin-top: 20px; color: #888; text-decoration: none; }
+    .error { color: #ff3e3e; border-color: #ff3e3e; }
 </style>
 """
 
@@ -159,32 +163,22 @@ def index():
 
 @app.route('/scan', methods=['POST'])
 def scan():
-    if 'file' not in request.files: return "No file", 400
-    f = request.files['file']
-    if f.filename == '': return "No file", 400
-
+    f = request.files.get('file')
+    if not f: return "No file", 400
+    
     path = os.path.join('/tmp', f.filename)
     f.save(path)
-    os.sync() 
-
-    # ИСПОЛЬЗУЕМ ТВОЙ ПУТЬ: /root/clamav/clamscan
-    # Добавляем флаг -d если базы лежат в той же папке (обычно они в /var/lib/clamav)
+    
     try:
-        res = subprocess.run(['/root/clamav/clamscan', '--stdout', path], capture_output=True, text=True)
+        # Запуск с полным путем
+        res = subprocess.run([CLAM_PATH, '--stdout', path], capture_output=True, text=True)
         scan_output = res.stdout if res.stdout else res.stderr
     except Exception as e:
-        scan_output = f"Error executing clamscan: {str(e)}"
+        scan_output = f"Critical Error: {str(e)}"
     
-    os.remove(path)
-    res_class = "infected" if "FOUND" in scan_output else "clean"
+    if os.path.exists(path): os.remove(path)
     
-    return render_template_string(STYLE + """
-    <div class="container">
-        <h2>> SCAN_REPORT</h2>
-        <pre class="{{ res_class }}">{{ scan_output }}</pre>
-        <center><a href="/" class="back-btn">[ RETURN ]</a></center>
-    </div>
-    """, scan_output=scan_output, res_class=res_class)
+    return render_template_string(STYLE + f'<div class="container"><h2>> SCAN_REPORT</h2><pre>{scan_output}</pre><br><a href="/" style="color:#888;">[ RETURN ]</a></div>')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
