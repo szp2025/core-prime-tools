@@ -141,76 +141,55 @@ import subprocess, os
 
 app = Flask(__name__)
 
-# Стилизация в стиле Hacker/Cyberpunk
 STYLE = """
 <style>
-    body { background: #0a0a0a; color: #00ff41; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .container { border: 1px solid #00ff41; padding: 30px; box-shadow: 0 0 20px rgba(0, 255, 65, 0.2); background: #111; border-radius: 5px; min-width: 400px; }
-    h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
-    input[type="file"] { margin: 20px 0; color: #00ff41; }
-    button { background: transparent; border: 1px solid #00ff41; color: #00ff41; padding: 10px 20px; cursor: pointer; text-transform: uppercase; font-weight: bold; transition: 0.3s; }
-    button:hover { background: #00ff41; color: #000; box-shadow: 0 0 15px #00ff41; }
-    .status { margin-top: 20px; padding: 15px; border: 1px dashed #00ff41; background: #050505; }
-    .infected { color: #ff3e3e; text-shadow: 0 0 5px #ff3e3e; }
-    .clean { color: #00ff41; text-shadow: 0 0 5px #00ff41; }
-    .back-btn { display: inline-block; margin-top: 20px; color: #888; text-decoration: none; font-size: 0.8em; }
-    .back-btn:hover { color: #fff; }
-    pre { white-space: pre-wrap; word-wrap: break-word; }
+    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; min-width: 500px; }
+    h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.9em; color: #00ff41; }
+    .infected { color: #ff3e3e; }
+    .clean { color: #00ff41; }
+    .back-btn { display: inline-block; margin-top: 20px; color: #888; text-decoration: none; }
 </style>
-"""
-
-HTML_INDEX = STYLE + """
-<div class="container">
-    <h2>> SYSTEM_AV_SCANNER</h2>
-    <p style="font-size: 0.8em; color: #888;">Ready for inbound file stream...</p>
-    <form method="post" action="/scan" enctype="multipart/form-data">
-        <input type="file" name="file" required><br>
-        <button type="submit">Execute Scan</button>
-    </form>
-</div>
-"""
-
-HTML_RESULT = STYLE + """
-<div class="container">
-    <h2>> SCAN_REPORT</h2>
-    <div class="status">
-        <pre class="{{ res_class }}">{{ scan_output }}</pre>
-    </div>
-    <center><a href="/" class="back-btn">[ RETURN TO TERMINAL ]</a></center>
-</div>
 """
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_INDEX)
+    return render_template_string(STYLE + '<div class="container"><h2>> SYSTEM_AV</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit">Execute Scan</button></form></div>')
 
 @app.route('/scan', methods=['POST'])
 def scan():
-    if 'file' not in request.files:
-        return "No file part", 400
-    
+    if 'file' not in request.files: return "No file", 400
     f = request.files['file']
-    if f.filename == '':
-        return "No selected file", 400
+    if f.filename == '': return "No file", 400
 
+    # Сохраняем файл и принудительно сбрасываем буфер на диск
     path = os.path.join('/tmp', f.filename)
     f.save(path)
+    os.sync() # Гарантируем, что файл записан до запуска clamscan
+
+    # Запускаем расширенный скан:
+    # -v (verbose) покажет детали
+    # --stdout выводит всё в стандартный поток
+    res = subprocess.run(['clamscan', '-v', '--stdout', path], capture_output=True, text=True)
     
-    # Запуск clamscan
-    # --no-summary убран, чтобы видеть краткий итог, но можно вернуть
-    res = subprocess.run(['clamscan', '--infected', '--allmatch', path], capture_output=True, text=True)
+    scan_output = res.stdout
+    os.remove(path) # Удаляем после проверки
+
+    res_class = "infected" if "FOUND" in scan_output else "clean"
     
-    output = res.stdout
-    os.remove(path)
-    
-    # Логика определения цвета (красный если найден вирус)
-    res_class = "infected" if "FOUND" in output else "clean"
-    
-    return render_template_string(HTML_RESULT, scan_output=output, res_class=res_class)
+    return render_template_string(STYLE + """
+    <div class="container">
+        <h2>> SCAN_REPORT</h2>
+        <div style="background:#000; padding:15px; border:1px dashed #333;">
+            <pre class="{{ res_class }}">{{ scan_output }}</pre>
+        </div>
+        <center><a href="/" class="back-btn">[ RETURN TO TERMINAL ]</a></center>
+    </div>
+    """, scan_output=scan_output, res_class=res_class)
 
 if __name__ == '__main__':
-    # Слушаем на всех интерфейсах (0.0.0.0), порт 5000
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
 EOF
 
 cat << 'EOF' > /root/share_server.py
