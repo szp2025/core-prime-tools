@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="16.2"
+CURRENT_VERSION="16.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -24,15 +24,24 @@ safe_pip() {
 }
 
 install_clamav_force() {
-    echo -e "${Y}[*] Инъекция ClamAV (Force Install)...${NC}"
-    repair_and_clean
-    apt-get update >/dev/null 2>&1
-    cd /root
-    apt-get download clamav clamav-base clamav-freshclam libclamav* >/dev/null 2>&1
-    dpkg -i --force-all *.deb >/dev/null 2>&1
-    mkdir -p /var/lib/clamav
-    touch /var/lib/clamav/main.cvd /var/lib/clamav/daily.cvd
-    rm -f *.deb
+    # Проверяем, установлен ли clamav (ищем исполняемый файл clamscan)
+    if ! command -v clamscan >/dev/null 2>&1; then
+        echo -e "${Y}[*] ClamAV не найден. Инъекция ClamAV (Force Install)...${NC}"
+        repair_and_clean
+        apt-get update >/dev/null 2>&1
+        cd /root
+        # Скачиваем пакеты
+        apt-get download clamav clamav-base clamav-freshclam libclamav* >/dev/null 2>&1
+        # Форсированная установка всех скачанных .deb
+        dpkg -i --force-all *.deb >/dev/null 2>&1
+        # Создание необходимых директорий и файлов заглушек
+        mkdir -p /var/lib/clamav
+        touch /var/lib/clamav/main.cvd /var/lib/clamav/daily.cvd
+        # Очистка за собой
+        rm -f *.deb
+    else
+        echo -e "${G}[+] ClamAV уже установлен. Пропускаю...${NC}"
+    fi
 }
 
 install_tool() {
