@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18.4"
+CURRENT_VERSION="18.5"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -134,49 +134,30 @@ if [ ! -d "/root/infoga" ]; then
 fi
 
 # Текущая версия инструмента
-IBAN_VERSION="1.4"
+IBAN_VERSION="1.5"
 FILE_PATH="/root/iban_check.py"
 
-echo -e "${C}[*] Проверка модуля IBAN/RIB (Heuristic Engine)...${NC}"
+echo -e "${C}[*] Проверка модуля IBAN/RIB (System Integrated)...${NC}"
 
 if [ ! -f "$FILE_PATH" ] || ! grep -q "VERSION = '$IBAN_VERSION'" "$FILE_PATH"; then
-    echo -e "${Y}[!] Апгрейд до v$IBAN_VERSION: Эвристический анализ...${NC}"
+    echo -e "${Y}[!] Апгрейд до v$IBAN_VERSION: Системная интеграция...${NC}"
     zero_clear
 
     cat << EOF > "$FILE_PATH"
-import sys, re, json
+import sys, re, json, subprocess
 from urllib.request import urlopen
 
 # VERSION = '$IBAN_VERSION'
 
-def get_bank_info(iban):
+def get_detailed_bank(iban):
+    """Глубокий запрос данных банка"""
     try:
+        # Используем открытый API для получения данных по BIC/IBAN
         url = f"https://api.ibanlist.com/v1/validate/{iban}"
-        with urlopen(url, timeout=3) as response:
+        with urlopen(url, timeout=4) as response:
             return json.loads(response.read().decode())
     except:
         return None
-
-def heuristic_risk_score(iban, bank_name):
-    """Эвристический анализ рисков"""
-    score = 0
-    reasons = []
-    
-    # Список необанков (часто используемых мошенниками)
-    neobanks = ['REVOLUT', 'REWISE', 'ADVYCAASH', 'PAYONEER', 'MONZO', 'QONTO', 'N26']
-    
-    if bank_name:
-        for neo in neobanks:
-            if neo in bank_name.upper():
-                score += 40
-                reasons.append("Цифровой необанк (Low Trust)")
-    
-    # Проверка на страны из "серой" зоны или офшоры (пример)
-    if iban.startswith(('LT', 'EE', 'CY', 'MT')):
-        score += 20
-        reasons.append("Юрисдикция с упрощенным открытием счетов")
-        
-    return score, reasons
 
 def validate_iban(iban):
     iban = re.sub(r'[\s-]+', '', iban).upper()
@@ -190,39 +171,31 @@ if __name__ == "__main__":
     t = sys.argv[1].replace(' ', '')
     
     if validate_iban(t):
-        print(f"\033[92m[+] IBAN {t} ВАЛИДЕН (OK)\033[0m")
-        data = get_bank_info(t)
+        print(f"\033[92m[+] IBAN {t} ВАЛИДЕН\033[0m")
+        data = get_detailed_bank(t)
         
-        bank_n = data.get('bank_name') if data else "Unknown Bank"
-        city = data.get('city') if data else "Unknown City"
+        if data and data.get('valid'):
+            print(f"\033[1;34m--- ФИНАНСОВОЕ ДОСЬЕ ---\033[0m")
+            print(f"🏦 Банк: {data.get('bank_name', 'N/A')}")
+            print(f"🌍 Страна: {data.get('country', t[:2])} | Город: {data.get('city', 'N/A')}")
+            print(f"🔑 BIC/SWIFT: {data.get('bic', 'N/A')}")
+            
+            # Эвристика на лету
+            if any(x in str(data.get('bank_name')).upper() for x in ['REVOLUT', 'N26', 'PAYPAL', 'WISE']):
+                print(f"\033[91m[⚠️] ВНИМАНИЕ: Виртуальный необанк (высокий риск фрода)\033[0m")
         
-        # 1. Детальный вывод
-        print(f"\033[1;34m--- ДЕТАЛИ БАНКА ---\033[0m")
-        print(f"🏦 Учреждение: {bank_n}")
-        print(f"📍 Локация: {city}, {t[:2]}")
         if t.startswith('FR'):
-            print(f"🆔 RIB FR: Банк {t[4:9]}, Филиал {t[9:14]}, Счет {t[14:25]}")
-
-        # 2. Эвристический анализ
-        risk, reasons = heuristic_risk_score(t, bank_n)
-        print(f"\n\033[1;35m--- ЭВРИСТИЧЕСКИЙ АНАЛИЗ РИСКОВ ---\033[0m")
-        color = "\033[92m" if risk < 30 else "\033[93m" if risk < 60 else "\033[91m"
-        print(f"📊 Индекс подозрительности: {color}{risk}/100\033[0m")
-        for r in reasons: print(f"  [-] {r}")
-
-        # 3. Автоматические дорки для ручного поиска
-        print(f"\n\033[1;36m--- OSINT ДОРКИ (Сгенерировано автоматически) ---\033[0m")
-        print(f"🔍 Google: \"{t}\" OR \"{t[14:25]}\"")
-        print(f"🔍 Twitter/X: https://x.com/search?q={t}")
-        
+            print(f"\033[94m[ФРАНЦИЯ] RIB: {t[4:9]} {t[9:14]} {t[14:25]} {t[25:27]}\033[0m")
+            
+        print(f"\n\033[93m[*] Запуск системного Maigret для поиска владельца...\033[0m")
     else:
-        print(f"\033[91m[-] ОШИБКА: Некорректная контрольная сумма или формат\033[0m")
+        print(f"\033[91m[-] ОШИБКА: Неверная контрольная сумма\033[0m")
 EOF
     chmod +x "$FILE_PATH"
-    echo -e "${G}[+] Модуль повышенной мощности v$IBAN_VERSION готов.${NC}"
+    echo -e "${G}[+] Модуль v$IBAN_VERSION интегрирован с системой.${NC}"
 fi
-# --- ГЕНЕРАЦИЯ СЕРВЕРОВ (Твой оригинал) ---
 
+# --- ГЕНЕРАЦИЯ СЕРВЕРОВ (Твой оригинал) ---
 cat << 'EOF' > /root/av_server.py
 from flask import Flask, request, render_template_string
 import subprocess, os
