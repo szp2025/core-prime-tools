@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.1"
+CURRENT_VERSION="20.2"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -613,15 +613,17 @@ if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
 fi
 
 # Принудительная инициализация нового кэша без вывода ошибок
-autoload -Uz compinit && compinit -u 2>/dev/null
+#autoload -Uz compinit && compinit -u 2>/dev/null
 
 # 1. Определяем текущий локальный IP
 CURRENT_IP=$(ip route get 1 | awk '{print $7}')
 
 # 2. Настраиваем dnsmasq (если установлен)
-if command -v dnsmasq >/dev/null 2>&1; then
+if command -v dnsmasq >/dev/null 2>&1; 
+then
     echo "[*] Configuring DNS: scanclamavlocal -> $CURRENT_IP"
-    
+    fi
+
     # Полностью перезаписываем конфиг под текущую сеть
     cat << EOF > /etc/dnsmasq.conf
 # Основные настройки
@@ -632,7 +634,6 @@ interface=wlan0  # Слушать запросы из Wi-Fi сети
 
 # Магическая строка: привязка имени к текущему IP
 address=/scanclamavlocal/$CURRENT_IP
-EOF
 
 # Ремонт блока управления службой dnsmasq
 if [ -f /etc/init.d/dnsmasq ]; then
