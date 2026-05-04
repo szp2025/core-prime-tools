@@ -744,24 +744,29 @@ run_iban_scan() {
     clear
     echo -e "${R}========== [ FINANCIAL INTELLIGENCE ] ==========${NC}"
     echo -ne "${Y}Введите номер для анализа: ${NC}"
-    read target
-    [ -z "$target" ] && return
+    read input
+    [ -z "$input" ] && return
 
-    # 1. Запуск твоего нового валидатора v1.5
+    # Удаляем пробелы, чтобы не было ошибок в URL
+    target=$(echo "$input" | tr -d ' ')
+
+    # 1. Запуск валидатора (Банк, страна, риски)
     python3 /root/iban_check.py "$target"
     
-    # 2. Сброс кэша для Maigret
+    # Очистка RAM перед тяжелым поиском
     sync && echo 3 > /proc/sys/vm/drop_caches
     
-    # 3. Запуск системного Maigret с корректными флагами
-    echo -e "${C}[*] Поиск владельца в глобальных базах...${NC}"
-    # Используем прямую цель без лишних аргументов, которые вызывают ошибки
-    maigret "$target" --info --timeout 20
+    echo -e "${C}[*] Поиск ФИО владельца через Maigret (Extraction Mode)...${NC}"
     
-    echo -ne "\n${G}Готово. Нажми Enter для возврата...${NC}"
+    # 2. Запуск Maigret с извлечением имен
+    # --extract заставляет Maigret выводить найденные имена/фамилии на экран
+    maigret "$target" --extract --timeout 20 --info
+    
+    echo -ne "\n${G}Поиск завершен. Результаты выше. Нажми Enter...${NC}"
     read
     history -c # Режим "В ноль"
 }
+
 # --- ЛОГИКА МЕНЮ ---
 # (Тут твои функции run_ghost_scan, run_osint, run_device_hack и т.д. без изменений)
 # [Для краткости использую твой оригинальный switch-case]
