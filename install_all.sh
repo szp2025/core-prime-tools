@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="17.9"
+CURRENT_VERSION="18,0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -140,18 +140,29 @@ FILE_PATH="/root/iban_check.py"
 echo -e "${C}[*] Проверка модуля IBAN/RIB...${NC}"
 
 # Проверяем существование и версию
-if [ ! -f "$FILE_PATH" ] || ! grep -q "VERSION = '$IBAN_VERSION'" "$FILE_PATH"; then
-    echo -e "${Y}[!] Обновление или создание iban_check.py (v$IBAN_VERSION)...${NC}"
-    zero_clear
+# VERSION = '1.2'
+FILE_PATH="/root/iban_check.py"
 
-    cat << EOF > "$FILE_PATH"
-import sys, re
+cat << EOF > "$FILE_PATH"
+import sys, re, json
+from urllib.request import urlopen
 
-# VERSION = '$IBAN_VERSION'
+# VERSION = '1.2'
 
-def check_luhn(n):
-    r = [int(ch) for ch in str(n)][::-1]
-    return (sum(r[0::2]) + sum(sum(divmod(d*2, 10)) for d in r[1::2])) % 10 == 0
+def get_bank_details(iban):
+    """Запрос названия банка и города через открытый API (без логов)"""
+    try:
+        url = f"https://api.ibanlist.com/v1/validate/{iban}"
+        with urlopen(url, timeout=3) as response:
+            data = json.loads(response.read().decode())
+            if data.get('valid'):
+                bank = data.get('bank_name', 'Неизвестно')
+                city = data.get('city', 'Неизвестно')
+                country = data.get('country', 'Неизвестно')
+                return f"\033[96m[БАНК]: {bank} | [ГОРОД]: {city} | [СТРАНА]: {country}\033[0m"
+    except:
+        return "\033[31m[!] Не удалось получить данные о банке из сети\033[0m"
+    return ""
 
 def validate_iban(iban):
     iban = re.sub(r'[\s-]+', '', iban).upper()
@@ -160,21 +171,20 @@ def validate_iban(iban):
     num_str = ''.join(str(ord(c) - 55) if c.isalpha() else c for c in check_str)
     return int(num_str) % 97 == 1
 
-def validate_rib_fr(iban):
-    if len(iban) == 27 and iban.startswith('FR'):
-        bank, branch, acc, key = iban[4:9], iban[9:14], iban[14:25], iban[25:27]
-        print(f"\033[94m[ФРАНЦИЯ] Банк: {bank} | Филиал: {branch} | Счет: {acc} | Ключ: {key}\033[0m")
-        return True
-    return False
-
 if __name__ == "__main__":
     if len(sys.argv) < 2: sys.exit(1)
     target = sys.argv[1].replace(' ', '')
+    
     if validate_iban(target):
         print(f"\033[92m[+] IBAN {target} ВАЛИДЕН\033[0m")
-        validate_rib_fr(target)
-    elif 13 <= len(target) <= 19 and check_luhn(target):
-        print(f"\033[92m[+] КАРТА (Luhn) {target} ВАЛИДНА\033[0m")
+        # Вывод названия банка
+        print(get_bank_details(target))
+        
+        # Разбор французского RIB (твоя специфика)
+        if target.startswith('FR'):
+            print(f"\033[94m[ДЕТАЛИ RIB] Банк: {target[4:9]} | Филиал: {target[9:14]} | Счет: {target[14:25]}\033[0m")
+        
+        print("\n\033[93m[*] Запуск Maigret для поиска ФИО владельца...\033[0m")
     else:
         print(f"\033[91m[-] РЕКВИЗИТЫ НЕВАЛИДНЫ\033[0m")
 EOF
