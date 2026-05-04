@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="19.9"
+CURRENT_VERSION="20.0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -606,11 +606,14 @@ interface=wlan0  # Слушать запросы из Wi-Fi сети
 address=/scanclamavlocal/$CURRENT_IP
 EOF
 
+# Ремонт блока управления службой dnsmasq
 if [ -f /etc/init.d/dnsmasq ]; then
-    service dnsmasq restart
+    service dnsmasq restart 2>/dev/null
 else
-    echo "[!] dnsmasq service not found, skipping..."
+    # Добавляем команду, чтобы блок не был пустым
+    echo -e "\e[33m[!] Служба dnsmasq не найдена, пропускаю перезапуск.\e[0m"
 fi
+
 
 repair() { 
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
