@@ -742,24 +742,23 @@ run_sqlmap() {
 
 run_iban_scan() {
     clear
-    echo -e "${R}========== [ FINANCIAL INTELLIGENCE ] ==========${NC}"
-    echo -ne "${Y}Введите IBAN, RIB или номер карты: ${NC}"
+    echo -e "${R}========== [ IBAN/RIB INTELLIGENCE ] ==========${NC}"
+    echo -ne "${Y}Введите номер для анализа: ${NC}"
     read target
     [ -z "$target" ] && return
 
-    # 1. Валидация + Имя банка (наш локальный iban_check.py)
     python3 /root/iban_check.py "$target"
     
-    # 2. Поиск ФИО владельца через Maigret (если есть в базах/сети)
-    echo -e "\n${C}[*] Поиск ФИО и цифрового следа владельца...${NC}"
     sync && echo 3 > /proc/sys/vm/drop_caches
-     maigret "$target" --parse
-
-    echo -ne "\n${G}Нажми Enter для возврата в меню...${NC}"
+    
+    echo -e "${C}[*] Запуск системного Maigret...${NC}"
+    # Убрали проблемный --parse, добавили --info для детальности
+    maigret "$target" --info --timeout 20
+    
+    echo -ne "\n${G}Анализ завершен. Нажми Enter...${NC}"
     read
     history -c
 }
-
 
 # --- ЛОГИКА МЕНЮ ---
 # (Тут твои функции run_ghost_scan, run_osint, run_device_hack и т.д. без изменений)
