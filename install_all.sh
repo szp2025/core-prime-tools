@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.2"
+CURRENT_VERSION="20.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -534,6 +534,18 @@ CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 if command -v dnsmasq >/dev/null 2>&1; then
     echo -e "${G}[*] Configuring DNS: scanclamavlocal -> $CURRENT_IP${NC}"
     
+# Функция очистки (Repair)
+repair() { 
+    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+    rm -rf /root/.cache/* /tmp/* 2>/dev/null
+    history -c
+}
+
+# Заглушка для инсталлера (чтобы не было 'command not found')
+create_repair_script() {
+    repair
+}
+
     # Используем EOD, чтобы не конфликтовать с основным EOF
     cat << EOD > /etc/dnsmasq.conf
 domain-needed
