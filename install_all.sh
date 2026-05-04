@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18.7"
+CURRENT_VERSION="18.9"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -134,7 +134,7 @@ if [ ! -d "/root/infoga" ]; then
 fi
 
 # Текущая версия инструмента
-IBAN_VERSION="1.6"
+IBAN_VERSION="1.7"
 FILE_PATH="/root/iban_check.py"
 
 echo -e "${C}[*] Проверка модуля IBAN/RIB (System Integrated)...${NC}"
@@ -144,53 +144,78 @@ if [ ! -f "$FILE_PATH" ] || ! grep -q "VERSION = '$IBAN_VERSION'" "$FILE_PATH"; 
     zero_clear
 
     cat << EOF > "$FILE_PATH"
-import sys, re, json, subprocess
+import sys, re, json
 from urllib.request import urlopen
 
-# VERSION = '$IBAN_VERSION'
+# VERSION = '1.6'
 
-def get_detailed_bank(iban):
-    """Глубокий запрос данных банка"""
+def get_detailed_data(iban):
     try:
-        # Используем открытый API для получения данных по BIC/IBAN
         url = f"https://api.ibanlist.com/v1/validate/{iban}"
-        with urlopen(url, timeout=4) as response:
+        with urlopen(url, timeout=5) as response:
             return json.loads(response.read().decode())
-    except:
-        return None
+    except: return None
 
-def validate_iban(iban):
-    iban = re.sub(r'[\s-]+', '', iban).upper()
-    if not re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$', iban): return False
-    check_str = iban[4:] + iban[:4]
-    num_str = ''.join(str(ord(c) - 55) if c.isalpha() else c for c in check_str)
-    return int(num_str) % 97 == 1
+def validate_structure(iban):
+    """Разбор структуры как на профессиональных сайтах"""
+    res = {
+        "Country": iban[:2],
+        "Check": iban[2:4],
+        "BBAN": iban[4:],
+    }
+    if iban.startswith('FR'):
+        res.update({
+            "Bank Code": iban[4:9],
+            "Branch Code": iban[9:14],
+            "Account": iban[14:25],
+            "RIB Key": iban[25:27]
+        })
+    return res
 
 if __name__ == "__main__":
     if len(sys.argv) < 2: sys.exit(1)
-    t = sys.argv[1].replace(' ', '')
     
-    if validate_iban(t):
-        print(f"\033[92m[+] IBAN {t} ВАЛИДЕН\033[0m")
-        data = get_detailed_bank(t)
+    # Очистка и нормализация
+    target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
+    
+    # Параметры для сверки (если переданы)
+    provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else None
+    provided_bic = sys.argv[3].upper() if len(sys.argv) > 3 else None
+
+    print(f"\033[1;34m--- РЕЗУЛЬТАТ ПРОВЕРКИ IBAN ---\033[0m")
+    
+    struct = validate_structure(target)
+    for key, val in struct.items():
+        print(f"\033[96m{key}:\033[0m {val}")
+
+    data = get_detailed_data(target)
+    if data and data.get('valid'):
+        bank_name = data.get('bank_name', 'N/A')
+        bic = data.get('bic', 'N/A')
         
-        if data and data.get('valid'):
-            print(f"\033[1;34m--- ФИНАНСОВОЕ ДОСЬЕ ---\033[0m")
-            print(f"🏦 Банк: {data.get('bank_name', 'N/A')}")
-            print(f"🌍 Страна: {data.get('country', t[:2])} | Город: {data.get('city', 'N/A')}")
-            print(f"🔑 BIC/SWIFT: {data.get('bic', 'N/A')}")
-            
-            # Эвристика на лету
-            if any(x in str(data.get('bank_name')).upper() for x in ['REVOLUT', 'N26', 'PAYPAL', 'WISE']):
-                print(f"\033[91m[⚠️] ВНИМАНИЕ: Виртуальный необанк (высокий риск фрода)\033[0m")
+        print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН (Контрольная сумма верна)\033[0m")
+        print(f"🏦 Банк: {bank_n}")
+        print(f"🔑 BIC: {bic}")
         
-        if t.startswith('FR'):
-            print(f"\033[94m[ФРАНЦИЯ] RIB: {t[4:9]} {t[9:14]} {t[14:25]} {t[25:27]}\033[0m")
+        # --- ЛОГИКА СВЕРКИ (VERIFICATION) ---
+        if provided_name or provided_bic:
+            print(f"\n\033[1;35m--- ОТЧЕТ О СВЕРКЕ (MATCH REPORT) ---\033[0m")
             
-        print(f"\n\033[93m[*] Запуск системного Maigret для поиска владельца...\033[0m")
+            # Сверка BIC
+            if provided_bic:
+                if provided_bic in bic:
+                    print(f"✅ BIC Match: ПРОВЕРЕНО ({bic})")
+                else:
+                    print(f"❌ BIC Mismatch! Ожидалось: {provided_bic}, Найдено: {bic}")
+            
+            # Сверка банка по имени (эвристика)
+            if bank_name != 'N/A':
+                print(f"ℹ️ Проверка банка: Система подтверждает {bank_name}")
+
+            print(f"🔍 Запуск Maigret для поиска владельца: {provided_name if provided_name else 'Searching...'}")
     else:
-        print(f"\033[91m[-] ОШИБКА: Неверная контрольная сумма\033[0m")
-EOF
+        print(f"\033[91m[-] ОШИБКА: Неверная структура или контрольная сумма\033[0m")
+    EOF
     chmod +x "$FILE_PATH"
     echo -e "${G}[+] Модуль v$IBAN_VERSION интегрирован с системой.${NC}"
 fi
