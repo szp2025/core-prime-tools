@@ -161,92 +161,6 @@ if [ ! -d "/root/infoga" ]; then
     cd /root/infoga && safe_pip -r requirements.txt
 fi
 
-# Текущая версия инструмента
-IBAN_VERSION="1.7"
-FILE_PATH="/root/iban_check.py"
-
-echo -e "${C}[*] Проверка модуля IBAN/RIB (System Integrated)...${NC}"
-
-# Проверка: если файл отсутствует или версия в нем не совпадает с актуальной
-if [ ! -f "$FILE_PATH" ] || ! grep -q "VERSION = '$IBAN_VERSION'" "$FILE_PATH"; then
-    echo -e "${Y}[!] Апгрейд до v$IBAN_VERSION: Системная интеграция...${NC}"
-    
-    cat << EOF > "$FILE_PATH"
-import sys, re, json
-from urllib.request import urlopen
-
-# VERSION = '$IBAN_VERSION'
-
-def get_detailed_data(iban):
-    try:
-        url = f"https://api.ibanlist.com/v1/validate/{iban}"
-        with urlopen(url, timeout=5) as response:
-            return json.loads(response.read().decode())
-    except: return None
-
-def validate_structure(iban):
-    """Разбор структуры как на профессиональных сайтах"""
-    res = {
-        "Country": iban[:2],
-        "Check": iban[2:4],
-        "BBAN": iban[4:],
-    }
-    if iban.startswith('FR'):
-        res.update({
-            "Bank Code": iban[4:9],
-            "Branch Code": iban[9:14],
-            "Account": iban[14:25],
-            "RIB Key": iban[25:27]
-        })
-    return res
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2: sys.exit(1)
-    
-    # Очистка от пробелов и тире
-    target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
-    
-    provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else None
-    provided_bic = sys.argv[3].upper() if len(sys.argv) > 3 else None
-
-    print(f"\033[1;34m--- РЕЗУЛЬТАТ ПРОВЕРКИ IBAN ---\033[0m")
-    
-    struct = validate_structure(target)
-    for key, val in struct.items():
-        print(f"\033[96m{key}:\033[0m {val}")
-
-    data = get_detailed_data(target)
-    if data and data.get('valid'):
-        bank_name = data.get('bank_name', 'N/A')
-        bic = data.get('bic', 'N/A')
-        
-        print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН (Контрольная сумма верна)\033[0m")
-        print(f"🏦 Банк: {bank_name}")
-        print(f"🔑 BIC: {bic}")
-        
-        if provided_name or provided_bic:
-            print(f"\n\033[1;35m--- ОТЧЕТ О СВЕРКЕ (MATCH REPORT) ---\033[0m")
-            
-            if provided_bic:
-                if provided_bic in bic:
-                    print(f"✅ BIC Match: ПРОВЕРЕНО ({bic})")
-                else:
-                    print(f"❌ BIC Mismatch! Ожидалось: {provided_bic}, Найдено: {bic}")
-            
-            if bank_name != 'N/A':
-                print(f"ℹ️ Проверка банка: Система подтверждает {bank_name}")
-
-            print(f"🔍 Запуск Maigret для поиска владельца: {provided_name if provided_name else 'Searching...'}")
-    else:
-        print(f"\033[91m[-] ОШИБКА: Неверная структура или контрольная сумма\033[0m")
-EOF
-
-    chmod +x "$FILE_PATH"
-    echo -e "${G}[+] Модуль v$IBAN_VERSION успешно обновлен.${NC}"
-fi
-
-
-
 # Универсальная функция для проверки и обновления модулей
 update_module() {
     local file_path="$1"
@@ -612,37 +526,31 @@ if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
     rm -f /root/.zcompdump* 2>/dev/null
 fi
 
-# Принудительная инициализация нового кэша без вывода ошибок
-#autoload -Uz compinit && compinit -u 2>/dev/null
-
 # 1. Определяем текущий локальный IP
-CURRENT_IP=$(ip route get 1 | awk '{print $7}')
+CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
+[ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
 
 # 2. Настраиваем dnsmasq (если установлен)
-if command -v dnsmasq >/dev/null 2>&1; 
-then
-    echo "[*] Configuring DNS: scanclamavlocal -> $CURRENT_IP"
-    fi
-
-    # Полностью перезаписываем конфиг под текущую сеть
-    cat << EOF > /etc/dnsmasq.conf
-# Основные настройки
+if command -v dnsmasq >/dev/null 2>&1; then
+    echo -e "${G}[*] Configuring DNS: scanclamavlocal -> $CURRENT_IP${NC}"
+    
+    # Используем EOD, чтобы не конфликтовать с основным EOF
+    cat << EOD > /etc/dnsmasq.conf
 domain-needed
 bogus-priv
 interface=lo
-interface=wlan0  # Слушать запросы из Wi-Fi сети
-
-# Магическая строка: привязка имени к текущему IP
+interface=wlan0
 address=/scanclamavlocal/$CURRENT_IP
+EOD
 
-# Ремонт блока управления службой dnsmasq
-if [ -f /etc/init.d/dnsmasq ]; then
-    service dnsmasq restart 2>/dev/null
-else
-    # Добавляем команду, чтобы блок не был пустым
-    echo -e "\e[33m[!] Служба dnsmasq не найдена, пропускаю перезапуск.\e[0m"
+    # Ремонт блока управления службой dnsmasq
+    if [ -f /etc/init.d/dnsmasq ]; then
+        service dnsmasq restart 2>/dev/null
+    else
+        killall dnsmasq 2>/dev/null
+        dnsmasq -C /etc/dnsmasq.conf 2>/dev/null
+    fi
 fi
-
 
 repair() { 
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
@@ -689,363 +597,107 @@ TOOLS_DATA=(
     "instashell;https://github.com/thelinuxchoice/instashell/archive/refs/heads/master.zip;instashell.sh;chmod +x install.sh && ./install.sh"
 )
 
-run_osint() {
-    # Внутренняя функция для мгновенного обнуления
-    zero_clear() {
-        # Очистка временных файлов, логов npm и кэша
-        rm -rf /tmp/* /root/.npm/_logs/* > /dev/null 2>&1
-        # Сброс кэша оперативной памяти
-        sync && echo 3 > /proc/sys/vm/drop_caches
-    }
+zero_clear() {
+    rm -rf /tmp/* /root/.npm/_logs/* > /dev/null 2>&1
+    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+}
 
-    clear
-    zero_clear # Обнуление перед началом сессии
-    
+run_osint() {
+    clear; zero_clear
     echo -e "${Y}>>> [ SMART OSINT 2026: TOTAL ZERO MODE ] <<<${NC}"
-    echo -e "${C}Поддерживается: email, username, phone (+33...)${NC}"
     echo -ne "Input: "
     read i
     [ -z "$i" ] && return
-    
-    # 1. ОПРЕДЕЛЕНИЕ ТИПА: EMAIL
     if [[ "$i" =~ "@" ]]; then 
-        echo -e "${G}[*] Email detected. Running Tools...${NC}"
-        zero_clear
-        if [ -f "/root/infoga/mosint.py" ]; then
-            python3 /root/infoga/mosint.py "$i"
-        elif [ -f "/root/infoga/infoga.py" ]; then
-            python3 /root/infoga/infoga.py --target "$i"
-        else
-            echo -e "${Y}[!] Использование Maigret для почты...${NC}"
-            maigret "$i"
-        fi
-
-    # 2. ОПРЕДЕЛЕНИЕ ТИПА: НОМЕР ТЕЛЕФОНА (начинается с +)
+        python3 /root/infoga/infoga.py --target "$i" 2>/dev/null || maigret "$i"
     elif [[ "$i" =~ ^\+ ]]; then
-        echo -e "${G}[*] Phone number detected. Running Multi-Search...${NC}"
-        
-        echo -e "${C}[1/2] Checking social presence (Socialscan)...${NC}"
-        zero_clear
-        socialscan "$i"
-        
-        echo -e "${C}[2/2] Searching deep records (Maigret)...${NC}"
-        zero_clear
-        maigret.py "$i" --parse
-
-    # 3. ОПРЕДЕЛЕНИЕ ТИПА: НИКНЕЙМ
+        socialscan "$i" && maigret "$i" --parse
     else 
-        echo -e "${G}[*] Username detected. Running Snoop & Blackbird...${NC}"
-        
-        # Сначала быстрый поиск через Blackbird
-        if [ -d "/root/blackbird" ]; then
-            echo -e "${C}>>> Fast Scan: Blackbird...${NC}"
-            zero_clear
-            python3 /root/blackbird/blackbird.py -u "$i"
-        fi
-
-        # Затем глубокий поиск через Snoop (база на 329 сайтов)
-        if [ -d "/root/snoop" ]; then
-            echo -e "\n${C}>>> Deep Scan: Snoop...${NC}"
-            zero_clear
-            python3 /root/snoop/snoop.py "$i"
-        else
-            echo -e "${Y}>>> Fallback: Sherlock...${NC}"
-            zero_clear
-            sherlock "$i" --timeout 2 --print-found
-        fi
+        python3 /root/blackbird/blackbird.py -u "$i" 2>/dev/null || python3 /root/snoop/snoop.py "$i"
     fi
-
-    echo -e "\n${Y}Нажми Enter для завершения и тотального обнуления...${NC}"
-    read
-    
-    zero_clear # Финальное обнуление после работы
-    history -c # Удаление следов введенных данных
-    echo -e "${G}[+] Система очищена. Логи и кэш удалены.${NC}"
-    sleep 2
+    zero_clear; history -c
 }
-
 
 run_osint2() {
-    zero_clear() {
-        rm -rf /tmp/* /root/.npm/_logs/* > /dev/null 2>&1
-        sync && echo 3 > /proc/sys/vm/drop_caches
-    }
-
-    clear
-    zero_clear
+    clear; zero_clear
     echo -e "${Y}>>> [ TOTAL OSINT 2: DEEP SCAN MODE ] <<<${NC}"
-    echo -e "${C}Введите любые данные (Email, Phone или Username)${NC}"
-    echo -ne "Input: "
-    read i
+    read -p "Input: " i
     [ -z "$i" ] && return
-
-    echo -e "${G}[!] Начинаю комплексную проверку всех баз...${NC}"
-
-    # 1. ПРОВЕРКА СОЦИАЛЬНЫХ СЕТЕЙ (Socialscan)
-    echo -e "\n${C}[STEP 1] Checking Social Accounts...${NC}"
-    zero_clear
     socialscan "$i"
-
-    # 2. ГЛУБОКИЙ ПОИСК ЦИФРОВОГО СЛЕДА (Maigret)
-    echo -e "\n${C}[STEP 2] Running Maigret (Deep Parse)...${NC}"
-    zero_clear
     maigret "$i" --parse
-
-    # 3. ПОИСК ПО 329 САЙТАМ (Snoop)
-    if [ -d "/root/snoop" ]; then
-        echo -e "\n${C}[STEP 3] Running Snoop Deep Scan...${NC}"
-        zero_clear
-        python3 /root/snoop/snoop.py "$i"
-    fi
-
-    # 4. БЫСТРЫЙ ПОИСК (Blackbird)
-    if [ -d "/root/blackbird" ]; then
-        echo -e "\n${C}[STEP 4] Running Blackbird...${NC}"
-        zero_clear
-        python3 /root/blackbird/blackbird.py -u "$i"
-    fi
-
-    # 5. ПРОВЕРКА ПОЧТЫ (Если в данных есть @)
-    if [[ "$i" =~ "@" ]]; then
-        echo -e "\n${C}[STEP 5] Running Email Specific Tools...${NC}"
-        zero_clear
-        if [ -f "/root/infoga/mosint.py" ]; then
-            python3 /root/infoga/mosint.py "$i"
-        fi
-    fi
-
-    # 6. ПОИСК ПО ИМЕНИ И ФАМИЛИИ (Name Search)
-    echo -e "\n${C}[STEP 6] Searching by Full Name...${NC}"
-    zero_clear
-    # Используем Snoop в режиме поиска имен (он отлично справляется с ФИО)
-    if [ -d "/root/snoop" ]; then
-        python3 /root/snoop/snoop.py "$i" --quick
-    fi
-
-# 7. КОМПЛЕКСНАЯ ПРОВЕРКА RIB И ВЛАДЕЛЬЦА
-    if [[ "$i" =~ ^[A-Z0-9]{10,34}$ ]]; then
-        echo -e "\n${Y}[!] Обнаружен банковский идентификатор. Начинаю проверку соответствия...${NC}"
-        zero_clear # Обнуление перед сетевым запросом
-
-        # Шаг А: Валидация структуры и определение банка
-        echo -e "${C}[1/3] Определение банка и региона...${NC}"
-        bank_info=$(curl -s "https://api.ibanlist.com/v1/validate/$i")
-        echo "$bank_info" | grep -E "bank_name|city|country|bic"
-
-        # Шаг Б: Поиск владельца через утечки и кэш (если есть имя для сопоставления)
-        echo -e "${C}[2/3] Поиск связки владельца в локальных базах...${NC}"
-        # Проверяем, нет ли этого RIB в логах прошлых поисков или перехватах
-        grep -r "$i" /root/snoop/reports/ 2>/dev/null
-
-        # Шаг В: Проверка через Maigret (поиск упоминаний счета в сети)
-        echo -e "${C}[3/3] Поиск упоминаний счета в открытых источниках...${NC}"
-        maigret "$i" --parse
-    fi
-
-    echo -e "\n${Y}Комплексный пробив завершен. Нажми Enter для обнуления...${NC}"
-    read
-    zero_clear
-    history -c
-    echo -e "${G}[+] Система полностью обнулена.${NC}"
-    sleep 2
+    python3 /root/snoop/snoop.py "$i"
+    zero_clear; history -c
 }
-
 
 update_prime() {
     clear
     echo -e "${B}[ PRIME MASTER UPDATE ]${NC}"
-    echo -e "${Y}[*] Подключение к серверу обновлений...${NC}"
-    
-    # Ссылка на твой скрипт
     local UP_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
-    
-    # Проверка интернета (timeout 5 секунд)
-    if curl -Is --connect-timeout 5 https://github.com > /dev/null; then
-        echo -e "${G}[+] Сервер доступен. Качаем install_all.sh...${NC}"
-        
-        # Скачиваем с флагом -k для обхода проблем с SSL на старых ядрах
-        if curl -L -k "$UP_URL" -o /root/install_all.sh; then
-            chmod +x /root/install_all.sh
-            echo -e "${G}[✔] Скрипт обновлен. Запуск тотальной сборки через 2 сек...${NC}"
-            sleep 2
-            exec /root/install_all.sh
-        else
-            echo -e "${R}[!] Ошибка при скачивании файла.${NC}"
-            sleep 2
-        fi
-    else
-        echo -e "${R}[!] Нет сети или GitHub недоступен.${NC}"
-        sleep 2
-    fi
+    curl -L -k "$UP_URL" -o /root/install_all.sh && chmod +x /root/install_all.sh && exec /root/install_all.sh
 }
 
 run_servers() {
-    repair
+    clear
     echo -e "${B}>>> [ SECURITY & DATA HUB ] <<<${NC}"
-    echo -e "${G}V)${NC} AV-Scanner Server (Port 5000)"
-    echo -e "${G}S)${NC} Share-File Server (Port 5001)"
-    echo -e "${G}U)${NC} Upload-Inbound Server (Port 5002)"
-    echo -e "${R}B)${NC} Назад в меню"
-    echo -ne "\n${Y}Выбери режим: ${NC}"
-    read srv_opt
-    
+    echo -e "V) AV-Scanner  S) Share-File  U) Upload-Inbound  B) Back"
+    read -p ">> " srv_opt
     case $srv_opt in
-        [vV]) 
-            echo -e "${G}[*] Запуск AV-Scanner...${NC}"
-            python3 /root/av_server.py ;;
-        [sS]) 
-            echo -e "${G}[*] Запуск Share-Server...${NC}"
-            python3 /root/share_server.py ;;
-        [uU]) 
-            echo -e "${G}[*] Запуск Upload-Server...${NC}"
-            python3 /root/upload_server.py ;;
-        [bB]) 
-            return ;;
-        *) 
-            echo -e "${R}[!] Ошибка: Неверный выбор${NC}"
-            sleep 1 ; run_servers ;;
+        v|V) python3 /root/av_server.py ;;
+        s|S) python3 /root/share_server.py ;;
+        u|U) python3 /root/upload_server.py ;;
+        *) return ;;
     esac
 }
 
 run_device_hack() {
     clear
-    echo -e "${B}>>> [ DEVICE EXPLOIT HUB ] <<<${NC}"
-    echo -e "${G}1)${NC} PhoneSploit (ADB Remote Control)"
-    echo -e "${G}2)${NC} Bluetooth Scan (hcitool)"
-    echo -e "${R}B)${NC} Назад в меню"
-    echo -ne "\n${Y}Выбери инструмент: ${NC}"
-    read dh
-    
+    echo -e "1) PhoneSploit  2) Bluetooth Scan  B) Back"
+    read -p ">> " dh
     case $dh in
-        1) 
-            echo -e "${G}[*] Запуск PhoneSploit...${NC}"
-            cd /root/phonesploit && python3 phonesploitpython.py ;;
-        2) 
-            echo -e "${G}[*] Сканирование Bluetooth...${NC}"
-            hcitool scan ;;
-        [bB]) 
-            return ;;
-        *) 
-            echo -e "${R}[!] Неверный ввод${NC}"
-            sleep 1 ; run_device_hack ;;
+        1) cd /root/phonesploit && python3 phonesploitpython.py ;;
+        2) hcitool scan ;;
+        *) return ;;
     esac
-    echo -e "\n${Y}Нажми Enter, чтобы вернуться...${NC}"
-    read
 }
 
-
 run_phishing() {
-    clear
-    echo -e "${R}>>> [ SOCIAL ENGINEERING HUB ] <<<${NC}"
-    echo -e "${Y}[*] Запуск Zphisher...${NC}"
-    
-    # Проверка наличия директории перед переходом
-    if [ -d "/root/zphisher" ]; then
-        cd /root/zphisher && ./zphisher.sh
-    else
-        echo -e "${R}[!] Ошибка: Директория /root/zphisher не найдена.${NC}"
-        echo -e "${Y}[*] Попробуй запустить Update (U), чтобы восстановить инструменты.${NC}"
-        sleep 3
-    fi
+    [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh
 }
 
 run_ghost_scan() {
-    repair
-    echo -e "${G}>>> [ GHOST PORT SCANNER ] <<<${NC}"
-    read -p "Target IP/Domain: " t
-    [ -z "$t" ] && return
-    echo -e "1) Fast Scan (-F)\n2) Version Scan (-sV)\n3) Aggressive (-A)\nB) Back"
-    read -p ">> " m
-    case $m in
-        1) nmap -F -T4 "$t" ;;
-        2) nmap -sV "$t" ;;
-        3) nmap -A -v "$t" ;;
-        *) return ;;
-    esac
-    read -p "Press Enter..."
+    read -p "Target IP: " t
+    [ -n "$t" ] && nmap -F "$t"
 }
 
-
 run_sqlmap() {
-    clear
-    echo -e "${Y}>>> [ SQL INJECTION EXPLOTATION ] <<<${NC}"
-    echo -e "${G}[*] Запуск SQLmap Wizard...${NC}"
-    
-    # Проверка, установлен ли sqlmap в системе
-    if command -v sqlmap >/dev/null 2>&1; then
-        sqlmap --wizard
-    elif [ -f "/root/sqlmap/sqlmap.py" ]; then
-        python3 /root/sqlmap/sqlmap.py --wizard
-    else
-        echo -e "${R}[!] Ошибка: SQLmap не найден.${NC}"
-        echo -e "${Y}[*] Попробуй запустить установку через пункт U.${NC}"
-        sleep 3
-        return
-    fi
-    
-    echo -e "\n${Y}Работа завершена. Нажми Enter...${NC}"
-    read
+    sqlmap --wizard
 }
 
 run_iban_scan() {
     clear
-    echo -e "${R}========== [ IBAN VERIFICATION SYSTEM ] ==========${NC}"
-    echo -e "${Y}1) Просто проверить IBAN"
-    echo -e "2) Сверить IBAN с данными (Имя, BIC)${NC}"
-    read -p ">> " mode
-
-    if [ "$mode" == "2" ]; then
-        read -p "Введите Имя (Nom): " v_name
-        read -p "Введите IBAN: " v_iban
-        read -p "Введите BIC (если есть): " v_bic
-        
-        # Запуск сверки
-        python3 /root/iban_check.py "$v_iban" "$v_name" "$v_bic"
-        target=$(echo "$v_iban" | tr -d ' ')
-        
-        echo -e "\n${C}[*] Ищу совпадения ФИО ($v_name) с этим счетом...${NC}"
-        maigret "$target" --extract --info | grep -i "$v_name"
-    else
-        read -p "Введите IBAN: " v_iban
-        target=$(echo "$v_iban" | tr -d ' ')
-        python3 /root/iban_check.py "$target"
-        maigret "$target" --extract --info
-    fi
-
-    echo -ne "\n${G}Нажми Enter...${NC}"
-    read
-    history -c
+    echo -e "${R}== [ IBAN VERIFICATION ] ==${NC}"
+    read -p "IBAN: " v_iban
+    python3 /root/iban_check.py "$(echo $v_iban | tr -d ' ')"
 }
-# --- ЛОГИКА МЕНЮ ---
-# (Тут твои функции run_ghost_scan, run_osint, run_device_hack и т.д. без изменений)
-# [Для краткости использую твой оригинальный switch-case]
 
 while true; do
     repair; 
     echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
     get_stats
-    # Обновленный визуальный ряд меню
     echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG   2) SQLMAP"
     echo -e "3) SMART OSINT  4) DEVICE HACK  5) SECURITY HUB"
-    echo -e "6) AIO OSINT    7) IBAN/RIB SCAN" # Новый пункт
+    echo -e "6) AIO OSINT    7) IBAN/RIB SCAN"
     echo -e "U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
-    
     read -p ">> " opt
     case $opt in
-        g|G) run_ghost_scan ;; 
-        1) run_phishing ;;     
-        2) run_sqlmap ;;      
-        3) run_osint ;;
-        4) run_device_hack ;;  
-        5) run_servers ;;      
-        6) run_osint2 ;;
-        7) run_iban_scan ;;    # Вызов нашего нового модуля
-        i|I) run_servers ;; 
-        u|U) update_prime ;;
+        g|G) run_ghost_scan ;; 1) run_phishing ;; 2) run_sqlmap ;; 
+        3) run_osint ;; 4) run_device_hack ;; 5|i|I) run_servers ;; 
+        6) run_osint2 ;; 7) run_iban_scan ;; u|U) update_prime ;; 
         0) exit 0 ;;
     esac
 done
 EOF
+
 
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
