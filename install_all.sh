@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18.9"
+CURRENT_VERSION="19.0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -767,31 +767,33 @@ run_sqlmap() {
 
 run_iban_scan() {
     clear
-    echo -e "${R}========== [ FINANCIAL INTELLIGENCE ] ==========${NC}"
-    echo -ne "${Y}Введите номер для анализа: ${NC}"
-    read input
-    [ -z "$input" ] && return
+    echo -e "${R}========== [ IBAN VERIFICATION SYSTEM ] ==========${NC}"
+    echo -e "${Y}1) Просто проверить IBAN"
+    echo -e "2) Сверить IBAN с данными (Имя, BIC)${NC}"
+    read -p ">> " mode
 
-    # Удаляем пробелы, чтобы не было ошибок в URL
-    target=$(echo "$input" | tr -d ' ')
+    if [ "$mode" == "2" ]; then
+        read -p "Введите Имя (Nom): " v_name
+        read -p "Введите IBAN: " v_iban
+        read -p "Введите BIC (если есть): " v_bic
+        
+        # Запуск сверки
+        python3 /root/iban_check.py "$v_iban" "$v_name" "$v_bic"
+        target=$(echo "$v_iban" | tr -d ' ')
+        
+        echo -e "\n${C}[*] Ищу совпадения ФИО ($v_name) с этим счетом...${NC}"
+        maigret "$target" --extract --info | grep -i "$v_name"
+    else
+        read -p "Введите IBAN: " v_iban
+        target=$(echo "$v_iban" | tr -d ' ')
+        python3 /root/iban_check.py "$target"
+        maigret "$target" --extract --info
+    fi
 
-    # 1. Запуск валидатора (Банк, страна, риски)
-    python3 /root/iban_check.py "$target"
-    
-    # Очистка RAM перед тяжелым поиском
-    sync && echo 3 > /proc/sys/vm/drop_caches
-    
-    echo -e "${C}[*] Поиск ФИО владельца через Maigret (Extraction Mode)...${NC}"
-    
-    # 2. Запуск Maigret с извлечением имен
-    # --extract заставляет Maigret выводить найденные имена/фамилии на экран
-    maigret "$target" --extract --timeout 20 --info
-    
-    echo -ne "\n${G}Поиск завершен. Результаты выше. Нажми Enter...${NC}"
+    echo -ne "\n${G}Нажми Enter...${NC}"
     read
-    history -c # Режим "В ноль"
+    history -c
 }
-
 # --- ЛОГИКА МЕНЮ ---
 # (Тут твои функции run_ghost_scan, run_osint, run_device_hack и т.д. без изменений)
 # [Для краткости использую твой оригинальный switch-case]
