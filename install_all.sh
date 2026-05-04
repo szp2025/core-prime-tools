@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18,0"
+CURRENT_VERSION="18.1"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -105,7 +105,7 @@ install_clamav_force
 TOOLS=(
     "zphisher;https://github.com/htr-tech/zphisher/archive/refs/heads/master.zip;zphisher.sh;"
     "seeker;https://github.com/thewhiteh4t/seeker/archive/refs/heads/master.zip;seeker.py;safe_pip -r requirements.txt"
-    "wifite2;https://github.com/derv82/wifite2/archive/refs/heads/master.zip;wifite.py;python3 setup.py install --break-system-packages"
+    # "wifite2;https://github.com/derv82/wifite2/archive/refs/heads/master.zip;wifite.py;python3 setup.py install --break-system-packages"
     "sqlmap;https://github.com/sqlmapproject/sqlmap/archive/refs/heads/master.zip;sqlmap.py;"
    # "routersploit;https://github.com/threat9/routersploit/archive/refs/heads/master.zip;rsf.py;safe_pip -r requirements.txt"
    # "sherlock;https://github.com/sherlock-project/sherlock/archive/refs/heads/master.zip;sherlock_project/sherlock.py;safe_pip -r requirements.txt"
@@ -134,35 +134,37 @@ if [ ! -d "/root/infoga" ]; then
 fi
 
 # Текущая версия инструмента
-IBAN_VERSION="1.1"
+IBAN_VERSION="1.2"
 FILE_PATH="/root/iban_check.py"
 
 echo -e "${C}[*] Проверка модуля IBAN/RIB...${NC}"
 
 # Проверяем существование и версию
-# VERSION = '1.2'
-FILE_PATH="/root/iban_check.py"
+if [ ! -f "$FILE_PATH" ] || ! grep -q "VERSION = '$IBAN_VERSION'" "$FILE_PATH"; then
+    echo -e "${Y}[!] Обновление или создание iban_check.py (v$IBAN_VERSION)...${NC}"
+    zero_clear
 
-cat << EOF > "$FILE_PATH"
+    cat << EOF > "$FILE_PATH"
 import sys, re, json
 from urllib.request import urlopen
 
-# VERSION = '1.2'
+# VERSION = '$IBAN_VERSION'
 
-def get_bank_details(iban):
-    """Запрос названия банка и города через открытый API (без логов)"""
+def get_bank_info(iban):
+    """Получение названия банка через API (Zero-Footprint)"""
     try:
         url = f"https://api.ibanlist.com/v1/validate/{iban}"
         with urlopen(url, timeout=3) as response:
             data = json.loads(response.read().decode())
             if data.get('valid'):
-                bank = data.get('bank_name', 'Неизвестно')
-                city = data.get('city', 'Неизвестно')
-                country = data.get('country', 'Неизвестно')
-                return f"\033[96m[БАНК]: {bank} | [ГОРОД]: {city} | [СТРАНА]: {country}\033[0m"
+                return data.get('bank_name'), data.get('city')
     except:
-        return "\033[31m[!] Не удалось получить данные о банке из сети\033[0m"
-    return ""
+        pass
+    return None, None
+
+def check_luhn(n):
+    r = [int(ch) for ch in str(n)][::-1]
+    return (sum(r[0::2]) + sum(sum(divmod(d*2, 10)) for d in r[1::2])) % 10 == 0
 
 def validate_iban(iban):
     iban = re.sub(r'[\s-]+', '', iban).upper()
@@ -177,14 +179,20 @@ if __name__ == "__main__":
     
     if validate_iban(target):
         print(f"\033[92m[+] IBAN {target} ВАЛИДЕН\033[0m")
-        # Вывод названия банка
-        print(get_bank_details(target))
         
-        # Разбор французского RIB (твоя специфика)
+        # Вывод названия банка и города
+        bank_name, city = get_bank_info(target)
+        if bank_name:
+            print(f"\033[96m[БАНК]: {bank_name} ({city})\033[0m")
+        
+        # Специфика Франции
         if target.startswith('FR'):
-            print(f"\033[94m[ДЕТАЛИ RIB] Банк: {target[4:9]} | Филиал: {target[9:14]} | Счет: {target[14:25]}\033[0m")
+            print(f"\033[94m[ФРАНЦИЯ] Код: {target[4:9]} | Филиал: {target[9:14]} | Счет: {target[14:25]}\033[0m")
         
         print("\n\033[93m[*] Запуск Maigret для поиска ФИО владельца...\033[0m")
+        
+    elif 13 <= len(target) <= 19 and check_luhn(target):
+        print(f"\033[92m[+] КАРТА (Luhn) {target} ВАЛИДНА\033[0m")
     else:
         print(f"\033[91m[-] РЕКВИЗИТЫ НЕВАЛИДНЫ\033[0m")
 EOF
