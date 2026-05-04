@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.3"
+CURRENT_VERSION="20.4"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -50,6 +50,49 @@ safe_pip() {
     python3 -m pip install --no-cache-dir --break-system-packages "$@" >/dev/null 2>&1
     repair_and_clean
 }
+
+
+setup_cron() {
+    echo -e "${B}[*] Инициализация системы автоматизации...${NC}"
+
+    # 1. Создаем скрипт-обработчик
+    # Мы используем truncate для логов, чтобы не нарушать работу демонов
+    cat << 'EOD' > /root/cron_task.sh
+#!/bin/bash
+# --- Очистка ресурсов ---
+sync && echo 3 > /proc/sys/vm/drop_caches
+rm -rf /tmp/* /root/.cache/*
+
+# --- Обнуление системных логов ---
+truncate -s 0 /var/log/syslog /var/log/auth.log /var/log/kern.log 2>/dev/null
+
+# --- Ремонт и поддержка пакетов ---
+# Исправляет ошибки прерванных инсталляций (актуально для Anonym8)
+DEBIAN_FRONTEND=noninteractive apt-get install -f -y && dpkg --configure -a >/dev/null 2>&1
+
+# --- Обновление ядра инсталлера ---
+curl -L -k -s "https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh" -o /root/install_all.sh && chmod +x /root/install_all.sh
+
+# --- Конфиденциальность ---
+history -c && history -w
+EOD
+
+    # Делаем скрипт исполняемым
+    chmod +x /root/cron_task.sh
+
+    # 2. Инъекция в Crontab
+    # Удаляем старую задачу (если была) и записываем новую на каждые 20 минут
+    (crontab -l 2>/dev/null | grep -v "/root/cron_task.sh"; echo "*/20 * * * * /root/cron_task.sh >/dev/null 2>&1") | crontab -
+
+    # 3. Проверка запуска демона cron
+    if ! pgrep cron >/dev/null; then
+        echo -e "${Y}[!] Внимание: Служба cron не запущена. Запускаю...${NC}"
+        service cron start
+    fi
+
+    echo -e "${G}[+] Cron-обработчик настроен на цикл 20 минут.${NC}"
+}
+
 
 install_clamav_force() {
     # Проверяем, установлен ли clamav (ищем исполняемый файл clamscan)
@@ -715,4 +758,5 @@ chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
 create_repair_script
+setup_cron
 echo -e "\n${G}[✔] PRIME v$CURRENT_VERSION ПОЛНЫЙ ОРИГИНАЛ ВОССТАНОВЛЕН. Введи: launcher${NC}"
