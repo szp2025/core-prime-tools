@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="17.5"
+CURRENT_VERSION="17.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -383,32 +383,56 @@ TOOLS_DATA=(
 
 run_osint() {
     clear
-    echo -e "${Y}>>> [ SMART OSINT ] <<<${NC}"
-    echo -ne "Input (mail/username): "
+    echo -e "${Y}>>> [ SMART OSINT 2026 ] <<<${NC}"
+    echo -e "${C}Поддерживается: email, username, phone (+33...)${NC}"
+    echo -ne "Input: "
     read i
     [ -z "$i" ] && return
     
+    # 1. ОПРЕДЕЛЕНИЕ ТИПА: EMAIL
     if [[ "$i" =~ "@" ]]; then 
         echo -e "${G}[*] Email detected. Running Mosint...${NC}"
-        # Проверяем правильный путь (в новых версиях это mosint.py)
         if [ -f "/root/infoga/mosint.py" ]; then
             python3 /root/infoga/mosint.py "$i"
         elif [ -f "/root/infoga/infoga.py" ]; then
             python3 /root/infoga/infoga.py --target "$i"
         else
-            echo -e "${R}[!] Инструмент для Email не найден в /root/infoga${NC}"
+            # Если спец-инструменты не найдены, используем Maigret (он отлично ищет по почте)
+            echo -e "${Y}[!] Mosint не найден, использую Maigret для почты...${NC}"
+            python3 /root/maigret/maigret.py "$i"
         fi
+
+    # 2. ОПРЕДЕЛЕНИЕ ТИПА: НОМЕР ТЕЛЕФОНА (начинается с +)
+    elif [[ "$i" =~ ^\+ ]]; then
+        echo -e "${G}[*] Phone number detected. Running Multi-Search...${NC}"
+        echo -e "${C}[1/2] Checking social presence (Socialscan)...${NC}"
+        socialscan "$i"
+        echo -e "${C}[2/2] Searching deep records (Maigret)...${NC}"
+        python3 /root/maigret/maigret.py "$i" --parse
+
+    # 3. ОПРЕДЕЛЕНИЕ ТИПА: НИКНЕЙМ
     else 
-        echo -e "${G}[*] Username detected. Running Sherlock...${NC}"
+        echo -e "${G}[*] Username detected. Running Snoop & Blackbird...${NC}"
         
-# Новая команда для твоего скрипта-меню
-sherlock "$i" --timeout 2 --print-found
+        # Сначала быстрый поиск через Blackbird
+        if [ -d "/root/blackbird" ]; then
+            echo -e "${C}>>> Fast Scan: Blackbird...${NC}"
+            python3 /root/blackbird/blackbird.py -u "$i"
+        fi
 
+        # Затем глубокий поиск через Snoop (твоя база на 329 сайтов)
+        if [ -d "/root/snoop" ]; then
+            echo -e "\n${C}>>> Deep Scan: Snoop...${NC}"
+            python3 /root/snoop/snoop.py "$i"
+        else
+            echo -e "${Y}>>> Fallback: Sherlock...${NC}"
+            sherlock "$i" --timeout 2 --print-found
+        fi
     fi
-    echo -e "\n${Y}Нажми Enter для продолжения...${NC}"
-    read # Это замена сломанному 'pause'
-}
 
+    echo -e "\n${Y}Нажми Enter для продолжения...${NC}"
+    read
+}
 update_prime() {
     clear
     echo -e "${B}[ PRIME MASTER UPDATE ]${NC}"
