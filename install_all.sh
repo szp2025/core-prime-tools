@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="19.6"
+CURRENT_VERSION="19.7"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -368,29 +368,24 @@ def scan():
     f = request.files.get('file')
     if not f: return "No data", 400
     
-    # Сохраняем файл
     tmp_path = os.path.join('/tmp', f.filename)
     f.save(tmp_path)
-    os.sync() # Принудительная запись на диск
+    os.sync()
 
     scan_output = ""
     try:
-        # Важно: передаем путь как элемент списка, чтобы пробелы не ломали команду
+        # Передача списка параметров исключает ошибки с пробелами в именах
         cmd = [CLAM_PATH, '--no-summary', tmp_path]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
         
-        # Если ClamScan выдал пустой результат, но файл был - берем stderr
         scan_output = res.stdout if res.stdout else res.stderr
         if not scan_output and res.returncode == 0:
             scan_output = f"{f.filename}: OK"
             
-    except subprocess.TimeoutExpired:
-        scan_output = "Error: Scanning timeout (File too large for Wiko RAM)"
     except Exception as e:
         scan_output = f"System Error: {str(e)}"
     finally:
-        # Убеждаемся, что скан завершен перед удалением
-        time.sleep(0.5) 
+        # Файл удаляется ТОЛЬКО после того, как результат сканирования считан в память
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
@@ -408,17 +403,20 @@ def scan():
     """, output=scan_output)
 
 if __name__ == '__main__':
-    # Генерация сертификатов если их нет
+    ip = get_ip()
+    # Авто-генерация SSL если отсутствуют
     if not os.path.exists('/root/cert.pem'):
         os.system('openssl req -x509 -newkey rsa:2048 -nodes -out /root/cert.pem -keyout /root/key.pem -days 365 -subj "/CN=scanclamavlocal"')
     
-    ip = get_ip()
-    print(f"[*] SSL: https://scanclamavlocal:5000 | https://{ip}:5000")
+    # Очистка порта перед запуском
+    os.system('fuser -k 5000/tcp 2>/dev/null')
+    
     app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'))
 EOF
 }
+
 # Антивирусный сервер (Security Hub)
-update_module "/root/av_server.py" "1.5" generate_av_server_code "AV-Scanner"
+update_module "/root/av_server.py" "1.6" generate_av_server_code "AV-Scanner"
 
 
 # Функция-генератор для Share-Server (v1.0)
@@ -576,9 +574,18 @@ update_module "/root/upload_server.py" "1.0" generate_upload_server_code "Inboun
 # --- ГЕНЕРАЦИЯ LAUNCHER (Твой оригинал + расширенный TOOLS_DATA) ---
 cat << 'EOF' > /root/launcher.sh
 #!/bin/bash
-CURRENT_VERSION="18.6"
+CURRENT_VERSION="18.8"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
+
+# Решение проблемы с кэшем ZSH (zcompdump)
+if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
+    rm -f /root/.cache/zcompdump* 2>/dev/null
+    rm -f /root/.zcompdump* 2>/dev/null
+fi
+
+# Принудительная инициализация нового кэша без вывода ошибок
+autoload -Uz compinit && compinit -u 2>/dev/null
 
 repair() { 
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
