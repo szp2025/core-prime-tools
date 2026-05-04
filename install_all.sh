@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18.1"
+CURRENT_VERSION="18.2"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -748,6 +748,25 @@ run_sqlmap() {
     read
 }
 
+run_iban_scan() {
+    clear
+    echo -e "${R}========== [ FINANCIAL INTELLIGENCE ] ==========${NC}"
+    echo -ne "${Y}Введите IBAN, RIB или номер карты: ${NC}"
+    read target
+    [ -z "$target" ] && return
+
+    # 1. Валидация + Имя банка (наш локальный iban_check.py v1.2)
+    python3 /root/iban_check.py "$target"
+    
+    # 2. Поиск ФИО владельца через Maigret (если есть в базах/сети)
+    echo -e "\n${C}[*] Поиск ФИО и цифрового следа владельца...${NC}"
+    sync && echo 3 > /proc/sys/vm/drop_caches
+    python3 /root/maigret/maigret.py "$target" --parse
+
+    echo -ne "\n${G}Нажми Enter для возврата в меню...${NC}"
+    read
+    history -c
+}
 
 
 # --- ЛОГИКА МЕНЮ ---
@@ -758,23 +777,27 @@ while true; do
     repair; 
     echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
     get_stats
-    echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG\n2) SQLMAP  3) SMART OSINT\n4) DEVICE HACK  5) SECURITY HUB\n  6) AIO AUTO OSINT\nU) UPDATE CORE  I) SERVICE HUB\n0) EXIT${NC}"
+    # Обновленный визуальный ряд меню
+    echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG   2) SQLMAP"
+    echo -e "3) SMART OSINT  4) DEVICE HACK  5) SECURITY HUB"
+    echo -e "6) AIO OSINT    7) IBAN/RIB SCAN" # Новый пункт
+    echo -e "U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
+    
     read -p ">> " opt
     case $opt in
-       g|G) run_ghost_scan ;; # ЧИСТО
-        1) run_phishing ;;     # ЧИСТО
-        2) run_sqlmap ;;      # ЧИСТО
+        g|G) run_ghost_scan ;; 
+        1) run_phishing ;;     
+        2) run_sqlmap ;;      
         3) run_osint ;;
-        4) run_device_hack ;;  # ЧИСТО: Вызов функции вместо кучи условий
-        5) run_servers ;;  # ТЕПЕРЬ ТУТ ЧИСТО: просто вызываем твою новую функцию
+        4) run_device_hack ;;  
+        5) run_servers ;;      
         6) run_osint2 ;;
-        i|I) # Твой оригинальный mod_service с unified_installer
-           exec /root/launcher.sh ;; # Упрощенный вызов
+        7) run_iban_scan ;;    # Вызов нашего нового модуля
+        i|I) exec /root/launcher.sh ;; 
         u|U) update_prime ;;
         0) exit 0 ;;
     esac
 done
-EOF
 
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
