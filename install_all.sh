@@ -330,10 +330,9 @@ generate_av_server_code() {
 
     cat << EOF > "$target_file"
 from flask import Flask, request, render_template_string
-import subprocess, os, shutil, socket
+import subprocess, os, shutil, socket, time
 
 # VERSION = '$v_num'
-
 app = Flask(__name__)
 CLAM_PATH = shutil.which('clamscan') or '/usr/bin/clamscan'
 
@@ -351,35 +350,49 @@ def get_ip():
 STYLE = """
 <style>
     body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; width: 80%; max-width: 700px; }
+    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; width: 80%; max-width: 800px; }
     h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
-    pre { white-space: pre-wrap; font-size: 0.85em; color: #0cf; background: #000; padding: 15px; border: 1px solid #222; }
-    .status-box { padding: 10px; margin-bottom: 15px; font-weight: bold; text-align: center; border: 1px solid; }
-    .infected { color: #ff3e3e; border-color: #ff3e3e; background: rgba(255,62,62,0.1); }
+    .status-box { padding: 15px; margin-bottom: 15px; font-weight: bold; text-align: center; border: 1px solid; text-transform: uppercase; }
+    pre { white-space: pre-wrap; font-size: 0.85em; color: #0cf; background: #000; padding: 15px; border: 1px solid #222; max-height: 400px; overflow-y: auto; }
     .clean { color: #00ff41; border-color: #00ff41; background: rgba(0,255,65,0.1); }
-    .back-link { color: #555; text-decoration: none; font-size: 0.8em; margin-top: 20px; display: block; text-align: center; }
+    .infected { color: #ff3e3e; border-color: #ff3e3e; background: rgba(255,62,62,0.1); }
 </style>
 """
 
 @app.route('/')
 def index():
-    return render_template_string(STYLE + '<div class="container"><h2>> SECURE_SCAN_GATEWAY (SSL)</h2><p>Uplink: scanclamavlocal:5000</p><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">INITIATE ENCRYPTED SCAN</button></form></div>')
+    return render_template_string(STYLE + '<div class="container"><h2>> SECURE_GATEWAY</h2><p>Uplink: scanclamavlocal</p><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">INITIATE SSL SCAN</button></form></div>')
 
 @app.route('/scan', methods=['POST'])
 def scan():
     f = request.files.get('file')
     if not f: return "No data", 400
+    
+    # Сохраняем файл
     tmp_path = os.path.join('/tmp', f.filename)
     f.save(tmp_path)
-    
+    os.sync() # Принудительная запись на диск
+
+    scan_output = ""
     try:
-        if os.path.exists(CLAM_PATH): os.chmod(CLAM_PATH, 0o755)
-        res = subprocess.run([CLAM_PATH, '--no-summary', tmp_path], capture_output=True, text=True)
+        # Важно: передаем путь как элемент списка, чтобы пробелы не ломали команду
+        cmd = [CLAM_PATH, '--no-summary', tmp_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        
+        # Если ClamScan выдал пустой результат, но файл был - берем stderr
         scan_output = res.stdout if res.stdout else res.stderr
+        if not scan_output and res.returncode == 0:
+            scan_output = f"{f.filename}: OK"
+            
+    except subprocess.TimeoutExpired:
+        scan_output = "Error: Scanning timeout (File too large for Wiko RAM)"
     except Exception as e:
-        scan_output = f"Error: {str(e)}"
+        scan_output = f"System Error: {str(e)}"
     finally:
-        if os.path.exists(tmp_path): os.remove(tmp_path)
+        # Убеждаемся, что скан завершен перед удалением
+        time.sleep(0.5) 
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
     is_infected = "FOUND" in scan_output
     status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_TRANSMISSION_VERIFIED"
@@ -389,23 +402,23 @@ def scan():
     <div class="container">
         <h2>> SCAN_RESULTS</h2>
         <div class="status-box {status_class}">{status_msg}</div>
-        <pre>{{{{ scan_output }}}}</pre>
-        <a href="/" class="back-link">[ RETURN TO GATEWAY ]</a>
+        <pre>{{{{ output }}}}</pre>
+        <a href="/" style="color:#555; text-decoration:none; display:block; text-align:center; margin-top:20px;">[ RETURN ]</a>
     </div>
-    """, scan_output=scan_output)
+    """, output=scan_output)
 
 if __name__ == '__main__':
-    current_ip = get_ip()
-    print(f"\n\033[1;32m[+] SSL Gateway: https://scanclamavlocal:5000\033[0m")
-    print(f"\033[1;34m[+] Local IP: https://{current_ip}:5000\033[0m\n")
+    # Генерация сертификатов если их нет
+    if not os.path.exists('/root/cert.pem'):
+        os.system('openssl req -x509 -newkey rsa:2048 -nodes -out /root/cert.pem -keyout /root/key.pem -days 365 -subj "/CN=scanclamavlocal"')
     
-    # Запуск с поддержкой SSL
+    ip = get_ip()
+    print(f"[*] SSL: https://scanclamavlocal:5000 | https://{ip}:5000")
     app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'))
 EOF
 }
-
 # Антивирусный сервер (Security Hub)
-update_module "/root/av_server.py" "1.4" generate_av_server_code "AV-Scanner"
+update_module "/root/av_server.py" "1.5" generate_av_server_code "AV-Scanner"
 
 
 # Функция-генератор для Share-Server (v1.0)
