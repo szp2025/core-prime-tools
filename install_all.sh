@@ -365,18 +365,22 @@ def scan():
     f.save(tmp_path)
     os.sync()
 
+    scan_output = ""
     try:
-        # Принудительно проверяем права перед запуском (фикс для Wiko)
+        # Принудительно проверяем права перед запуском
         if os.path.exists(CLAM_PATH):
             os.chmod(CLAM_PATH, 0o755)
         
-        # Запуск сканирования
+        # Запуск сканирования (результат сохраняется в переменную)
         res = subprocess.run([CLAM_PATH, '--no-summary', tmp_path], capture_output=True, text=True)
         scan_output = res.stdout if res.stdout else res.stderr
     except Exception as e:
         scan_output = f"Execution Error: {str(e)}"
-    
-    if os.path.exists(tmp_path): os.remove(tmp_path)
+    finally:
+        # Мгновенная очистка /tmp после завершения процесса clamscan
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+            os.sync()
     
     is_infected = "FOUND" in scan_output
     status_msg = "!!! THREAT DETECTED !!!" if is_infected else "FILE_CLEAN / SECURE"
@@ -386,10 +390,10 @@ def scan():
     <div class="container">
         <h2>> SCAN_RESULTS</h2>
         <div class="status-box {status_class}">{status_msg}</div>
-        <pre>{scan_output}</pre>
+        <pre>{{{{ scan_output }}}}</pre>
         <a href="/" class="back-link">[ RETURN TO DASHBOARD ]</a>
     </div>
-    """)
+    """, scan_output=scan_output)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
@@ -397,7 +401,7 @@ EOF
 }
 
 # Антивирусный сервер (Security Hub)
-update_module "/root/av_server.py" "1.2" generate_av_server_code "AV-Scanner"
+update_module "/root/av_server.py" "1.3" generate_av_server_code "AV-Scanner"
 
 
 # Функция-генератор для Share-Server (v1.0)
