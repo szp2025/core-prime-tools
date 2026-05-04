@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18.6"
+CURRENT_VERSION="18.7"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -742,24 +742,26 @@ run_sqlmap() {
 
 run_iban_scan() {
     clear
-    echo -e "${R}========== [ IBAN/RIB INTELLIGENCE ] ==========${NC}"
+    echo -e "${R}========== [ FINANCIAL INTELLIGENCE ] ==========${NC}"
     echo -ne "${Y}Введите номер для анализа: ${NC}"
     read target
     [ -z "$target" ] && return
 
+    # 1. Запуск твоего нового валидатора v1.5
     python3 /root/iban_check.py "$target"
     
+    # 2. Сброс кэша для Maigret
     sync && echo 3 > /proc/sys/vm/drop_caches
     
-    echo -e "${C}[*] Запуск системного Maigret...${NC}"
-    # Убрали проблемный --parse, добавили --info для детальности
+    # 3. Запуск системного Maigret с корректными флагами
+    echo -e "${C}[*] Поиск владельца в глобальных базах...${NC}"
+    # Используем прямую цель без лишних аргументов, которые вызывают ошибки
     maigret "$target" --info --timeout 20
     
-    echo -ne "\n${G}Анализ завершен. Нажми Enter...${NC}"
+    echo -ne "\n${G}Готово. Нажми Enter для возврата...${NC}"
     read
-    history -c
+    history -c # Режим "В ноль"
 }
-
 # --- ЛОГИКА МЕНЮ ---
 # (Тут твои функции run_ghost_scan, run_osint, run_device_hack и т.д. без изменений)
 # [Для краткости использую твой оригинальный switch-case]
