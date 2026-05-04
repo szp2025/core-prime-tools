@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="19.2"
+CURRENT_VERSION="19.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -139,15 +139,15 @@ FILE_PATH="/root/iban_check.py"
 
 echo -e "${C}[*] Проверка модуля IBAN/RIB (System Integrated)...${NC}"
 
+# Проверка: если файл отсутствует или версия в нем не совпадает с актуальной
 if [ ! -f "$FILE_PATH" ] || ! grep -q "VERSION = '$IBAN_VERSION'" "$FILE_PATH"; then
     echo -e "${Y}[!] Апгрейд до v$IBAN_VERSION: Системная интеграция...${NC}"
-    zero_clear
-
+    
     cat << EOF > "$FILE_PATH"
 import sys, re, json
 from urllib.request import urlopen
 
-# VERSION = '1.6'
+# VERSION = '$IBAN_VERSION'
 
 def get_detailed_data(iban):
     try:
@@ -175,10 +175,9 @@ def validate_structure(iban):
 if __name__ == "__main__":
     if len(sys.argv) < 2: sys.exit(1)
     
-    # Очистка и нормализация
+    # Очистка от пробелов и тире
     target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
     
-    # Параметры для сверки (если переданы)
     provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else None
     provided_bic = sys.argv[3].upper() if len(sys.argv) > 3 else None
 
@@ -194,30 +193,28 @@ if __name__ == "__main__":
         bic = data.get('bic', 'N/A')
         
         print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН (Контрольная сумма верна)\033[0m")
-        print(f"🏦 Банк: {bank_n}")
+        print(f"🏦 Банк: {bank_name}")
         print(f"🔑 BIC: {bic}")
         
-        # --- ЛОГИКА СВЕРКИ (VERIFICATION) ---
         if provided_name or provided_bic:
             print(f"\n\033[1;35m--- ОТЧЕТ О СВЕРКЕ (MATCH REPORT) ---\033[0m")
             
-            # Сверка BIC
             if provided_bic:
                 if provided_bic in bic:
                     print(f"✅ BIC Match: ПРОВЕРЕНО ({bic})")
                 else:
                     print(f"❌ BIC Mismatch! Ожидалось: {provided_bic}, Найдено: {bic}")
             
-            # Сверка банка по имени (эвристика)
             if bank_name != 'N/A':
                 print(f"ℹ️ Проверка банка: Система подтверждает {bank_name}")
 
             print(f"🔍 Запуск Maigret для поиска владельца: {provided_name if provided_name else 'Searching...'}")
     else:
         print(f"\033[91m[-] ОШИБКА: Неверная структура или контрольная сумма\033[0m")
-    EOF
+EOF
+
     chmod +x "$FILE_PATH"
-    echo -e "${G}[+] Модуль v$IBAN_VERSION интегрирован с системой.${NC}"
+    echo -e "${G}[+] Модуль v$IBAN_VERSION успешно обновлен.${NC}"
 fi
 
 # --- ГЕНЕРАЦИЯ СЕРВЕРОВ (Твой оригинал) ---
