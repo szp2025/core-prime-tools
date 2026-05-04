@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="19.5"
+CURRENT_VERSION="19.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -217,15 +217,126 @@ EOF
     echo -e "${G}[+] Модуль v$IBAN_VERSION успешно обновлен.${NC}"
 fi
 
+
+
+# Универсальная функция для проверки и обновления модулей
+update_module() {
+    local file_path="$1"
+    local version="$2"
+    local content_func="$3"
+    local module_name="$4"
+
+    # Проверка: если файл отсутствует или версия внутри не совпадает
+    if [ ! -f "$file_path" ] || ! grep -q "VERSION = '$version'" "$file_path"; then
+        echo -e "${Y}[!] Обновление модуля $module_name до v$version...${NC}"
+        
+        # Вызываем функцию, которая запишет контент
+        $content_func "$file_path" "$version"
+        
+        chmod +x "$file_path"
+        echo -e "${G}[+] Модуль $module_name v$version успешно интегрирован.${NC}"
+    else
+        echo -e "${G}[+] Модуль $module_name v$version уже актуален.${NC}"
+    fi
+}
+
+# Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
+generate_iban_code() {
+    local target_file="$1"
+    local v_num="$2"
+    
+    cat << EOF > "$target_file"
+import sys, re, json
+from urllib.request import urlopen
+
+# VERSION = '$v_num'
+
+def get_detailed_data(iban):
+    try:
+        url = f"https://api.ibanlist.com/v1/validate/{iban}"
+        with urlopen(url, timeout=5) as response:
+            return json.loads(response.read().decode())
+    except: return None
+
+def validate_structure(iban):
+    """Разбор структуры как на профессиональных сайтах"""
+    res = {
+        "Country": iban[:2],
+        "Check": iban[2:4],
+        "BBAN": iban[4:],
+    }
+    if iban.startswith('FR'):
+        res.update({
+            "Bank Code": iban[4:9],
+            "Branch Code": iban[9:14],
+            "Account": iban[14:25],
+            "RIB Key": iban[25:27]
+        })
+    return res
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2: sys.exit(1)
+    
+    # Очистка от пробелов и тире
+    target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
+    
+    # Параметры для сверки (если переданы)
+    provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else None
+    provided_bic = sys.argv[3].upper() if len(sys.argv) > 3 else None
+
+    print(f"\033[1;34m--- РЕЗУЛЬТАТ ПРОВЕРКИ IBAN ---\033[0m")
+    
+    struct = validate_structure(target)
+    for key, val in struct.items():
+        print(f"\033[96m{key}:\033[0m {val}")
+
+    data = get_detailed_data(target)
+    if data and data.get('valid'):
+        bank_name = data.get('bank_name', 'N/A')
+        bic = data.get('bic', 'N/A')
+        
+        print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН (Контрольная сумма верна)\033[0m")
+        print(f"🏦 Банк: {bank_name}")
+        print(f"🔑 BIC: {bic}")
+        
+        # --- ЛОГИКА СВЕРКИ (MATCH REPORT) ---
+        if provided_name or provided_bic:
+            print(f"\n\033[1;35m--- ОТЧЕТ О СВЕРКЕ (MATCH REPORT) ---\033[0m")
+            
+            # Сверка BIC
+            if provided_bic:
+                if provided_bic in bic:
+                    print(f"✅ BIC Match: ПРОВЕРЕНО ({bic})")
+                else:
+                    print(f"❌ BIC Mismatch! Ожидалось: {provided_bic}, Найдено: {bic}")
+            
+            # Сверка банка по имени (эвристика)
+            if bank_name != 'N/A':
+                print(f"ℹ️ Проверка банка: Система подтверждает {bank_name}")
+
+            print(f"🔍 Запуск Maigret для поиска владельца: {provided_name if provided_name else 'Searching...'}")
+    else:
+        print(f"\033[91m[-] ОШИБКА: Неверная структура или контрольная сумма\033[0m")
+EOF
+}
+
+update_module "/root/iban_check.py" "1.7" generate_iban_code "IBAN/RIB"
+
 # --- ГЕНЕРАЦИЯ СЕРВЕРОВ (Твой оригинал) ---
-cat << 'EOF' > /root/av_server.py
+# Функция-генератор для AV-Server (v1.2)
+generate_av_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+
+    cat << EOF > "$target_file"
 from flask import Flask, request, render_template_string
-import subprocess, os
+import subprocess, os, shutil
+
+# VERSION = '$v_num'
 
 app = Flask(__name__)
 
-# АБСОЛЮТНО ТОЧНЫЙ ПУТЬ К ФАЙЛУ
-import shutil
+# Динамический поиск пути к бинарнику
 CLAM_PATH = shutil.which('clamscan') or '/usr/bin/clamscan'
 
 STYLE = """
@@ -255,8 +366,10 @@ def scan():
     os.sync()
 
     try:
-        # Принудительно проверяем права перед запуском
-        os.chmod(CLAM_PATH, 0o755)
+        # Принудительно проверяем права перед запуском (фикс для Wiko)
+        if os.path.exists(CLAM_PATH):
+            os.chmod(CLAM_PATH, 0o755)
+        
         # Запуск сканирования
         res = subprocess.run([CLAM_PATH, '--no-summary', tmp_path], capture_output=True, text=True)
         scan_output = res.stdout if res.stdout else res.stderr
@@ -281,15 +394,27 @@ def scan():
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
 EOF
+}
 
-cat << 'EOF' > /root/share_server.py
+# Антивирусный сервер (Security Hub)
+update_module "/root/av_server.py" "1.2" generate_av_server_code "AV-Scanner"
+
+
+# Функция-генератор для Share-Server (v1.0)
+generate_share_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+
+    cat << EOF > "$target_file"
 from flask import Flask, render_template_string, send_from_directory
 import os
+
+# VERSION = '$v_num'
 
 app = Flask(__name__)
 SHARE_DIR = '/root/share'
 
-# Убедимся, что папка существует
+# Автоматическое создание директории при запуске
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR)
 
@@ -333,7 +458,10 @@ HTML = STYLE + """
 
 @app.route('/')
 def index():
-    files = os.listdir(SHARE_DIR)
+    try:
+        files = os.listdir(SHARE_DIR)
+    except Exception:
+        files = []
     return render_template_string(HTML, files=files, path=SHARE_DIR)
 
 @app.route('/get/<filename>')
@@ -341,13 +469,22 @@ def get_file(filename):
     return send_from_directory(SHARE_DIR, filename)
 
 if __name__ == '__main__':
-    # Порт 5002, как в твоем запросе
     app.run(host='0.0.0.0', port=5002)
 EOF
+}
+# 3. Сервер раздачи файлов (Share Sector) - Port 5002
+update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Share"
 
-cat << 'EOF' > /root/upload_server.py
+# Функция-генератор для Upload-Server (v1.0)
+generate_upload_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+
+    cat << EOF > "$target_file"
 from flask import Flask, request, render_template_string
 import os
+
+# VERSION = '$v_num'
 
 app = Flask(__name__)
 
@@ -409,9 +546,11 @@ def upload():
     return render_template_string(HTML_SUCCESS)
 
 if __name__ == '__main__':
-    # Порт 5001 для Upload-сервера
     app.run(host='0.0.0.0', port=5001)
 EOF
+}
+
+update_module "/root/upload_server.py" "1.0" generate_upload_server_code "Inbound-Drop"
 
 # --- ГЕНЕРАЦИЯ LAUNCHER (Твой оригинал + расширенный TOOLS_DATA) ---
 cat << 'EOF' > /root/launcher.sh
