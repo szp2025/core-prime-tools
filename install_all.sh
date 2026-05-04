@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18.2"
+CURRENT_VERSION="18.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -109,7 +109,7 @@ TOOLS=(
     "sqlmap;https://github.com/sqlmapproject/sqlmap/archive/refs/heads/master.zip;sqlmap.py;"
    # "routersploit;https://github.com/threat9/routersploit/archive/refs/heads/master.zip;rsf.py;safe_pip -r requirements.txt"
    # "sherlock;https://github.com/sherlock-project/sherlock/archive/refs/heads/master.zip;sherlock_project/sherlock.py;safe_pip -r requirements.txt"
-    "phoneinfoga;https://github.com/sundowndev/phoneinfoga/archive/refs/heads/master.zip;phoneinfoga.py;safe_pip -r requirements.txt"
+     #"phoneinfoga;https://github.com/sundowndev/phoneinfoga/archive/refs/heads/master.zip;phoneinfoga.py;safe_pip -r requirements.txt"
     "infoga;https://github.com/m4ll0k/Infoga/archive/refs/heads/master.zip;infoga.py;safe_pip -r requirements.txt"
     "phonesploit;https://github.com/Zucccs/PhoneSploit-Python/archive/refs/heads/main.zip;phonesploitpython.py;safe_pip -r requirements.txt"
     "cupp;https://github.com/Mebus/cupp/archive/refs/heads/master.zip;cupp.py;"
@@ -134,7 +134,7 @@ if [ ! -d "/root/infoga" ]; then
 fi
 
 # Текущая версия инструмента
-IBAN_VERSION="1.2"
+IBAN_VERSION="1.3"
 FILE_PATH="/root/iban_check.py"
 
 echo -e "${C}[*] Проверка модуля IBAN/RIB...${NC}"
@@ -761,7 +761,7 @@ run_iban_scan() {
     # 2. Поиск ФИО владельца через Maigret (если есть в базах/сети)
     echo -e "\n${C}[*] Поиск ФИО и цифрового следа владельца...${NC}"
     sync && echo 3 > /proc/sys/vm/drop_caches
-    python3 /root/maigret/maigret.py "$target" --parse
+    python3 maigret "$target" --parse
 
     echo -ne "\n${G}Нажми Enter для возврата в меню...${NC}"
     read
@@ -798,6 +798,7 @@ while true; do
         0) exit 0 ;;
     esac
 done
+EOF
 
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
