@@ -330,14 +330,23 @@ generate_av_server_code() {
 
     cat << EOF > "$target_file"
 from flask import Flask, request, render_template_string
-import subprocess, os, shutil
+import subprocess, os, shutil, socket
 
 # VERSION = '$v_num'
 
 app = Flask(__name__)
-
-# Динамический поиск пути к бинарнику
 CLAM_PATH = shutil.which('clamscan') or '/usr/bin/clamscan'
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
 
 STYLE = """
 <style>
@@ -354,36 +363,26 @@ STYLE = """
 
 @app.route('/')
 def index():
-    return render_template_string(STYLE + '<div class="container"><h2>> CLAMAV_SCANNER</h2><p>Upload data for deep analysis...</p><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">START SCAN</button></form></div>')
+    return render_template_string(STYLE + '<div class="container"><h2>> SECURE_SCAN_GATEWAY (SSL)</h2><p>Uplink: scanclamavlocal:5000</p><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">INITIATE ENCRYPTED SCAN</button></form></div>')
 
 @app.route('/scan', methods=['POST'])
 def scan():
     f = request.files.get('file')
-    if not f: return "No file uploaded", 400
-    
+    if not f: return "No data", 400
     tmp_path = os.path.join('/tmp', f.filename)
     f.save(tmp_path)
-    os.sync()
-
-    scan_output = ""
+    
     try:
-        # Принудительно проверяем права перед запуском
-        if os.path.exists(CLAM_PATH):
-            os.chmod(CLAM_PATH, 0o755)
-        
-        # Запуск сканирования (результат сохраняется в переменную)
+        if os.path.exists(CLAM_PATH): os.chmod(CLAM_PATH, 0o755)
         res = subprocess.run([CLAM_PATH, '--no-summary', tmp_path], capture_output=True, text=True)
         scan_output = res.stdout if res.stdout else res.stderr
     except Exception as e:
-        scan_output = f"Execution Error: {str(e)}"
+        scan_output = f"Error: {str(e)}"
     finally:
-        # Мгновенная очистка /tmp после завершения процесса clamscan
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-            os.sync()
-    
+        if os.path.exists(tmp_path): os.remove(tmp_path)
+
     is_infected = "FOUND" in scan_output
-    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "FILE_CLEAN / SECURE"
+    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_TRANSMISSION_VERIFIED"
     status_class = "infected" if is_infected else "clean"
 
     return render_template_string(STYLE + f"""
@@ -391,17 +390,22 @@ def scan():
         <h2>> SCAN_RESULTS</h2>
         <div class="status-box {status_class}">{status_msg}</div>
         <pre>{{{{ scan_output }}}}</pre>
-        <a href="/" class="back-link">[ RETURN TO DASHBOARD ]</a>
+        <a href="/" class="back-link">[ RETURN TO GATEWAY ]</a>
     </div>
     """, scan_output=scan_output)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    current_ip = get_ip()
+    print(f"\n\033[1;32m[+] SSL Gateway: https://scanclamavlocal:5000\033[0m")
+    print(f"\033[1;34m[+] Local IP: https://{current_ip}:5000\033[0m\n")
+    
+    # Запуск с поддержкой SSL
+    app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'))
 EOF
 }
 
 # Антивирусный сервер (Security Hub)
-update_module "/root/av_server.py" "1.3" generate_av_server_code "AV-Scanner"
+update_module "/root/av_server.py" "1.4" generate_av_server_code "AV-Scanner"
 
 
 # Функция-генератор для Share-Server (v1.0)
