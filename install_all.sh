@@ -514,13 +514,24 @@ run_osint2() {
         python3 /root/snoop/snoop.py "$i" --quick
     fi
 
-    # 7. ПРОВЕРКА RIB / IBAN (Банковские реквизиты)
-    if [[ "$i" =~ ^[A-Z]{2}[0-9]{2} ]] || [[ "$i" =~ ^[0-9]{5} ]]; then
-        echo -e "\n${C}[STEP 7] Validating RIB / IBAN...${NC}"
-        zero_clear
-        # Используем curl для проверки через открытые API валидаторы
-        # Это не занимает RAM и дает информацию о банке и владельце
-        curl -s "https://api.ibanlist.com/v1/validate/$i" | grep -E "bank_name|city|country"
+# 7. КОМПЛЕКСНАЯ ПРОВЕРКА RIB И ВЛАДЕЛЬЦА
+    if [[ "$i" =~ ^[A-Z0-9]{10,34}$ ]]; then
+        echo -e "\n${Y}[!] Обнаружен банковский идентификатор. Начинаю проверку соответствия...${NC}"
+        zero_clear # Обнуление перед сетевым запросом
+
+        # Шаг А: Валидация структуры и определение банка
+        echo -e "${C}[1/3] Определение банка и региона...${NC}"
+        bank_info=$(curl -s "https://api.ibanlist.com/v1/validate/$i")
+        echo "$bank_info" | grep -E "bank_name|city|country|bic"
+
+        # Шаг Б: Поиск владельца через утечки и кэш (если есть имя для сопоставления)
+        echo -e "${C}[2/3] Поиск связки владельца в локальных базах...${NC}"
+        # Проверяем, нет ли этого RIB в логах прошлых поисков или перехватах
+        grep -r "$i" /root/snoop/reports/ 2>/dev/null
+
+        # Шаг В: Проверка через Maigret (поиск упоминаний счета в сети)
+        echo -e "${C}[3/3] Поиск упоминаний счета в открытых источниках...${NC}"
+        python3 /root/maigret/maigret.py "$i" --parse
     fi
 
     echo -e "\n${Y}Комплексный пробив завершен. Нажми Enter для обнуления...${NC}"
