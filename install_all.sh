@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="19.1"
+CURRENT_VERSION="19.2"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -228,7 +228,7 @@ import subprocess, os
 app = Flask(__name__)
 
 # АБСОЛЮТНО ТОЧНЫЙ ПУТЬ К ФАЙЛУ
-CLAM_PATH = '/root/clamav/clamscan'
+CLAM_PATH = '/usr/bin/clamscan'
 
 STYLE = """
 <style>
