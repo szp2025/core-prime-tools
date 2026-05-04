@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="17.7"
+CURRENT_VERSION="17.8"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -504,6 +504,23 @@ run_osint2() {
         if [ -f "/root/infoga/mosint.py" ]; then
             python3 /root/infoga/mosint.py "$i"
         fi
+    fi
+
+    # 6. ПОИСК ПО ИМЕНИ И ФАМИЛИИ (Name Search)
+    echo -e "\n${C}[STEP 6] Searching by Full Name...${NC}"
+    zero_clear
+    # Используем Snoop в режиме поиска имен (он отлично справляется с ФИО)
+    if [ -d "/root/snoop" ]; then
+        python3 /root/snoop/snoop.py "$i" --quick
+    fi
+
+    # 7. ПРОВЕРКА RIB / IBAN (Банковские реквизиты)
+    if [[ "$i" =~ ^[A-Z]{2}[0-9]{2} ]] || [[ "$i" =~ ^[0-9]{5} ]]; then
+        echo -e "\n${C}[STEP 7] Validating RIB / IBAN...${NC}"
+        zero_clear
+        # Используем curl для проверки через открытые API валидаторы
+        # Это не занимает RAM и дает информацию о банке и владельце
+        curl -s "https://api.ibanlist.com/v1/validate/$i" | grep -E "bank_name|city|country"
     fi
 
     echo -e "\n${Y}Комплексный пробив завершен. Нажми Enter для обнуления...${NC}"
