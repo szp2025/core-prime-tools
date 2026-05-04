@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="18.5"
+CURRENT_VERSION="18.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -134,7 +134,7 @@ if [ ! -d "/root/infoga" ]; then
 fi
 
 # Текущая версия инструмента
-IBAN_VERSION="1.5"
+IBAN_VERSION="1.6"
 FILE_PATH="/root/iban_check.py"
 
 echo -e "${C}[*] Проверка модуля IBAN/RIB (System Integrated)...${NC}"
@@ -753,7 +753,7 @@ run_iban_scan() {
     # 2. Поиск ФИО владельца через Maigret (если есть в базах/сети)
     echo -e "\n${C}[*] Поиск ФИО и цифрового следа владельца...${NC}"
     sync && echo 3 > /proc/sys/vm/drop_caches
-    python3 maigret "$target" --parse
+     maigret "$target" --parse
 
     echo -ne "\n${G}Нажми Enter для возврата в меню...${NC}"
     read
