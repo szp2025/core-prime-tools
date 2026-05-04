@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.0"
+CURRENT_VERSION="20.1"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -14,39 +14,29 @@ fi
 create_repair_tool() {
     echo -e "\e[34m[*] Создание инструмента восстановления (repair.sh)...\e[0m"
     
-    # Путь к сырому файлу на твоем GitHub
-    local REPO_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
-    
     cat << 'EOF' > /root/repair.sh
 #!/bin/bash
-
 echo -e "\e[1;33m[!][ Режим восстановления Core-Prime ][!]\e[0m"
 
-# 1. Удаляем старый файл, если он существует
-if [ -f "/root/install_all.sh" ]; then
-    echo "[*] Удаление старого install_all.sh..."
-    rm -f /root/install_all.sh
-fi
+# Удаляем старые сломанные версии
+rm -f /root/install_all.sh
+rm -f /usr/local/bin/launcher
 
-# 2. Очистка системных заторов перед загрузкой
-echo "[*] Очистка кэша APT и ZSH..."
-rm -rf /root/.cache/zcompdump* 2>/dev/null
+# Чистим систему
 dpkg --configure -a 2>/dev/null
+apt --fix-broken install -y 2>/dev/null
 
-# 3. Скачивание свежей версии с GitHub
+# Качаем свежую версию
 echo "[*] Загрузка актуальной версии..."
 curl -L -o /root/install_all.sh https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh
-
-# 4. Выдача прав на исполнение
 chmod +x /root/install_all.sh
 
-echo -e "\e[1;32m[+] Восстановление завершено. Теперь можно запустить ./install_all.sh\e[0m"
+echo -e "\e[1;32m[+] Восстановление завершено. Запусти: ./install_all.sh\e[0m"
 EOF
 
-    # Делаем сам repair.sh исполняемым
     chmod +x /root/repair.sh
-    echo -e "\e[32m[OK] Инструмент создан: /root/repair.sh\e[0m"
 }
+
 
 
 repair_and_clean() {
