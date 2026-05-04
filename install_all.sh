@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.4"
+CURRENT_VERSION="20.5"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -59,23 +59,29 @@ setup_cron() {
     # Мы используем truncate для логов, чтобы не нарушать работу демонов
     cat << 'EOD' > /root/cron_task.sh
 #!/bin/bash
+# --- Энергосбережение и сеть ---
+# Не даем Wi-Fi уснуть, пока идет обслуживание
+svc power stayon true 2>/dev/null
+
 # --- Очистка ресурсов ---
 sync && echo 3 > /proc/sys/vm/drop_caches
 rm -rf /tmp/* /root/.cache/*
-
-# --- Обнуление системных логов ---
 truncate -s 0 /var/log/syslog /var/log/auth.log /var/log/kern.log 2>/dev/null
 
+# --- Обновление баз инструментов ---
+# Обновляем шаблоны Nuclei (раз в 20 мин — это часто, но для мобильного OSINT полезно)
+nuclei -update-templates -silent
+
 # --- Ремонт и поддержка пакетов ---
-# Исправляет ошибки прерванных инсталляций (актуально для Anonym8)
 DEBIAN_FRONTEND=noninteractive apt-get install -f -y && dpkg --configure -a >/dev/null 2>&1
 
 # --- Обновление ядра инсталлера ---
 curl -L -k -s "https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh" -o /root/install_all.sh && chmod +x /root/install_all.sh
 
-# --- Конфиденциальность ---
+# --- Безопасность ---
 history -c && history -w
 EOD
+
 
     # Делаем скрипт исполняемым
     chmod +x /root/cron_task.sh
