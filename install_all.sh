@@ -1059,4 +1059,5 @@ EOF
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
+create_repair_script
 echo -e "\n${G}[✔] PRIME v$CURRENT_VERSION ПОЛНЫЙ ОРИГИНАЛ ВОССТАНОВЛЕН. Введи: launcher${NC}"
