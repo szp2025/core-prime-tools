@@ -740,10 +740,23 @@ run_osint2() {
 
 update_prime() {
     clear
-    echo -e "${B}[ PRIME MASTER UPDATE ]${NC}"
+    echo -e "${B}[ PRIME MASTER UPDATE CHECK ]${NC}"
+    
+    # URL для проверки версии (создай файл version.txt на GitHub с номером, например, 1.2)
+    local VER_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/version.txt"
+    local REMOTE_VER=$(curl -sL -k "$VER_URL")
+    
+    if [ "$REMOTE_VER" == "$CURRENT_VERSION" ]; then
+        echo -e "${G}У вас уже установлена актуальная версия v$CURRENT_VERSION${NC}"
+        sleep 2
+        return
+    fi
+
+    echo -e "${Y}Найдена новая версия: $REMOTE_VER. Обновляемся...${NC}"
     local UP_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
     curl -L -k "$UP_URL" -o /root/install_all.sh && chmod +x /root/install_all.sh && exec /root/install_all.sh
 }
+
 
 run_servers() {
     clear
