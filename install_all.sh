@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.9"
+CURRENT_VERSION="30.0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -192,6 +192,15 @@ TOOLS=(
     "cupp;https://github.com/Mebus/cupp/archive/refs/heads/master.zip;cupp.py;"
     #"anonym8;https://github.com/HiroshiSama/anonym8/archive/refs/heads/master.zip;anonym8;chmod +x install.sh && ./install.sh"
 )
+
+# Дополнительные инструменты для EXPLOIT HUB
+TOOLS+=(
+    "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
+    "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
+    "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
+    "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
+)
+
 
 for entry in "${TOOLS[@]}"; do
     IFS=";" read -r t_name t_url t_exec t_extra <<< "$entry"
