@@ -11,7 +11,9 @@ if [ "$EUID" -ne 0 ]; then
   exit
 fi
 
-create_repair_tool() {
+#create_repair_tool() {
+
+create_repair_script(){
     echo -e "\e[34m[*] Создание инструмента восстановления (repair.sh)...\e[0m"
     
     cat << 'EOF' > /root/repair.sh
