@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.6"
+CURRENT_VERSION="20.8"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -660,6 +660,7 @@ zero_clear() {
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
 }
 
+
 run_osint() {
     clear; zero_clear
     echo -e "${Y}>>> [ SMART OSINT 2026: TOTAL ZERO MODE ] <<<${NC}"
@@ -761,9 +762,27 @@ run_ghost_scan() {
 }
 
 run_sqlmap() {
-    sqlmap --wizard
-}
+    clear; zero_clear
+    echo -e "${Y}>>> [ SQLMAP: SMART INJECTION HUB ] <<<${NC}"
+    echo -e "${B}Enter Target URL or 'w' for Wizard:${NC}"
+    read -p ">> " target
+    
+    [ -z "$target" ] && return
 
+    if [[ "$target" == "w" ]] || [[ "$target" == "W" ]]; then
+        # Стандартный мастер для новичков
+        sqlmap --wizard
+    else
+        echo -e "${G}[*] Analyzing target: $target${NC}"
+        # Эвристический запуск: 
+        # --batch (без лишних вопросов), --random-agent (маскировка), 
+        # --level 2 (глубже обычного), --tamper=space2comment (обход простых фильтров)
+        sqlmap -u "$target" --batch --random-agent --level 2 --threads 5 --tamper=space2comment --dbms=mysql
+    fi
+
+    zero_clear; history -c
+    read -p "Press Enter to return..."
+}
 run_iban_scan() {
     clear
     echo -e "${R}== [ IBAN VERIFICATION ] ==${NC}"
