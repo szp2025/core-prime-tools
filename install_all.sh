@@ -231,6 +231,26 @@ update_module() {
     fi
 }
 
+# --- УНИВЕРСАЛЬНАЯ И БЕЗОПАСНАЯ ФУНКЦИЯ ГЕНЕРАЦИИ ---
+smart_cat() {
+    local target_file="$1"
+    local limit_type="$2"  # Оставляем для совместимости/логики
+    local content="$3"
+    local perms="${4:-755}" # По умолчанию 755 (исполняемый)
+
+    # Создаем папку, если её нет
+    mkdir -p "$(dirname "$target_file")"
+
+    # Записываем контент максимально безопасно
+    printf "%s\n" "$content" > "$target_file"
+
+    # Выставляем права
+    chmod "$perms" "$target_file"
+    
+    echo -e "\033[32m[OK]\033[0m Файл создан: $target_file (Права: $perms)"
+}
+
+
 # Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
 generate_iban_code() {
     local target_file="$1"
