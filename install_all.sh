@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="20.5"
+CURRENT_VERSION="20.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -331,7 +331,7 @@ EOF
 }
 
 # --- ВЫЗОВ В СЕКЦИИ DEPLOYMENT ---
-update_module "/root/iban_check.py" "1.7" generate_iban_code "IBAN/RIB Checker"
+
 
 # Функция-генератор для AV-Server (v1.2)
 # --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
@@ -423,9 +423,6 @@ EOF
     smart_cat "$target_file" "$code"
 }
 
-# Вызов обновления
-update_module "/root/av_server.py" "1.6" generate_av_server_code "AV-Scanner"
-
 
 # Функция-генератор для Share-Server (v1.0)
 # --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
@@ -499,9 +496,6 @@ EOF
     smart_cat "$target_file" "$code"
 }
 
-# Вызов обновления
-update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Share"
-
 # Функция-генератор для Upload-Server (v1.0)
 generate_upload_server_code() {
     local target_file="$1"
@@ -571,13 +565,6 @@ EOF
 # --- 4. ИСПОЛНЕНИЕ (DEPLOYMENT) ---
 
 echo -e "${B}--- STARTING CORE-PRIME SYNCHRONIZATION ---${NC}"
-
-# Пример вызова для твоего модуля
-update_module \
-    "/root/upload_server.py" \
-    "1.0.4" \
-    generate_upload_server_code \
-    "Inbound-Drop-Box"
 
 # --- ГЕНЕРАЦИЯ LAUNCHER (Твой оригинал + расширенный TOOLS_DATA) ---
 # --- ГЕНЕРАТОР ГЛАВНОГО ЛОНЧЕРА (СОХРАНЕННЫЙ ОРИГИНАЛ) ---
@@ -773,6 +760,11 @@ EOF
     code="${code//\{\{V_NUM\}\}/$v_num}"
     smart_cat "$target_file" "$code"
 }
+
+update_module "/root/av_server.py" "1.6" generate_av_server_code "AV-Scanner"
+update_module "/root/iban_check.py" "1.7" generate_iban_code "IBAN/RIB Checker"
+update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Share"
+update_module \ "/root/upload_server.py" \  "1.0.4" \ generate_upload_server_code \ "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
 update_module "/root/launcher.sh" "18.8" generate_launcher_code "Prime-Launcher"
