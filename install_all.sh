@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="30.3"
+CURRENT_VERSION="30.4"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -787,7 +787,7 @@ run_device_hack() {
     echo -e "1) PhoneSploit  2) Bluetooth Scan  B) Back"
     read -p ">> " dh
     case $dh in
-        1) cd /root/phonesploit && python3 phonesploitpython.py ;;
+        1) cd /root/PhoneSploit-Pro && python3 phonesploitpython.py ;;
         2) hcitool scan ;;
         *) return ;;
     esac
