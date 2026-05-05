@@ -666,25 +666,90 @@ run_osint() {
     echo -ne "Input: "
     read i
     [ -z "$i" ] && return
-    if [[ "$i" =~ "@" ]]; then 
-        python3 /root/infoga/infoga.py --target "$i" 2>/dev/null || maigret "$i"
-    elif [[ "$i" =~ ^\+ ]]; then
-        socialscan "$i" && maigret "$i" --parse
-    else 
-        python3 /root/blackbird/blackbird.py -u "$i" 2>/dev/null || python3 /root/snoop/snoop.py "$i"
+
+    # Эвристический анализ входных данных
+    if [[ "$i" =~ ^[0-9]{8,15}$ ]] || [[ "$i" =~ ^\+ ]]; then
+        # ЦЕЛЬ: ТЕЛЕФОН (Эвристика: только цифры или + в начале)
+        echo -e "${B}[!] Type detected: PHONE. Running Fast Analysis...${NC}"
+        # Вызываем phoneinfoga в быстром режиме (без глубокого сканирования всех инстансов)
+        phoneinfoga scan -n "$i" | grep -E "Carrier|Location|International"
+        # Социальный поиск только по подтвержденным базам
+        socialscan "$i"
+
+    elif [[ "$i" =~ "@" ]]; then
+        # ЦЕЛЬ: EMAIL (Эвристика: наличие символа @)
+        echo -e "${B}[!] Type detected: EMAIL. Searching Breaches...${NC}"
+        # Сначала infoga (быстрая проверка метаданных)
+        python3 /root/infoga/infoga.py --target "$i" 2>/dev/null
+        # Быстрая проверка привязки к соцсетям
+        socialscan "$i"
+
+    elif [[ "$i" =~ "^(http|https)://" ]] || [[ "$i" =~ "\." ]]; then
+        # ЦЕЛЬ: DOMAIN/URL (Эвристика: протокол или точка)
+        echo -e "${B}[!] Type detected: DOMAIN. Running Web-Intel...${NC}"
+        # Используем Photon для быстрого сбора email и субдоменов
+        python3 /root/Photon/photon.py -u "$i" --level 1 --threads 10
+
+    else
+        # ЦЕЛЬ: NICKNAME (Эвристика: всё остальное)
+        echo -e "${B}[!] Type detected: NICKNAME. Smart Multi-Scan...${NC}"
+        # Запускаем Blackbird (он быстрее Snoop в 3 раза на старте)
+        python3 /root/blackbird/blackbird.py -u "$i" --ai-check 2>/dev/null &
+        BB_PID=$!
+        
+        # Пока Blackbird шуршит в фоне, запускаем мгновенный socialscan
+        socialscan "$i"
+        
+        wait $BB_PID
     fi
+
+    # Финальный аккорд: Эвристическая очистка истории команд и логов
     zero_clear; history -c
+    echo -e "${G}>>> Smart Scan Finished. Trace Cleaned.${NC}"
 }
+
 
 run_osint2() {
     clear; zero_clear
-    echo -e "${Y}>>> [ TOTAL OSINT 2: DEEP SCAN MODE ] <<<${NC}"
-    read -p "Input: " i
+    echo -e "${Y}>>> [ TOTAL OSINT 2: DEEP SCAN MODE 2026 ] <<<${NC}"
+    read -p "Target (Nick/Phone/Email): " i
     [ -z "$i" ] && return
-    socialscan "$i"
-    maigret "$i" --parse
-    python3 /root/snoop/snoop.py "$i"
+
+    echo -e "${B}[*] Starting Deep Analysis Pipeline...${NC}"
+
+    # 1. Если это номер телефона (начинается с + или цифр)
+    if [[ "$i" =~ ^\+?[0-9]{10,15}$ ]]; then
+        echo -e "${G}>> Running Phone Intelligence...${NC}"
+        phoneinfoga scan -n "$i"
+        maigret "$i" --parse
+    
+    # 2. Если это Email
+    elif [[ "$i" =~ "@" ]]; then
+        echo -e "${G}>> Running Email OSINT...${NC}"
+        # Использование infoga (если оставили) или maigret
+        python3 /root/infoga/infoga.py --target "$i" 2>/dev/null
+        socialscan "$i"
+        maigret "$i"
+
+    # 3. Если это Никнейм (стандартный глубокий поиск)
+    else
+        echo -e "${G}>> Running Multi-Platform Nickname Scan...${NC}"
+        # Запускаем параллельно-последовательную цепочку
+        socialscan "$i"
+        
+        echo -e "${Y}--- Maigret Analysis ---${NC}"
+        maigret "$i" --parse --pdf # Создаем отчет
+        
+        echo -e "${Y}--- Snoop Deep Search ---${NC}"
+        python3 /root/snoop/snoop.py "$i"
+        
+        echo -e "${Y}--- Blackbird OSINT ---${NC}"
+        python3 /root/blackbird/blackbird.py -u "$i"
+    fi
+
+    echo -e "${G}[+] Deep Scan Completed. Reports saved.${NC}"
     zero_clear; history -c
+    read -p "Press Enter to return..."
 }
 
 update_prime() {
@@ -743,7 +808,7 @@ while true; do
     echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
     get_stats
     echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG   2) SQLMAP"
-    echo -e "3) SMART OSINT  4) DEVICE HACK  5) SECURITY HUB"
+    echo -e "3) SMART OSINT  4) DEVICE HACK  "
     echo -e "6) AIO OSINT    7) IBAN/RIB SCAN"
     echo -e "U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
     read -p ">> " opt
