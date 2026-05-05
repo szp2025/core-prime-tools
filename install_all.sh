@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="30.0"
+CURRENT_VERSION="30.1"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -126,47 +126,56 @@ install_clamav_force() {
 install_tool() {
     local name=$1; local url=$2; local exec_file=$3; local extra_cmd=$4
     
-    # Проверяем, существует ли папка И исполняемый файл внутри
+    # 1. Проверка на существование
     if [ -d "$name" ] && [ -f "$name/$exec_file" ]; then 
-        echo -e "${G}[+] $name уже установлен. Пропускаю...${NC}"
+        echo -e "${G}[+] $name найден. Пропуск...${NC}"
         return 0 
     fi
 
-    echo -e "${Y}[*] Installing $name...${NC}"
+    echo -e "${Y}[*] Установка $name...${NC}"
     
-    # Очистка перед скачиванием, чтобы temp.zip не конфликтовал
-    rm -f "temp.zip"
+    # 2. Подготовка
+    rm -rf "temp.zip" "$name" # Удаляем старые битые попытки
     
-    curl -L -f "$url" -o "temp.zip" >/dev/null 2>&1
+    # 3. Скачивание с проверкой кода ответа (200 OK)
+    curl -L -k -f "$url" -o "temp.zip" >/dev/null 2>&1
     
-    if [ -s "temp.zip" ]; then
-        unzip -q "temp.zip"
-        # Поиск извлеченной директории (учитываем master, main или имя инструмента)
-        local extracted_dir=$(ls -d */ 2>/dev/null | grep -iE "${name}|master|main" | head -n 1)
+    # Проверка: скачался ли файл и является ли он ZIP-архивом
+    if [ -s "temp.zip" ] && file "temp.zip" | grep -q "Zip archive"; then
+        unzip -q "temp.zip" -d "temp_extract"
+        
+        # Ищем любую папку внутри temp_extract
+        local extracted_dir=$(ls -d temp_extract/*/ 2>/dev/null | head -n 1)
         
         if [ -n "$extracted_dir" ]; then
-            # Если папка уже была, но бинарника не было — удаляем старую перед mv
-            [ -d "$name" ] && rm -rf "$name"
             mv "$extracted_dir" "$name"
-            rm -f "temp.zip"
+            rm -rf "temp_extract" "temp.zip"
             
-            # Выполнение дополнительных команд (сборка, зависимости)
+            # 4. Выполнение доп. команд (сборка/pip)
             if [ -n "$extra_cmd" ]; then
+                echo -e "${B}[*] Настройка зависимостей для $name...${NC}"
                 (cd "$name" && eval "$extra_cmd" >/dev/null 2>&1)
             fi
             
-            # Делаем файл исполняемым
+            # 5. Права доступа
             if [ -f "$name/$exec_file" ]; then
                 chmod +x "$name/$exec_file"
-                echo -e "${G}[+] $name успешно установлен.${NC}"
+                echo -e "${G}[+] $name готов к работе.${NC}"
+            else
+                # Если файл не найден там, где ждали, ищем его по всей папке
+                find "$name" -name "$exec_file" -exec chmod +x {} \;
+                echo -e "${G}[+] $name установлен (path fixed).${NC}"
             fi
         fi
     else
-        echo -e "${R}[!] Ошибка загрузки $name. Проверь сеть.${NC}"
+        echo -e "${R}[!] Ошибка: Сервер GitHub отклонил запрос или файл поврежден.${NC}"
+        rm -f "temp.zip"
     fi
     
+    # Твоя функция очистки RAM и кэша
     repair_and_clean
 }
+
 
 
 # --- СТАРТ ---
@@ -926,7 +935,7 @@ while true; do
     case $opt in
         g|G) run_ghost_scan ;; 1) run_phishing ;; 2) run_sqlmap ;; 
         3) run_osint ;; 4) run_device_hack ;; 5|i|I) run_servers ;; 
-        6) run_osint2 ;; 7) run_iban_scan ;; u|U) update_prime ;; 
+       m|M) install_manual_tools ;;   6) run_osint2 ;; 7) run_iban_scan ;; u|U) update_prime ;; 
         0) exit 0 ;; e) run_exploit_hub ;;
     esac
 done
