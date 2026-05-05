@@ -829,7 +829,7 @@ while true; do
     echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
     get_stats
     echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG   2) SQLMAP"
-    echo -e "3) SMART OSINT  4) DEVICE HACK   E) EXPLOIT HUB""
+    echo -e "3) SMART OSINT  4) DEVICE HACK   E) EXPLOIT HUB"
     echo -e "6) AIO OSINT AUTO    7) IBAN/RIB SCAN"
     echo -e "U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
     read -p ">> " opt
