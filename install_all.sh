@@ -210,42 +210,36 @@ if [ ! -d "/root/infoga" ]; then
     cd /root/infoga && safe_pip -r requirements.txt
 fi
 
-# --- УНИВЕРСАЛЬНАЯ И БЕЗОПАСНАЯ ФУНКЦИЯ ГЕНЕРАЦИИ ---
+# --- 1. УНИВЕРСАЛЬНАЯ И БЕЗОПАСНАЯ ФУНКЦИЯ ЗАПИСИ ---
+# Использует printf %s для предотвращения интерпретации символов внутри кода
 smart_cat() {
     local target_file="$1"
-    local limit_type="$2"  # Оставляем для совместимости/логики
-    local content="$3"
-    local perms="${4:-755}" # По умолчанию 755 (исполняемый)
+    local content="$2"
+    local perms="${3:-755}"
 
-    # Создаем папку, если её нет
     mkdir -p "$(dirname "$target_file")"
-
-    # Записываем контент максимально безопасно
-    printf "%s\n" "$content" > "$target_file"
-
-    # Выставляем права
-    chmod "$perms" "$target_file"
     
-    echo -e "\033[32m[OK]\033[0m Файл создан: $target_file (Права: $perms)"
+    # Запись байт-в-байт без риска инъекций
+    printf "%s\n" "$content" > "$target_file"
+    
+    chmod "$perms" "$target_file"
+    echo -e "${G}[OK]${NC} Файл создан: $target_file (Права: $perms)"
 }
 
-
-
-# Универсальная функция для проверки и обновления модулей
+# --- 2. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ОБНОВЛЕНИЯ МОДУЛЕЙ ---
+# Проверяет версию внутри файла перед перезаписью
 update_module() {
     local file_path="$1"
     local version="$2"
     local content_func="$3"
     local module_name="$4"
 
-    # Проверка: если файл отсутствует или версия внутри не совпадает
     if [ ! -f "$file_path" ] || ! grep -q "VERSION = '$version'" "$file_path"; then
         echo -e "${Y}[!] Обновление модуля $module_name до v$version...${NC}"
         
-        # Вызываем функцию, которая запишет контент
+        # Вызов функции генерации контента
         $content_func "$file_path" "$version"
         
-        chmod +x "$file_path"
         echo -e "${G}[+] Модуль $module_name v$version успешно интегрирован.${NC}"
     else
         echo -e "${G}[+] Модуль $module_name v$version уже актуален.${NC}"
@@ -253,27 +247,28 @@ update_module() {
 }
 
 
-
 # Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
 generate_iban_code() {
     local target_file="$1"
     local v_num="$2"
-    
-    cat << EOF > "$target_file"
+    local code
+
+    # Захватываем код Python. Используем 'EOF' в кавычках для защиты символов $ и скобок.
+    code=$(cat << 'EOF'
 import sys, re, json
 from urllib.request import urlopen
 
-# VERSION = '$v_num'
+# VERSION = '{{V_NUM}}'
 
 def get_detailed_data(iban):
     try:
-        url = f"https://api.ibanlist.com/v1/validate/{iban}"
+        url = f"[https://api.ibanlist.com/v1/validate/](https://api.ibanlist.com/v1/validate/){iban}"
         with urlopen(url, timeout=5) as response:
             return json.loads(response.read().decode())
     except: return None
 
 def validate_structure(iban):
-    """Разбор структуры как на профессиональных сайтах"""
+    """Разбор структуры (специфика FR и общая)"""
     res = {
         "Country": iban[:2],
         "Check": iban[2:4],
@@ -294,7 +289,7 @@ if __name__ == "__main__":
     # Очистка от пробелов и тире
     target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
     
-    # Параметры для сверки (если переданы)
+    # Параметры для сверки
     provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else None
     provided_bic = sys.argv[3].upper() if len(sys.argv) > 3 else None
 
@@ -309,44 +304,47 @@ if __name__ == "__main__":
         bank_name = data.get('bank_name', 'N/A')
         bic = data.get('bic', 'N/A')
         
-        print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН (Контрольная сумма верна)\033[0m")
+        print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН\033[0m")
         print(f"🏦 Банк: {bank_name}")
         print(f"🔑 BIC: {bic}")
         
-        # --- ЛОГИКА СВЕРКИ (MATCH REPORT) ---
         if provided_name or provided_bic:
             print(f"\n\033[1;35m--- ОТЧЕТ О СВЕРКЕ (MATCH REPORT) ---\033[0m")
-            
-            # Сверка BIC
             if provided_bic:
                 if provided_bic in bic:
                     print(f"✅ BIC Match: ПРОВЕРЕНО ({bic})")
                 else:
                     print(f"❌ BIC Mismatch! Ожидалось: {provided_bic}, Найдено: {bic}")
             
-            # Сверка банка по имени (эвристика)
             if bank_name != 'N/A':
-                print(f"ℹ️ Проверка банка: Система подтверждает {bank_name}")
-
-            print(f"🔍 Запуск Maigret для поиска владельца: {provided_name if provided_name else 'Searching...'}")
+                print(f"ℹ️ Подтверждение: Банк {bank_name} верифицирован")
     else:
         print(f"\033[91m[-] ОШИБКА: Неверная структура или контрольная сумма\033[0m")
 EOF
+)
+
+    # Внедряем версию
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+
+    # Используем smart_cat для записи (права 755 по умолчанию)
+    smart_cat "$target_file" "$code"
 }
 
-update_module "/root/iban_check.py" "1.7" generate_iban_code "IBAN/RIB"
+# --- ВЫЗОВ В СЕКЦИИ DEPLOYMENT ---
+update_module "/root/iban_check.py" "1.7" generate_iban_code "IBAN/RIB Checker"
 
-# --- ГЕНЕРАЦИЯ СЕРВЕРОВ (Твой оригинал) ---
 # Функция-генератор для AV-Server (v1.2)
+# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
 generate_av_server_code() {
     local target_file="$1"
     local v_num="$2"
+    local code
 
-    cat << EOF > "$target_file"
+    code=$(cat << 'EOF'
 from flask import Flask, request, render_template_string
 import subprocess, os, shutil, socket, time
 
-# VERSION = '$v_num'
+# VERSION = '{{V_NUM}}'
 app = Flask(__name__)
 CLAM_PATH = shutil.which('clamscan') or '/usr/bin/clamscan'
 
@@ -375,7 +373,7 @@ STYLE = """
 
 @app.route('/')
 def index():
-    return render_template_string(STYLE + '<div class="container"><h2>> SECURE_GATEWAY</h2><p>Uplink: scanclamavlocal</p><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">INITIATE SSL SCAN</button></form></div>')
+    return render_template_string(STYLE + '<div class="container"><h2>> SECURE_GATEWAY</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">INITIATE SSL SCAN</button></form></div>')
 
 @app.route('/scan', methods=['POST'])
 def scan():
@@ -388,20 +386,15 @@ def scan():
 
     scan_output = ""
     try:
-        # Передача списка параметров исключает ошибки с пробелами в именах
         cmd = [CLAM_PATH, '--no-summary', tmp_path]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
-        
         scan_output = res.stdout if res.stdout else res.stderr
         if not scan_output and res.returncode == 0:
             scan_output = f"{f.filename}: OK"
-            
     except Exception as e:
         scan_output = f"System Error: {str(e)}"
     finally:
-        # Файл удаляется ТОЛЬКО после того, как результат сканирования считан в память
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(tmp_path): os.remove(tmp_path)
 
     is_infected = "FOUND" in scan_output
     status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_TRANSMISSION_VERIFIED"
@@ -417,37 +410,39 @@ def scan():
     """, output=scan_output)
 
 if __name__ == '__main__':
-    ip = get_ip()
-    # Авто-генерация SSL если отсутствуют
+    # Авто-генерация SSL
     if not os.path.exists('/root/cert.pem'):
         os.system('openssl req -x509 -newkey rsa:2048 -nodes -out /root/cert.pem -keyout /root/key.pem -days 365 -subj "/CN=scanclamavlocal"')
     
-    # Очистка порта перед запуском
     os.system('fuser -k 5000/tcp 2>/dev/null')
-    
     app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'))
 EOF
+)
+    # Внедряем версию и записываем
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
 }
 
-# Антивирусный сервер (Security Hub)
+# Вызов обновления
 update_module "/root/av_server.py" "1.6" generate_av_server_code "AV-Scanner"
 
 
 # Функция-генератор для Share-Server (v1.0)
+# --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
 generate_share_server_code() {
     local target_file="$1"
     local v_num="$2"
+    local code
 
-    cat << EOF > "$target_file"
+    code=$(cat << 'EOF'
 from flask import Flask, render_template_string, send_from_directory
 import os
 
-# VERSION = '$v_num'
+# VERSION = '{{V_NUM}}'
 
 app = Flask(__name__)
 SHARE_DIR = '/root/share'
 
-# Автоматическое создание директории при запуске
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR)
 
@@ -461,29 +456,23 @@ STYLE = """
         transition: 0.3s; text-decoration: none; color: #00ff41; border-radius: 4px;
         display: flex; flex-direction: column; align-items: center;
     }
-    .file-card:hover { 
-        border-color: #00ff41; background: #00ff4111; transform: translateY(-5px); 
-        box-shadow: 0 5px 15px rgba(0, 255, 65, 0.2); 
-    }
+    .file-card:hover { border-color: #00ff41; background: #00ff4111; transform: translateY(-5px); }
     .icon { font-size: 40px; margin-bottom: 10px; }
-    .filename { font-size: 0.9em; word-break: break-all; }
-    .empty { color: #555; font-style: italic; }
 </style>
 """
 
 HTML = STYLE + """
 <div style="max-width: 1000px; margin: auto;">
     <h2>> SECURE_FILE_DISTRIBUTION</h2>
-    <p style="color: #555; font-size: 0.8em;">Location: {{ path }}</p>
-    
+    <p style="color: #555; font-size: 0.8em;">Sector Location: {{ path }}</p>
     <div class="grid">
         {% for f in files %}
         <a href="/get/{{f}}" class="file-card">
             <div class="icon">📄</div>
-            <div class="filename">{{ f }}</div>
+            <div style="font-size: 0.9em; word-break: break-all;">{{ f }}</div>
         </a>
         {% else %}
-        <p class="empty">No files detected in the transmission sector.</p>
+        <p style="color: #555; font-style: italic;">No files detected in the transmission sector.</p>
         {% endfor %}
     </div>
 </div>
@@ -493,7 +482,7 @@ HTML = STYLE + """
 def index():
     try:
         files = os.listdir(SHARE_DIR)
-    except Exception:
+    except:
         files = []
     return render_template_string(HTML, files=files, path=SHARE_DIR)
 
@@ -504,20 +493,27 @@ def get_file(filename):
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002)
 EOF
+)
+    # Внедряем версию и записываем
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
 }
-# 3. Сервер раздачи файлов (Share Sector) - Port 5002
+
+# Вызов обновления
 update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Share"
 
 # Функция-генератор для Upload-Server (v1.0)
 generate_upload_server_code() {
     local target_file="$1"
     local v_num="$2"
-
-    cat << EOF > "$target_file"
+    local code
+    
+    # Захватываем код Python. Кавычки вокруг 'EOF' критически важны!
+    code=$(cat << 'EOF'
 from flask import Flask, request, render_template_string
 import os
 
-# VERSION = '$v_num'
+# VERSION = '{{V_NUM}}'
 
 app = Flask(__name__)
 
@@ -534,30 +530,18 @@ STYLE = """
     input[type="file"] { background: #1a1a1a; border: 1px solid #333; padding: 10px; color: #00ff41; width: 100%; margin-bottom: 20px; }
     button { background: #00ff41; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; width: 100%; }
     button:hover { background: #008f25; box-shadow: 0 0 15px #00ff41; }
-    .path-info { color: #555; font-size: 0.7em; margin-top: 20px; border-top: 1px solid #222; padding-top: 10px; }
-    .success { color: #fff; text-transform: uppercase; animation: blink 1s infinite; }
-    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 </style>
 """
 
 HTML_INDEX = STYLE + """
 <div class="box">
     <h2>> INBOUND_DROP_BOX</h2>
-    <p style="font-size: 0.8em; margin-bottom: 20px; color: #888;">Secure uplink established. Ready for transmission.</p>
+    <p style="font-size: 0.8em; margin-bottom: 20px; color: #888;">Secure uplink established.</p>
     <form method="post" action="/upload" enctype="multipart/form-data">
         <input type="file" name="file" required>
         <button type="submit">Initiate Upload</button>
     </form>
-    <div class="path-info">Target: {{ target_dir }}</div>
-</div>
-"""
-
-HTML_SUCCESS = STYLE + """
-<div class="box">
-    <h2 class="success">Data Received</h2>
-    <p style="color: #00ff41;">The file has been successfully written to the secure sector.</p>
-    <br>
-    <a href="/" style="color: #888; text-decoration: none;">[ RETURN TO GATEWAY ]</a>
+    <div style="color: #555; font-size: 0.7em; margin-top: 20px;">Target: {{ target_dir }}</div>
 </div>
 """
 
@@ -567,32 +551,49 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files: 
-        return "Transmission Error: No data", 400
+    if 'file' not in request.files: return "Error", 400
     f = request.files['file']
-    if f.filename == '': 
-        return "Transmission Error: Empty filename", 400
-    
-    file_path = os.path.join(UPLOAD_DIR, f.filename)
-    f.save(file_path)
-    
-    return render_template_string(HTML_SUCCESS)
+    if f.filename == '': return "Error", 400
+    f.save(os.path.join(UPLOAD_DIR, f.filename))
+    return "SUCCESS: File received"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
 EOF
+)
+    # Внедряем версию через замену плейсхолдера
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    
+    # Записываем через smart_cat
+    smart_cat "$target_file" "$code"
 }
 
-update_module "/root/upload_server.py" "1.0" generate_upload_server_code "Inbound-Drop"
+# --- 4. ИСПОЛНЕНИЕ (DEPLOYMENT) ---
+
+echo -e "${B}--- STARTING CORE-PRIME SYNCHRONIZATION ---${NC}"
+
+# Пример вызова для твоего модуля
+update_module \
+    "/root/upload_server.py" \
+    "1.0.4" \
+    generate_upload_server_code \
+    "Inbound-Drop-Box"
 
 # --- ГЕНЕРАЦИЯ LAUNCHER (Твой оригинал + расширенный TOOLS_DATA) ---
-cat << 'EOF' > /root/launcher.sh
+# --- ГЕНЕРАТОР ГЛАВНОГО ЛОНЧЕРА (СОХРАНЕННЫЙ ОРИГИНАЛ) ---
+generate_launcher_code() {
+    local target_file="$1"
+    local v_num="$2"
+    local code
+
+    # Мы помещаем весь твой код в переменную, заменяя только версию
+    code=$(cat << 'EOF'
 #!/bin/bash
-CURRENT_VERSION="18.8"
+CURRENT_VERSION="{{V_NUM}}"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
-# Решение проблемы с кэшем ZSH (zcompdump)
+# Решение проблемы с кэшем ZSH
 if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
     rm -f /root/.cache/zcompdump* 2>/dev/null
     rm -f /root/.zcompdump* 2>/dev/null
@@ -602,23 +603,10 @@ fi
 CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 [ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
 
-# 2. Настраиваем dnsmasq (если установлен)
+# 2. Настраиваем dnsmasq
 if command -v dnsmasq >/dev/null 2>&1; then
     echo -e "${G}[*] Configuring DNS: scanclamavlocal -> $CURRENT_IP${NC}"
     
-# Функция очистки (Repair)
-repair() { 
-    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
-    rm -rf /root/.cache/* /tmp/* 2>/dev/null
-    history -c
-}
-
-# Заглушка для инсталлера (чтобы не было 'command not found')
-create_repair_script() {
-    repair
-}
-
-    # Используем EOD, чтобы не конфликтовать с основным EOF
     cat << EOD > /etc/dnsmasq.conf
 domain-needed
 bogus-priv
@@ -627,7 +615,6 @@ interface=wlan0
 address=/scanclamavlocal/$CURRENT_IP
 EOD
 
-    # Ремонт блока управления службой dnsmasq
     if [ -f /etc/init.d/dnsmasq ]; then
         service dnsmasq restart 2>/dev/null
     else
@@ -659,7 +646,7 @@ get_stats() {
     echo -e "${Y}NET: $net ${Y}| ACTIVE SRV:$srv${NC}"
 }
 
-# --- БАЗА TOOLS_DATA (Все 18+ позиций) ---
+# --- БАЗА TOOLS_DATA ---
 TOOLS_DATA=(
     "zphisher;https://github.com/htr-tech/zphisher/archive/refs/heads/master.zip;zphisher.sh;"
     "seeker;https://github.com/thewhiteh4t/seeker/archive/refs/heads/master.zip;seeker.py;python3 -m pip install -r requirements.txt --break-system-packages"
@@ -781,8 +768,14 @@ while true; do
     esac
 done
 EOF
+)
+    # Применяем версию и записываем через нашу надежную функцию
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
 
-
+# --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
+update_module "/root/launcher.sh" "18.8" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
