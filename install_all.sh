@@ -826,6 +826,38 @@ run_pc_control() {
     esac
 }
 
+install_manual_tools() {
+    clear
+    echo -e "${Y}>>> [ MANUAL INSTALLATION HUB ] <<<${NC}"
+    echo -e "1) Metasploit (Heavy)  2) Searchsploit (DB)  3) Sliver C2  4) LaZagne"
+    read -p "Выберите инструмент: " m_opt
+
+    case $m_opt in
+        1)
+            echo -e "${G}[*] Installing Metasploit...${NC}"
+            # Используем самый стабильный скрипт для Termux/Linux на Android
+            pkg install wget -y && wget https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh
+            chmod +x metasploit.sh && ./metasploit.sh
+            ;;
+        2)
+            echo -e "${G}[*] Installing ExploitDB...${NC}"
+            git clone --depth 1 https://github.com/offensive-security/exploitdb.git /root/exploitdb
+            ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit
+            ;;
+        3)
+            echo -e "${G}[*] Downloading Sliver Server...${NC}"
+            curl -Ls https://api.github.com/repos/BishopFox/sliver/releases/latest | grep "browser_download_url.*sliver-server_linux" | cut -d : -f 2,3 | tr -d \" | wget -qi - -O /root/sliver-server
+            chmod +x /root/sliver-server
+            ;;
+        4)
+            echo -e "${G}[*] Installing LaZagne...${NC}"
+            git clone https://github.com/AlessandroZ/LaZagne.git /root/lazagne
+            cd /root/lazagne && python3 -m pip install -r requirements.txt --break-system-packages
+            ;;
+    esac
+    read -p "Установка завершена. Нажмите Enter..."
+}
+
 
 run_exploit_hub() {
     clear; zero_clear
@@ -889,7 +921,7 @@ while true; do
     echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG   2) SQLMAP"
     echo -e "3) SMART OSINT  4) DEVICE HACK   E) EXPLOIT HUB"
     echo -e "6) AIO OSINT AUTO    7) IBAN/RIB SCAN"
-    echo -e "U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
+    echo -e "M) MANUAL INSTALL  U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
     read -p ">> " opt
     case $opt in
         g|G) run_ghost_scan ;; 1) run_phishing ;; 2) run_sqlmap ;; 
