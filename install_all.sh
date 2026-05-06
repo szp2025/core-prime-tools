@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="30.5"
+CURRENT_VERSION="30.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -720,6 +720,41 @@ run_osint() {
     echo -e "${G}>>> Smart Scan Finished. Trace Cleaned.${NC}"
 }
 
+# Функция: Мониторинг соединений в реальном времени
+monitor_connections() {
+    echo -e "\033[1;34m[*] Отслеживание активных соединений (CTRL+C для выхода)...\033[0m"
+    # Показывает IP, процессы и порты, обновляя каждые 2 секунды
+    watch -n 2 "ss -tpn | grep ESTAB"
+}
+
+# Функция: Быстрый поиск устройств в подсети
+fast_network_scan() {
+    echo -e "\033[1;34m[*] Сканирование локальной сети...\033[0m"
+    # Используем стандартный интерфейс wlan0
+    local subnet=$(ip route | grep wlan0 | awk '{print $1}')
+    arp-scan --interface=wlan0 "$subnet"
+}
+
+# Функция: Скрытый перехват трафика
+capture_traffic_smart() {
+    echo -e "\033[1;34m[*] Запуск TShark (анализ в реальном времени)...\033[0m"
+    echo -e "[*] Фильтр: только HTTP и DNS (чтобы не забивать память)"
+    
+    # Запуск перехвата только важных данных
+    tshark -i wlan0 -f "port 80 or port 53" -T fields -e http.host -e dns.qry.name
+}
+
+# Функция: Очистка системы
+clear_logs_and_traces() {
+    echo -e "\033[1;33m[*] Стирание логов и истории...\033[0m"
+    # Очистка истории bash
+    history -c
+    # Затирание временных файлов в /tmp
+    rm -rf /tmp/*
+    # Очистка кэша пакетов (освобождает место)
+    apt-get clean
+    echo -e "\033[1;32m[+] Система очищена.\033[0m"
+}
 
 run_osint2() {
     clear; zero_clear
@@ -1178,7 +1213,7 @@ update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "30.5" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "30.6" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
