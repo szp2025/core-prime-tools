@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="30.4"
+CURRENT_VERSION="30.5"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -851,6 +851,123 @@ search_exploit_db() {
     read -n 1
 }
 
+
+
+# Функция: Автоматизированная экстракция учетных данных
+# Описание: Использует LaZagne с умным сохранением и проверкой модулей
+extract_all_passwords() {
+    clear
+    echo -e "\033[1;34m[*] Определение ОС и запуск экстракции...\033[0m"
+    
+    # 1. Попытка собрать системные хэши (Linux/macOS)
+    if [ -f "/etc/shadow" ]; then
+        echo -e "[+] Обнаружена Linux-система. Копирование хэшей shadow..."
+        cp /etc/shadow /root/reports/shadow_backup 2>/dev/null
+    fi
+
+    # 2. Запуск LaZagne (универсальный для всех ОС)
+    cd /root/lazagne
+    python3 lazagne.py all -oN /root/reports/universal_passwords.txt
+    
+    echo -e "\033[1;32m[+] Сбор завершен. Отчет: /root/reports/universal_passwords.txt\033[0m"
+}
+
+reset_any_os_password() {
+    echo -e "\n[1] Windows (SAM)"
+    echo -e "[2] Linux (Shadow Edit)"
+    echo -e "[3] macOS (Instructions)"
+    read -p "Выберите ОС цели: " os_type
+
+    case $os_type in
+        1)
+            # Тот самый умный поиск SAM, который мы делали
+            reset_windows_password 
+            ;;
+        2)
+            echo -e "\033[1;33m[*] Сброс пароля Linux...\033[0m"
+            read -p "Введите имя пользователя: " username
+            # Метод: удаление хэша пароля в /etc/shadow (делает пароль пустым)
+            sed -i "s/^$username:[^:]*:/$username::/" /etc/shadow
+            echo -e "\033[1;32m[+] Пароль для $username удален. Теперь можно войти без него.\033[0m"
+            ;;
+        3)
+            echo -e "\033[1;34m[*] Для macOS используйте 'resetpassword' в Recovery Mode или терминал:\033[0m"
+            echo "Команда: dscl . -passwd /Users/username newpassword"
+            ;;
+    esac
+}
+
+
+# Функция: Сброс пароля Windows через поиск SAM
+# Описание: Автоматический поиск реестра Windows на смонтированных разделах
+reset_windows_password() {
+    echo -e "\033[1;34m[*] Поиск конфигурации реестра Windows (SAM)...\033[0m"
+    
+    # Эвристический поиск файла SAM в /mnt и /media
+    local sam_files=$(find /mnt /media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null)
+    
+    if [[ -z "$sam_files" ]]; then
+        echo -e "\033[1;31m[!] Системный диск Windows не примонтирован.\033[0m"
+        return
+    fi
+    
+    echo -e "[*] Найдены файлы SAM:"
+    select sam_path in $sam_files; do
+        if [[ -n "$sam_path" ]]; then
+            echo -e "\033[1;33m[*] Открытие редактора для: $sam_path\033[0m"
+            chntpw -i "$sam_path"
+            break
+        else
+            echo "Неверный выбор."
+        fi
+    done
+}
+
+
+# Функция: Умный скан на вирусы и руткиты
+# Описание: Комбинированный анализ системы на скрытые угрозы
+smart_threat_scan() {
+    echo -e "\033[1;34m[*] Запуск кроссплатформенного анализа...\033[0m"
+    
+    # Ищем подозрительные файлы в автозагрузке (Linux/macOS)
+    echo -e "[1/3] Проверка автозагрузки (Cron/Systemd/LaunchAgents)..."
+    ls -la /etc/cron.* /etc/systemd/system/*.service ~/Library/LaunchAgents 2>/dev/null
+    
+    # Ищем скрытые бинарники в /tmp и /dev/shm (излюбленные места вирусов)
+    echo -e "[2/3] Поиск скрытых исполняемых файлов в памяти..."
+    find /dev/shm /tmp -type f -executable 2>/dev/null
+    
+    # Базовый скан rkhunter
+    echo -e "[3/3] Запуск rkhunter..."
+    rkhunter --check --sk --quiet
+}
+
+
+
+# Функция: PC Recovery & Password Extraction
+# Описание: Извлечение паролей из системы, браузеров и сброс пароля ОС
+pc_password_recovery() {
+    while true; do
+        clear
+        echo -e "\033[1;33m--- MULTI-OS RECOVERY & FORENSIC (Win/Lin/Mac) ---\033[0m"
+        echo -e "1) Extract Passwords (All Platforms)"
+        echo -e "2) Reset OS Password (Win/Lin/Mac)"
+        echo -e "3) Heuristic Malware Scan (Cross-Platform)"
+        echo -e "B) Back"
+        read -p ">> " recovery_choice
+
+        case $recovery_choice in
+            1) extract_all_passwords ;;
+            2) reset_any_os_password ;;
+            3) smart_threat_scan ;;
+            [Bb]) return ;;
+        esac
+        echo -e "\nНажмите Enter..."
+        read
+    done
+}
+
+
 # Функция: Глубокий аудит устройства
 # Параметры: target_ip
 # Описание: Автоматический сбор паролей, проверка портов и анализ системы
@@ -885,6 +1002,7 @@ run_device_hack() {
         echo -e "3) Ghost Auto-Pwn (Connect)"
         echo -e "4) Search ExploitDB"
         echo -e "5) Full System Audit (Passwords/Vulns)"
+        echo -e "6) PC Recovery & Passwords (USB/Local)" # Наш новый пункт
         echo -e "B) Back"
         echo -e "---------------------------------------"
         read -p ">> " dh
@@ -895,6 +1013,7 @@ run_device_hack() {
             3) launch_ghost_autopwn ;;
             4) search_exploit_db ;;
             5) run_deep_audit ;; # Наш новый мощный пункт
+            6) pc_password_recovery ;;
             [Bb]) return ;;
             *) echo "Неверный выбор"; sleep 1 ;;
         esac
@@ -1059,7 +1178,7 @@ update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "30.4" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "30.5" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
