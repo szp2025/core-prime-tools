@@ -718,40 +718,64 @@ run_sqlmap() { read -p "URL: " target; [ -n "$target" ] && sqlmap -u "$target" -
 run_osint() { echo -e "${Y}OSINT Logic...${NC}"; sleep 2; }
 
 
-# Исправленный Пункт 5 (Пароли и Компьютер)
+# --- РАЗДЕЛ: DEVICE HACK (Пункт 5) ---
 run_device_hack() {
     local names="Multi-OS Recovery;PC Control;Anti-Forensic;Back"
     local funcs="run_recovery run_pc_control run_anti_forensic run_main_menu"
     prime_dynamic_controller "DEVICE HACK" "$names" "$funcs"
 }
 
-
-# Функция для работы с паролями (LaZagne и прочее)
 run_recovery() {
-    echo -e "${G}[*] Запуск Multi-OS Recovery (Password Extract)...${NC}"
-    # Если LaZagne установлен, запускаем его
+    echo -e "${G}[*] Запуск Multi-OS Recovery (LaZagne)...${NC}"
+    # Проверяем наличие модуля в папке core-prime-tools
     if [ -f "/root/core-prime-tools/modules/lazagne.py" ]; then
         python3 /root/core-prime-tools/modules/lazagne.py all
     else
-        echo -e "${R}[!] Модуль паролей не найден. Проверь установку.${NC}"
+        echo -e "${R}[!] Ошибка: Модуль паролей не найден по пути /root/core-prime-tools/modules/lazagne.py${NC}"
     fi
     pause
     run_device_hack
 }
 
-# Исправленный запуск PC Control (чтобы не вылетало)
 run_pc_control() {
     echo -e "${G}[*] Активация PC Control Mode...${NC}"
-    # Здесь должен быть вызов твоего основного скрипта управления ПК
-    if [ -f "/root/core-prime-tools/modules/pc_controller.sh" ]; then
-        bash /root/core-prime-tools/modules/pc_controller.sh
+    # Здесь должен быть вызов твоего основного контроллера для ПК
+    if [ -f "/root/core-prime-tools/modules/pc_control.sh" ]; then
+        bash /root/core-prime-tools/modules/pc_control.sh
     else
-        echo -e "${Y}[!] Скрипт управления не найден. Запуск тестового режима...${NC}"
-        # Временная заглушка, чтобы не вылетало сразу
-        sleep 2
+        echo -e "${Y}[!] Исполняемый файл pc_control.sh не найден.${NC}"
+        echo -e "${W}[*] Попытка запуска универсального метода...${NC}"
+        sleep 1
     fi
     run_device_hack
 }
+
+run_anti_forensic() {
+    echo -e "${R}[!] ВНИМАНИЕ: Очистка следов системы...${NC}"
+    history -c
+    rm -rf /var/log/* 2>/dev/null
+    echo -e "${G}[+] Логи очищены.${NC}"
+    pause
+    run_device_hack
+}
+
+
+
+run_update_system() {
+    echo -e "${B}[*] Проверка обновлений на GitHub...${NC}"
+    if ping -c 1 google.com &>/dev/null; then
+        cd /root/core-prime-tools
+        git fetch --all
+        git reset --hard origin/main
+        chmod +x install_all.sh
+        echo -e "${G}[+] Обновление завершено. Перезапусти инсталлер.${NC}"
+    else
+        echo -e "${R}[!] Нет сети. Проверь подключение.${NC}"
+    fi
+    pause
+    run_main_menu
+}
+
 
 launch_ghost_manual() { cd /root/Ghost && python3 -m ghost; }
 analyze_network_traffic() { tshark -i wlan0; }
