@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="31.0"
+CURRENT_VERSION="31.1"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -718,25 +718,40 @@ run_sqlmap() { read -p "URL: " target; [ -n "$target" ] && sqlmap -u "$target" -
 run_osint() { echo -e "${Y}OSINT Logic...${NC}"; sleep 2; }
 
 
+# Исправленный Пункт 5 (Пароли и Компьютер)
 run_device_hack() {
     local names="Multi-OS Recovery;PC Control;Anti-Forensic;Back"
     local funcs="run_recovery run_pc_control run_anti_forensic run_main_menu"
     prime_dynamic_controller "DEVICE HACK" "$names" "$funcs"
 }
 
+
+# Функция для работы с паролями (LaZagne и прочее)
 run_recovery() {
-    # Вот здесь и живет работа с паролями!
-    echo -e "${G}[*] Запуск модуля извлечения паролей (LaZagne)...${NC}"
-    # Проверка наличия файла перед запуском
-    if [ -f "/root/lazagne.py" ]; then
-        python3 /root/lazagne.py all
+    echo -e "${G}[*] Запуск Multi-OS Recovery (Password Extract)...${NC}"
+    # Если LaZagne установлен, запускаем его
+    if [ -f "/root/core-prime-tools/modules/lazagne.py" ]; then
+        python3 /root/core-prime-tools/modules/lazagne.py all
     else
-        echo -e "${R}[!] Ошибка: LaZagne не найден. Установи через пункт 9.${NC}"
+        echo -e "${R}[!] Модуль паролей не найден. Проверь установку.${NC}"
     fi
     pause
     run_device_hack
 }
 
+# Исправленный запуск PC Control (чтобы не вылетало)
+run_pc_control() {
+    echo -e "${G}[*] Активация PC Control Mode...${NC}"
+    # Здесь должен быть вызов твоего основного скрипта управления ПК
+    if [ -f "/root/core-prime-tools/modules/pc_controller.sh" ]; then
+        bash /root/core-prime-tools/modules/pc_controller.sh
+    else
+        echo -e "${Y}[!] Скрипт управления не найден. Запуск тестового режима...${NC}"
+        # Временная заглушка, чтобы не вылетало сразу
+        sleep 2
+    fi
+    run_device_hack
+}
 
 launch_ghost_manual() { cd /root/Ghost && python3 -m ghost; }
 analyze_network_traffic() { tshark -i wlan0; }
@@ -773,7 +788,7 @@ exit_script() {
 
 run_main_menu() {
     local m_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL UPDATE_CORE SERVICE_HUB EXIT"
-    local m_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools update_prime run_servers exit_script"
+    local m_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_payload_gen run_web_attack run_installer run_repair run_system_info exit_script"
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$m_names" "$m_funcs"
 }
 
@@ -794,7 +809,7 @@ update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "30.9" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "31.0" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
