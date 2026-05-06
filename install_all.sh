@@ -763,7 +763,7 @@ run_main_menu() {
 repair
 run_main_menu
 EOF
-
+)
     # Применяем версию и записываем
     code="${code//\{\{V_NUM\}\}/$v_num}"
     smart_cat "$target_file" "$code"
