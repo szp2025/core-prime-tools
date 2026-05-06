@@ -716,11 +716,28 @@ run_ghost_scan() { read -p "Target IP: " t; [ -n "$t" ] && nmap -F "$t"; read -p
 run_phishing() { [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh; }
 run_sqlmap() { read -p "URL: " target; [ -n "$target" ] && sqlmap -u "$target" --batch --random-agent; }
 run_osint() { echo -e "${Y}OSINT Logic...${NC}"; sleep 2; }
+
+
 run_device_hack() {
-    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Bluetooth_Scan"
-    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn scan_bluetooth_devices"
-    prime_dynamic_controller "DEVICE & NETWORK" "$dh_names" "$dh_funcs"
+    local names="Multi-OS Recovery;PC Control;Anti-Forensic;Back"
+    local funcs="run_recovery run_pc_control run_anti_forensic run_main_menu"
+    prime_dynamic_controller "DEVICE HACK" "$names" "$funcs"
 }
+
+run_recovery() {
+    # Вот здесь и живет работа с паролями!
+    echo -e "${G}[*] Запуск модуля извлечения паролей (LaZagne)...${NC}"
+    # Проверка наличия файла перед запуском
+    if [ -f "/root/lazagne.py" ]; then
+        python3 /root/lazagne.py all
+    else
+        echo -e "${R}[!] Ошибка: LaZagne не найден. Установи через пункт 9.${NC}"
+    fi
+    pause
+    run_device_hack
+}
+
+
 launch_ghost_manual() { cd /root/Ghost && python3 -m ghost; }
 analyze_network_traffic() { tshark -i wlan0; }
 launch_ghost_autopwn() { read -p "IP: " tip; cd /root/Ghost && python3 -m ghost --execute "connect $tip"; }
@@ -731,6 +748,7 @@ run_exploit_hub() {
     local ex_funcs="ex_phonesploit_pro run_sqlmap ex_pc_network_scan run_pc_control"
     prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
 }
+
 ex_phonesploit_pro() { cd /root/PhoneSploit-Pro && python3 phonesploitpro.py; }
 ex_pc_network_scan() { read -p "IP: " t; nmap -sV --script vuln "$t"; read -p "Enter..."; }
 run_pc_control() { echo -e "PC Control Mode..."; sleep 2; }
