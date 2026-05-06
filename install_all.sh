@@ -832,6 +832,25 @@ launch_ghost_autopwn() {
     sleep 2
 }
 
+# Функция: Поиск эксплойтов
+# Параметры: query (ввод пользователя)
+# Описание: Локальный поиск по базе данных ExploitDB
+search_exploit_db() {
+    clear
+    echo -e "\033[1;34m[*] Поиск в ExploitDB (SearchSploit)...\033[0m"
+    read -p "Введите название (например, android 13 или smb): " exploit_query
+    
+    if [[ -z "$exploit_query" ]]; then
+        return
+    fi
+
+    # Поиск по локальной базе
+    searchsploit "$exploit_query"
+    
+    echo -e "\nНажмите любую клавишу для возврата..."
+    read -n 1
+}
+
 # Основная функция управления
 run_device_hack() {
     while true; do
@@ -840,6 +859,7 @@ run_device_hack() {
         echo -e "1) Ghost Framework (Manual)"
         echo -e "2) Bluetooth Scan"
         echo -e "3) Ghost Auto-Pwn (Connect by IP)"
+        echo -e "3) search exploit db"
         echo -e "B) Back to Main Menu"
         echo -e "---------------------------------------"
         read -p ">> " dh
@@ -848,6 +868,7 @@ run_device_hack() {
             1) launch_ghost_manual ;;
             2) scan_bluetooth_devices ;;
             3) launch_ghost_autopwn ;;
+            4) search_exploit_db ;; # Наш новый пункт
             [Bb]) return ;;
             *) echo "Неверный выбор"; sleep 1 ;;
         esac
