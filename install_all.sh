@@ -1291,10 +1291,9 @@ exit_script() {
     exit 0
 }
 
-
-EOF
 repair
 run_main_menu
+EOF
     # Применяем версию и записываем через нашу надежную функцию
     code="${code//\{\{V_NUM\}\}/$v_num}"
     smart_cat "$target_file" "$code"
