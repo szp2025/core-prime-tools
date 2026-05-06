@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="30.6"
+CURRENT_VERSION="30.7"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -1004,30 +1004,34 @@ pc_password_recovery() {
 
 
 
-# Функция: Анализ трафика (TShark/Tcpdump)
-# Описание: Перехват данных на интерфейсе wlan0 без графической оболочки
+# Функция: Глубокий анализ сети через TShark
+# Описание: Использует уже установленный /usr/bin/tshark
 analyze_network_traffic() {
     clear
-    echo -e "\033[1;33m--- МОДУЛЬ СЕТЕВОГО АНАЛИЗА ---\033[0m"
-    
-    if command -v tshark &> /dev/null; then
-        echo -e "[1] Быстрый монитор (Host + Протокол)"
-        echo -e "[2] Перехват HTTP-заголовков (поиск паролей/куки)"
-        echo -e "[B] Назад"
-        read -p ">> " net_choice
+    echo -e "\033[1;33m--- ТЕРМИНАЛЬНЫЙ АНАЛИЗАТОР (TSHARK) ---\033[0m"
+    echo -e "1) Мониторинг всех хостов (Кто в сети?)"
+    echo -e "2) Перехват HTTP/DNS (Поиск данных)"
+    echo -e "3) Запись трафика в файл (.pcap для ПК)"
+    echo -e "B) Назад"
+    read -p ">> " net_choice
 
-        case $net_choice in
-            1) tshark -i wlan0 -T fields -e frame.time_relative -e ip.src -e ip.dst -e _ws.col.Protocol ;;
-            2) tshark -i wlan0 -Y http.request -T fields -e http.host -e http.user_agent ;;
-            *) return ;;
-        esac
-    else
-        echo -e "\033[1;31m[!] TShark не найден. Использую базовый Tcpdump...\033[0m"
-        tcpdump -i wlan0 -n -c 50
-    fi
-    read -p "Нажмите Enter..."
+    case $net_choice in
+        1) 
+            # Показывает время, IP источника, IP цели и протокол
+            tshark -i wlan0 -T fields -e frame.time_relative -e ip.src -e ip.dst -e _ws.col.Protocol 
+            ;;
+        2) 
+            # Вытягивает посещенные сайты и поисковые запросы
+            tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name 
+            ;;
+        3) 
+            # Сохраняет трафик в папку /root/reports для анализа на компе
+            echo -e "[*] Запись... Нажми CTRL+C для остановки."
+            tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap
+            ;;
+        *) return ;;
+    esac
 }
-
 
 # Функция: Глубокий аудит устройства
 # Параметры: target_ip
@@ -1057,29 +1061,34 @@ run_deep_audit() {
 run_device_hack() {
     while true; do
         clear
-        echo -e "\033[1;37m--- УПРАВЛЕНИЕ УСТРОЙСТВАМИ (GHOST) ---\033[0m"
-        echo -e "1) Ghost Framework (Manual)"
-        echo -e "2) Bluetooth Scan"
-        echo -e "3) Ghost Auto-Pwn (Connect)"
-        echo -e "4) Search ExploitDB"
-        echo -e "5) Full System Audit (Passwords/Vulns)"
-        echo -e "6) PC Recovery & Passwords (USB/Local)" # Наш новый пункт
+        echo -e "\033[1;36m--- УПРАВЛЕНИЕ УСТРОЙСТВАМИ И СЕТЬЮ ---\033[0m"
+        echo -e "1) Ghost Framework (Manual)      - Интерактивный контроль Android"
+        echo -e "2) TShark Network Sniffer        - Умный перехват трафика"
+        echo -e "3) Ghost Auto-Pwn (Connect)      - Мгновенное подключение по IP"
+        echo -e "4) Search ExploitDB              - Поиск уязвимостей в базе"
+        echo -e "5) Smart System Audit            - Эвристика, пароли и вирусы"
+        echo -e "6) Multi-OS Recovery (USB)       - Сброс паролей Win/Lin/Mac"
+        echo -e "7) Bluetooth Scan                - Поиск устройств рядом"
+        echo -e "8) Anti-Forensic (Clear)         - Очистка логов и следов"
         echo -e "B) Back"
-        echo -e "---------------------------------------"
+        echo -e "--------------------------------------------------------"
         read -p ">> " dh
 
         case $dh in
             1) launch_ghost_manual ;;
-            2) scan_bluetooth_devices ;;
+            2) analyze_network_traffic ;; # Использует найденный /usr/bin/tshark
             3) launch_ghost_autopwn ;;
             4) search_exploit_db ;;
-            5) run_deep_audit ;; # Наш новый мощный пункт
-            6) pc_password_recovery ;;
+            5) run_deep_audit ;;         # Пароли, скан памяти и портов
+            6) pc_password_recovery ;;   # Универсальный сброс (SAM/Shadow)
+            7) scan_bluetooth_devices ;;
+            8) clear_logs_and_traces ;;   # Защита твоего "Гамбита"
             [Bb]) return ;;
-            *) echo "Неверный выбор"; sleep 1 ;;
+            *) echo -e "\033[1;31mНеверный выбор\033[0m"; sleep 1 ;;
         esac
     done
 }
+
 run_phishing() {
     [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh
 }
@@ -1239,7 +1248,7 @@ update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "30.6" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "30.7" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
