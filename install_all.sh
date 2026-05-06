@@ -1003,6 +1003,32 @@ pc_password_recovery() {
 }
 
 
+
+# Функция: Анализ трафика (TShark/Tcpdump)
+# Описание: Перехват данных на интерфейсе wlan0 без графической оболочки
+analyze_network_traffic() {
+    clear
+    echo -e "\033[1;33m--- МОДУЛЬ СЕТЕВОГО АНАЛИЗА ---\033[0m"
+    
+    if command -v tshark &> /dev/null; then
+        echo -e "[1] Быстрый монитор (Host + Протокол)"
+        echo -e "[2] Перехват HTTP-заголовков (поиск паролей/куки)"
+        echo -e "[B] Назад"
+        read -p ">> " net_choice
+
+        case $net_choice in
+            1) tshark -i wlan0 -T fields -e frame.time_relative -e ip.src -e ip.dst -e _ws.col.Protocol ;;
+            2) tshark -i wlan0 -Y http.request -T fields -e http.host -e http.user_agent ;;
+            *) return ;;
+        esac
+    else
+        echo -e "\033[1;31m[!] TShark не найден. Использую базовый Tcpdump...\033[0m"
+        tcpdump -i wlan0 -n -c 50
+    fi
+    read -p "Нажмите Enter..."
+}
+
+
 # Функция: Глубокий аудит устройства
 # Параметры: target_ip
 # Описание: Автоматический сбор паролей, проверка портов и анализ системы
