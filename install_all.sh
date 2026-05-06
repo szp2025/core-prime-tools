@@ -206,7 +206,7 @@ TOOLS=(
 
 # Дополнительные инструменты для EXPLOIT HUB
 TOOLS+=(
-    "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
+   # "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
     "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
     "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
@@ -669,7 +669,7 @@ TOOLS_DATA=(
     "infoga;https://github.com/m4ll0k/Infoga/archive/refs/heads/master.zip;infoga.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "phoneinfoga;https://github.com/sundowndev/phoneinfoga/archive/refs/heads/master.zip;phoneinfoga.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "recon-dog;https://github.com/s0md3v/ReconDog/archive/refs/heads/master.zip;dog;"
-    "phonesploit;https://github.com/Zucccs/PhoneSploit-Python/archive/refs/heads/main.zip;phonesploitpython.py;python3 -m pip install -r requirements.txt --break-system-packages"
+    # "phonesploit;https://github.com/Zucccs/PhoneSploit-Python/archive/refs/heads/main.zip;phonesploitpython.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "ghost-framework;https://github.com/EntySec/Ghost/archive/refs/heads/master.zip;ghost;python3 -m pip install -r requirements.txt --break-system-packages"
     "cupp;https://github.com/Mebus/cupp/archive/refs/heads/master.zip;cupp.py;"
     "instashell;https://github.com/thelinuxchoice/instashell/archive/refs/heads/master.zip;instashell.sh;chmod +x install.sh && ./install.sh"
@@ -677,7 +677,7 @@ TOOLS_DATA=(
 
 # Дополнительные инструменты для EXPLOIT HUB
 TOOLS_DATA+=(
-    "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
+   # "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
     "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
     "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
@@ -782,17 +782,77 @@ run_servers() {
     esac
 }
 
-run_device_hack() {
+# --- Глобальные параметры Ghost ---
+GHOST_PATH="/root/Ghost"
+PYTHON_BIN="python3"
+
+# Функция 1: Ручной режим
+# Параметры: нет
+# Описание: Запускает интерактивную консоль Ghost Framework
+launch_ghost_manual() {
     clear
-    echo -e "1) PhoneSploit  2) Bluetooth Scan  B) Back"
-    read -p ">> " dh
-    case $dh in
-        1) cd /root/PhoneSploit-Pro && python3 phonesploitpython.py ;;
-        2) hcitool scan ;;
-        *) return ;;
-    esac
+    echo -e "\033[1;34m[*] Вход в ручной режим Ghost Framework...\033[0m"
+    if [ -d "$GHOST_PATH" ]; then
+        cd "$GHOST_PATH" && $PYTHON_BIN -m ghost
+    else
+        echo -e "\033[1;31m[!] Ошибка: Директория $GHOST_PATH не найдена.\033[0m"
+        sleep 2
+    fi
 }
 
+# Функция 2: Сканирование Bluetooth
+# Параметры: использует системный hcitool
+# Описание: Поиск активных Bluetooth устройств в радиусе видимости
+scan_bluetooth_devices() {
+    clear
+    echo -e "\033[1;34m[*] Сканирование Bluetooth устройств (hcitool)...\033[0m"
+    hcitool scan
+    echo -e "\nНажмите любую клавишу для возврата..."
+    read -n 1
+}
+
+# Функция 3: Автоматическое подключение (Auto-Pwn)
+# Параметры: target_ip (ввод пользователя)
+# Описание: Передает команду connect напрямую в ядро Ghost без входа в консоль
+launch_ghost_autopwn() {
+    clear
+    echo -e "\033[1;32m[*] Запуск Ghost Auto-Pwn Модуля\033[0m"
+    read -p "Введите IP адрес цели (Android ADB): " target_ip
+    
+    if [[ -z "$target_ip" ]]; then
+        echo -e "\033[1;31m[!] IP адрес не может быть пустым.\033[0m"
+        sleep 1
+        return
+    fi
+
+    echo -e "\033[1;34m[*] Попытка автоматического сопряжения с $target_ip...\033[0m"
+    cd "$GHOST_PATH" && $PYTHON_BIN -m ghost --execute "connect $target_ip"
+    
+    echo -e "\nСессия завершена. Возврат в меню..."
+    sleep 2
+}
+
+# Основная функция управления
+run_device_hack() {
+    while true; do
+        clear
+        echo -e "\033[1;37m--- УПРАВЛЕНИЕ УСТРОЙСТВАМИ (GHOST) ---\033[0m"
+        echo -e "1) Ghost Framework (Manual)"
+        echo -e "2) Bluetooth Scan"
+        echo -e "3) Ghost Auto-Pwn (Connect by IP)"
+        echo -e "B) Back to Main Menu"
+        echo -e "---------------------------------------"
+        read -p ">> " dh
+
+        case $dh in
+            1) launch_ghost_manual ;;
+            2) scan_bluetooth_devices ;;
+            3) launch_ghost_autopwn ;;
+            [Bb]) return ;;
+            *) echo "Неверный выбор"; sleep 1 ;;
+        esac
+    done
+}
 run_phishing() {
     [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh
 }
@@ -952,7 +1012,7 @@ update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "20.8" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "30.4" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
