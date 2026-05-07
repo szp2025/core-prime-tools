@@ -769,10 +769,15 @@ pause() { read -p "Press Enter..." dummy; }
 
 exit_script() { history -c; exit 0; }
 
-# --- ГЛАВНОЕ МЕНЮ ---
+# --- ГЛАВНОЕ МЕНЮ (v31.2 с UPDATE и SERVICES) ---
 run_main_menu() {
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR SYSTEM_INFO EXIT"
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair run_system_info exit_script"
+    # 1. Список имен (Добавлено: UPDATE_CORE и SERVICE_HUB)
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB SYSTEM_INFO EXIT"
+    
+    # 2. Список функций (Добавлено: update_prime и run_servers)
+    # Важно: порядок функций должен СТРОГО совпадать с порядком имен выше
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_system_info exit_script"
+    
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
 
