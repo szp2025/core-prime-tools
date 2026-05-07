@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="31.3"
+CURRENT_VERSION="31.4"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -202,16 +202,10 @@ TOOLS=(
     #"phonesploit;https://github.com/Zucccs/PhoneSploit-Python/archive/refs/heads/main.zip;phonesploitpython.py;safe_pip -r requirements.txt"
     "cupp;https://github.com/Mebus/cupp/archive/refs/heads/master.zip;cupp.py;"
     #"anonym8;https://github.com/HiroshiSama/anonym8/archive/refs/heads/master.zip;anonym8;chmod +x install.sh && ./install.sh"
-)
-
-# Дополнительные инструменты для EXPLOIT HUB
-TOOLS+=(
-   # "metasploit;https://raw.githubusercontent.com/gushmazuko/metasploit_in_termux/master/metasploit.sh;msfconsole;chmod +x metasploit.sh && ./metasploit.sh"
     "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
     "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
     "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
 )
-
 
 for entry in "${TOOLS[@]}"; do
     IFS=";" read -r t_name t_url t_exec t_extra <<< "$entry"
@@ -353,47 +347,111 @@ EOF
 # --- ВЫЗОВ В СЕКЦИИ DEPLOYMENT ---
 
 
+# --- ГЕНЕРАТОР ЕДИНОГО ДИЗАЙНА ---
+generate_core_template() {
+    echo '
+def render_prime_page(title, content):
+    style = """
+    <style>
+        body { background: #050505; color: #00ff41; font-family: "Courier New", monospace; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.1); border-radius: 5px; width: 90%; max-width: 900px; text-align: center; }
+        h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; margin-top: 0; color: #00ff41; }
+        .btn, button { background: #00ff41; color: #000; border: none; padding: 12px 24px; cursor: pointer; font-weight: bold; text-transform: uppercase; text-decoration: none; display: inline-block; width: 100%; transition: 0.3s; margin-top: 20px; font-family: inherit; }
+        .btn:hover, button:hover { background: #008f25; box-shadow: 0 0 15px #00ff41; }
+        pre { white-space: pre-wrap; font-size: 0.85em; color: #0cf; background: #000; padding: 15px; border: 1px solid #222; text-align: left; max-height: 300px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 20px; }
+        .file-card { background: #1a1a1a; border: 1px solid #333; padding: 15px; color: #00ff41; text-decoration: none; font-size: 0.8em; word-break: break-all; transition: 0.2s; }
+        .file-card:hover { border-color: #00ff41; background: #00ff4111; }
+        .status-box { padding: 15px; margin-bottom: 15px; font-weight: bold; border: 1px solid; text-transform: uppercase; }
+        .clean { color: #00ff41; border-color: #00ff41; }
+        .infected { color: #ff3e3e; border-color: #ff3e3e; }
+    </style>
+    """
+    full_html = f"""
+    {{style}}
+    <div class="container">
+        <h2>> {{title}}</h2>
+        <div class="content-area">
+            {{content}}
+        </div>
+    </div>
+    """
+    return full_html
+'
+}
+
+generate_core_form_template() {
+    echo '
+def render_prime_form(action_url, fields=None, btn_text="EXECUTE"):
+    """
+    fields: список словарей, например:
+    [{"type": "file", "name": "file", "label": "Select File"},
+     {"type": "text", "name": "user", "placeholder": "Operator ID"}]
+    """
+    if fields is None:
+        fields = [{"type": "file", "name": "file"}] # По умолчанию просто выбор файла
+
+    inputs_html = ""
+    for field in fields:
+        f_type = field.get("type", "text")
+        f_name = field.get("name", "input")
+        f_placeholder = field.get("placeholder", "")
+        f_label = field.get("label", "")
+        
+        inputs_html += f"<div style='margin-bottom: 15px;'>"
+        if f_label:
+            inputs_html += f"<label style='display:block; font-size:0.7em; color:#888;'>{f_label}</label>"
+        
+        if f_type == "select":
+            options = "".join([f"<option value='{o}'>{o}</option>" for o in field.get("options", [])])
+            inputs_html += f"<select name='{f_name}' style='background:#111; color:#00ff41; border:1px solid #333; padding:10px; width:80%; font-family:inherit;'>{options}</select>"
+        else:
+            inputs_html += f"<input type='{f_type}' name='{f_name}' placeholder='{f_placeholder}' required style='background:#111; color:#00ff41; border:1px dashed #333; padding:10px; width:80%; font-family:inherit;'>"
+        
+        inputs_html += "</div>"
+
+    return f"""
+    <form method="post" action="{action_url}" enctype="multipart/form-data" style="margin-top:20px;">
+        {inputs_html}
+        <button type="submit">{btn_text}</button>
+    </form>
+    """
+'
+}
+
+
 # Функция-генератор для AV-Server (v1.2)
 # --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
 generate_av_server_code() {
     local target_file="$1"
     local v_num="$2"
+    
+    # Загружаем оба шаблона: базовый Layout и конструктор Form
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
     local code
 
-    code=$(cat << 'EOF'
+    code=$(cat << EOF
 from flask import Flask, request, render_template_string
-import subprocess, os, shutil, socket, time
+import subprocess, os, shutil, socket
 
 # VERSION = '{{V_NUM}}'
 app = Flask(__name__)
-CLAM_PATH = shutil.which('clamscan') or '/usr/bin/clamscan'
 
-def get_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(('8.8.8.8', 1))
-        IP = s.getsockname()[0]
-    except Exception:
-        IP = '127.0.0.1'
-    finally:
-        s.close()
-    return IP
+# Поиск движка ClamAV
+CLAM_PATH = shutil.which('clamdscan') or shutil.which('clamscan') or '/usr/bin/clamscan'
 
-STYLE = """
-<style>
-    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-    .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.2); border-radius: 5px; width: 80%; max-width: 800px; }
-    h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
-    .status-box { padding: 15px; margin-bottom: 15px; font-weight: bold; text-align: center; border: 1px solid; text-transform: uppercase; }
-    pre { white-space: pre-wrap; font-size: 0.85em; color: #0cf; background: #000; padding: 15px; border: 1px solid #222; max-height: 400px; overflow-y: auto; }
-    .clean { color: #00ff41; border-color: #00ff41; background: rgba(0,255,65,0.1); }
-    .infected { color: #ff3e3e; border-color: #ff3e3e; background: rgba(255,62,62,0.1); }
-</style>
-"""
+$templates
 
 @app.route('/')
 def index():
-    return render_template_string(STYLE + '<div class="container"><h2>> SECURE_GATEWAY</h2><form method="post" action="/scan" enctype="multipart/form-data"><input type="file" name="file" required><br><br><button type="submit" style="background:#00ff41; color:#000; border:none; padding:10px 20px; cursor:pointer; font-weight:bold;">INITIATE SSL SCAN</button></form></div>')
+    # Динамически создаем форму: только выбор файла для сканирования
+    fields = [
+        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_ANALYSIS"}
+    ]
+    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE DEEP SCAN")
+    return render_template_string(render_prime_page("SECURE_GATEWAY", form_html))
 
 @app.route('/scan', methods=['POST'])
 def scan():
@@ -406,39 +464,42 @@ def scan():
 
     scan_output = ""
     try:
-        cmd = [CLAM_PATH, '--no-summary', tmp_path]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        # Лимит 20МБ и таймаут 300с для старых устройств (Wiko Lenny 3)
+        cmd = [CLAM_PATH, '--no-summary', '--max-filesize=20M', tmp_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         scan_output = res.stdout if res.stdout else res.stderr
         if not scan_output and res.returncode == 0:
             scan_output = f"{f.filename}: OK"
+    except subprocess.TimeoutExpired:
+        scan_output = "SCAN_ERROR: TIMED OUT (CPU OVERLOAD). PROBABLY FILE TOO LARGE."
     except Exception as e:
-        scan_output = f"System Error: {str(e)}"
+        scan_output = f"SYSTEM_CRITICAL_ERROR: {str(e)}"
     finally:
         if os.path.exists(tmp_path): os.remove(tmp_path)
 
-    is_infected = "FOUND" in scan_output
+    is_infected = "FOUND" in scan_output or "Infected" in scan_output
     status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_TRANSMISSION_VERIFIED"
     status_class = "infected" if is_infected else "clean"
 
-    return render_template_string(STYLE + f"""
-    <div class="container">
-        <h2>> SCAN_RESULTS</h2>
-        <div class="status-box {status_class}">{status_msg}</div>
-        <pre>{{{{ output }}}}</pre>
-        <a href="/" style="color:#555; text-decoration:none; display:block; text-align:center; margin-top:20px;">[ RETURN ]</a>
-    </div>
-    """, output=scan_output)
+    # Формируем контент результата
+    content = f"""
+    <div class="status-box {status_class}">{status_msg}</div>
+    <pre>{{{{ output }}}}</pre>
+    <a href="/" class="btn">[ RETURN TO GATEWAY ]</a>
+    """
+    return render_template_string(render_prime_page("SCAN_RESULTS", content), output=scan_output)
 
 if __name__ == '__main__':
-    # Авто-генерация SSL
+    # Генерация SSL сертификатов для безопасного канала
     if not os.path.exists('/root/cert.pem'):
         os.system('openssl req -x509 -newkey rsa:2048 -nodes -out /root/cert.pem -keyout /root/key.pem -days 365 -subj "/CN=scanclamavlocal"')
     
+    # Очистка порта перед запуском
     os.system('fuser -k 5000/tcp 2>/dev/null')
-    app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'))
+    app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'), debug=False)
 EOF
 )
-    # Внедряем версию и записываем
+    # Внедряем версию и записываем файл через твой smart_cat
     code="${code//\{\{V_NUM\}\}/$v_num}"
     smart_cat "$target_file" "$code"
 }
@@ -449,51 +510,23 @@ EOF
 generate_share_server_code() {
     local target_file="$1"
     local v_num="$2"
+    
+    # Загружаем только базовый шаблон страницы (формы здесь не нужны)
+    local template=$(generate_core_template)
     local code
 
-    code=$(cat << 'EOF'
+    code=$(cat << EOF
 from flask import Flask, render_template_string, send_from_directory
 import os
 
 # VERSION = '{{V_NUM}}'
-
 app = Flask(__name__)
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
-    os.makedirs(SHARE_DIR)
+    os.makedirs(SHARE_DIR, exist_ok=True)
 
-STYLE = """
-<style>
-    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; margin: 0; padding: 40px; }
-    h2 { text-transform: uppercase; letter-spacing: 3px; border-bottom: 2px solid #00ff41; display: inline-block; padding-bottom: 10px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 30px; }
-    .file-card { 
-        background: #111; border: 1px solid #333; padding: 20px; text-align: center; 
-        transition: 0.3s; text-decoration: none; color: #00ff41; border-radius: 4px;
-        display: flex; flex-direction: column; align-items: center;
-    }
-    .file-card:hover { border-color: #00ff41; background: #00ff4111; transform: translateY(-5px); }
-    .icon { font-size: 40px; margin-bottom: 10px; }
-</style>
-"""
-
-HTML = STYLE + """
-<div style="max-width: 1000px; margin: auto;">
-    <h2>> SECURE_FILE_DISTRIBUTION</h2>
-    <p style="color: #555; font-size: 0.8em;">Sector Location: {{ path }}</p>
-    <div class="grid">
-        {% for f in files %}
-        <a href="/get/{{f}}" class="file-card">
-            <div class="icon">📄</div>
-            <div style="font-size: 0.9em; word-break: break-all;">{{ f }}</div>
-        </a>
-        {% else %}
-        <p style="color: #555; font-style: italic;">No files detected in the transmission sector.</p>
-        {% endfor %}
-    </div>
-</div>
-"""
+$template
 
 @app.route('/')
 def index():
@@ -501,14 +534,33 @@ def index():
         files = os.listdir(SHARE_DIR)
     except:
         files = []
-    return render_template_string(HTML, files=files, path=SHARE_DIR)
+    
+    # Формируем динамический контент (сетку файлов)
+    grid_content = '<div class="grid">'
+    for f in files:
+        grid_content += f"""
+        <a href="/get/{f}" class="file-card">
+            <div style="font-size: 40px; margin-bottom: 10px;">📄</div>
+            <div style="word-break: break-all;">{f}</div>
+        </a>
+        """
+    
+    if not files:
+        grid_content += '<p style="color: #555; font-style: italic; grid-column: 1/-1;">No files detected in the transmission sector.</p>'
+    
+    grid_content += '</div>'
+    grid_content += f'<p style="color: #444; font-size: 0.7em; margin-top: 20px;">SECTOR_PATH: {SHARE_DIR}</p>'
+
+    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION", grid_content))
 
 @app.route('/get/<filename>')
 def get_file(filename):
     return send_from_directory(SHARE_DIR, filename)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002)
+    # Очистка порта перед запуском
+    os.system('fuser -k 5002/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 )
     # Внедряем версию и записываем
@@ -520,65 +572,58 @@ EOF
 generate_upload_server_code() {
     local target_file="$1"
     local v_num="$2"
-    local code
     
-    # Захватываем код Python. Кавычки вокруг 'EOF' критически важны!
-    code=$(cat << 'EOF'
+    # Загружаем оба шаблона: Layout и динамический конструктор форм
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+    local code
+
+    code=$(cat << EOF
 from flask import Flask, request, render_template_string
 import os
 
 # VERSION = '{{V_NUM}}'
-
 app = Flask(__name__)
 
-# Автоматическое определение директории (SD-карта или root)
+# Автоматическое определение директории (SD-карта или локальное хранилище)
 UPLOAD_DIR = '/sdcard/PRIME_INBOX' if os.path.exists('/sdcard') else '/root/PRIME_INBOX'
 if not os.path.exists(UPLOAD_DIR): 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-STYLE = """
-<style>
-    body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-    .box { border: 2px dashed #00ff41; padding: 40px; background: #111; box-shadow: 0 0 20px rgba(0, 255, 65, 0.1); border-radius: 10px; text-align: center; max-width: 500px; }
-    h2 { letter-spacing: 5px; text-shadow: 0 0 10px #00ff41; margin-bottom: 30px; }
-    input[type="file"] { background: #1a1a1a; border: 1px solid #333; padding: 10px; color: #00ff41; width: 100%; margin-bottom: 20px; }
-    button { background: #00ff41; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; width: 100%; }
-    button:hover { background: #008f25; box-shadow: 0 0 15px #00ff41; }
-</style>
-"""
-
-HTML_INDEX = STYLE + """
-<div class="box">
-    <h2>> INBOUND_DROP_BOX</h2>
-    <p style="font-size: 0.8em; margin-bottom: 20px; color: #888;">Secure uplink established.</p>
-    <form method="post" action="/upload" enctype="multipart/form-data">
-        <input type="file" name="file" required>
-        <button type="submit">Initiate Upload</button>
-    </form>
-    <div style="color: #555; font-size: 0.7em; margin-top: 20px;">Target: {{ target_dir }}</div>
-</div>
-"""
+$templates
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_INDEX, target_dir=UPLOAD_DIR)
+    # Описываем поля для конструктора формы
+    fields = [
+        {"type": "file", "name": "file", "label": "SELECT_TRANSMISSION_DATA"}
+    ]
+    
+    # Генерируем форму и описание
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE UPLOAD")
+    info_html = f'<p style="font-size: 0.8em; margin-bottom: 20px; color: #888;">Secure uplink established.</p>'
+    target_html = f'<div style="color: #444; font-size: 0.7em; margin-top: 20px;">TARGET_DIR: {UPLOAD_DIR}</div>'
+    
+    # Собираем страницу через Layout
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX", info_html + form_html + target_html))
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files: return "Error", 400
+    if 'file' not in request.files: return "TRANSFER_ERROR: NO_FILE", 400
     f = request.files['file']
-    if f.filename == '': return "Error", 400
+    if f.filename == '': return "TRANSFER_ERROR: EMPTY_FILENAME", 400
+    
     f.save(os.path.join(UPLOAD_DIR, f.filename))
-    return "SUCCESS: File received"
+    return "SUCCESS: File received and stored."
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
+    # Очистка порта перед запуском
+    os.system('fuser -k 5001/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 )
-    # Внедряем версию через замену плейсхолдера
+    # Внедряем версию и записываем
     code="${code//\{\{V_NUM\}\}/$v_num}"
-    
-    # Записываем через smart_cat
     smart_cat "$target_file" "$code"
 }
 
@@ -646,21 +691,36 @@ get_stats() {
 
 # --- Универсальный контроллер ---
 prime_dynamic_controller() {
-    local title=$1; local labels=($2); local actions=($3)
+    local title=$1
+    local -a labels=($2)
+    local -a actions=($3)
+    
     while true; do
-        clear; echo -e "${R}========== [ $title ] ==========${NC}"
-        get_stats; echo -e "---------------------------------------"
+        clear
+        echo -e "${R}========== [ $title ] ==========${NC}"
+        get_stats
+        echo -e "---------------------------------------"
+        
         for ((i=0; i<${#labels[@]}; i++)); do
             printf "${G}%2d) %-18s${NC}" "$((i+1))" "${labels[$i]//_/ }"
             if (( (i+1) % 2 == 0 )); then echo ""; fi
         done
-        echo -e "\n${Y} B) BACK / EXIT${NC}\n---------------------------------------"
+        echo -e "\n${Y} B) BACK / EXIT${NC}"
+        echo -e "---------------------------------------"
+        
         read -p ">> " choice
-        [[ "$choice" =~ ^[Bb]$ ]] && return
+        
+        # ГАРАНТИРОВАННЫЙ ВЫХОД
+        if [[ "$choice" == "b" ]] || [[ "$choice" == "B" ]]; then 
+            return 0 
+        fi
+        
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
-            ${actions[$((choice-1))]}
+            local idx=$((choice-1))
+            ${actions[$idx]}
         else
-            echo -e "${R}[!] Ошибка${NC}"; sleep 1
+            echo -e "${R}[!] Ошибка: выберите 1-${#labels[@]} или B${NC}"
+            sleep 1
         fi
     done
 }
@@ -793,13 +853,13 @@ EOF
 }
 
 
-update_module "/root/av_server.py" "1.6" generate_av_server_code "AV-Scanner"
-update_module "/root/iban_check.py" "1.7" generate_iban_code "IBAN/RIB Checker"
-update_module "/root/share_server.py" "1.0" generate_share_server_code "File-Share"
-update_module "/root/upload_server.py"  "1.0.4" generate_upload_server_code  "Inbound-Drop-Box"
+update_module "/root/av_server.py" "1.7" generate_av_server_code "AV-Scanner"
+update_module "/root/iban_check.py" "1.8" generate_iban_code "IBAN/RIB Checker"
+update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Share"
+update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "31.2" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "31.3" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
