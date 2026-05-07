@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="31.5"
+CURRENT_VERSION="31.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -202,9 +202,9 @@ TOOLS=(
     #"phonesploit;https://github.com/Zucccs/PhoneSploit-Python/archive/refs/heads/main.zip;phonesploitpython.py;safe_pip -r requirements.txt"
     "cupp;https://github.com/Mebus/cupp/archive/refs/heads/master.zip;cupp.py;"
     #"anonym8;https://github.com/HiroshiSama/anonym8/archive/refs/heads/master.zip;anonym8;chmod +x install.sh && ./install.sh"
-    "lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
-    "sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
-    "exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
+    #"lazagne;https://github.com/AlessandroZ/LaZagne/archive/refs/heads/master.zip;laZagne.py;python3 -m pip install -r requirements.txt --break-system-packages"
+    #"sliver;https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux;sliver-server;chmod +x sliver-server"
+    #"exploitdb;https://github.com/offensive-security/exploitdb/archive/refs/heads/master.zip;searchsploit;ln -sf /root/exploitdb/searchsploit /usr/local/bin/searchsploit"
 )
 
 for entry in "${TOOLS[@]}"; do
@@ -783,6 +783,132 @@ reset_windows_password() {
     [ -n "$sam" ] && chntpw -i "$sam" || echo -e "${R}SAM не найден${NC}"; pause
 }
 
+generate_pwd_tool() {
+    local target_file="$1"
+    local code=$(cat << 'EOF'
+#!/bin/bash
+# PRIME_PASSWORD_GENERATOR (Terminal Version)
+
+LENGTH=${1:-16} # Длина по умолчанию 16
+echo "--------------------------------------------------"
+echo ">> INITIATING KEY GENERATION (Length: $LENGTH)"
+echo "--------------------------------------------------"
+
+# Используем tr для фильтрации символов из рандомного потока
+PASSWORD=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+' < /dev/urandom | head -c "$LENGTH")
+
+echo -e "\e[1;32mNEW_KEY: $PASSWORD\e[0m"
+echo "--------------------------------------------------"
+EOF
+)
+    smart_cat "$target_file" "$code"
+    chmod +x "$target_file"
+}
+
+generate_cert_tool() {
+    local target_file="$1"
+    local code=$(cat << 'EOF'
+#!/bin/bash
+# PRIME_CERT_FORGE (Terminal Version)
+
+DOMAIN=${1:-prime.local}
+DAYS=${2:-365}
+
+echo "--------------------------------------------------"
+echo ">> FORGING SSL CERTIFICATE: $DOMAIN"
+echo "--------------------------------------------------"
+
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -out "${DOMAIN}.pem" \
+  -keyout "${DOMAIN}.key" \
+  -days "$DAYS" \
+  -subj "/CN=$DOMAIN" 2>/dev/null
+
+if [ $? -eq 0 ]; then
+    echo -e "\e[1;32m[+] SUCCESS:\e[0m"
+    echo "    - Cert: ${DOMAIN}.pem"
+    echo "    - Key:  ${DOMAIN}.key"
+else
+    echo -e "\e[1;31m[!] ERROR: Openssl failed to generate files.\e[0m"
+fi
+echo "--------------------------------------------------"
+EOF
+)
+    smart_cat "$target_file" "$code"
+    chmod +x "$target_file"
+}
+
+generate_cert_reader_tool() {
+    local target_file="$1"
+    local code=$(cat << 'EOF'
+#!/bin/bash
+# PRIME_CERT_ANALYZER (Terminal Version)
+
+FILE="$1"
+
+if [[ ! -f "$FILE" ]]; then
+    echo -e "\e[1;31m[!] ERROR: File not found: $FILE\e[0m"
+    exit 1
+fi
+
+echo "--------------------------------------------------"
+echo ">> ANALYZING CERTIFICATE: $(basename "$FILE")"
+echo "--------------------------------------------------"
+
+# 1. Основная информация (Владелец, Издатель, Сроки)
+echo -e "\e[1;34m[+] BASIC INFO:\e[0m"
+openssl x509 -in "$FILE" -noout -subject -issuer -dates | sed 's/^/    /'
+
+# 2. Отпечатки (Fingerprints) - критично для банковских транзакций
+echo -e "\e[1;34m[+] FINGERPRINTS (SHA256):\e[0m"
+openssl x509 -in "$FILE" -noout -fingerprint -sha256 | sed 's/^/    /'
+
+# 3. Публичный ключ и Алгоритм
+echo -e "\e[1;34m[+] PUBLIC KEY INFO:\e[0m"
+openssl x509 -in "$FILE" -noout -pubkey | openssl pkey -pubin -text -noout | head -n 5 | sed 's/^/    /'
+
+# 4. Расширения X509v3 (Здесь хранятся банковские лимиты, роли и политики)
+echo -e "\e[1;34m[+] X509v3 EXTENSIONS (Policy & Constraints):\e[0m"
+openssl x509 -in "$FILE" -noout -ext subjectAltName,certificatePolicies,basicConstraints,keyUsage,extendedKeyUsage 2>/dev/null | sed 's/^/    /'
+
+# 5. Проверка OCSP/CRL (Статус отзыва - важно для банков)
+echo -e "\e[1;34m[+] REVOCATION INFO (OCSP/CRL):\e[0m"
+openssl x509 -in "$FILE" -noout -ocsp_uri 2>/dev/null && echo "    OCSP URI detected" || echo "    No OCSP URI"
+
+echo "--------------------------------------------------"
+# Полный дамп в текстовом виде (скрыт по умолчанию, если нужно всё)
+# openssl x509 -in "$FILE" -text -noout
+EOF
+)
+    smart_cat "$target_file" "$code"
+    chmod +x "$target_file"
+}
+
+run_cert_reader() {
+    clear
+    echo -e "\e[1;32m[ PRIME CERTIFICATE ANALYZER ]\e[0m"
+    echo -e "Supports: X.509, Banking Certs, SSL/TLS, CA\n"
+    
+    read -p "ENTER PATH TO CERTIFICATE: " C_PATH
+    
+    # Проверка на существование файла
+    if [[ -f "$C_PATH" ]]; then
+        # Если сертификат в бинарном формате DER (часто в банках), конвертируем на лету
+        if grep -q "BEGIN CERTIFICATE" "$C_PATH"; then
+             cert-read "$C_PATH"
+        else
+             echo -e "[*] Binary format detected. Processing..."
+             openssl x509 -inform DER -in "$C_PATH" -out "/tmp/temp_cert.pem" 2>/dev/null
+             cert-read "/tmp/temp_cert.pem"
+             rm "/tmp/temp_cert.pem"
+        fi
+    else
+        echo -e "\e[1;31m[!] FILE NOT FOUND\e[0m"
+    fi
+    
+    echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
+    read
+}
 
 run_pwd_gen() {
     clear
@@ -863,10 +989,10 @@ exit_script() { history -c; exit 0; }
 # --- ГЛАВНОЕ МЕНЮ (v31.3: + SEC_TOOLS) ---
 run_main_menu() {
     # 1. Список имен
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO EXIT"
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO CERTIF_READER EXIT"
     
     # 2. Список функций
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info exit_script"
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info run_cert_reader exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
