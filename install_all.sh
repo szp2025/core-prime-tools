@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="31.4"
+CURRENT_VERSION="31.5"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -783,6 +783,37 @@ reset_windows_password() {
     [ -n "$sam" ] && chntpw -i "$sam" || echo -e "${R}SAM не найден${NC}"; pause
 }
 
+
+run_pwd_gen() {
+    clear
+    echo -e "\e[1;32m[ PRIME PASSWORD GENERATOR ]\e[0m"
+    read -p "ENTER PASSWORD LENGTH [DEFAULT: 24]: " P_LEN
+    P_LEN=${P_LEN:-24}
+    
+    # Вызов твоего базового инструмента
+    gen-pwd "$P_LEN"
+    
+    echo -e "\n\e[1;33mPRESS ENTER TO RETURN TO MENU...\e[0m"
+    read
+}
+
+   run_cert_forge() {
+    clear
+    echo -e "\e[1;32m[ PRIME CERTIFICATE FORGE ]\e[0m"
+    read -p "ENTER DOMAIN/CN [DEFAULT: prime.local]: " P_DOM
+    P_DOM=${P_DOM:-prime.local}
+    
+    read -p "ENTER VALIDITY DAYS [DEFAULT: 365]: " P_DAYS
+    P_DAYS=${P_DAYS:-365}
+    
+    # Вызов твоего базового инструмента
+    gen-cert "$P_DOM" "$P_DAYS"
+    
+    echo -e "\n\e[1;33mPRESS ENTER TO RETURN TO MENU...\e[0m"
+    read
+}
+
+
 reset_linux_pass() { read -p "User: " u; sed -i "s/^$u:[^:]*:/$u::/" /etc/shadow; pause; }
 reset_macos_info() { echo "dscl . -passwd /Users/username newpassword"; pause; }
 
@@ -829,14 +860,13 @@ pause() { read -p "Press Enter..." dummy; }
 
 exit_script() { history -c; exit 0; }
 
-# --- ГЛАВНОЕ МЕНЮ (v31.2 с UPDATE и SERVICES) ---
+# --- ГЛАВНОЕ МЕНЮ (v31.3: + SEC_TOOLS) ---
 run_main_menu() {
-    # 1. Список имен (Добавлено: UPDATE_CORE и SERVICE_HUB)
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB SYSTEM_INFO EXIT"
+    # 1. Список имен
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO EXIT"
     
-    # 2. Список функций (Добавлено: update_prime и run_servers)
-    # Важно: порядок функций должен СТРОГО совпадать с порядком имен выше
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_system_info exit_script"
+    # 2. Список функций
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
