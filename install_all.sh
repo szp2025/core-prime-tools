@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="31.9"
+CURRENT_VERSION="32.0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -840,10 +840,9 @@ EOF
 
 generate_cert_reader_tool() {
     local target_file="$1"
-    # Используем одинарные кавычки 'EOF', чтобы bash внутри не съел переменные $FILE и $1
     local code=$(cat << 'EOF'
 #!/bin/bash
-# PRIME_CERT_ANALYZER v4.0 (Universal Security Edition)
+# PRIME_CERT_ANALYZER v4.1 (Stability Patch)
 
 FILE="$1"
 
@@ -854,7 +853,7 @@ fi
 
 # Авто-детект формата (PEM или DER)
 FORMAT="PEM"
-if ! grep -q "BEGIN CERTIFICATE" "$FILE"; then
+if ! grep -q "BEGIN CERTIFICATE" "$FILE" 2>/dev/null; then
     FORMAT="DER"
 fi
 
@@ -862,36 +861,31 @@ echo "--------------------------------------------------"
 echo -e ">> ANALYZING CERTIFICATE: \e[1;33m$(basename "$FILE")\e[0m [\e[1;32m$FORMAT\e[0m]"
 echo "--------------------------------------------------"
 
-# Обертка для вызова openssl с учетом формата
+# Обертка для вызова openssl
 run_openssl() {
     openssl x509 -inform "$FORMAT" -in "$FILE" "$@"
 }
 
-# 1. Основная информация
+# 1. Основная информация (Используем двойные кавычки в sed для совместимости)
 echo -e "\e[1;34m[+] BASIC INFO:\e[0m"
-run_openssl -noout -subject -issuer -dates | sed 's/^/    /'
+run_openssl -noout -subject -issuer -dates | sed "s/^/    /"
 
-# 2. Отпечатки (Fingerprints)
+# 2. Отпечатки
 echo -e "\e[1;34m[+] FINGERPRINTS (SHA256):\e[0m"
-run_openssl -noout -fingerprint -sha256 | sed 's/^/    /'
+run_openssl -noout -fingerprint -sha256 | sed "s/^/    /"
 
-# 3. Публичный ключ и Алгоритм
+# 3. Публичный ключ
 echo -e "\e[1;34m[+] PUBLIC KEY INFO:\e[0m"
-run_openssl -noout -pubkey 2>/dev/null | openssl pkey -pubin -text -noout 2>/dev/null | head -n 5 | sed 's/^/    /'
+run_openssl -noout -pubkey 2>/dev/null | openssl pkey -pubin -text -noout 2>/dev/null | head -n 5 | sed "s/^/    /"
 
-# 4. Расширения X509v3 (Банковские лимиты и политики)
+# 4. Расширения X509v3
 echo -e "\e[1;34m[+] X509v3 EXTENSIONS:\e[0m"
-# Проверяем расширения, критичные для банков (Policies, KeyUsage)
-run_openssl -noout -ext subjectAltName,certificatePolicies,basicConstraints,keyUsage,extendedKeyUsage 2>/dev/null | sed 's/^/    /'
+run_openssl -noout -ext subjectAltName,certificatePolicies,basicConstraints,keyUsage,extendedKeyUsage 2>/dev/null | sed "s/^/    /"
 
 # 5. Статус отзыва
 echo -e "\e[1;34m[+] REVOCATION INFO:\e[0m"
 OCSP=$(run_openssl -noout -ocsp_uri 2>/dev/null)
-if [[ -n "$OCSP" ]]; then
-    echo "    OCSP URI: $OCSP"
-else
-    echo "    No OCSP/CRL URI detected in certificate"
-fi
+if [[ -n "$OCSP" ]]; then echo "    OCSP URI: $OCSP"; else echo "    No OCSP/CRL detected"; fi
 
 echo "--------------------------------------------------"
 EOF
@@ -899,6 +893,7 @@ EOF
     smart_cat "$target_file" "$code"
     chmod +x "$target_file"
 }
+
 
 
 run_cert_reader() {
