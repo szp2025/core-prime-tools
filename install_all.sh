@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="31.8"
+CURRENT_VERSION="31.9"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -840,9 +840,10 @@ EOF
 
 generate_cert_reader_tool() {
     local target_file="$1"
+    # Используем одинарные кавычки 'EOF', чтобы bash внутри не съел переменные $FILE и $1
     local code=$(cat << 'EOF'
 #!/bin/bash
-# PRIME_CERT_ANALYZER (Terminal Version)
+# PRIME_CERT_ANALYZER v4.0 (Universal Security Edition)
 
 FILE="$1"
 
@@ -851,38 +852,54 @@ if [[ ! -f "$FILE" ]]; then
     exit 1
 fi
 
+# Авто-детект формата (PEM или DER)
+FORMAT="PEM"
+if ! grep -q "BEGIN CERTIFICATE" "$FILE"; then
+    FORMAT="DER"
+fi
+
 echo "--------------------------------------------------"
-echo ">> ANALYZING CERTIFICATE: $(basename "$FILE")"
+echo -e ">> ANALYZING CERTIFICATE: \e[1;33m$(basename "$FILE")\e[0m [\e[1;32m$FORMAT\e[0m]"
 echo "--------------------------------------------------"
 
-# 1. Основная информация (Владелец, Издатель, Сроки)
+# Обертка для вызова openssl с учетом формата
+run_openssl() {
+    openssl x509 -inform "$FORMAT" -in "$FILE" "$@"
+}
+
+# 1. Основная информация
 echo -e "\e[1;34m[+] BASIC INFO:\e[0m"
-openssl x509 -in "$FILE" -noout -subject -issuer -dates | sed 's/^/    /'
+run_openssl -noout -subject -issuer -dates | sed 's/^/    /'
 
-# 2. Отпечатки (Fingerprints) - критично для банковских транзакций
+# 2. Отпечатки (Fingerprints)
 echo -e "\e[1;34m[+] FINGERPRINTS (SHA256):\e[0m"
-openssl x509 -in "$FILE" -noout -fingerprint -sha256 | sed 's/^/    /'
+run_openssl -noout -fingerprint -sha256 | sed 's/^/    /'
 
 # 3. Публичный ключ и Алгоритм
 echo -e "\e[1;34m[+] PUBLIC KEY INFO:\e[0m"
-openssl x509 -in "$FILE" -noout -pubkey | openssl pkey -pubin -text -noout | head -n 5 | sed 's/^/    /'
+run_openssl -noout -pubkey 2>/dev/null | openssl pkey -pubin -text -noout 2>/dev/null | head -n 5 | sed 's/^/    /'
 
-# 4. Расширения X509v3 (Здесь хранятся банковские лимиты, роли и политики)
-echo -e "\e[1;34m[+] X509v3 EXTENSIONS (Policy & Constraints):\e[0m"
-openssl x509 -in "$FILE" -noout -ext subjectAltName,certificatePolicies,basicConstraints,keyUsage,extendedKeyUsage 2>/dev/null | sed 's/^/    /'
+# 4. Расширения X509v3 (Банковские лимиты и политики)
+echo -e "\e[1;34m[+] X509v3 EXTENSIONS:\e[0m"
+# Проверяем расширения, критичные для банков (Policies, KeyUsage)
+run_openssl -noout -ext subjectAltName,certificatePolicies,basicConstraints,keyUsage,extendedKeyUsage 2>/dev/null | sed 's/^/    /'
 
-# 5. Проверка OCSP/CRL (Статус отзыва - важно для банков)
-echo -e "\e[1;34m[+] REVOCATION INFO (OCSP/CRL):\e[0m"
-openssl x509 -in "$FILE" -noout -ocsp_uri 2>/dev/null && echo "    OCSP URI detected" || echo "    No OCSP URI"
+# 5. Статус отзыва
+echo -e "\e[1;34m[+] REVOCATION INFO:\e[0m"
+OCSP=$(run_openssl -noout -ocsp_uri 2>/dev/null)
+if [[ -n "$OCSP" ]]; then
+    echo "    OCSP URI: $OCSP"
+else
+    echo "    No OCSP/CRL URI detected in certificate"
+fi
 
 echo "--------------------------------------------------"
-# Полный дамп в текстовом виде (скрыт по умолчанию, если нужно всё)
-# openssl x509 -in "$FILE" -text -noout
 EOF
 )
     smart_cat "$target_file" "$code"
     chmod +x "$target_file"
 }
+
 
 run_cert_reader() {
     clear
@@ -1164,7 +1181,7 @@ update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "31.5" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "31.6" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
