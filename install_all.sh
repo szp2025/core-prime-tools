@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="34.0"
+CURRENT_VERSION="34.1"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -1094,35 +1094,7 @@ run_heuristic_scanner_v2() {
 
 
 run_view_loot() {
-    clear
-    echo -e "\e[1;32m"
-    echo "--------------------------------------------------"
-    echo "    PRIME MASTER: DATA HARVESTER - LOOT VIEW      "
-    echo "--------------------------------------------------"
-    echo -e "\e[0m"
-
-    # Список файлов для проверки
-    LOOT_FILES=("/root/prime_loot_live.txt" "/root/prime_found_keys.txt")
-    FOUND_ANY=false
-
-    for file in "${LOOT_FILES[@]}"; do
-        if [[ -s "$file" ]]; then
-            FOUND_ANY=true
-            echo -e "\e[1;34m>>> DATA FROM: $file\e[0m"
-            echo -e "\e[1;30m--------------------------------------------------\e[0m"
-            # Используем column для выравнивания, если данных много
-            cat "$file" | sed 's/|/ | /g' | column -t -s '|' 2>/dev/null || cat "$file"
-            echo -e "\e[1;30m--------------------------------------------------\e[0m\n"
-        fi
-    done
-
-    if [ "$FOUND_ANY" = false ]; then
-        echo -e "\e[1;31m[!] No harvested data found yet.\e[0m"
-        echo "Try running the Scanner or Exploiter first."
-    fi
-
-    echo -e "\n\e[1;33m[ PRESS ENTER TO RETURN TO MAIN MENU ]\e[0m"
-    read -r
+    
 }
 
 
