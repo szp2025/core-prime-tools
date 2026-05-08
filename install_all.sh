@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="33.3"
+CURRENT_VERSION="33.4"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -990,52 +990,22 @@ run_cert_creator() {
 
 run_pwd_gen() {
     clear
-    echo -e "\e[1;32m"
-    echo "--------------------------------------------------"
-    echo "    PRIME MASTER: PASSWORD & BCRYPT GENERATOR     "
-    echo "--------------------------------------------------"
-    echo -e "\e[0m"
+    echo -e "\e[1;33m--- PRIME PASSWORD GENERATOR ---\e[0m"
+    read -p "Enter Length: " P_LEN
+    [ -z "$P_LEN" ] && P_LEN=16
 
-    # 1. Запрос параметров
-    echo -n "Enter required length [Default 12]: "
-    read P_LEN
-    if [[ ! "$P_LEN" =~ ^[0-9]+$ ]]; then P_LEN=12; fi
-
-    echo -e "\e[1;36mChoose complexity:\e[0m"
-    echo "  1) Alphanumeric (A-Z, 0-9)"
-    echo "  2) Full Secure (with Special Chars)"
-    echo -n "Select [1/2]: "
-    read P_MODE
-
-    echo -e "\n\e[1;34m[*] Generating data...\e[0m"
-
-    # 2. Генерация пароля
-    if [ "$P_MODE" == "2" ]; then
-        RESULT=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9!@#$%^&*()_+\-=[]{}|;:,.<>?' | head -c "$P_LEN")
-    else
-        RESULT=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c "$P_LEN")
+    # Исправленная строка 1014: используем экранирование и чистый набор символов
+    RESULT=$(cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+=-' | head -c "$P_LEN")
+    
+    echo -e "\n\e[1;32m[+] Generated:\e[0m $RESULT"
+    echo "--------------------------------"
+    
+    # Сразу предлагаем Bcrypt, раз уж мы в комбайне
+    read -p "Hash it with Bcrypt? (y/n): " h_choice
+    if [[ "$h_choice" == "y" ]]; then
+        echo -n "$RESULT" | mkpasswd -m bcrypt -s
     fi
-
-    # 3. Расчет bcrypt (используем python3 как самый точный метод)
-    # Мы передаем пароль через переменную окружения для безопасности
-    BCRYPT_HASH=$(export P_RAW="$RESULT"; python3 -c "import bcrypt; import os; print(bcrypt.hashpw(os.environ['P_RAW'].encode(), bcrypt.gensalt()).decode())" 2>/dev/null)
-
-    # 4. Вывод на экран
-    echo -e "\n\e[1;32m[+]\e[0m \e[1;7m DATA GENERATED \e[0m\n"
-    
-    echo -e "\e[1;33mRAW PASSWORD (OPEN):\e[0m"
-    echo -e ">> \e[1;37m$RESULT\e[0m"
-    
-    echo -e "\n\e[1;32mBCRYPT HASH:\e[0m"
-    if [ -n "$BCRYPT_HASH" ]; then
-        echo -e "\e[1;36m$BCRYPT_HASH\e[0m"
-    else
-        echo -e "\e[1;31mError: python3-bcrypt not found. Install with: apt install python3-bcrypt\e[0m"
-    fi
-    
-    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
-    echo -n "Press [ENTER] to return to menu..."
-    read -r
+    pause
 }
 
 
