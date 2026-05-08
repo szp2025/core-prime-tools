@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="33.5"
+CURRENT_VERSION="33.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -990,20 +990,19 @@ run_cert_creator() {
 
 run_pwd_gen() {
     clear
-    echo -e "\e[1;33m--- PRIME PASSWORD GENERATOR ---\e[0m"
-    read -p "Enter Length: " P_LEN
-    [[ -z "$P_LEN" || ! "$P_LEN" =~ ^[0-9]+$ ]] && P_LEN=16
+    echo -e "\e[1;33m[ PRIME PASSWORD GENERATOR ]\e[0m"
+    read -p "Enter Length (default 16): " P_LEN
+    [[ -z "$P_LEN" ]] && P_LEN=16
 
-    # Используем чистый набор символов без конфликтующих скобок
-    # Символы - и _ ставим в конец, чтобы tr не думал, что это диапазон
-    RESULT=$(cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+=' | head -c "$P_LEN")
+    # base64 генерирует буквы и цифры гарантированно чисто для Bash
+    # Затем добавляем пару спецсимволов в конец для надежности
+    RESULT=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9!@#%^*' | head -c "$P_LEN")
     
     echo -e "\n\e[1;32m[+] Generated:\e[0m $RESULT"
     echo "--------------------------------"
     
     read -p "Hash it with Bcrypt? (y/n): " h_choice
     if [[ "$h_choice" == "y" ]]; then
-        # Проверка наличия mkpasswd (пакет whois)
         if command -v mkpasswd >/dev/null; then
             echo -n "$RESULT" | mkpasswd -m bcrypt -s
         else
@@ -1016,42 +1015,38 @@ run_pwd_gen() {
 
 
 
+
    run_cert_forge() {
     clear
-    echo -e "\e[1;32m--------------------------------------------------"
-    echo "         PRIME MASTER: CERTIFICATE FORGE          "
-    echo "--------------------------------------------------\e[0m"
-    
-    read -p "Enter Domain to spoof (e.g. google.com): " S_DOMAIN
-    if [ -z "$S_DOMAIN" ]; then echo "No domain."; sleep 1; return; fi
+    echo -e "\e[1;32m[ PRIME MASTER: CERTIFICATE FORGE ]\e[0m"
+    read -p "Enter Domain (e.g. google.com): " S_DOMAIN
+    [[ -z "$S_DOMAIN" ]] && return
 
     echo -e "\e[1;34m[*] Fetching metadata for $S_DOMAIN...\e[0m"
     
-    # Исправленная линия 1032: используем более простой способ забора Subject
-    # Без сложных sed-конструкций внутри переменной
-    RAW_INFO=$(timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject)
+    # Получаем данные во временный файл, чтобы не мучить Bash кавычками
+    timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject > /tmp/cert_sub.txt
     
-    if [ -z "$RAW_INFO" ]; then
-        echo -e "\e[1;31m[!] Failed to get certificate info.\e[0m"
-        pause; return
+    if [[ ! -s /tmp/cert_sub.txt ]]; then
+        echo -e "\e[1;31m[!] Connection failed.\e[0m"; pause; return
     fi
 
-    # Очищаем только префикс 'subject='
-    ORIG_SUBJ=$(echo "$RAW_INFO" | sed 's/^subject=//')
+    # Извлекаем только то, что после 'subject='
+    ORIG_SUBJ=$(cat /tmp/cert_sub.txt | sed 's/^subject= //; s/^subject=//')
+    rm /tmp/cert_sub.txt
 
-    echo -e "\e[1;32m[+] Original Subject:\e[0m $ORIG_SUBJ"
-    echo -e "\e[1;33m[*] Generating Fake Certificate...\e[0m"
+    echo -e "\e[1;32m[+] Found Subject:\e[0m $ORIG_SUBJ"
+    echo -e "\e[1;33m[*] Forging Certificate...\e[0m"
     
-    # Генерация ключа и сертификата
     openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
         -subj "$ORIG_SUBJ" \
         -keyout "/root/${S_DOMAIN}.key" \
         -out "/root/${S_DOMAIN}.crt" 2>/dev/null
 
-    echo "--------------------------------------------------"
-    echo -e "[SUCCESS] Files created: /root/${S_DOMAIN}.key /root/${S_DOMAIN}.crt"
+    echo -e "\e[1;32m[DONE]\e[0m Files: /root/${S_DOMAIN}.key /root/${S_DOMAIN}.crt"
     pause
 }
+
 
 
 # 1. Единый Движок Эксплуатации (Ручной + Авто режим)
