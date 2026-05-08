@@ -17,100 +17,113 @@ pause() {
     read _
 }
 
-# Твой динамический контроллер меню
 prime_dynamic_controller() {
-    local title=$1
-    local names=$2
-    local funcs=$3
-    
+    local title=$1; local names=$2; local funcs=$3
     while true; do
         clear
         echo -e "${P}--------------------------------------------------${NC}"
         echo -e "   $title"
         echo -e "${P}--------------------------------------------------${NC}"
-        
         local i=1
         for name in $names; do
             echo -e "  [${G}$i${NC}] $name"
             i=$((i+1))
         done
-        
         echo -e "${P}--------------------------------------------------${NC}"
         read -p " Selection: " choice
-        
         local func=$(echo $funcs | cut -d' ' -f$choice)
-        if [ -z "$func" ]; then
-            echo -e "${R}Invalid option${NC}"
-            sleep 1
-        else
-            $func
-        fi
+        [ -z "$func" ] && continue
+        $func
     done
 }
 
-# --- [ МОДУЛИ: UTILS ] ---
-
-run_pwd_gen() {
+# --- [ МОДУЛЬ: OSINT ] ---
+run_smart_osint() {
     clear
-    echo -e "${Y}>>> [ PASSWORD GENERATOR ] <<<${NC}"
-    read -p "Length (default 16): " P_LEN
-    [ -z "$P_LEN" ] && P_LEN=16
+    echo -e "${C}>>> [ SMART OSINT ENGINE 2026 ] <<<${NC}"
+    read -p "Input (Nick/Phone/Email): " INPUT
+    [ -z "$INPUT" ] && return
     
-    # Максимально безопасная генерация для любого терминала
-    RESULT=$(openssl rand -base64 64 | tr -dc 'A-Za-z0-9!#%^*' | head -c "$P_LEN")
+    echo -e "${B}[*] Rapid Check...${NC}"
+    socialscan "$INPUT"
     
-    echo -e "\n${G}[+] Generated:${NC} $RESULT"
-    echo "--------------------------------------------------"
-    read -p "Hash it with Bcrypt? (y/n): " h_choice
-    if [ "$h_choice" = "y" ]; then
-        if command -v mkpasswd >/dev/null; then
-            echo -n "$RESULT" | mkpasswd -m bcrypt -s
+    if [[ "$INPUT" =~ @ ]]; then
+        python3 /root/infoga/infoga.py --target "$INPUT"
+    elif [[ "$INPUT" =~ ^[0-9+] ]]; then
+        echo -e "${G}[+] Phone detected. Running lookup...${NC}"
+    else
+        maigret "$INPUT" --parse --timeout 15
+        python3 /root/blackbird/blackbird.py -u "$INPUT"
+    fi
+    pause
+}
+
+# --- [ МОДУЛЬ: GHOST COMMANDER ] ---
+run_ghost_commander() {
+    clear
+    echo -e "${R}>>> [ GHOST COMMANDER ] <<<${NC}"
+    read -p "Target IP (Leave empty for Manual): " T_IP
+    if [ -z "$T_IP" ]; then
+        cd /root/Ghost && python3 -m ghost
+    else
+        cd /root/Ghost && python3 -m ghost --execute "connect $T_IP"
+    fi
+    pause
+}
+
+# --- [ МОДУЛЬ: RECOVERY & FORENSIC ] ---
+run_pc_recovery() {
+    clear
+    echo -e "${P}>>> [ RECOVERY & FORENSIC ] <<<${NC}"
+    echo "1. Passwords Extraction (LaZagne)"
+    echo "2. Reset OS Password (Smart Mode)"
+    read -p "Choice: " r_choice
+    
+    if [ "$r_choice" = "1" ]; then
+        python3 /root/lazagne/lazagne.py all -oN /root/passwords.txt
+    elif [ "$r_choice" = "2" ]; then
+        # Наша "умная" логика сброса (Linux/macOS/Windows)
+        WIN_SAM=$(find /mnt /media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
+        if [ -n "$WIN_SAM" ]; then
+            chntpw -i "$WIN_SAM"
         else
-            echo -e "${R}[!] Error: whois package missing.${NC}"
+            # Linux/macOS эвристика (упрощенно для стабильности)
+            read -p "Username to reset: " U_NAME
+            [ -n "$U_NAME" ] && sed -i "s/^$U_NAME:[^:]*:/$U_NAME::/" /etc/shadow
         fi
     fi
     pause
+}
+
+# --- [ МОДУЛЬ: UTILS ] ---
+run_pwd_gen() {
+    clear
+    RESULT=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9!#%^*' | head -c 16)
+    echo -e "${G}[+] Pass:${NC} $RESULT"; pause
 }
 
 run_cert_forge() {
     clear
-    echo -e "${G}>>> [ CERTIFICATE FORGE ] <<<${NC}"
-    read -p "Domain (google.com): " S_DOMAIN
-    [ -z "$S_DOMAIN" ] && return
-
-    echo -e "${B}[*] Fetching metadata...${NC}"
-    # Используем временный файл, чтобы не ломать Bash кавычками
-    timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject > /tmp/cert.tmp
-    
-    if [ -s /tmp/cert.tmp ]; then
-        # Чистим данные без вложенных кавычек
-        local ORIG_SUBJ=$(cat /tmp/cert.tmp | sed 's/subject=//; s/^[[:space:]]*//')
-        echo -e "${G}[+] Metadata:${NC} $ORIG_SUBJ"
-        
-        openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
-            -subj "$ORIG_SUBJ" \
-            -keyout "/root/${S_DOMAIN}.key" \
-            -out "/root/${S_DOMAIN}.crt" 2>/dev/null
-            
-        echo -e "${G}[DONE]${NC} Files saved in /root/"
-    else
-        echo -e "${R}[!] Failed to get info.${NC}"
-    fi
-    rm -f /tmp/cert.tmp
+    read -p "Domain: " S_DOM
+    [ -z "$S_DOM" ] && return
+    timeout 5 openssl s_client -connect "${S_DOM}:443" </dev/null 2>/dev/null | openssl x509 -noout -subject > /tmp/c.tmp
+    [ -s /tmp/c.tmp ] && openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "$(cat /tmp/c.tmp | sed 's/subject=//')" -keyout "/root/$S_DOM.key" -out "/root/$S_DOM.crt"
     pause
 }
 
-# Заглушки для функций, которые добавим позже
-exit_script() { echo -e "${G}Goodbye!${NC}"; exit 0; }
-not_implemented() { echo -e "${R}Module under construction...${NC}"; pause; }
+update_prime() {
+    echo -e "${Y}[*] Jumping to update script...${NC}"
+    bash /root/updlauncher.sh
+    exit 0
+}
+
+exit_script() { clear; exit 0; }
 
 # --- [ ГЛАВНОЕ МЕНЮ ] ---
 run_main_menu() {
-    local main_names="PWD_GEN CERT_FORGE EXIT"
-    local main_funcs="run_pwd_gen run_cert_forge exit_script"
-    
-    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
+    local names="GHOST_SCAN TOTAL_OSINT PC_RECOVERY PWD_GEN CERT_FORGE UPDATE_CORE EXIT"
+    local funcs="run_ghost_commander run_smart_osint run_pc_recovery run_pwd_gen run_cert_forge update_prime exit_script"
+    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$names" "$funcs"
 }
 
-# Запуск
 run_main_menu
