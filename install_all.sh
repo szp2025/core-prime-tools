@@ -42,7 +42,7 @@ EOF
 
 
 repair_and_clean() {
-    [ -f /var/lib/dpkg/status ] && sed -i '/Package: php8/,/^$/d' /var/lib/dpkg/status 2>/dev/null
+   # [ -f /var/lib/dpkg/status ] && sed -i '/Package: php8/,/^$/d' /var/lib/dpkg/status 2>/dev/null
     sync && echo 3 | tee /proc/sys/vm/drop_caches >/dev/null 2>&1
     rm -f /root/*.zip /root/*.tmp /root/*.log /root/*.deb 2>/dev/null
     apt-get clean && rm -rf ~/.cache/pip
