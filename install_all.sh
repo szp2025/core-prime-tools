@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="33.2"
+CURRENT_VERSION="33.3"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -779,8 +779,39 @@ run_device_hack() {
     prime_dynamic_controller "DEVICE & NETWORK HACK" "$dh_names" "$dh_funcs"
 }
 
-launch_ghost_manual() { cd /root/Ghost && python3 -m ghost; }
-launch_ghost_autopwn() { read -p "Target IP: " t; cd /root/Ghost && python3 -m ghost --execute "connect $t"; pause; }
+run_ghost_commander() {
+    clear
+    echo -e "\e[1;31m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: GHOST COMMANDER (ANDROID/IOT)   "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -n "Enter Target IP (Leave empty for Manual Console): "
+    read TARGET_IP
+
+    # Проверяем наличие самого фреймворка
+    if [ ! -d "/root/Ghost" ]; then
+        echo -e "\e[1;31m[!] Error: Ghost Framework not found in /root/Ghost\e[0m"
+        read -p "Press [ENTER] to return..."
+        return
+    fi
+
+    if [ -z "$TARGET_IP" ]; then
+        # --- Режим 1: Ручная консоль ---
+        echo -e "\e[1;34m[*] Launching Manual Ghost Console...\e[0m"
+        cd /root/Ghost && python3 -m ghost
+    else
+        # --- Режим 2: AutoPwn / Прямое подключение ---
+        echo -e "\e[1;32m[*] Executing Auto-Connect to: $TARGET_IP\e[0m"
+        # Мы используем --execute, чтобы пробросить команду прямо в движок
+        cd /root/Ghost && python3 -m ghost --execute "connect $TARGET_IP"
+    fi
+
+    echo -e "\n\e[1;33m--------------------------------------------------\e[0m"
+    read -p "Ghost Session Terminated. Press [ENTER]..."
+}
+
 
 analyze_network_traffic() {
     local n_names="Host_Monitor HTTP/DNS_Sniffer Traffic_Record"
@@ -1238,10 +1269,10 @@ exit_script() { history -c; exit 0; }
 run_main_menu() {
     # 1. Список имен (Визуальные названия)
     # Добавлен PC_RECOVERY (Forensic + Pass Reset)
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN/RIB_SCAN PWD_GEN CERT_FORGE CERTIF_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB MANUAL_INSTALL REPAIR UPDATE_CORE EXIT"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN/RIB_SCAN PWD_GEN CERT_FORGE CERTIF_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB MANUAL_INSTALL REPAIR UPDATE_CORE EXIT"
     
     # 2. Список функций (Строгое соответствие порядку имен)
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers install_manual_tools run_repair update_prime exit_script"
+    local main_funcs=run_ghost_commander run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers install_manual_tools run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -1265,7 +1296,7 @@ update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "33.0" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "33.1" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
