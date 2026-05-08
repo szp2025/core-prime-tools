@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="34.3"
+CURRENT_VERSION="34.7"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -676,16 +676,23 @@ zero_clear() {
 }
 
 get_stats() {
-    local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
+    # Добавляем MB к оперативной памяти
+    local ram=$(free -m | awk '/Mem:/ {printf "%dMB", $3}')
+    # df -h уже содержит буквы (G, M), поэтому просто закрываем кавычки
     local rom=$(df -h / | awk 'NR==2 {print $4}')
     local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}')
+    
     [ -z "$sd_info" ] && sd_info="N/A"
+    
     local net="${R}OFFLINE${NC}"; ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net="${G}ONLINE${NC}"
-    local srv=""; pgrep -f "av_server.py" >/dev/null && srv+=" ${G}[AV]${NC}"; pgrep -f "share_server.py" >/dev/null && srv+=" ${G}[SH]${NC}"; pgrep -f "upload_server.py" >/dev/null && srv+=" ${G}[UP]${NC}"
+    local srv=""; pgrep -f "av_server.py" >/dev/null 2>&1 && srv="${G}RUNNING${NC}"
     [ -z "$srv" ] && srv="${R}NONE${NC}"
-    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom ${Y}| SD: ${G}$sd_info"
-    echo -e "${Y}NET: $net ${Y}| ACTIVE SRV:$srv${NC}"
+    
+    # Вывод с четким разделением
+    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom"
+    echo -e "${Y}SD: ${G}$sd_info ${Y}| NET: $net ${Y}| ACTIVE SRV: $srv"
 }
+
 
 # --- Универсальный контроллер ---
 prime_dynamic_controller() {
