@@ -876,11 +876,22 @@ run_pc_recovery_ultimate() {
     clear
     echo -e "${R}--- PC RECOVERY & PASS RESET ---${NC}"
     echo -e "${Y}1) Создать Boot-USB (chntpw)${NC}"
-    echo -e "${Y}2) Инструкция по сбросу пароля Win/Linux${NC}"
+    echo -e "${Y}2) Показать инструкцию по сбросу${NC}"
     read -p ">> " pc_opt
+    
     case $pc_opt in
-        1) echo "Для этого модуля требуется подключение внешнего диска.";;
-        2) echo "Используйте: 'mount /dev/sdX /mnt' и 'chntpw -u Admin /mnt/Windows/System32/config/SAM'";;
+        1) 
+            echo "Для этого модуля требуется подключение внешнего диска."
+            ;;
+        2) 
+            echo "-------------------------------------------------------"
+            echo "1. mount /dev/sdX /mnt"
+            echo "2. chntpw -u Admin /mnt/Windows/System32/config/SAM"
+            echo "-------------------------------------------------------"
+            ;;
+        *)
+            echo "Неверный выбор"
+            ;;
     esac
     pause
 }
