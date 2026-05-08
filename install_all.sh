@@ -840,33 +840,17 @@ EOF
 
 generate_cert_reader_tool() {
     local target_file="$1"
-    local code=$(cat << 'EOF'
+    # Записываем скрипт, экранируя все переменные
+    cat << 'EOF' > "$target_file"
 #!/bin/bash
-# PRIME_CERT_ANALYZER v4.3
 FILE="$1"
-[[ ! -f "$FILE" ]] && echo -e "\e[1;31m[!] FILE NOT FOUND\e[0m" && exit 1
-FORMAT="PEM"
-grep -q "BEGIN CERTIFICATE" "$FILE" 2>/dev/null || FORMAT="DER"
-echo "--------------------------------------------------"
-echo -e ">> ANALYZING: \e[1;33m$(basename "$FILE")\e[0m [\e[1;32m$FORMAT\e[0m]"
-echo "--------------------------------------------------"
-run_info() {
-    openssl x509 -inform "$FORMAT" -in "$FILE" -noout "$@" | while read -r l; do printf "    %s\n" "$l"; done
-}
-echo -e "\e[1;34m[+] INFO:\e[0m"
-run_info -subject -issuer -dates
-echo -e "\e[1;34m[+] FINGERPRINT:\e[0m"
-run_info -fingerprint -sha256
-echo "--------------------------------------------------"
+if [ ! -f "$FILE" ]; then echo "Error: File not found"; exit 1; fi
+echo ">> ANALYZING CERTIFICATE: $FILE"
+# Прямой вызов без вложенных функций для стабильности
+openssl x509 -in "$FILE" -noout -subject -issuer -dates
 EOF
-)
-    smart_cat "$target_file" "$code"
     chmod +x "$target_file"
 }
-
-
-
-
 
 
 run_cert_reader() {
