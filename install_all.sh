@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="34.1"
+CURRENT_VERSION="34.2"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -1060,36 +1060,7 @@ run_prime_exploiter_v4() {
 
 # 2. Интеллектуальный Эвристический Сканер
 run_heuristic_scanner_v2() {
-    clear
-    echo -e "\e[1;35m"
-    echo "--------------------------------------------------"
-    echo "   PRIME MASTER: HEURISTIC AUTONOMOUS SCANNER     "
-    echo "--------------------------------------------------\e[0m"
-    echo -n "ENTER TARGET SCOPE (IP/CIDR/Domain): "
-    read SCOPE
-    [ -z "$SCOPE" ] && return
-
-    echo -e "\n\e[1;34m[*] Phase 1: Stealth Enumeration...\e[0m"
-    # Быстрый поиск живых хостов без лишнего шума
-    nmap -n -sn --host-timeout 500ms "$SCOPE" | grep "report for" | cut -d' ' -f5 > /tmp/.prime_nodes
-
-    NODE_COUNT=$(wc -l < /tmp/.prime_nodes)
-    if [ "$NODE_COUNT" -eq 0 ]; then
-        echo -e "\e[1;31m[!] No targets found.\e[0m"; sleep 2; return
-    fi
-
-    echo -e "\e[1;32m[+]\e[0m Found $NODE_COUNT nodes. \e[1;7m STARTING EXTRACTION... \e[0m\n"
-
-    while read -r NODE; do
-        echo -e "\e[1;35m>>> TARGET:\e[0m \e[1;37m$NODE\e[0m"
-        # Вызываем эксплойтер в авто-режиме
-        run_prime_exploiter_v4 "$NODE"
-        echo -e "\e[1;30m--------------------------------------------------\e[0m"
-    done < /tmp/.prime_nodes
-
-    rm -f /tmp/.prime_nodes
-    echo -e "\n\e[1;32m[+++] SCAN COMPLETE. Loot: /root/prime_loot_live.txt\e[0m"
-    read -p "Press [ENTER]"
+    
 }
 
 
