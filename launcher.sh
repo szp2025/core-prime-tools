@@ -1,21 +1,12 @@
 #!/bin/bash
 
-# --- [ КОНФИГУРАЦИЯ И ЦВЕТА ] ---
-G='\033[1;32m'
-R='\033[1;31m'
-Y='\033[1;33m'
-B='\033[1;34m'
-P='\033[1;35m'
-C='\033[1;36m'
-NC='\033[0m'
+# --- [ CONFIG & COLORS ] ---
+G='\033[1;32m'; R='\033[1;31m'; Y='\033[1;33m'; B='\033[1;34m'
+P='\033[1;35m'; C='\033[1;36m'; NC='\033[0m'
+CURRENT_VERSION="31.6"
 
-CURRENT_VERSION="31.5"
-
-# --- [ СИСТЕМНЫЕ ФУНКЦИИ ] ---
-pause() {
-    echo -e "\n${Y}[ PRESS ENTER TO CONTINUE ]${NC}"
-    read _
-}
+# --- [ SYSTEM CORE ] ---
+pause() { echo -e "\n${Y}[ PRESS ENTER ]${NC}"; read _; }
 
 prime_dynamic_controller() {
     local title=$1; local names=$2; local funcs=$3
@@ -32,97 +23,100 @@ prime_dynamic_controller() {
         echo -e "${P}--------------------------------------------------${NC}"
         read -p " Selection: " choice
         local func=$(echo $funcs | cut -d' ' -f$choice)
-        [ -z "$func" ] && continue
+        [ -z "$func" ] && break
         $func
     done
 }
 
-# --- [ МОДУЛЬ: OSINT ] ---
+# --- [ МОДУЛИ: EXPLOITATION ] ---
+
+run_ghost_scan() {
+    clear; echo -e "${R}>>> [ GHOST COMMANDER ] <<<${NC}"
+    read -p "Target IP (Leave empty for console): " t
+    if [ -z "$t" ]; then cd /root/Ghost && python3 -m ghost
+    else cd /root/Ghost && python3 -m ghost --execute "connect $t"; fi
+    pause
+}
+
+run_phishing() {
+    clear; echo -e "${C}>>> [ SOCIAL ENGINEERING ] <<<${NC}"
+    cd /root/zphisher && bash zphisher.sh
+}
+
+run_sqlmap() {
+    clear; echo -e "${Y}>>> [ SQLMAP ENGINE ] <<<${NC}"
+    read -p "Target URL: " u; [ -z "$u" ] && return
+    sqlmap -u "$u" --batch --random-agent --level=3
+    pause
+}
+
+run_device_hack() {
+    clear; echo -e "${R}>>> [ DEVICE HACK ENGINE ] <<<${NC}"
+    # Интеграция PhoneSploit или Metasploit
+    msfconsole -q -x "help"
+    pause
+}
+
+run_exploit_hub() {
+    clear; echo -e "${P}>>> [ EXPLOIT HUB ] <<<${NC}"
+    searchsploit --update
+    read -p "Search Term: " s
+    searchsploit "$s"
+    pause
+}
+
+# --- [ МОДУЛИ: OSINT & RECOVERY ] ---
+
 run_smart_osint() {
-    clear
-    echo -e "${C}>>> [ SMART OSINT ENGINE 2026 ] <<<${NC}"
-    read -p "Input (Nick/Phone/Email): " INPUT
-    [ -z "$INPUT" ] && return
-    
-    echo -e "${B}[*] Rapid Check...${NC}"
-    socialscan "$INPUT"
-    
-    if [[ "$INPUT" =~ @ ]]; then
-        python3 /root/infoga/infoga.py --target "$INPUT"
-    elif [[ "$INPUT" =~ ^[0-9+] ]]; then
-        echo -e "${G}[+] Phone detected. Running lookup...${NC}"
-    else
-        maigret "$INPUT" --parse --timeout 15
-        python3 /root/blackbird/blackbird.py -u "$INPUT"
-    fi
+    clear; echo -e "${C}>>> [ SMART OSINT 2026 ] <<<${NC}"
+    read -p "Input: " i; [ -z "$i" ] && return
+    socialscan "$i"
+    if [[ "$i" =~ @ ]]; then python3 /root/infoga/infoga.py --target "$i"
+    else maigret "$i" --parse --timeout 15; fi
     pause
 }
 
-# --- [ МОДУЛЬ: GHOST COMMANDER ] ---
-run_ghost_commander() {
-    clear
-    echo -e "${R}>>> [ GHOST COMMANDER ] <<<${NC}"
-    read -p "Target IP (Leave empty for Manual): " T_IP
-    if [ -z "$T_IP" ]; then
-        cd /root/Ghost && python3 -m ghost
-    else
-        cd /root/Ghost && python3 -m ghost --execute "connect $T_IP"
-    fi
-    pause
-}
-
-# --- [ МОДУЛЬ: RECOVERY & FORENSIC ] ---
-run_pc_recovery() {
-    clear
-    echo -e "${P}>>> [ RECOVERY & FORENSIC ] <<<${NC}"
-    echo "1. Passwords Extraction (LaZagne)"
-    echo "2. Reset OS Password (Smart Mode)"
-    read -p "Choice: " r_choice
-    
-    if [ "$r_choice" = "1" ]; then
-        python3 /root/lazagne/lazagne.py all -oN /root/passwords.txt
-    elif [ "$r_choice" = "2" ]; then
-        # Наша "умная" логика сброса (Linux/macOS/Windows)
-        WIN_SAM=$(find /mnt /media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
-        if [ -n "$WIN_SAM" ]; then
-            chntpw -i "$WIN_SAM"
-        else
-            # Linux/macOS эвристика (упрощенно для стабильности)
-            read -p "Username to reset: " U_NAME
-            [ -n "$U_NAME" ] && sed -i "s/^$U_NAME:[^:]*:/$U_NAME::/" /etc/shadow
+run_pc_recovery_ultimate() {
+    clear; echo -e "${B}>>> [ PC RECOVERY & FORENSIC ] <<<${NC}"
+    echo -e "1. Extract Passwords (LaZagne)\n2. Reset OS Password"
+    read -p "> " c
+    if [ "$c" = "1" ]; then python3 /root/lazagne/lazagne.py all -oN /root/pass.txt
+    elif [ "$c" = "2" ]; then
+        # Эвристика: ищем SAM для Windows или работаем с Linux Shadow
+        sam=$(find /mnt /media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
+        if [ -n "$sam" ]; then chntpw -i "$sam"
+        else 
+            read -p "Linux Username: " u
+            [ -n "$u" ] && sed -i "s/^$u:[^:]*:/$u::/" /etc/shadow && echo "Pass cleared."
         fi
     fi
     pause
 }
 
-# --- [ МОДУЛЬ: UTILS ] ---
+# --- [ МОДУЛИ: UTILS ] ---
+
 run_pwd_gen() {
-    clear
-    RESULT=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9!#%^*' | head -c 16)
-    echo -e "${G}[+] Pass:${NC} $RESULT"; pause
+    clear; echo -e "${Y}>>> [ PASSWORD GENERATOR ] <<<${NC}"
+    read -p "Length: " l; [ -z "$l" ] && l=16
+    res=$(openssl rand -base64 64 | tr -dc 'A-Za-z0-9!#%^*' | head -c "$l")
+    echo -e "${G}[+] Pass:${NC} $res"; pause
 }
 
 run_cert_forge() {
-    clear
-    read -p "Domain: " S_DOM
-    [ -z "$S_DOM" ] && return
-    timeout 5 openssl s_client -connect "${S_DOM}:443" </dev/null 2>/dev/null | openssl x509 -noout -subject > /tmp/c.tmp
-    [ -s /tmp/c.tmp ] && openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "$(cat /tmp/c.tmp | sed 's/subject=//')" -keyout "/root/$S_DOM.key" -out "/root/$S_DOM.crt"
-    pause
+    clear; read -p "Domain: " d; [ -z "$d" ] && return
+    timeout 5 openssl s_client -connect "${d}:443" </dev/null 2>/dev/null | openssl x509 -noout -subject > /tmp/c.tmp
+    [ -s /tmp/c.tmp ] && openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "$(cat /tmp/c.tmp | sed 's/subject=//')" -keyout "/root/$d.key" -out "/root/$d.crt"
+    echo "Done: /root/$d.crt"; rm /tmp/c.tmp; pause
 }
 
-update_prime() {
-    echo -e "${Y}[*] Jumping to update script...${NC}"
-    bash /root/updlauncher.sh
-    exit 0
-}
+# --- [ CORE CONTROL ] ---
 
-exit_script() { clear; exit 0; }
+update_core() { bash /root/updlauncher.sh; exit 0; }
+exit_script() { clear; echo "Exiting..."; exit 0; }
 
-# --- [ ГЛАВНОЕ МЕНЮ ] ---
 run_main_menu() {
-    local names="GHOST_SCAN TOTAL_OSINT PC_RECOVERY PWD_GEN CERT_FORGE UPDATE_CORE EXIT"
-    local funcs="run_ghost_commander run_smart_osint run_pc_recovery run_pwd_gen run_cert_forge update_prime exit_script"
+    local names="GHOST_SCAN SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT PC_RECOVERY PWD_GEN CERT_FORGE UPDATE EXIT"
+    local funcs="run_ghost_scan run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint run_pc_recovery_ultimate run_pwd_gen run_cert_forge update_core exit_script"
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$names" "$funcs"
 }
 
