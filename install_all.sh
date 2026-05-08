@@ -992,75 +992,67 @@ run_pwd_gen() {
     clear
     echo -e "\e[1;33m--- PRIME PASSWORD GENERATOR ---\e[0m"
     read -p "Enter Length: " P_LEN
-    [ -z "$P_LEN" ] && P_LEN=16
+    [[ -z "$P_LEN" || ! "$P_LEN" =~ ^[0-9]+$ ]] && P_LEN=16
 
-    # Исправленная строка 1014: используем экранирование и чистый набор символов
-    RESULT=$(cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+=-' | head -c "$P_LEN")
+    # Используем чистый набор символов без конфликтующих скобок
+    # Символы - и _ ставим в конец, чтобы tr не думал, что это диапазон
+    RESULT=$(cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+=' | head -c "$P_LEN")
     
     echo -e "\n\e[1;32m[+] Generated:\e[0m $RESULT"
     echo "--------------------------------"
     
-    # Сразу предлагаем Bcrypt, раз уж мы в комбайне
     read -p "Hash it with Bcrypt? (y/n): " h_choice
     if [[ "$h_choice" == "y" ]]; then
-        echo -n "$RESULT" | mkpasswd -m bcrypt -s
+        # Проверка наличия mkpasswd (пакет whois)
+        if command -v mkpasswd >/dev/null; then
+            echo -n "$RESULT" | mkpasswd -m bcrypt -s
+        else
+            echo "Error: whois package (mkpasswd) not installed."
+        fi
     fi
     pause
 }
 
 
 
+
    run_cert_forge() {
     clear
-    echo -e "\e[1;32m"
+    echo -e "\e[1;32m--------------------------------------------------"
+    echo "         PRIME MASTER: CERTIFICATE FORGE          "
+    echo "--------------------------------------------------\e[0m"
+    
+    read -p "Enter Domain to spoof (e.g. google.com): " S_DOMAIN
+    if [ -z "$S_DOMAIN" ]; then echo "No domain."; sleep 1; return; fi
+
+    echo -e "\e[1;34m[*] Fetching metadata for $S_DOMAIN...\e[0m"
+    
+    # Исправленная линия 1032: используем более простой способ забора Subject
+    # Без сложных sed-конструкций внутри переменной
+    RAW_INFO=$(timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject)
+    
+    if [ -z "$RAW_INFO" ]; then
+        echo -e "\e[1;31m[!] Failed to get certificate info.\e[0m"
+        pause; return
+    fi
+
+    # Очищаем только префикс 'subject='
+    ORIG_SUBJ=$(echo "$RAW_INFO" | sed 's/^subject=//')
+
+    echo -e "\e[1;32m[+] Original Subject:\e[0m $ORIG_SUBJ"
+    echo -e "\e[1;33m[*] Generating Fake Certificate...\e[0m"
+    
+    # Генерация ключа и сертификата
+    openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+        -subj "$ORIG_SUBJ" \
+        -keyout "/root/${S_DOMAIN}.key" \
+        -out "/root/${S_DOMAIN}.crt" 2>/dev/null
+
     echo "--------------------------------------------------"
-    echo "       PRIME MASTER: CERTIFICATE FORGE            "
-    echo "--------------------------------------------------"
-    echo -e "\e[0m"
-
-    echo -n "Enter Domain to spoof (e.g. google.com): "
-    read S_DOMAIN
-    if [ -z "$S_DOMAIN" ]; then
-        echo -e "\e[1;31m[!] No domain specified.\e[0m"
-        sleep 2; return
-    fi
-
-    echo -e "\n\e[1;34m[*] Fetching original metadata from $S_DOMAIN...\e[0m"
-
-    # Извлекаем Subject оригинального сертификата
-    # Используем sed для очистки вывода под формат openssl subj
-    ORIG_SUBJ=$(timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject | sed 's/^subject=//; s/ = /=/g; s/, /\//g; s/^/\//')
-
-    if [ -z "$ORIG_SUBJ" ] || [ "$ORIG_SUBJ" == "/" ]; then
-        echo -e "\e[1;33m[!] Could not fetch metadata. Using default spoof-identity.\e[0m"
-        ORIG_SUBJ="/C=US/ST=California/L=Mountain View/O=Internet Authority/CN=${S_DOMAIN}"
-    fi
-
-    echo -e "\e[1;32m[*] Targeted Identity:\e[0m $ORIG_SUBJ"
-    echo -e "\e[1;34m[*] Forging private key and self-signed cert...\e[0m"
-
-    # Генерация (имитация)
-    openssl req -x509 -newkey rsa:2048 -nodes \
-        -keyout "${S_DOMAIN}_forged.key" \
-        -out "${S_DOMAIN}_forged.crt" \
-        -days 365 \
-        -subj "$ORIG_SUBJ" 2>/dev/null
-
-    if [ $? -eq 0 ]; then
-        echo -e "\n\e[1;32m[SUCCESS]\e[0m Forged certificate created!"
-        echo -e "--------------------------------------------------"
-        echo -e "\e[1;33mFORGED FILES:\e[0m"
-        echo -e "  >> ${S_DOMAIN}_forged.key"
-        echo -e "  >> ${S_DOMAIN}_forged.crt"
-        echo -e "--------------------------------------------------"
-    else
-        echo -e "\n\e[1;31m[ERROR]\e[0m Forge failed. Check network or OpenSSL status."
-    fi
-
-    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
-    echo -n "Press [ENTER] to return to menu..."
-    read -r
+    echo -e "[SUCCESS] Files created: /root/${S_DOMAIN}.key /root/${S_DOMAIN}.crt"
+    pause
 }
+
 
 # 1. Единый Движок Эксплуатации (Ручной + Авто режим)
 run_prime_exploiter_v4() {
