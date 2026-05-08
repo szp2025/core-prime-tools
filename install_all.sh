@@ -726,19 +726,51 @@ prime_dynamic_controller() {
 }
 
 # --- Модули: OSINT ---
-run_osint() {
-    clear; zero_clear; echo -e "${Y}>>> [ SMART OSINT 2026 ] <<<${NC}"
-    read -p "Input (Nick/Phone/Email): " i; [ -z "$i" ] && return
-    socialscan "$i"; python3 /root/infoga/infoga.py --target "$i" 2>/dev/null
-    pause
+run_smart_osint_engine() {
+    clear
+    echo -e "\e[1;36m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: SMART OSINT ENGINE 2026         "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    read -p "ENTER DATA (Nick, Phone, or Email): " INPUT
+    [ -z "$INPUT" ] && return
+
+    echo -e "\n\e[1;34m[*] Phase 1: Rapid Presence Check (SocialScan)...\e[0m"
+    socialscan "$INPUT"
+
+    # --- ФАЗА 2: Эвристический анализ типа данных ---
+    if [[ "$INPUT" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$ ]]; then
+        # Это EMAIL
+        echo -e "\e[1;32m[!] Detected Type: EMAIL\e[0m"
+        echo -e "\e[1;34m[*] Running Infoga & Breach Analysis...\e[0m"
+        python3 /root/infoga/infoga.py --target "$INPUT"
+        
+    elif [[ "$INPUT" =~ ^\+?[0-9]{10,15}$ ]]; then
+        # Это ТЕЛЕФОН
+        echo -e "\e[1;32m[!] Detected Type: PHONE\e[0m"
+        echo -e "\e[1;34m[*] Running Phone Lookup Engine...\e[0m"
+        # Здесь можно добавить поиск по базам или специфические утилиты для телефонов
+        echo "Searching for $INPUT across known databases..."
+        
+    else
+        # Это НИКНЕЙМ (Username)
+        echo -e "\e[1;32m[!] Detected Type: USERNAME\e[0m"
+        echo -e "\e[1;34m[*] Starting Deep Auto-Pilot (Maigret + Blackbird)...\e[0m"
+        
+        echo -e "\e[1;33m[>] Running Maigret (Parse Mode)...\e[0m"
+        maigret "$INPUT" --parse --timeout 15 --top 500
+        
+        echo -e "\e[1;33m[>] Running Blackbird (Recursive Search)...\e[0m"
+        python3 /root/blackbird/blackbird.py -u "$INPUT"
+    fi
+
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo "OSINT Scan Complete."
+    read -p "Press [ENTER] to return..."
 }
 
-run_osint2() {
-    clear; echo -e "${Y}>>> [ TOTAL OSINT 2: DEEP AUTO-PILOT ] <<<${NC}"
-    read -p "Target: " i; [ -z "$i" ] && return
-    socialscan "$i"; maigret "$i" --parse --timeout 20; python3 /root/blackbird/blackbird.py -u "$i"
-    pause
-}
 
 # --- Модули: DEVICE & NETWORK (Пункт 5) ---
 run_device_hack() {
@@ -762,27 +794,93 @@ run_traffic_record() { mkdir -p /root/reports; tshark -i wlan0 -w /root/reports/
 
 # --- Модули: RECOVERY & PASSWORDS ---
 pc_password_recovery() {
-    local p_names="Extract_Passwords Reset_OS_Password Heuristic_Scan"
-    local p_funcs="extract_all_passwords reset_any_os_password smart_threat_scan"
+    local p_names="Extract_Reset_OS_Password Heuristic_Scan"
+    local  n_funcs="run_pc_recovery_ultimate smart_threat_scan"
     prime_dynamic_controller "PC RECOVERY & FORENSIC" "$p_names" "$p_funcs"
 }
 
-extract_all_passwords() {
-    cd /root/lazagne && python3 lazagne.py all -oN /root/reports/passwords.txt
-    echo -e "${G}[+] Saved to /root/reports/passwords.txt${NC}"; pause
-}
+run_pc_recovery_ultimate() {
+    clear
+    echo -e "\e[1;35m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: RECOVERY & FORENSIC ENGINE      "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
 
-reset_any_os_password() {
-    local r_names="Windows_(SAM) Linux_(Shadow) macOS"
-    local r_funcs="reset_windows_password reset_linux_pass reset_macos_info"
-    prime_dynamic_controller "OS PASSWORD RESET" "$r_names" "$r_funcs"
-}
+    echo -e "\e[1;34m[1] PASSWORDS EXTRACTION (LaZagne Mode)\e[0m"
+    echo -e "\e[1;34m[2] SMART PASSWORD RESET (Windows/Linux/macOS)\e[0m"
+    echo -e "\e[1;34m[3] EXIT TO MAIN MENU\e[0m"
+    echo "--------------------------------------------------"
+    read -p "SELECT ACTION: " MAIN_CHOICE
 
-reset_windows_password() {
-    local sam=$(find /mnt /media -type f -name "SAM" -path "*/System32/config/*" | head -n 1)
-    [ -n "$sam" ] && chntpw -i "$sam" || echo -e "${R}SAM не найден${NC}"; pause
-}
+    case "$MAIN_CHOICE" in
+        1)
+            # --- Экстракция паролей через LaZagne ---
+            echo -e "\n\e[1;33m[*] Starting LaZagne Engine...\e[0m"
+            if [ -d "/root/lazagne" ]; then
+                python3 /root/lazagne/lazagne.py all -oN /root/prime_extracted_passwords.txt
+                echo -e "\e[1;32m[+] Done! Loot saved to /root/prime_extracted_passwords.txt\e[0m"
+            else
+                echo -e "\e[1;31m[ERR] LaZagne not found in /root/lazagne\e[0m"
+            fi
+            ;;
 
+        2)
+            # --- Единый Умный Сброс Паролей (All-in-One) ---
+            echo -e "\n\e[1;34m[*] Detecting Target OS Environment...\e[0m"
+            
+            # 1. Проверка на Windows SAM (если примонтированы диски)
+            WIN_SAM=$(find /mnt /media /run/media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
+            
+            if [ -n "$WIN_SAM" ]; then
+                echo -e "\e[1;32m[+] Windows SAM detected at: $WIN_SAM\e[0m"
+                echo -e "\e[1;33m[!] Launching CHNTPW Interactive Mode...\e[0m"
+                chntpw -i "$WIN_SAM"
+            
+            # 2. Проверка на Linux/macOS через нашу эвристику
+            else
+                OS_TYPE="Unknown"
+                [[ "$OSTYPE" == "linux-gnu"* ]] && OS_TYPE="Linux"
+                [[ "$OSTYPE" == "darwin"* ]] && OS_TYPE="macOS"
+                
+                if [ "$OS_TYPE" == "Linux" ] || [ "$OS_TYPE" == "macOS" ]; then
+                    echo -e "\e[1;32m[+] $OS_TYPE Environment detected.\e[0m"
+                    
+                    # Собираем список юзеров (как в нашей прошлой версии)
+                    declare -a USERS_LIST
+                    if [ "$OS_TYPE" == "Linux" ]; then
+                        mapfile -t USERS_LIST < <(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd)
+                    else
+                        mapfile -t USERS_LIST < <(dscl . list /Users | grep -v '^_' | grep -v 'root')
+                    fi
+
+                    if [ ${#USERS_LIST[@]} -eq 0 ]; then
+                        echo -e "\e[1;31m[!] No users found.\e[0m"
+                    else
+                        for i in "${!USERS_LIST[@]}"; do echo -e "  [\e[1;32m$i\e[0m] ${USERS_LIST[$i]}"; done
+                        read -p "SELECT USER NUMBER: " U_IDX
+                        TARGET_USER="${USERS_LIST[$U_IDX]}"
+                        
+                        if [ -n "$TARGET_USER" ]; then
+                            if [ "$OS_TYPE" == "Linux" ]; then
+                                sed -i "s/^$TARGET_USER:[^:]*:/$TARGET_USER::/" /etc/shadow
+                                echo -e "\e[1;32m[SUCCESS] Password cleared for $TARGET_USER\e[0m"
+                            else
+                                read -p "New Pass: " M_PASS
+                                sudo dscl . -passwd /Users/"$TARGET_USER" "$M_PASS"
+                                echo -e "\e[1;32m[SUCCESS] Password updated for $TARGET_USER\e[0m"
+                            fi
+                        fi
+                    fi
+                else
+                    echo -e "\e[1;31m[ERR] No Windows SAM or supported OS found.\e[0m"
+                fi
+            fi
+            ;;
+        *) return ;;
+    esac
+    read -p "Press [ENTER] to return..."
+}
 
 
 run_cert_analyzer() {
@@ -1090,8 +1188,7 @@ run_view_loot() {
 }
 
 
-reset_linux_pass() { read -p "User: " u; sed -i "s/^$u:[^:]*:/$u::/" /etc/shadow; pause; }
-reset_macos_info() { echo "dscl . -passwd /Users/username newpassword"; pause; }
+
 
 # --- Модули: EXPLOIT HUB (Пункт 6) ---
 run_exploit_hub() {
@@ -1137,15 +1234,14 @@ pause() { read -p "Press Enter..." dummy; }
 exit_script() { history -c; exit 0; }
 
 
-# --- ГЛАВНОЕ МЕНЮ (v31.4: + LIVE_EXPLOIT_ENGINE) ---
+# --- ГЛАВНОЕ МЕНЮ (v31.5: + PC_RECOVERY_ULTIMATE) ---
 run_main_menu() {
-    # 1. Список имен (Визуальные названия в меню)
-    # Заменили HEURESTIC_ROUTER_SCAN на NET_SCAN_v2 и добавили ULTIMATE_EXPLOIT
-    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP SMART_OSINT DEVICE_HACK EXPLOIT_HUB AIO_OSINT_AUTO IBAN/RIB_SCAN PWD_GEN CERT_FORGE CERTIF_READER NET_SCAN_v2 ULTIMATE_EXPLOIT VIEW_LOOT SYSTEM_INFO SERVICE_HUB MANUAL_INSTALL REPAIR UPDATE_CORE EXIT"
+    # 1. Список имен (Визуальные названия)
+    # Добавлен PC_RECOVERY (Forensic + Pass Reset)
+    local main_names="GHOST_SCAN SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN/RIB_SCAN PWD_GEN CERT_FORGE CERTIF_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB MANUAL_INSTALL REPAIR UPDATE_CORE EXIT"
     
-    # 2. Список функций (Которые реально вызываются)
-    # Важно: порядок имен и функций должен строго совпадать!
-    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_osint run_device_hack run_exploit_hub run_osint2 run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_view_loot run_system_info run_servers install_manual_tools run_repair update_prime exit_script"
+    # 2. Список функций (Строгое соответствие порядку имен)
+    local main_funcs="run_ghost_scan run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers install_manual_tools run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
