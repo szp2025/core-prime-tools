@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="35.0"
+CURRENT_VERSION="35.1"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -682,6 +682,7 @@ get_stats() {
     
     echo -e "${Y}CPU: ${G}$cpu ${Y}| RAM: ${G}$ram ${Y}| DISK: ${G}$rom${NC}"
 }
+
 
 
 
