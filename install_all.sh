@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="33.0"
+CURRENT_VERSION="33.1"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -784,58 +784,14 @@ reset_windows_password() {
 }
 
 generate_pwd_tool() {
-    local target_file="$1"
-    local code=$(cat << 'EOF'
-#!/bin/bash
-# PRIME_PASSWORD_GENERATOR (Terminal Version)
-
-LENGTH=${1:-16} # Длина по умолчанию 16
-echo "--------------------------------------------------"
-echo ">> INITIATING KEY GENERATION (Length: $LENGTH)"
-echo "--------------------------------------------------"
-
-# Используем tr для фильтрации символов из рандомного потока
-PASSWORD=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+' < /dev/urandom | head -c "$LENGTH")
-
-echo -e "\e[1;32mNEW_KEY: $PASSWORD\e[0m"
-echo "--------------------------------------------------"
-EOF
+    
 )
     smart_cat "$target_file" "$code"
     chmod +x "$target_file"
 }
 
 generate_cert_tool() {
-    local target_file="$1"
-    local code=$(cat << 'EOF'
-#!/bin/bash
-# PRIME_CERT_FORGE (Terminal Version)
-
-DOMAIN=${1:-prime.local}
-DAYS=${2:-365}
-
-echo "--------------------------------------------------"
-echo ">> FORGING SSL CERTIFICATE: $DOMAIN"
-echo "--------------------------------------------------"
-
-openssl req -x509 -newkey rsa:2048 -nodes \
-  -out "${DOMAIN}.pem" \
-  -keyout "${DOMAIN}.key" \
-  -days "$DAYS" \
-  -subj "/CN=$DOMAIN" 2>/dev/null
-
-if [ $? -eq 0 ]; then
-    echo -e "\e[1;32m[+] SUCCESS:\e[0m"
-    echo "    - Cert: ${DOMAIN}.pem"
-    echo "    - Key:  ${DOMAIN}.key"
-else
-    echo -e "\e[1;31m[!] ERROR: Openssl failed to generate files.\e[0m"
-fi
-echo "--------------------------------------------------"
-EOF
-)
-    smart_cat "$target_file" "$code"
-    chmod +x "$target_file"
+    
 }
 
 generate_cert_reader_tool() {
@@ -844,29 +800,7 @@ generate_cert_reader_tool() {
 
 
 run_cert_reader() {
-    clear
-    echo -e "\e[1;32m[ PRIME CERTIFICATE ANALYZER ]\e[0m"
-    echo -e "Supports: X.509, Banking Certs, SSL/TLS, CA\n"
     
-    read -p "ENTER PATH TO CERTIFICATE: " C_PATH
-    
-    # Проверка на существование файла
-    if [[ -f "$C_PATH" ]]; then
-        # Если сертификат в бинарном формате DER (часто в банках), конвертируем на лету
-        if grep -q "BEGIN CERTIFICATE" "$C_PATH"; then
-             cert-read "$C_PATH"
-        else
-             echo -e "[*] Binary format detected. Processing..."
-             openssl x509 -inform DER -in "$C_PATH" -out "/tmp/temp_cert.pem" 2>/dev/null
-             cert-read "/tmp/temp_cert.pem"
-             rm "/tmp/temp_cert.pem"
-        fi
-    else
-        echo -e "\e[1;31m[!] FILE NOT FOUND\e[0m"
-    fi
-    
-    echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
-    read
 }
 
 # 3. Исправленный ГЕНЕРАТОР ПАРОЛЕЙ (Линия 972 - ФАТАЛЬНАЯ ОШИБКА)
@@ -875,19 +809,7 @@ run_pwd_gen() {
 }
 
    run_cert_forge() {
-    clear
-    echo -e "\e[1;32m[ PRIME CERTIFICATE FORGE ]\e[0m"
-    read -p "ENTER DOMAIN/CN [DEFAULT: prime.local]: " P_DOM
-    P_DOM=${P_DOM:-prime.local}
     
-    read -p "ENTER VALIDITY DAYS [DEFAULT: 365]: " P_DAYS
-    P_DAYS=${P_DAYS:-365}
-    
-    # Вызов твоего базового инструмента
-    gen-cert "$P_DOM" "$P_DAYS"
-    
-    echo -e "\n\e[1;33mPRESS ENTER TO RETURN TO MENU...\e[0m"
-    read
 }
 
 # 1. Исправленный ГЕНЕРАТОР ЭКСПЛОЙТА (Линии 957, 991, 997)
