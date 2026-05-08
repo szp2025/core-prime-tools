@@ -913,36 +913,7 @@ run_pc_recovery_ultimate() {
 
 
 run_cert_analyzer() {
-    clear
-    echo -e "\e[1;32m"
-    echo "--------------------------------------------------"
-    echo "       PRIME MASTER: CERTIFICATE ANALYZER         "
-    echo "--------------------------------------------------"
-    echo -e "\e[0m"
-
-    echo -n "Enter Path to File or Domain (e.g. google.com): "
-    read TARGET
-
-    if [ -z "$TARGET" ]; then
-        echo -e "\e[1;31m[!] No target specified.\e[0m"
-        sleep 2
-        return
-    fi
-
-    echo -e "\n\e[1;34m[*] Extracting Certificate Data...\e[0m\n"
-
-    # Проверка: это файл или домен?
-    if [ -f "$TARGET" ]; then
-        # Анализ локального файла
-        openssl x509 -in "$TARGET" -text -noout | grep -E "Subject:|Issuer:|Not Before:|Not After:|Public-Key:" | sed 's/^[[:space:]]*//'
-    else
-        # Анализ удаленного домена через сетевой запрос
-        timeout 5 openssl s_client -connect "${TARGET}:443" -servername "$TARGET" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates | sed 's/^/    /'
-    fi
-
-    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
-    echo -n "Press [ENTER] to return to menu..."
-    read -r
+    
 }
 
 
