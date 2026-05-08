@@ -677,20 +677,7 @@ zero_clear() {
 
 get_stats() {
     # Добавляем MB к оперативной памяти
-    local ram=$(free -m | awk '/Mem:/ {printf "%dMB", $3}')
-    # df -h уже содержит буквы (G, M), поэтому просто закрываем кавычки
-    local rom=$(df -h / | awk 'NR==2 {print $4}')
-    local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}')
     
-    [ -z "$sd_info" ] && sd_info="N/A"
-    
-    local net="${R}OFFLINE${NC}"; ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net="${G}ONLINE${NC}"
-    local srv=""; pgrep -f "av_server.py" >/dev/null 2>&1 && srv="${G}RUNNING${NC}"
-    [ -z "$srv" ] && srv="${R}NONE${NC}"
-    
-    # Вывод с четким разделением
-    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom"
-    echo -e "${Y}SD: ${G}$sd_info ${Y}| NET: $net ${Y}| ACTIVE SRV: $srv"
 }
 
 
