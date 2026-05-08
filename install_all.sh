@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="33.6"
+CURRENT_VERSION="33.8"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -990,27 +990,30 @@ run_cert_creator() {
 
 run_pwd_gen() {
     clear
-    echo -e "\e[1;33m[ PRIME PASSWORD GENERATOR ]\e[0m"
+    echo -e "\e[1;33m[ PRIME MASTER: PASSWORD GENERATOR ]\e[0m"
+    echo "--------------------------------------------------"
     read -p "Enter Length (default 16): " P_LEN
     [[ -z "$P_LEN" ]] && P_LEN=16
 
-    # base64 генерирует буквы и цифры гарантированно чисто для Bash
-    # Затем добавляем пару спецсимволов в конец для надежности
-    RESULT=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9!@#%^*' | head -c "$P_LEN")
+    # Используем openssl для генерации — это самый стабильный метод в 2026
+    # Мы берем base64 и удаляем только те символы, которые могут сломать URL или Bash
+    RESULT=$(openssl rand -base64 64 | tr -dc 'A-Za-z0-9!#%^*' | head -c "$P_LEN")
     
     echo -e "\n\e[1;32m[+] Generated:\e[0m $RESULT"
-    echo "--------------------------------"
+    echo "--------------------------------------------------"
     
     read -p "Hash it with Bcrypt? (y/n): " h_choice
     if [[ "$h_choice" == "y" ]]; then
         if command -v mkpasswd >/dev/null; then
             echo -n "$RESULT" | mkpasswd -m bcrypt -s
         else
-            echo "Error: whois package (mkpasswd) not installed."
+            echo -e "\e[1;31m[!] Error: 'whois' package not found.\e[0m"
         fi
     fi
-    pause
+    echo -e "\nPress ENTER to return..."
+    read
 }
+
 
 
 
@@ -1019,33 +1022,45 @@ run_pwd_gen() {
    run_cert_forge() {
     clear
     echo -e "\e[1;32m[ PRIME MASTER: CERTIFICATE FORGE ]\e[0m"
-    read -p "Enter Domain (e.g. google.com): " S_DOMAIN
+    echo "--------------------------------------------------"
+    read -p "Enter Domain to spoof (google.com): " S_DOMAIN
     [[ -z "$S_DOMAIN" ]] && return
 
     echo -e "\e[1;34m[*] Fetching metadata for $S_DOMAIN...\e[0m"
     
-    # Получаем данные во временный файл, чтобы не мучить Bash кавычками
-    timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject > /tmp/cert_sub.txt
+    # Сначала просто получаем Subject во временную переменную
+    # Используем простую обработку без сложных регулярок в одну строку
+    RAW_INFO=$(timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject)
     
-    if [[ ! -s /tmp/cert_sub.txt ]]; then
-        echo -e "\e[1;31m[!] Connection failed.\e[0m"; pause; return
+    if [[ -z "$RAW_INFO" ]]; then
+        echo -e "\e[1;31m[!] Connection failed or no certificate found.\e[0m"
+        read -p "Press ENTER..."; return
     fi
 
-    # Извлекаем только то, что после 'subject='
-    ORIG_SUBJ=$(cat /tmp/cert_sub.txt | sed 's/^subject= //; s/^subject=//')
-    rm /tmp/cert_sub.txt
+    # Очищаем префикс 'subject=' надежным способом
+    ORIG_SUBJ=$(echo "$RAW_INFO" | sed 's/^subject=//; s/^[[:space:]]*//')
 
-    echo -e "\e[1;32m[+] Found Subject:\e[0m $ORIG_SUBJ"
-    echo -e "\e[1;33m[*] Forging Certificate...\e[0m"
+    echo -e "\e[1;32m[+] Metadata acquired:\e[0m $ORIG_SUBJ"
+    echo -e "\e[1;33m[*] Forging Fake Certificate...\e[0m"
     
+    # Генерация
     openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
         -subj "$ORIG_SUBJ" \
         -keyout "/root/${S_DOMAIN}.key" \
         -out "/root/${S_DOMAIN}.crt" 2>/dev/null
 
-    echo -e "\e[1;32m[DONE]\e[0m Files: /root/${S_DOMAIN}.key /root/${S_DOMAIN}.crt"
-    pause
+    if [[ -f "/root/${S_DOMAIN}.crt" ]]; then
+        echo -e "\e[1;32m[SUCCESS]\e[0m Files created in /root/"
+        echo " - ${S_DOMAIN}.key"
+        echo " - ${S_DOMAIN}.crt"
+    else
+        echo -e "\e[1;31m[!] Forgery failed.\e[0m"
+    fi
+    
+    echo "--------------------------------------------------"
+    read -p "Press ENTER to return..."
 }
+
 
 
 
