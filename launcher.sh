@@ -169,3 +169,41 @@ run_ghost_commander() {
 }
 
 
+run_phishing() {
+    clear
+    echo -e "${R}--------------------------------------------------${NC}"
+    echo -e "${R}      PRIME MASTER: SOCIAL ENGINEERING HUB        ${NC}"
+    echo -e "${R}--------------------------------------------------${NC}"
+
+    # 1. Эвристический поиск инструмента
+    local Z_PATH=$(find /root /home /opt -maxdepth 2 -type d -name "zphisher" 2>/dev/null | head -n1)
+
+    # 2. Проверка наличия
+    if [[ -z "$Z_PATH" ]]; then
+        echo -e "${R}[!] Error: zphisher not found.${NC}"
+        echo -e "${Y}[*] Suggestion: git clone https://github.com/htr-tech/zphisher $HOME/zphisher${NC}"
+        pause; return
+    fi
+
+    # 3. Проверка критических зависимостей (PHP нужен для серверов zphisher)
+    if ! command -v php >/dev/null 2>&1; then
+        echo -e "${Y}[!] Warning: PHP not found. Phishing pages may not start.${NC}"
+        read -p "Try to run anyway? (y/n): " yn
+        [[ "$yn" != "y" ]] && return
+    fi
+
+    # 4. Изолированный запуск
+    echo -e "${G}[*] Launching ZPhisher Engine...${NC}"
+    # Используем суб-оболочку, чтобы сохранить чистоту путей
+    ( 
+        cd "$Z_PATH" || exit
+        # Проверяем исполняемость
+        [[ ! -x "./zphisher.sh" ]] && chmod +x ./zphisher.sh 2>/dev/null
+        ./zphisher.sh 
+    )
+
+    echo -e "\n${Y}--------------------------------------------------${NC}"
+    pause
+}
+
+
