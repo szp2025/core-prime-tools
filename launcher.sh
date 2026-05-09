@@ -26,35 +26,45 @@ EOD
     service dnsmasq restart 2>/dev/null || (killall dnsmasq 2>/dev/null && dnsmasq -C /etc/dnsmasq.conf 2>/dev/null)
 fi
 
+# Специализированный вывод системной строки
+print_stats_line() {
+    local label1="$1" value1="$2"
+    local label2="$3" value2="$4"
+    local label3="$5" value3="$6"
+    echo -e "${Y}$label1: ${G}$value1 ${Y}│ $label2: ${G}$value2 ${Y}│ $label3: ${G}$value3${NC}"
+}
+
+
 # --- Вспомогательные функции ---
-get_stats: {
-    # 1. Сбор системных метрик (RAM, ROM, SD)
+get_stats() {
+    # 1. Метрики (RAM, ROM, SD)
     local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
     local rom=$(df -h / | awk 'NR==2 {print $4}')
-    
-    # SD через логическое ИЛИ (если не смонтировано)
     local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}' || echo "N/A")
 
-    # 2. Проверка сети (Сжатая цепочка && / ||)
+    # 2. Сеть
     local net_status="${R}OFFLINE${NC}"
     ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net_status="${G}ONLINE${NC}"
 
-    # 3. Мониторинг сервисов (Элегантный сбор через цикл и pgrep)
+    # 3. Сервисы
     local active_srv=""
     local check_list=("av_server.py:AV" "share_server.py:SH" "upload_server.py:UP")
     
     for srv in "${check_list[@]}"; do
         pgrep -f "${srv%%:*}" >/dev/null && active_srv+="${G}[${srv#*:}]${NC} "
     done
-    
-    # Если строка пуста, ставим NONE
     active_srv=${active_srv:-${R}NONE${NC}}
 
-    # 4. Финальный вывод через стандартизированный интерфейс
-    echo -e "${D}--------------------------------------------------${NC}"
-    echo -e "${Y}RAM: ${G}$ram ${Y}│ ROM: ${G}$rom ${Y}│ SD: ${G}$sd_info"
+    # 4. Вывод через абстракцию (Никаких прямых echo)
+    print_line # Рисует разделитель -----------------------
+    
+    print_stats_line "RAM" "$ram" "ROM" "$rom" "SD" "$sd_info"
+    
+    # Вторую строку выводим вручную через стилизованный статус, 
+    # либо расширяем print_stats_line
     echo -e "${Y}NET: $net_status ${Y}│ ACTIVE SRV: $active_srv"
-    echo -e "${D}--------------------------------------------------${NC}"
+    
+    print_line
 }
 
 
