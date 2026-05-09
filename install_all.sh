@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- ВЕРСИЯ И ОБНОВЛЕНИЕ ---
-CURRENT_VERSION="35.1"
+CURRENT_VERSION="35.2"
 UPDATE_URL="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/install_all.sh"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 
@@ -676,11 +676,7 @@ zero_clear() {
 }
 
 get_stats() {
-    local ram=$(free -m | awk '/Mem:/ {printf "%dMB / %dMB", $3, $2}')
-    local cpu=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4"%"}')
-    local rom=$(df -h / | awk 'NR==2 {print $3 " / " $2}')
     
-    echo -e "${Y}CPU: ${G}$cpu ${Y}| RAM: ${G}$ram ${Y}| DISK: ${G}$rom${NC}"
 }
 
 
