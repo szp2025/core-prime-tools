@@ -105,6 +105,27 @@ log_loot() {
     echo "[$(date +%T)] $data" >> "$file"
 }
 
+# Аргументы: $1 - тип проверки (cmd, file, port, dir), $2 - цель, $3 - текст ошибки
+check_step() {
+    local type="$1"
+    local target="$2"
+    local err_msg="$3"
+    local status=1
+
+    case "$type" in
+        "cmd") command -v "$target" >/dev/null 2>&1 && status=0 ;;
+        "file") [[ -f "$target" ]] && status=0 ;;
+        "dir")  [[ -d "$target" ]] && status=0 ;;
+        "port") timeout 1 bash -c "cat < /dev/tcp/${target/:/ }" 2>/dev/null && status=0 ;;
+    esac
+
+    if [[ $status -ne 0 ]]; then
+        print_status "e" "$err_msg"
+        return 1
+    fi
+    return 0
+}
+
 
 
 # --- Конец  Модулей ---
@@ -207,43 +228,17 @@ run_ghost_commander() {
 
 
 run_phishing() {
-    # 1. Унифицированная шапка
     print_header "SOCIAL ENGINEERING HUB"
 
-    # 2. Эвристический поиск ZPhisher
-    local Z_PATH=$(find /root /home /opt /sdcard -maxdepth 2 -type d -name "zphisher" 2>/dev/null | head -n1)
+    # Ищем путь
+    local Z_PATH=$(find /root /home /opt -maxdepth 2 -type d -name "zphisher" 2>/dev/null | head -n1)
 
-    if [[ -z "$Z_PATH" ]]; then
-        print_status "e" "ZPhisher not found in system paths."
-        print_status "i" "Suggestion: git clone https://github.com/htr-tech/zphisher"
-        pause; return
-    fi
+    # Проверяем всё одной цепочкой. Если хоть один шаг вернет 1, выполнение остановится.
+    check_step "dir" "$Z_PATH" "ZPhisher not found." || { pause; return; }
+    check_step "cmd" "php" "PHP is required but not installed." || { pause; return; }
 
-    # 3. Проверка критических зависимостей
-    if ! command -v php >/dev/null 2>&1; then
-        print_status "w" "PHP is missing. Phishing server will fail to start."
-        echo -en "${Y}Attempt to install dependencies? (y/n): ${NC}"
-        read -r inst
-        if [[ "$inst" == "y" ]]; then
-            apt update && apt install php -y
-        else
-            echo -en "${R}Continue without PHP? (y/n): ${NC}"
-            read -r yn
-            [[ "$yn" != "y" ]] && return
-        fi
-    fi
-
-    # 4. Логирование и запуск
-    print_status "s" "Initializing ZPhisher Engine..."
-    log_loot "phishing" "Session started from $Z_PATH"
-
-    # Изолированный запуск в суб-оболочке
-    ( 
-        cd "$Z_PATH" || exit
-        [[ ! -x "./zphisher.sh" ]] && chmod +x ./zphisher.sh 2>/dev/null
-        ./zphisher.sh 
-    )
-
+    print_status "s" "All checks passed. Launching..."
+    ( cd "$Z_PATH" && ./zphisher.sh )
     pause
 }
 
