@@ -307,3 +307,68 @@ run_sqlmap() {
     print_status "i" "RAM Purge Complete."
     pause
 }
+
+
+run_host_monitor() {
+    print_header "NETWORK HOST MONITOR"
+
+    # Валидация tshark и интерфейса
+    check_step "cmd" "tshark" "TShark not installed." || { pause; return; }
+    local iface=$(ip route | grep default | awk '{print $5}' || echo "wlan0")
+    
+    print_status "i" "Monitoring traffic on: $iface (Press CTRL+C to stop)"
+    print_status "w" "Filtering Unique Connections..."
+
+    # Запуск tshark с агрегацией данных в реальном времени
+    tshark -i "$iface" -n -T fields -e ip.src -e ip.dst -E separator=" -> " 2>/dev/null | stdbuf -oL uniq
+    
+    pause
+}
+
+run_http_dns_sniffer() {
+    print_header "HTTP & DNS SNIFFER"
+
+    check_step "cmd" "tshark" "TShark not installed." || { pause; return; }
+    local iface=$(ip route | grep default | awk '{print $5}' || echo "wlan0")
+
+    print_status "s" "Sniffing Queries on $iface..."
+    log_loot "sniffer" "Session started on $iface"
+
+    # Фильтруем только запросы, убирая лишние поля
+    tshark -i "$iface" -Y "http.request || dns.flags.response == 0" \
+           -T fields -e http.host -e dns.qry.name 2>/dev/null \
+           | stdbuf -oL awk NF | stdbuf -oL uniq
+    
+    pause
+}
+
+run_traffic_record() {
+    print_header "TRAFFIC RECORDING (PCAP)"
+
+    check_step "cmd" "tshark" "TShark not installed." || { pause; return; }
+    
+    local report_dir="/root/reports"
+    [[ ! -d "$report_dir" ]] && mkdir -p "$report_dir"
+
+    local filename="$report_dir/capture_$(date +%H%M).pcap"
+    local iface=$(ip route | grep default | awk '{print $5}' || echo "wlan0")
+
+    # Выбор режима записи
+    local duration=$(select_option "Set Record Duration:" \
+        "Quick (1 min):60" \
+        "Medium (5 min):300" \
+        "Deep (15 min):900")
+
+    print_status "i" "Recording traffic on $iface..."
+    print_status "s" "Output: $filename"
+    print_status "w" "Recording will stop after $duration seconds or CTRL+C"
+
+    # Запуск записи с авто-стопом
+    tshark -i "$iface" -a duration:"$duration" -w "$filename" 2>/dev/null
+
+    check_step "file" "$filename" "Failed to create PCAP file." && \
+    print_status "s" "Capture saved successfully."
+    
+    pause
+}
+
