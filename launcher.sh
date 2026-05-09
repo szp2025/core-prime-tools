@@ -123,7 +123,52 @@ run_upload_srv() { python3 /root/upload_server.py; }
 # Здесь будут располагаться функции: run_ghost_commander, run_phishing и др.
 repair() { echo -e "${G}System check... OK${NC}"; sleep 1; }
 update_prime() { echo "Checking for updates..."; sleep 1; }
+# --- Модули ---
 
+# --- Модули: OSINT ---
+run_smart_osint_engine() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${G}    PRIME MASTER: SMART OSINT ENGINE 2026         ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    
+    read -p "ENTER DATA (Nick, Phone, or Email): " INPUT
+    [ -z "$INPUT" ] && return
+
+    echo -e "${Y}[*] Starting socialscan...${NC}"
+    socialscan "$INPUT"
+
+    # Валидация Email
+    if [[ "$INPUT" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$ ]]; then
+        echo -e "${Y}[*] Email detected. Running Infoga...${NC}"
+        python3 /root/infoga/infoga.py --target "$INPUT"
+    
+    # Валидация Телефона
+    elif [[ "$INPUT" =~ ^\+?[0-9]{10,15}$ ]]; then
+        echo -e "${Y}[*] Phone number detected. Searching global database...${NC}"
+        # Здесь можно добавить вызов специализированного софта для телефонов (например, phoneinfoga)
+        echo "Searching phone database for $INPUT..."
+    
+    # Поиск по Никнейму (Default)
+    else
+        echo -e "${Y}[*] Nickname detected. Launching Maigret & Blackbird...${NC}"
+        # Maigret с таймаутом для предотвращения зависаний на мобильном железе
+        maigret "$INPUT" --parse --timeout 15 --top 500
+        
+        if [ -f "/root/blackbird/blackbird.py" ]; then
+            python3 /root/blackbird/blackbird.py -u "$INPUT"
+        fi
+    fi
+
+    pause
+}
+
+
+
+
+
+
+# --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
     local main_names="GHOST_COMMANDER SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
