@@ -650,6 +650,215 @@ EOF
 
 
 
+# Функция-генератор для AV-Server (v1.2)
+# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
+generate_av_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+    
+    # Загружаем оба шаблона: базовый Layout и конструктор Form
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    local code
+
+    code=$(cat << EOF
+from flask import Flask, request, render_template_string
+import subprocess, os, shutil, socket
+
+# VERSION = '{{V_NUM}}'
+app = Flask(__name__)
+
+# Поиск движка ClamAV
+CLAM_PATH = shutil.which('clamdscan') or shutil.which('clamscan') or '/usr/bin/clamscan'
+
+$templates
+
+@app.route('/')
+def index():
+    # Динамически создаем форму: только выбор файла для сканирования
+    fields = [
+        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_ANALYSIS"}
+    ]
+    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE DEEP SCAN")
+    return render_template_string(render_prime_page("SECURE_GATEWAY", form_html))
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "No data", 400
+    
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    os.sync()
+
+    scan_output = ""
+    try:
+        # Лимит 20МБ и таймаут 300с для старых устройств (Wiko Lenny 3)
+        cmd = [CLAM_PATH, '--no-summary', '--max-filesize=20M', tmp_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        scan_output = res.stdout if res.stdout else res.stderr
+        if not scan_output and res.returncode == 0:
+            scan_output = f"{f.filename}: OK"
+    except subprocess.TimeoutExpired:
+        scan_output = "SCAN_ERROR: TIMED OUT (CPU OVERLOAD). PROBABLY FILE TOO LARGE."
+    except Exception as e:
+        scan_output = f"SYSTEM_CRITICAL_ERROR: {str(e)}"
+    finally:
+        if os.path.exists(tmp_path): os.remove(tmp_path)
+
+    is_infected = "FOUND" in scan_output or "Infected" in scan_output
+    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_TRANSMISSION_VERIFIED"
+    status_class = "infected" if is_infected else "clean"
+
+    # Формируем контент результата
+    content = f"""
+    <div class="status-box {status_class}">{status_msg}</div>
+    <pre>{{{{ output }}}}</pre>
+    <a href="/" class="btn">[ RETURN TO GATEWAY ]</a>
+    """
+    return render_template_string(render_prime_page("SCAN_RESULTS", content), output=scan_output)
+
+if __name__ == '__main__':
+    # Генерация SSL сертификатов для безопасного канала
+    if not os.path.exists('/root/cert.pem'):
+        os.system('openssl req -x509 -newkey rsa:2048 -nodes -out /root/cert.pem -keyout /root/key.pem -days 365 -subj "/CN=scanclamavlocal"')
+    
+    # Очистка порта перед запуском
+    os.system('fuser -k 5000/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5000, ssl_context=('/root/cert.pem', '/root/key.pem'), debug=False)
+EOF
+)
+    # Внедряем версию и записываем файл через твой smart_cat
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
+
+
+# Функция-генератор для Share-Server (v1.0)
+# --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
+generate_share_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+    
+    # Загружаем только базовый шаблон страницы (формы здесь не нужны)
+    local template=$(generate_core_template)
+    local code
+
+    code=$(cat << EOF
+from flask import Flask, render_template_string, send_from_directory
+import os
+
+# VERSION = '{{V_NUM}}'
+app = Flask(__name__)
+SHARE_DIR = '/root/share'
+
+if not os.path.exists(SHARE_DIR):
+    os.makedirs(SHARE_DIR, exist_ok=True)
+
+$template
+
+@app.route('/')
+def index():
+    try:
+        files = os.listdir(SHARE_DIR)
+    except:
+        files = []
+    
+    # Формируем динамический контент (сетку файлов)
+    grid_content = '<div class="grid">'
+    for f in files:
+        grid_content += f"""
+        <a href="/get/{f}" class="file-card">
+            <div style="font-size: 40px; margin-bottom: 10px;">📄</div>
+            <div style="word-break: break-all;">{f}</div>
+        </a>
+        """
+    
+    if not files:
+        grid_content += '<p style="color: #555; font-style: italic; grid-column: 1/-1;">No files detected in the transmission sector.</p>'
+    
+    grid_content += '</div>'
+    grid_content += f'<p style="color: #444; font-size: 0.7em; margin-top: 20px;">SECTOR_PATH: {SHARE_DIR}</p>'
+
+    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION", grid_content))
+
+@app.route('/get/<filename>')
+def get_file(filename):
+    return send_from_directory(SHARE_DIR, filename)
+
+if __name__ == '__main__':
+    # Очистка порта перед запуском
+    os.system('fuser -k 5002/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5002, debug=False)
+EOF
+)
+    # Внедряем версию и записываем
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
+
+# Функция-генератор для Upload-Server (v1.0)
+generate_upload_server_code() {
+    local target_file="$1"
+    local v_num="$2"
+    
+    # Загружаем оба шаблона: Layout и динамический конструктор форм
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+    local code
+
+    code=$(cat << EOF
+from flask import Flask, request, render_template_string
+import os
+
+# VERSION = '{{V_NUM}}'
+app = Flask(__name__)
+
+# Автоматическое определение директории (SD-карта или локальное хранилище)
+UPLOAD_DIR = '/sdcard/PRIME_INBOX' if os.path.exists('/sdcard') else '/root/PRIME_INBOX'
+if not os.path.exists(UPLOAD_DIR): 
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+$templates
+
+@app.route('/')
+def index():
+    # Описываем поля для конструктора формы
+    fields = [
+        {"type": "file", "name": "file", "label": "SELECT_TRANSMISSION_DATA"}
+    ]
+    
+    # Генерируем форму и описание
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE UPLOAD")
+    info_html = f'<p style="font-size: 0.8em; margin-bottom: 20px; color: #888;">Secure uplink established.</p>'
+    target_html = f'<div style="color: #444; font-size: 0.7em; margin-top: 20px;">TARGET_DIR: {UPLOAD_DIR}</div>'
+    
+    # Собираем страницу через Layout
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX", info_html + form_html + target_html))
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files: return "TRANSFER_ERROR: NO_FILE", 400
+    f = request.files['file']
+    if f.filename == '': return "TRANSFER_ERROR: EMPTY_FILENAME", 400
+    
+    f.save(os.path.join(UPLOAD_DIR, f.filename))
+    return "SUCCESS: File received and stored."
+
+if __name__ == '__main__':
+    # Очистка порта перед запуском
+    os.system('fuser -k 5001/tcp 2>/dev/null')
+    app.run(host='0.0.0.0', port=5001, debug=False)
+EOF
+)
+    # Внедряем версию и записываем
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+    smart_cat "$target_file" "$code"
+}
+
+
+
 
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
