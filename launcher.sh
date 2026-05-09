@@ -126,6 +126,13 @@ check_step() {
     return 0
 }
 
+ask_confirm() {
+    local prompt="$1"
+    echo -en "${Y}$prompt (y/n): ${NC}"
+    read -r answer
+    [[ "$answer" == "y" ]]
+}
+
 
 
 # --- Конец  Модулей ---
