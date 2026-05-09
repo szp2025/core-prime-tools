@@ -603,8 +603,7 @@ EOF
 
 
 
-# --- ГЕНЕРАТОР ЕДИНОГО ДИЗАЙНА (CORE) ---
-# Используем 'EOF' в кавычках, чтобы Python f-strings не конфликтовали с Bash
+# --- ГЕНЕРАТОР ЕДИНОГО ДИЗАЙНА (FIXED) ---
 generate_core_template() {
     cat << 'EOF'
 def render_prime_page(title, content):
@@ -624,7 +623,7 @@ def render_prime_page(title, content):
         .infected { color: #ff3e3e; border-color: #ff3e3e; }
     </style>
     """
-    return f"""{style}<div class="container"><h2>> {title}</h2><div class="content-area">{content}</div></div>"""
+    return f"{style}<div class='container'><h2>> {title}</h2><div class='content-area'>{content}</div></div>"
 EOF
 }
 
@@ -636,7 +635,7 @@ def render_prime_form(action_url, fields=None, btn_text="EXECUTE"):
     for field in fields:
         f_type, f_name = field.get("type", "text"), field.get("name", "input")
         f_placeholder, f_label = field.get("placeholder", ""), field.get("label", "")
-        inputs_html += f"<div style='margin-bottom: 15px;'>"
+        inputs_html += f"<div style='margin-bottom:15px;'>"
         if f_label: inputs_html += f"<label style='display:block; font-size:0.7em; color:#888;'>{f_label}</label>"
         if f_type == "select":
             options = "".join([f"<option value='{o}'>{o}</option>" for o in field.get("options", [])])
