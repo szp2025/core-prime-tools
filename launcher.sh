@@ -26,6 +26,10 @@ EOD
     service dnsmasq restart 2>/dev/null || (killall dnsmasq 2>/dev/null && dnsmasq -C /etc/dnsmasq.conf 2>/dev/null)
 fi
 
+print_line() {
+    echo -e "${D}--------------------------------------------------${NC}"
+}
+
 # Специализированный вывод системной строки
 print_stats_line() {
     local label1="$1" value1="$2"
