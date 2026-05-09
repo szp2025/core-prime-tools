@@ -216,43 +216,30 @@ run_servers() {
 
 # --- Модули по меню ---
 run_ghost_commander() {
-    # Использование унифицированной шапки
     print_header "GHOST COMMANDER (ANDROID/IOT)"
 
-    # Эвристический поиск пути
-    local GHOST_PATH=$(find /root /home /opt -maxdepth 2 -type d -name "Ghost" 2>/dev/null | head -n1)
-    
-    if [[ -z "$GHOST_PATH" ]]; then
-        print_status "e" "Ghost Framework not found in system paths."
-        pause; return
-    fi
+    # 1. Валидация наличия
+    local GHOST_PATH=$(find /root /home /opt /sdcard -maxdepth 2 -type d -name "Ghost" 2>/dev/null | head -n1)
+    check_step "dir" "$GHOST_PATH" "Ghost Framework not found." || { pause; return; }
 
     echo -en "${Y}Enter Target IP ${W}(Leave empty for Manual Console)${Y}: ${NC}"
     read -r TARGET_IP
 
-    if [[ -z "$TARGET_IP" ]]; then
-        print_status "i" "Launching Manual Ghost Console..."
-        # Изолированный запуск в суб-оболочке
-        (cd "$GHOST_PATH" && python3 -m ghost)
-    else
-        print_status "i" "Pre-scanning target $TARGET_IP:5555..."
-        
-        # Эвристическая проверка порта через файловый дескриптор (без nmap)
-        if ! timeout 2 bash -c "cat < /dev/tcp/$TARGET_IP/5555" 2>/dev/null; then
-            print_status "w" "Target port 5555 (ADB) is closed or filtered."
-            echo -en "${Y}Proceed with forced connection? (y/n): ${NC}"
-            read -r yn
-            [[ "$yn" != "y" ]] && return
-        fi
+    # 2. Ручной режим (универсальный запуск)
+    check_empty_run "$TARGET_IP" "$GHOST_PATH" "python3 -m ghost" && return
 
-        print_status "s" "Executing Auto-Connect to $TARGET_IP..."
-        
-        # Логируем попытку подключения в loot
-        log_loot "ghost" "Attempting connection to $TARGET_IP"
-        
-        # Запуск с передачей команды напрямую в движок
-        (cd "$GHOST_PATH" && python3 -m ghost --execute "connect $TARGET_IP")
-    fi
+    # 3. Автоматический режим: Проверка связи
+    print_status "i" "Pre-scanning target $TARGET_IP:5555..."
+    
+    # Используем check_step для порта и ask_confirm для логики пропуска ошибок
+    check_step "port" "$TARGET_IP:5555" "Port 5555 (ADB) is closed." || \
+    ask_confirm "Force connection attempt?" || return
+
+    # 4. Исполнение
+    print_status "s" "Executing Auto-Connect to $TARGET_IP..."
+    log_loot "ghost" "Connection attempt: $TARGET_IP"
+    
+    (cd "$GHOST_PATH" && python3 -m ghost --execute "connect $TARGET_IP")
 
     pause
 }
