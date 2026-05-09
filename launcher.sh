@@ -27,10 +27,36 @@ EOD
 fi
 
 # --- Вспомогательные функции ---
-get_stats() {
-    local ram=$(free -m | awk '/Mem:/ {print $3 "/" $2 "MB"}')
-    echo -e "${B}IP: ${W}$CURRENT_IP ${G}| ${B}RAM: ${W}$ram${NC}"
+Get_stats() {
+    # 1. Сбор системных метрик (RAM, ROM, SD)
+    local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
+    local rom=$(df -h / | awk 'NR==2 {print $4}')
+    
+    # SD через логическое ИЛИ (если не смонтировано)
+    local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}' || echo "N/A")
+
+    # 2. Проверка сети (Сжатая цепочка && / ||)
+    local net_status="${R}OFFLINE${NC}"
+    ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net_status="${G}ONLINE${NC}"
+
+    # 3. Мониторинг сервисов (Элегантный сбор через цикл и pgrep)
+    local active_srv=""
+    local check_list=("av_server.py:AV" "share_server.py:SH" "upload_server.py:UP")
+    
+    for srv in "${check_list[@]}"; do
+        pgrep -f "${srv%%:*}" >/dev/null && active_srv+="${G}[${srv#*:}]${NC} "
+    done
+    
+    # Если строка пуста, ставим NONE
+    active_srv=${active_srv:-${R}NONE${NC}}
+
+    # 4. Финальный вывод через стандартизированный интерфейс
+    echo -e "${D}--------------------------------------------------${NC}"
+    echo -e "${Y}RAM: ${G}$ram ${Y}│ ROM: ${G}$rom ${Y}│ SD: ${G}$sd_info"
+    echo -e "${Y}NET: $net_status ${Y}│ ACTIVE SRV: $active_srv"
+    echo -e "${D}--------------------------------------------------${NC}"
 }
+
 
 pause() { echo -e "\n${Y}Press Enter to return...${NC}"; read -r _; }
 
