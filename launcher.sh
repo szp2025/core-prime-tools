@@ -999,3 +999,41 @@ run_av_server() {
 
     pause
 }
+
+
+run_share_server() {
+    print_header "SHARE SECTOR: SECURE FILE DISTRIBUTION"
+
+    local srv_path="/root/share_server.py"
+    local share_dir="/root/share"
+    
+    # 1. Проверка и подготовка инфраструктуры
+    [[ -d "$share_dir" ]] || {
+        mkdir -p "$share_dir"
+        print_status "i" "Created transmission sector at $share_dir"
+    }
+
+    # 2. Генерация кода с использованием визуального ядра
+    print_status "i" "Generating Engine v1.0 [Core UI Integrated]..."
+    generate_share_server_code "$srv_path" "1.0"
+
+    # 3. Запуск сервера
+    print_status "w" "Igniting Share-Server on port 5002..."
+    
+    # Очистка порта и запуск
+    fuser -k 5002/tcp >/dev/null 2>&1
+    (
+        python3 "$srv_path" > /dev/null 2>&1 &
+    ) && {
+        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
+        print_status "s" "TRANSMISSION NODE ONLINE"
+        log_loot "service" "Share-Server activated: http://$ip_addr:5002"
+        
+        print_list "Node Intelligence" \
+            "Access: http://$ip_addr:5002" \
+            "Storage: $share_dir" \
+            "Mode: Read-Only (Secure Fetch)"
+    } || print_status "e" "Failed to establish transmission node."
+
+    pause
+}
