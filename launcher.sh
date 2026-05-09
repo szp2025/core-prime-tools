@@ -251,6 +251,79 @@ run_traffic_record() {
     pause
 }
 
+# --- Модули: IBAN, CERTIFICATES & FORGE ---
+
+run_iban_scan() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${Y}         IBAN/RIB SECURITY CHECKER v1.7           ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    
+    read -p "Введите IBAN для проверки: " IBAN_INPUT
+    [ -z "$IBAN_INPUT" ] && return
+
+    # Предварительная очистка ввода от пробелов перед передачей в Python
+    local CLEAN_IBAN=$(echo "$IBAN_INPUT" | tr -d '[:space:]-')
+
+    # Путь к модулю [95] Sterile Channel
+    if [ -f "/root/iban_check.py" ]; then
+        echo -e "${Y}[*] Запуск модуля проверки...${NC}"
+        python3 /root/iban_check.py "$CLEAN_IBAN"
+    else
+        echo -e "${R}[!] Ошибка: Модуль /root/iban_check.py не найден${NC}"
+    fi
+    pause
+}
+
+run_cert_reader() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${G}           CERTIFICATE & KEY ANALYZER             ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    
+    read -e -p "Путь к файлу (.crt/.key/.pem): " CERT_PATH
+    
+    if [ ! -f "$CERT_PATH" ]; then
+        echo -e "${R}[!] Ошибка: Файл не найден по пути: $CERT_PATH${NC}"
+        pause
+        return
+    fi
+
+    echo -e "${Y}[*] Анализ содержимого...${NC}\n"
+
+    # Умное переключение между сертификатом и приватным ключом
+    if grep -q "BEGIN CERTIFICATE" "$CERT_PATH"; then
+        openssl x509 -in "$CERT_PATH" -text -noout
+    elif grep -q "BEGIN RSA PRIVATE KEY" "$CERT_PATH" || grep -q "BEGIN PRIVATE KEY" "$CERT_PATH"; then
+        openssl rsa -in "$CERT_PATH" -check -noout
+    else
+        echo -e "${R}[!] Неизвестный формат файла. Попытка стандартного чтения...${NC}"
+        openssl x509 -in "$CERT_PATH" -text -noout 2>/dev/null || openssl rsa -in "$CERT_PATH" -check
+    fi
+    
+    pause
+}
+
+run_cert_forge() {
+    # Функция вызывает твой внутренний генератор сертификатов
+    if command -v run_cert_creator >/dev/null 2>&1 || typeset -f run_cert_creator >/dev/null; then
+        run_cert_creator
+    else
+        clear
+        echo -e "${R}--------------------------------------------------${NC}"
+        echo -e "${R}       CERTIFICATE FORGE (Self-Signed)            ${NC}"
+        echo -e "${R}--------------------------------------------------${NC}"
+        echo -e "${Y}[*] Генерация стандартного самоподписанного сертификата...${NC}"
+        
+        openssl req -x509 -newkey rsa:4096 -keyout /root/key.pem -out /root/cert.pem -days 365 -nodes \
+        -subj "/C=FR/ST=Paris/L=Paris/O=Security/OU=IT/CN=scanclamavlocal"
+        
+        echo -e "${G}[+] Готово: /root/key.pem и /root/cert.pem созданы.${NC}"
+        pause
+    fi
+}
+
+
 
 
 
