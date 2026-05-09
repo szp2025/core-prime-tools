@@ -1037,3 +1037,36 @@ run_share_server() {
 
     pause
 }
+
+run_upload_server() {
+    print_header "INBOUND DROP BOX: SECURE UPLINK"
+
+    local srv_path="/root/upload_server.py"
+    
+    # 1. Проверка окружения
+    check_step "cmd" "python3" "Python3 missing." || { pause; return; }
+
+    # 2. Генерация кода с интеграцией Core UI
+    print_status "i" "Generating Upload Engine v1.0 [Full UI Stack]..."
+    generate_upload_server_code "$srv_path" "1.0"
+
+    # 3. Запуск и мониторинг
+    print_status "w" "Establishing Uplink on port 5001..."
+    
+    # Очистка порта и тихий запуск
+    fuser -k 5001/tcp >/dev/null 2>&1
+    (
+        python3 "$srv_path" > /dev/null 2>&1 &
+    ) && {
+        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
+        print_status "s" "UPLINK NODE OPERATIONAL"
+        log_loot "service" "Upload-Server activated: http://$ip_addr:5001"
+        
+        print_list "Drop Box Intelligence" \
+            "Access: http://$ip_addr:5001" \
+            "Protocol: HTTP Inbound" \
+            "Status: Ready for Transmission"
+    } || print_status "e" "Failed to ignite the uplink."
+
+    pause
+}
