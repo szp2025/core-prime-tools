@@ -1,6 +1,6 @@
 #!/bin/bash
 # --- PRIME MASTER LAUNCHER v35.0m1 ---
-CURRENT_VERSION="35.3"
+CURRENT_VERSION="35.4"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
@@ -263,10 +263,6 @@ run_main_menu() {
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
-
-# --- Точка входа ---
-#repair
-run_main_menu
 
 
 # --- Модули: DEVICE & NETWORK ---
@@ -1070,3 +1066,9 @@ run_upload_server() {
 
     pause
 }
+
+
+# --- Точка входа ---
+#repair
+run_main_menu
+
