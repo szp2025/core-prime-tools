@@ -805,3 +805,89 @@ run_iban_analyzer() {
 
 
 
+
+
+
+# --- py functions ---
+# Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
+generate_iban_code() {
+    local target_file="$1"
+    local v_num="$2"
+    local code
+
+    # Захватываем код Python. Используем 'EOF' в кавычках для защиты символов $ и скобок.
+    code=$(cat << 'EOF'
+import sys, re, json
+from urllib.request import urlopen
+
+# VERSION = '{{V_NUM}}'
+
+def get_detailed_data(iban):
+    try:
+        url = f"[https://api.ibanlist.com/v1/validate/](https://api.ibanlist.com/v1/validate/){iban}"
+        with urlopen(url, timeout=5) as response:
+            return json.loads(response.read().decode())
+    except: return None
+
+def validate_structure(iban):
+    """Разбор структуры (специфика FR и общая)"""
+    res = {
+        "Country": iban[:2],
+        "Check": iban[2:4],
+        "BBAN": iban[4:],
+    }
+    if iban.startswith('FR'):
+        res.update({
+            "Bank Code": iban[4:9],
+            "Branch Code": iban[9:14],
+            "Account": iban[14:25],
+            "RIB Key": iban[25:27]
+        })
+    return res
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2: sys.exit(1)
+    
+    # Очистка от пробелов и тире
+    target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
+    
+    # Параметры для сверки
+    provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else None
+    provided_bic = sys.argv[3].upper() if len(sys.argv) > 3 else None
+
+    print(f"\033[1;34m--- РЕЗУЛЬТАТ ПРОВЕРКИ IBAN ---\033[0m")
+    
+    struct = validate_structure(target)
+    for key, val in struct.items():
+        print(f"\033[96m{key}:\033[0m {val}")
+
+    data = get_detailed_data(target)
+    if data and data.get('valid'):
+        bank_name = data.get('bank_name', 'N/A')
+        bic = data.get('bic', 'N/A')
+        
+        print(f"\n\033[1;32m[+] СТАТУС: ВАЛИДЕН\033[0m")
+        print(f"🏦 Банк: {bank_name}")
+        print(f"🔑 BIC: {bic}")
+        
+        if provided_name or provided_bic:
+            print(f"\n\033[1;35m--- ОТЧЕТ О СВЕРКЕ (MATCH REPORT) ---\033[0m")
+            if provided_bic:
+                if provided_bic in bic:
+                    print(f"✅ BIC Match: ПРОВЕРЕНО ({bic})")
+                else:
+                    print(f"❌ BIC Mismatch! Ожидалось: {provided_bic}, Найдено: {bic}")
+            
+            if bank_name != 'N/A':
+                print(f"ℹ️ Подтверждение: Банк {bank_name} верифицирован")
+    else:
+        print(f"\033[91m[-] ОШИБКА: Неверная структура или контрольная сумма\033[0m")
+EOF
+)
+
+    # Внедряем версию
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+
+    # Используем smart_cat для записи (права 755 по умолчанию)
+    smart_cat "$target_file" "$code"
+}
