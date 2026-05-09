@@ -1,6 +1,6 @@
 #!/bin/bash
 # --- PRIME MASTER LAUNCHER v35.0m1 ---
-CURRENT_VERSION="35.2"
+CURRENT_VERSION="35.3"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
@@ -27,7 +27,7 @@ EOD
 fi
 
 # --- Вспомогательные функции ---
-Get_stats() {
+get_stats: {
     # 1. Сбор системных метрик (RAM, ROM, SD)
     local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
     local rom=$(df -h / | awk 'NR==2 {print $4}')
