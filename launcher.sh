@@ -372,3 +372,60 @@ run_traffic_record() {
     pause
 }
 
+
+run_smart_osint_engine() {
+    print_header "SMART OSINT ENGINE 2026"
+
+    echo -en "${Y}ENTER DATA ${W}(Nick, Phone, or Email)${Y}: ${NC}"
+    read -r INPUT
+    [[ -z "$INPUT" ]] && return
+
+    # 1. Быстрая проверка SocialScan (Базовая для всех типов)
+    check_step "cmd" "socialscan" "SocialScan not found. Skipping Phase 1..." && {
+        print_status "i" "Phase 1: Rapid Presence Check..."
+        socialscan "$INPUT"
+    }
+
+    # 2. Определение типа через Regex (без if/else)
+    local is_email="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
+    local is_phone="^\+?[0-9]{10,15}$"
+
+    # --- ВЕТКА: EMAIL ---
+    [[ "$INPUT" =~ $is_email ]] && {
+        print_status "s" "Detected Type: EMAIL"
+        check_step "file" "/root/infoga/infoga.py" "Infoga not found." && {
+            print_status "i" "Running Breach Analysis (Infoga)..."
+            python3 /root/infoga/infoga.py --target "$INPUT"
+        }
+    }
+
+    # --- ВЕТКА: ТЕЛЕФОН ---
+    [[ "$INPUT" =~ $is_phone ]] && {
+        print_status "s" "Detected Type: PHONE"
+        print_status "i" "Searching for $INPUT across phone databases..."
+        # Сюда можно вписать любой phone-lookup инструмент
+        log_loot "osint" "Phone lookup: $INPUT"
+    }
+
+    # --- ВЕТКА: НИКНЕЙМ (Если не email и не телефон) ---
+    [[ ! "$INPUT" =~ $is_email && ! "$INPUT" =~ $is_phone ]] && {
+        print_status "s" "Detected Type: USERNAME"
+        
+        # Запуск Maigret
+        check_step "cmd" "maigret" "Maigret not found." && {
+            print_status "i" "Launching Maigret (Deep Parse)..."
+            maigret "$INPUT" --parse --timeout 15 --top 500
+        }
+
+        # Запуск Blackbird
+        check_step "file" "/root/blackbird/blackbird.py" "Blackbird not found." && {
+            print_status "i" "Launching Blackbird (Recursive)..."
+            python3 /root/blackbird/blackbird.py -u "$INPUT"
+        }
+    }
+
+    log_loot "osint" "Full scan completed for: $INPUT"
+    print_status "s" "OSINT Scan Complete."
+    pause
+}
+
