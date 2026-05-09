@@ -159,6 +159,23 @@ select_option() {
 }
 
 
+# Для красивых запросов ввода
+print_input() {
+    local prompt="$1"
+    local default="$2"
+    echo -en "${Y}[?] $prompt ${W}(Default: $default)${Y}: ${NC}"
+}
+
+# Для вывода списков (ключи, файлы, пути)
+print_list() {
+    local title="$1"; shift
+    echo -e "${Y}--- $title ---${NC}"
+    for item in "$@"; do
+        echo -e "    ${G}>> ${W}$item${NC}"
+    done
+}
+
+
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
@@ -503,4 +520,74 @@ run_pc_recovery_ultimate() {
 
     pause
 }
+
+
+
+run_cert_analyzer() {
+    print_header "CERTIFICATE ANALYZER"
+
+    echo -en "${Y}Enter File Path or Domain ${W}(e.g. google.com)${Y}: ${NC}"
+    read -r TARGET
+    [[ -z "$TARGET" ]] && return
+
+    check_step "cmd" "openssl" "OpenSSL is not installed." || { pause; return; }
+
+    print_status "i" "Extracting Certificate Data..."
+
+    # ВМЕСТО IF: Логическое разветвление (Файл vs Домен)
+    # Если это файл (-f), выполняем локальный разбор
+    [[ -f "$TARGET" ]] && {
+        print_status "s" "Local File Detected: $TARGET"
+        openssl x509 -in "$TARGET" -text -noout | grep -E "Subject:|Issuer:|Not Before:|Not After:|Public-Key:" | sed 's/^[[:space:]]*//'
+    }
+
+    # Если это НЕ файл (! -f), пробуем сетевое подключение
+    [[ ! -f "$TARGET" ]] && {
+        print_status "i" "Remote Target Detected: ${TARGET}:443"
+        timeout 5 openssl s_client -connect "${TARGET}:443" -servername "$TARGET" </dev/null 2>/dev/null | \
+        openssl x509 -noout -subject -issuer -dates | sed 's/^/    /' || \
+        print_status "e" "Failed to connect or invalid certificate."
+    }
+
+    pause
+}
+
+
+run_cert_creator() {
+    print_header "CERTIFICATE CREATOR"
+
+    # Валидация
+    check_step "cmd" "openssl" "OpenSSL required." || { pause; return; }
+
+    # Запросы через print_input
+    print_input "Enter Domain/CN" "prime.local"
+    read -r DOMAIN
+    DOMAIN=${DOMAIN:-prime.local}
+
+    print_input "Enter Country Code" "US"
+    read -r COUNTRY
+    COUNTRY=${COUNTRY:-US}
+
+    print_status "i" "Generating 2048-bit RSA Key and Certificate..."
+    
+    # Генерация
+    openssl req -x509 -newkey rsa:2048 -nodes \
+        -keyout "${DOMAIN}.key" \
+        -out "${DOMAIN}.crt" \
+        -days 365 \
+        -subj "/C=${COUNTRY}/O=PrimeMaster/CN=${DOMAIN}" 2>/dev/null && {
+        
+        print_status "s" "Certificate created successfully!"
+        log_loot "crypto" "Generated cert for $DOMAIN"
+        
+        # Красивый вывод списка файлов
+        print_list "Files Saved" "${DOMAIN}.key" "${DOMAIN}.crt"
+        
+    } || {
+        print_status "e" "Generation failed. Verify OpenSSL config."
+    }
+
+    pause
+}
+
 
