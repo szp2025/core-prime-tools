@@ -623,3 +623,45 @@ run_pwd_gen() {
 }
 
 
+run_cert_forge() {
+    print_header "CERTIFICATE FORGE (SPOOFING)"
+
+    # 1. Валидация и ввод
+    check_step "cmd" "openssl" "OpenSSL required." || { pause; return; }
+    
+    print_input "Enter Domain to spoof" "google.com"
+    read -r S_DOMAIN
+    [[ -z "$S_DOMAIN" ]] && return
+
+    print_status "i" "Fetching metadata for $S_DOMAIN..."
+
+    # 2. Сбор данных (без IF)
+    # Пытаемся получить Subject. Если не вышло — выводим ошибку через ||
+    local raw_info=$(timeout 5 openssl s_client -connect "${S_DOMAIN}:443" -servername "$S_DOMAIN" </dev/null 2>/dev/null | openssl x509 -noout -subject 2>/dev/null)
+    
+    [[ -n "$raw_info" ]] || { print_status "e" "Target unreachable or no SSL info."; pause; return; }
+
+    # 3. Очистка и клонирование
+    local orig_subj=$(echo "$raw_info" | sed 's/^subject=//')
+    print_status "s" "Target Metadata Cloned."
+    print_status "i" "Subject: $orig_subj"
+
+    # 4. Генерация (цепочка успеха)
+    print_status "w" "Forging Fake Certificate..."
+    
+    openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+        -subj "$orig_subj" \
+        -keyout "/root/${S_DOMAIN}.key" \
+        -out "/root/${S_DOMAIN}.crt" 2>/dev/null && {
+        
+        print_status "s" "Forge Complete: Identity Mirrored."
+        log_loot "crypto" "Forged certificate for $S_DOMAIN"
+        print_list "Spoofing Assets" "/root/${S_DOMAIN}.key" "/root/${S_DOMAIN}.crt"
+        
+    } || print_status "e" "Forge failed. Check OpenSSL permissions."
+
+    pause
+}
+
+
+
