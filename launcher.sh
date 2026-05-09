@@ -47,7 +47,7 @@ prime_dynamic_controller() {
     local -a actions=($3)
     
     while true; do
-        clear
+        #clear
         echo -e "${R}========== [ $title ] ==========${NC}"
         get_stats
         echo -e "---------------------------------------"
