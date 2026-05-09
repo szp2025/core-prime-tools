@@ -1,6 +1,6 @@
 #!/bin/bash
 # --- PRIME MASTER LAUNCHER v35.0m1 ---
-CURRENT_VERSION="35.1"
+CURRENT_VERSION="35.2"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
@@ -77,7 +77,7 @@ prime_dynamic_controller() {
 
 print_header() {
     local title="$1"
-    clear
+    #clear
     echo -e "${R}--------------------------------------------------${NC}"
     # Центрируем текст: 46 символов свободного места в рамке
     # Используем printf для выравнивания
