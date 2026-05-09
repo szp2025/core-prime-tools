@@ -129,3 +129,43 @@ run_servers() {
     local s_funcs="run_av_srv run_share_srv run_upload_srv"
     prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
 }
+
+
+# --- Модули по меню ---
+run_ghost_commander() {
+    clear
+    echo -e "${R}--------------------------------------------------${NC}"
+    echo -e "${R}    PRIME MASTER: GHOST COMMANDER (ANDROID/IOT)   ${NC}"
+    echo -e "${R}--------------------------------------------------${NC}"
+
+    # Динамический поиск пути к Ghost
+    local GHOST_PATH=$(find /root /home /opt -maxdepth 2 -type d -name "Ghost" 2>/dev/null | head -n1)
+    
+    if [[ -z "$GHOST_PATH" ]]; then
+        echo -e "${R}[!] Error: Ghost Framework not found.${NC}"
+        pause; return
+    fi
+
+    read -p "Enter Target IP (Leave empty for Manual Console): " TARGET_IP
+
+    if [[ -z "$TARGET_IP" ]]; then
+        echo -e "${B}[*] Launching Manual Ghost Console...${NC}"
+        (cd "$GHOST_PATH" && python3 -m ghost)
+    else
+        echo -e "${Y}[*] Pre-scanning target $TARGET_IP:5555...${NC}"
+        # Эвристическая проверка порта перед запуском тяжелого Python
+        if ! : >/dev/tcp/"$TARGET_IP"/5555 2>/dev/null; then
+            echo -e "${R}[!] Target port 5555 is closed. Proceed anyway? (y/n)${NC}"
+            read -r yn; [[ "$yn" != "y" ]] && return
+        fi
+
+        echo -e "${G}[*] Executing Auto-Connect...${NC}"
+        # Запуск в суб-оболочке ( ), чтобы не мусорить в основном процессе
+        (cd "$GHOST_PATH" && python3 -m ghost --execute "connect $TARGET_IP")
+    fi
+
+    echo -e "\n${Y}--------------------------------------------------${NC}"
+    pause
+}
+
+
