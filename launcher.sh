@@ -960,3 +960,42 @@ EOF
     # Используем smart_cat для записи (права 755 по умолчанию)
     smart_cat "$target_file" "$code"
 }
+
+
+# --- Server Generating---
+
+run_av_server() {
+    print_header "PRIME SECURITY HUB: CLAMAV GATEWAY"
+
+    local srv_path="/root/av_server.py"
+    
+    # 1. Проверка зависимостей (Python + ClamAV)
+    check_step "cmd" "python3" "Python3 missing." || { pause; return; }
+    check_step "cmd" "clamscan" "ClamAV not found. Installing..." || {
+        # Если ClamAV нет, пытаемся поставить (для Kali/NetHunter)
+        apt-get update && apt-get install clamav -y
+    }
+
+    # 2. Обновление движка сервера
+    print_status "i" "Generating Engine v1.2 with Core UI Templates..."
+    generate_av_server_code "$srv_path" "1.2"
+
+    # 3. Запуск (с проверкой портов)
+    print_status "w" "Cleaning port 5000 and establishing SSL Tunnel..."
+    
+    # Запускаем сервер в фоне через суб-оболочку
+    (
+        python3 "$srv_path" > /dev/null 2>&1 &
+    ) && {
+        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
+        print_status "s" "SECURITY GATEWAY DEPLOYED SUCCESSFULLY"
+        log_loot "service" "AV-Server started on https://$ip_addr:5000"
+        
+        print_list "Access Details" \
+            "URL: https://$ip_addr:5000" \
+            "Encryption: SSL/TLS (Self-Signed)" \
+            "Scanner: ClamAV Engine"
+    } || print_status "e" "Failed to ignite the engine."
+
+    pause
+}
