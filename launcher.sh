@@ -212,6 +212,49 @@ smart_cat() {
 
 
 
+# --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
+generate_core_template() {
+    # Твой код Python для стилей
+    cat << 'EOF' > /tmp/prime_view.py
+def render_prime_page(title, content):
+    style = """
+    <style>
+        body { background: #050505; color: #00ff41; font-family: "Courier New", monospace; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .container { border: 1px solid #00ff41; padding: 30px; background: #111; box-shadow: 0 0 20px rgba(0,255,65,0.1); border-radius: 5px; width: 90%; max-width: 900px; text-align: center; }
+        h2 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; margin-top: 0; color: #00ff41; }
+        .btn, button { background: #00ff41; color: #000; border: none; padding: 12px 24px; cursor: pointer; font-weight: bold; text-transform: uppercase; text-decoration: none; display: inline-block; width: 100%; transition: 0.3s; margin-top: 20px; font-family: inherit; }
+        .btn:hover, button:hover { background: #008f25; box-shadow: 0 0 15px #00ff41; }
+        pre { white-space: pre-wrap; font-size: 0.85em; color: #0cf; background: #000; padding: 15px; border: 1px solid #222; text-align: left; max-height: 300px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 20px; }
+        .file-card { background: #1a1a1a; border: 1px solid #333; padding: 15px; color: #00ff41; text-decoration: none; font-size: 0.8em; word-break: break-all; transition: 0.2s; }
+        .file-card:hover { border-color: #00ff41; background: #00ff4111; }
+        .status-box { padding: 15px; margin-bottom: 15px; font-weight: bold; border: 1px solid; text-transform: uppercase; }
+        .clean { color: #00ff41; border-color: #00ff41; }
+        .infected { color: #ff3e3e; border-color: #ff3e3e; }
+    </style>
+    """
+    return f"{style}<div class='container'><h2>> {title}</h2><div class='content-area'>{content}</div></div>"
+
+def render_prime_form(action_url, fields=None, btn_text="EXECUTE"):
+    fields = fields or [{"type": "file", "name": "file"}]
+    inputs_html = ""
+    for field in fields:
+        f_type, f_name = field.get("type", "text"), field.get("name", "input")
+        f_placeholder, f_label = field.get("placeholder", ""), field.get("label", "")
+        inputs_html += f"<div style='margin-bottom: 15px;'>"
+        if f_label: inputs_html += f"<label style='display:block; font-size:0.7em; color:#888;'>{f_label}</label>"
+        if f_type == "select":
+            options = "".join([f"<option value='{o}'>{o}</option>" for o in field.get("options", [])])
+            inputs_html += f"<select name='{f_name}' style='background:#111; color:#00ff41; border:1px solid #333; padding:10px; width:80%; font-family:inherit;'>{options}</select>"
+        else:
+            inputs_html += f"<input type='{f_type}' name='{f_name}' placeholder='{f_placeholder}' required style='background:#111; color:#00ff41; border:1px dashed #333; padding:10px; width:80%; font-family:inherit;'>"
+        inputs_html += "</div>"
+    return f'<form method="post" action="{action_url}" enctype="multipart/form-data" style="margin-top:20px;">{inputs_html}<button type="submit">{btn_text}</button></form>'
+EOF
+}
+
+
+
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
