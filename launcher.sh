@@ -197,6 +197,61 @@ run_ghost_commander() {
     pause
 }
 
+# --- Модули: TSHARK ANALYZER ---
+
+run_host_monitor() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${G}          NETWORK MONITOR: LIVE IP FLOW           ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${Y}[*] Press Ctrl+C to stop monitoring...${NC}\n"
+    
+    # Проверка прав и наличия tshark
+    if ! command -v tshark &> /dev/null; then echo -e "${R}Error: tshark not installed${NC}"; pause; return; fi
+
+    # Запуск: выводим только IP отправителя и получателя
+    tshark -i wlan0 -n -T fields -e ip.src -e ip.dst 2>/dev/null | awk '{print $1 "  -->  " $2}'
+    
+    pause
+}
+
+run_http_dns_sniffer() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${G}        SNIFFER: HTTP HOSTS & DNS QUERIES         ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${Y}[*] Filtering: HTTP requests and DNS lookups...${NC}\n"
+
+    # -l для немедленного вывода строки (line-buffered)
+    tshark -i wlan0 -l -Y "http.request || dns.flags.response == 0" \
+           -T fields -e http.host -e dns.qry.name 2>/dev/null | grep -v '^$'
+    
+    pause
+}
+
+run_traffic_record() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${G}          TRAFFIC RECORDER: PCAP STORAGE          ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    
+    local report_dir="/root/reports"
+    mkdir -p "$report_dir"
+    
+    local filename="${report_dir}/capture_$(date +%H%M_%d%m).pcap"
+    
+    echo -e "${Y}[*] Recording started...${NC}"
+    echo -e "${W}File: $filename${NC}"
+    echo -e "${R}[!] Press Ctrl+C to stop recording and save.${NC}"
+    
+    # Записываем трафик в файл
+    tshark -i wlan0 -w "$filename" 2>/dev/null
+    
+    echo -e "\n${G}[+] Recording saved to $filename${NC}"
+    pause
+}
+
+
 
 
 
