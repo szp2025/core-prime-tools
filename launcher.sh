@@ -165,6 +165,38 @@ run_smart_osint_engine() {
 
 
 
+# --- Модули: GHOST COMMANDER ---
+run_ghost_commander() {
+    clear
+    echo -e "${B}--------------------------------------------------${NC}"
+    echo -e "${G}         PRIME MASTER: GHOST COMMANDER            ${NC}"
+    echo -e "${B}--------------------------------------------------${NC}"
+    
+    # Проверка наличия директории и основного файла
+    if [ ! -d "/root/Ghost" ]; then 
+        echo -e "${R}[!] Error: Directory /root/Ghost not found${NC}"
+        pause
+        return
+    fi
+
+    read -p "Enter Target IP (or press Enter for menu): " TARGET_IP
+
+    # Используем подоболочку (parentheses), чтобы cd /root/Ghost не менял рабочую директорию основного лончера
+    (
+        cd /root/Ghost || exit
+        if [ -z "$TARGET_IP" ]; then
+            # Запуск без параметров, если IP не введен
+            python3 ghost.py
+        else
+            # Запуск с конкретным IP. Экранируем команду для python
+            echo -e "${Y}[*] Connecting to $TARGET_IP...${NC}"
+            python3 ghost.py --connect "$TARGET_IP"
+        fi
+    )
+
+    pause
+}
+
 
 
 
