@@ -175,6 +175,16 @@ print_list() {
     done
 }
 
+smart_cat() {
+    local path="$1"
+    local content="$2"
+    echo "$content" > "$path"
+    chmod +x "$path"
+    print_status "i" "Engine component updated: $path"
+}
+
+
+
 
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
@@ -755,6 +765,40 @@ run_view_loot() {
         print_status "e" "No harvested data found."
         print_status "i" "Execute Scanner or Exploiter to collect intelligence."
     }
+
+    pause
+}
+
+run_iban_analyzer() {
+    print_header "FINANCIAL INTELLIGENCE: IBAN ANALYZER"
+
+    local engine_path="/tmp/iban_engine.py"
+    
+    # 1. Проверка/Генерация движка
+    check_step "cmd" "python3" "Python3 required." || { pause; return; }
+    generate_iban_code "$engine_path" "1.7"
+
+    # 2. Сбор данных через наши стандартизированные запросы
+    print_input "Enter IBAN to validate" "FR76..."
+    read -r TARGET_IBAN
+    [[ -z "$TARGET_IBAN" ]] && return
+
+    print_input "Enter Expected Bank/Name (Optional)" "none"
+    read -r EXPECTED_NAME
+    
+    print_input "Enter Expected BIC (Optional)" "none"
+    read -r EXPECTED_BIC
+
+    # 3. Запуск движка
+    print_status "i" "Executing Deep Validation..."
+    
+    # Мы передаем параметры, очищая дефолты "none"
+    python3 "$engine_path" "$TARGET_IBAN" \
+        "${EXPECTED_NAME#none}" \
+        "${EXPECTED_BIC#none}" && {
+        
+        log_loot "financial" "Validated IBAN: ${TARGET_IBAN:0:4}**** (Match: ${EXPECTED_NAME:-N/A})"
+    } || print_status "e" "Analysis interrupted."
 
     pause
 }
