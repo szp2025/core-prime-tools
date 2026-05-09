@@ -723,4 +723,41 @@ run_prime_exploiter_v4() {
 }
 
 
+run_view_loot() {
+    print_header "DATA HARVESTER: LOOT VIEW"
+
+    # Массив путей к потенциальному луту
+    local loot_paths=(
+        "/root/prime_loot/critical_vulns.txt"
+        "/root/prime_loot/sql_success.txt"
+        "/root/prime_extracted_passwords.txt"
+    )
+
+    local found_count=0
+
+    for file in "${loot_paths[@]}"; do
+        # Проверка: файл существует и не пуст (без явного if через &&)
+        [[ -s "$file" ]] && {
+            ((found_count++))
+            print_status "s" "SOURCE: $file"
+            echo -e "${D}--------------------------------------------------${NC}"
+            
+            # Табличное форматирование через column
+            # Если column не справляется, просто выводим содержимое
+            sed 's/|/ │ /g' "$file" | column -t -s '│' 2>/dev/null || cat "$file"
+            
+            echo -e "${D}--------------------------------------------------${NC}\n"
+        }
+    done
+
+    # Если ничего не найдено
+    [[ $found_count -eq 0 ]] && {
+        print_status "e" "No harvested data found."
+        print_status "i" "Execute Scanner or Exploiter to collect intelligence."
+    }
+
+    pause
+}
+
+
 
