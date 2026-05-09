@@ -591,3 +591,35 @@ run_cert_creator() {
 }
 
 
+run_pwd_gen() {
+    print_header "PRIME PASSWORD GENERATOR"
+
+    # 1. Запрос длины с дефолтом
+    print_input "Enter Password Length" "16"
+    read -r P_LEN
+    # Валидация через регулярку: если не число, ставим 16
+    [[ "$P_LEN" =~ ^[0-9]+$ ]] || P_LEN=16
+
+    print_status "i" "Generating secure sequence..."
+    
+    # 2. Генерация (использование /dev/urandom)
+    local RESULT=$(cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+=' | head -c "$P_LEN")
+    
+    # Вывод результата через print_list (один элемент тоже список)
+    print_list "Generated Password" "$RESULT"
+    
+    # 3. Хеширование через цепочку логики (без IF)
+    ask_confirm "Hash it with Bcrypt?" && {
+        check_step "cmd" "mkpasswd" "whois package (mkpasswd) required." && {
+            print_status "i" "Bcrypt Hash:"
+            echo -n "$RESULT" | mkpasswd -m bcrypt -s
+        }
+    }
+
+    # Логируем факт генерации (без самого пароля в целях безопасности!)
+    log_loot "crypto" "Generated $P_LEN chars password and requested hash"
+
+    pause
+}
+
+
