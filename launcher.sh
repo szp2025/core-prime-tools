@@ -358,8 +358,8 @@ pc_password_recovery() {
 
 # --- EXPLOIT HUB ---
 run_exploit_hub() {
-    local ex_names="PhoneSploit_Pro SQLmap/Web PC/Network_Scan PC_Control"
-    local ex_funcs="ex_phonesploit_pro run_sqlmap_smart ex_pc_network_scan run_pc_control"
+    local ex_names="PhoneSploit_Pro  PC/Network_Scan PC_Control"
+    local ex_funcs="ex_phonesploit_pro ex_pc_network_scan run_pc_control"
     prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
 }
 
