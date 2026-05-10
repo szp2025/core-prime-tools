@@ -329,8 +329,8 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG Adaptive_SQL_Injection DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_analyzer run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG Adaptive_SQL_Injection DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN PWD_DECRYPTOR CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_prime_decryptor run_cert_forge run_cert_analyzer run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -1282,6 +1282,69 @@ run_upload_server() {
 
     pause
 }
+
+run_prime_decryptor() {
+    print_header "PRIME DECRYPTOR: GENERATIVE ENGINE"
+
+    # 1. Валидация инструментов
+    check_step "cmd" "john" "John the Ripper is required." || { 
+        print_status "e" "Install: apt install john"
+        pause; return 
+    }
+
+    print_input "Enter Hash to crack" "$2y$12$..."
+    read -r user_hash
+    [[ -z "$user_hash" ]] && return
+
+    # 2. Интеллектуальный анализ типа хеша
+    local hash_file="/tmp/target_hash.txt"
+    echo "$user_hash" > "$hash_file"
+    
+    print_status "i" "Analyzing hash signature..."
+    local format=$(john --list=formats | grep -iE "$(echo "$user_hash" | cut -c1-5)" | head -n 1 || echo "auto")
+    print_status "s" "Potential Format Detected: $format"
+
+    # 3. Настройка генеративного режима
+    local mode=$(select_option "Select Attack Mode:" \
+        "Single Crack (Fast/Names):single" \
+        "Wordlist + Mutations (Balanced):wordlist" \
+        "Incremental (Brute-force/Slow):incremental")
+
+    print_status "w" "Starting Engine. Press Ctrl+C to pause/save status."
+    print_line
+
+    # 4. Выполнение (Генерация на лету)
+    case "$mode" in
+        "single")
+            # Использует информацию о пользователе из хеша (если есть)
+            john --single "$hash_file"
+            ;;
+        "wordlist")
+            # Используем встроенный генератор мутаций (--rules)
+            # Это позволяет из 100 слов сделать 10,000 вариантов "на лету"
+            john --wordlist=/usr/share/john/password.lst --rules "$hash_file"
+            ;;
+        "incremental")
+            # Полный перебор, если ничего не помогло
+            john --incremental "$hash_file"
+            ;;
+    esac
+
+    # 5. Анализ результата
+    print_line
+    local result=$(john --show "$hash_file" | head -n 1)
+    if [[ "$result" == *":"* ]]; then
+        local pass=$(echo "$result" | cut -d: -f2)
+        print_status "s" "PASSWORD DECRYPTED: $pass"
+        log_loot "decryptor" "SUCCESS: $user_hash -> $pass"
+    else
+        print_status "i" "Hash not cracked yet. John is still processing in background."
+    fi
+
+    rm -f "$hash_file"
+    pause
+}
+
 
 
 # --- Точка входа ---
