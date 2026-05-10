@@ -1050,42 +1050,38 @@ run_view_loot() {
 }
 
 run_iban_analyzer() {
-    print_header "FINANCIAL INTELLIGENCE: IBAN ANALYZER"
+    print_header "FINANCIAL INTELLIGENCE: OMNI-BANKER v2.0"
 
-    local engine_path="/tmp/iban_engine.py"
+    local engine_path="/tmp/iban_engine_$RANDOM.py"
     
-    # 1. Проверка/Генерация движка
+    # 1. Проверка и генерация адаптивного движка
     check_step "cmd" "python3" "Python3 required." || { pause; return; }
-    generate_iban_code "$engine_path" "1.7"
+    generate_iban_code "$engine_path" "2.0"
 
-    # 2. Сбор данных через наши стандартизированные запросы
+    # 2. Интерактивный сбор данных
     print_input "Enter IBAN to validate" "FR76..."
     read -r TARGET_IBAN
     [[ -z "$TARGET_IBAN" ]] && return
 
-    print_input "Enter Expected Bank/Name (Optional)" "none"
+    print_input "Enter Expected Holder Name (Optional)" "none"
     read -r EXPECTED_NAME
-    
-    print_input "Enter Expected BIC (Optional)" "none"
-    read -r EXPECTED_BIC
 
-    # 3. Запуск движка
-    print_status "i" "Executing Deep Validation..."
+    # 3. Запуск глубокого анализа
+    print_status "i" "Executing Multi-Source Validation..."
     
-    # Мы передаем параметры, очищая дефолты "none"
-    python3 "$engine_path" "$TARGET_IBAN" \
-        "${EXPECTED_NAME#none}" \
-        "${EXPECTED_BIC#none}" && {
-        
-        log_loot "financial" "Validated IBAN: ${TARGET_IBAN:0:4}**** (Match: ${EXPECTED_NAME:-N/A})"
-    } || print_status "e" "Analysis interrupted."
+    # Передаем параметры. Если имя "none", Python поймет это как пустую строку.
+    python3 "$engine_path" "$TARGET_IBAN" "${EXPECTED_NAME#none}" && {
+        # Логируем успех в Loot
+        log_loot "financial" "Validated IBAN: ${TARGET_IBAN:0:4}**** | Holder: ${EXPECTED_NAME:-Unknown}"
+        print_status "s" "Analysis report secured in loot."
+    } || print_status "e" "Analysis failed or interrupted."
 
+    # 4. Стерилизация (Удаляем следы финансового инструмента)
+    rm -f "$engine_path"
+    print_status "i" "Engine Purge: Complete."
+    
     pause
 }
-
-
-
-
 
 
 # --- py functions ---
