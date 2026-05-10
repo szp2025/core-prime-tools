@@ -351,6 +351,42 @@ run_ghost_commander() {
 }
 
 
+run_system_info() {
+    print_header "PRIME SYSTEM & USB INTELLIGENCE"
+
+    # 1. Сбор локальных данных
+    local kernel=$(uname -rs)
+    local uptime=$(uptime -p)
+    local internal_ip=$(ip route get 1.2.3.4 2>/dev/null | awk '{print $7}' || echo "N/A")
+    
+    # 2. Опрос USB-шины (Работает без root на большинстве систем)
+    # Пытаемся использовать lsusb, если нет - читаем напрямую из /sys
+    local usb_devices
+    if command -v lsusb >/dev/null; then
+        usb_devices=$(lsusb | awk '{print "ID "$6" "$7,$8,$9,$10}')
+    else
+        usb_devices=$(find /sys/bus/usb/devices/ihi -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
+    fi
+    [[ -z "$usb_devices" ]] && usb_devices="No active USB connections detected."
+
+    # 3. Вывод отчета
+    print_status "i" "Core Intelligence Report:"
+    
+    print_list "Node Hardware" \
+        "Kernel:  $kernel" \
+        "Uptime:  $uptime" \
+        "Local IP: $internal_ip"
+
+    print_list "USB Connectivity (Bus Scan)" \
+        "$usb_devices"
+
+    print_status "s" "Diagnostic complete."
+    log_loot "sysinfo" "Full diagnostic (Local + USB) executed."
+
+    pause
+}
+
+
 run_phishing() {
     print_header "SOCIAL ENGINEERING HUB"
 
