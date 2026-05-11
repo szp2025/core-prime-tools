@@ -476,63 +476,67 @@ run_ghost_commander() {
 
 run_system_info() {
     clear
-    print_header "PRIME INTELLIGENCE & RECON"
+    print_header "PRIME INTELLIGENCE & RECON v2.0"
     echo ""
 
     # Выбор вектора анализа
     select_option "Select Intelligence Target:" \
         "LOCAL: Internal Node & USB Status:local" \
         "REMOTE: External Server/Site Recon:remote" \
-        "BACK: Return to Main Menu:exit"
+        "EXIT: Return to Main Menu:exit"
     
     local target="$CHOICE"
     [[ "$target" == "exit" || -z "$target" ]] && return
 
     case "$target" in
         "local")
-            print_status "i" "Scanning Local Node..."
+            print_status "i" "Gathering Local Intelligence..."
+            
             local kernel=$(uname -rs)
             local uptime=$(uptime -p)
             local internal_ip=$(hostname -I | awk '{print $1}' || echo "N/A")
             
-            # USB Scan
+            # Опрос USB
             local usb_devices
             if command -v lsusb >/dev/null; then
-                usb_devices=$(lsusb | tail -n +1)
+                usb_devices=$(lsusb)
             else
-                usb_devices="Standard Bus Scan not available."
+                usb_devices=$(find /sys/bus/usb/devices/ihi -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
             fi
+            [[ -z "$usb_devices" ]] && usb_devices="No active USB connections detected."
 
-            print_list "Hardware & Network" \
-                "Kernel:   $kernel" \
-                "Uptime:   $uptime" \
-                "Local IP: $internal_ip"
+            echo -e "\n${Y}--- LOCAL NODE REPORT ---${NC}"
+            print_list "System Core" \
+                "Kernel:  $kernel" \
+                "Uptime:  $uptime" \
+                "Priv IP: $internal_ip"
             
-            print_list "USB Peripheral" "$usb_devices"
+            print_list "USB Bus Scan" "$usb_devices"
             ;;
 
         "remote")
-            print_input "Enter Target Domain or IP" "example.com"
+            print_input "Enter Target Domain or IP" "google.com"
             read -r r_target
             [[ -z "$r_target" ]] && return
 
-            print_status "w" "Starting Deep Recon on: $r_target..."
+            print_status "w" "Executing Remote Reconnaissance..."
             
-            # 1. DNS & IP Mapping
-            local ip_map=$(host "$r_target" | head -n 3)
+            # 1. DNS & IP (host)
+            local ip_map=$(host "$r_target" 2>/dev/null | head -n 3 || echo "Host command failed.")
             
-            # 2. HTTP Header Analysis (аналог части phpinfo)
-            # Вытягивает сервер, версию PHP/Nginx, куки
-            local headers=$(curl -Is --connect-timeout 5 "$r_target" | grep -E "Server|X-Powered-By|Set-Cookie" || echo "Headers Hidden")
+            # 2. HTTP Fingerprint (curl)
+            # Извлекаем сервер и технологии (как в phpinfo)
+            local headers=$(curl -Is --connect-timeout 5 "$r_target" 2>/dev/null | grep -E "Server|X-Powered-By|Set-Cookie|Content-Type" || echo "Headers Hidden")
 
-            # 3. WHOIS Data (базовая инфо о владельце)
-            local owner=$(whois "$r_target" | grep -Ei "Registrar:|Organization:|Country:" | head -n 5)
+            # 3. Ownership (whois)
+            local owner=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Country:|Expires:" | head -n 5 || echo "Whois unavailable.")
 
-            print_list "DNS Mapping" "$ip_map"
-            print_list "Server Fingerprint" "$headers"
-            print_list "Ownership Context" "$owner"
+            echo -e "\n${Y}--- REMOTE TARGET REPORT: $r_target ---${NC}"
+            print_list "Network Mapping" "$ip_map"
+            print_list "Server Stack" "$headers"
+            print_list "Intelligence Context" "$owner"
 
-            log_loot "recon" "Recon executed for: $r_target"
+            log_loot "recon" "Recon executed: $r_target"
             ;;
     esac
 
