@@ -475,37 +475,69 @@ run_ghost_commander() {
 
 
 run_system_info() {
-    print_header "PRIME SYSTEM & USB INTELLIGENCE"
+    clear
+    print_header "PRIME INTELLIGENCE & RECON"
+    echo ""
 
-    # 1. Сбор локальных данных
-    local kernel=$(uname -rs)
-    local uptime=$(uptime -p)
-    local internal_ip=$(ip route get 1.2.3.4 2>/dev/null | awk '{print $7}' || echo "N/A")
+    # Выбор вектора анализа
+    select_option "Select Intelligence Target:" \
+        "LOCAL: Internal Node & USB Status:local" \
+        "REMOTE: External Server/Site Recon:remote" \
+        "BACK: Return to Main Menu:exit"
     
-    # 2. Опрос USB-шины (Работает без root на большинстве систем)
-    # Пытаемся использовать lsusb, если нет - читаем напрямую из /sys
-    local usb_devices
-    if command -v lsusb >/dev/null; then
-        usb_devices=$(lsusb | awk '{print "ID "$6" "$7,$8,$9,$10}')
-    else
-        usb_devices=$(find /sys/bus/usb/devices/ihi -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
-    fi
-    [[ -z "$usb_devices" ]] && usb_devices="No active USB connections detected."
+    local target="$CHOICE"
+    [[ "$target" == "exit" || -z "$target" ]] && return
 
-    # 3. Вывод отчета
-    print_status "i" "Core Intelligence Report:"
-    
-    print_list "Node Hardware" \
-        "Kernel:  $kernel" \
-        "Uptime:  $uptime" \
-        "Local IP: $internal_ip"
+    case "$target" in
+        "local")
+            print_status "i" "Scanning Local Node..."
+            local kernel=$(uname -rs)
+            local uptime=$(uptime -p)
+            local internal_ip=$(hostname -I | awk '{print $1}' || echo "N/A")
+            
+            # USB Scan
+            local usb_devices
+            if command -v lsusb >/dev/null; then
+                usb_devices=$(lsusb | tail -n +1)
+            else
+                usb_devices="Standard Bus Scan not available."
+            fi
 
-    print_list "USB Connectivity (Bus Scan)" \
-        "$usb_devices"
+            print_list "Hardware & Network" \
+                "Kernel:   $kernel" \
+                "Uptime:   $uptime" \
+                "Local IP: $internal_ip"
+            
+            print_list "USB Peripheral" "$usb_devices"
+            ;;
 
+        "remote")
+            print_input "Enter Target Domain or IP" "example.com"
+            read -r r_target
+            [[ -z "$r_target" ]] && return
+
+            print_status "w" "Starting Deep Recon on: $r_target..."
+            
+            # 1. DNS & IP Mapping
+            local ip_map=$(host "$r_target" | head -n 3)
+            
+            # 2. HTTP Header Analysis (аналог части phpinfo)
+            # Вытягивает сервер, версию PHP/Nginx, куки
+            local headers=$(curl -Is --connect-timeout 5 "$r_target" | grep -E "Server|X-Powered-By|Set-Cookie" || echo "Headers Hidden")
+
+            # 3. WHOIS Data (базовая инфо о владельце)
+            local owner=$(whois "$r_target" | grep -Ei "Registrar:|Organization:|Country:" | head -n 5)
+
+            print_list "DNS Mapping" "$ip_map"
+            print_list "Server Fingerprint" "$headers"
+            print_list "Ownership Context" "$owner"
+
+            log_loot "recon" "Recon executed for: $r_target"
+            ;;
+    esac
+
+    echo ""
     print_status "s" "Diagnostic complete."
-    log_loot "sysinfo" "Full diagnostic (Local + USB) executed."
-
     pause
 }
 
