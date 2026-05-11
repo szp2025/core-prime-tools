@@ -489,8 +489,8 @@ pc_password_recovery() {
 
 # --- EXPLOIT HUB ---
 run_exploit_hub() {
-    local ex_names="PC_Recovery PC_Control"
-    local ex_funcs="run_pc_recovery run_pc_control"
+    local ex_names="PC_Control"
+    local ex_funcs="run_pc_control"
     prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
 }
 
