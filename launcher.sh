@@ -1288,38 +1288,69 @@ run_view_loot() {
 }
 
 run_iban_analyzer() {
-    print_header "FINANCIAL INTELLIGENCE: OMNI-BANKER v2.0"
+    clear
+    print_header "FINANCIAL INTELLIGENCE: OMNI-BANKER v2.2"
+    echo ""
 
+    # 1. Проверка фундамента
+    check_step "cmd" "python3" "Python3 required for Global Analysis." || { pause; return; }
+
+    # 2. Вызов меню (Записывает цифру 1, 2 или 3 в CHOICE)
+    select_option "Select Operation Vector:" \
+        "SINGLE: Full IBAN & Holder Analysis" \
+        "PASSIVE: Structural Validation Only" \
+        "EXIT: Return to Main Menu"
+    
+    local btn="$CHOICE"
+
+    # Сразу отсекаем выход или пустой выбор
+    [[ -z "$btn" || "$btn" == "3" ]] && return
+
+    # 3. Подготовка временного движка
     local engine_path="/tmp/iban_engine_$RANDOM.py"
-    
-    # 1. Проверка и генерация адаптивного движка
-    check_step "cmd" "python3" "Python3 required." || { pause; return; }
-    generate_iban_code "$engine_path" "2.0"
+    generate_iban_code "$engine_path" "2.2"
 
-    # 2. Интерактивный сбор данных
-    print_input "Enter IBAN to validate" "FR76..."
-    read -r TARGET_IBAN
-    [[ -z "$TARGET_IBAN" ]] && return
+    # 4. Обработка логики через Case (Никаких if-then)
+    case "$btn" in
+        "1")
+            print_input "Enter IBAN to validate" "FR76..."
+            read -r TARGET_IBAN
+            [[ -z "$TARGET_IBAN" ]] && { rm -f "$engine_path"; return; }
 
-    print_input "Enter Expected Holder Name (Optional)" "none"
-    read -r EXPECTED_NAME
+            print_input "Enter Expected Holder Name (Optional)" "none"
+            read -r EXPECTED_NAME
+            
+            print_status "i" "Executing Full Intelligence Cycle..."
+            echo ""
+            python3 "$engine_path" "$TARGET_IBAN" "${EXPECTED_NAME:-none}"
+            
+            log_loot "financial" "Full Scan: ${TARGET_IBAN:0:4}..."
+            ;;
 
-    # 3. Запуск глубокого анализа
-    print_status "i" "Executing Multi-Source Validation..."
-    
-    # Передаем параметры. Если имя "none", Python поймет это как пустую строку.
-    python3 "$engine_path" "$TARGET_IBAN" "${EXPECTED_NAME#none}" && {
-        # Логируем успех в Loot
-        log_loot "financial" "Validated IBAN: ${TARGET_IBAN:0:4}**** | Holder: ${EXPECTED_NAME:-Unknown}"
-        print_status "s" "Analysis report secured in loot."
-    } || print_status "e" "Analysis failed or interrupted."
+        "2")
+            print_input "Enter IBAN for Structural Check" "DE..."
+            read -r TARGET_IBAN
+            [[ -z "$TARGET_IBAN" ]] && { rm -f "$engine_path"; return; }
 
-    # 4. Стерилизация (Удаляем следы финансового инструмента)
+            print_status "i" "Executing Passive Structural Validation..."
+            echo ""
+            # В пассивном режиме передаем "none" как имя
+            python3 "$engine_path" "$TARGET_IBAN" "none"
+            
+            log_loot "financial" "Passive Check: ${TARGET_IBAN:0:4}..."
+            ;;
+    esac
+
+    # 5. Финализация и Стерилизация
+    local res_status=$?
     rm -f "$engine_path"
-    print_status "i" "Engine Purge: Complete."
     
+    echo ""
+    [[ $res_status -eq 0 ]] && print_status "s" "Analysis complete. Trace purged." \
+                            || print_status "e" "Analysis interrupted."
     pause
 }
+
 
 
 # --- py functions ---
