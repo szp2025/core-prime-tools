@@ -94,17 +94,34 @@ exit_script() {
 
 show_progress() {
     local duration=$1
-    local col=$(tput cols)
-    local width=$(( col - 20 ))
-    local sleep_step=$(echo "scale=2; $duration / $width" | bc -l)
-
+    local message=${2:-"Processing"}
+    local col=$(tput cols 2>/dev/null || echo 40) # Резервное значение, если tput нет
+    local width=$(( col - 25 ))
+    [[ $width -lt 10 ]] && width=20 # Защита для узких экранов
+    
+    echo -ne "${Y}[*] ${message}${NC}\n"
     echo -ne " Progress: ["
-    for ((i=0; i<$width; i++)); do
+    
+    # Рисуем пустую шкалу
+    for ((i=0; i<width; i++)); do echo -ne " "; done
+    echo -ne "] 0%"
+    
+    # Возвращаемся в начало строки для заполнения
+    echo -ne "\r Progress: ["
+    
+    for ((i=1; i<=width; i++)); do
+        local percent=$(( i * 100 / width ))
         echo -ne "▓"
-        sleep $sleep_step
+        # Простой расчет задержки без bc
+        sleep 0.1 # Фиксированная скорость или расчет: sleep $(( duration / width ))
+        echo -ne "\r Progress: ["
+        for ((j=0; j<i; j++)); do echo -ne "▓"; done
+        for ((j=i; j<width; j++)); do echo -ne " "; done
+        echo -ne "] ${percent}%"
     done
-    echo -e "] Done!"
+    echo -e "\n${G}[+] Task Synchronized.${NC}\n"
 }
+
 
 # --- Универсальный динамический контроллер ---
 prime_dynamic_controller() {
