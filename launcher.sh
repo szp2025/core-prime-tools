@@ -224,27 +224,26 @@ ask_confirm() {
 # Аргументы: $1 - текст вопроса, $2... - варианты (формат "описание:аргументы")
 select_option() {
     local prompt="$1"; shift
-    print_status "w" "$prompt"
-    local count=1
     local options=("$@")
+    local count=1
 
+    # Выводим вопрос и список ПРЯМО в терминал
+    echo -e "${W}[?] $prompt${NC}" > /dev/tty
     for opt in "${options[@]}"; do
-        echo -e " $count) ${opt%%:*}" # Показываем описание
+        echo -e " ${G}$count)${NC} ${opt%%:*}" > /dev/tty
         ((count++))
     done
 
-    echo -en "${Y}>> ${NC}"
-    read -r choice
+    echo -en "${Y}>> ${NC}" > /dev/tty
+    read -r choice < /dev/tty # Читаем ввод тоже напрямую из терминала
     
-    # Извлекаем аргументы из выбранного варианта
     local index=$((choice - 1))
-    if [[ $index -ge 0 && $index -lt ${#options[@]} ]]; then
-        echo "${options[$index]#*:}" # Возвращаем часть после двоеточия
-    else
-        echo "${options[0]#*:}" # По умолчанию первый вариант
-    fi
+    
+    # А вот результат возвращаем в stdout, чтобы его поймала переменная
+    [[ $index -ge 0 && $index -lt ${#options[@]} ]] \
+        && echo "${options[$index]#*:}" \
+        || echo "${options[0]#*:}"
 }
-
 
 # Для красивых запросов ввода
 print_input() {
@@ -977,31 +976,34 @@ run_crypto_forge() {
 run_pass_lab() {
     clear
     print_header "PRIME PASSWORD LABORATORY v13.6"
-    
-    # --- СЛОЙ 1: ВЫБОР ВЕКТОРА (Zero-IF Selection) ---
-    # Если аргумент $1 передан (например, из Bridge), сразу идем в дешифровку
+    echo "" # Отступ после заголовка
+
+    # --- СЛОЙ 1: ВЫБОР ВЕКТОРА ---
     local mode="dec"
-    [[ -z "$1" ]] && mode=$(select_option "Select Operation:" \
-        "GENERATE: Secure Sequence Creation:gen" \
-        "DECRYPT: Generative Hash Cracking:dec")
+    # Если аргумента нет, вызываем меню
+    [[ -z "$1" ]] && mode=$(select_option "Select Operation Mode:" \
+        "GENERATE: Create Secure Sequence:gen" \
+        "DECRYPT: Generative Hash Cracking:dec" \
+        "EXIT: Return to Main Menu:exit")
     
-    [[ -z "$mode" ]] && return
+    # Если выбрали выход - уходим
+    [[ "$mode" == "exit" || -z "$mode" ]] && return
 
     # --- СЛОЙ 2: ВЕТКА ГЕНЕРАЦИИ (gen) ---
     [[ "$mode" == "gen" ]] && {
-        print_input "Length" "16"
+        print_input "Enter Password Length" "16"
         read -r p_len
         local len=${p_len:-16}
         
-        # Генерация через /dev/urandom без лишних труб
         local pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
-        print_list "Secure Artifact" "$pass"
+        print_line
+        print_list "Generated Artifact" "$pass"
+        print_line
         
-        # Предложение хеширования (bcrypt)
         ask_confirm "Apply Bcrypt mutation?" && {
             local h_res=$(echo -n "$pass" | mkpasswd -m bcrypt -s 2>/dev/null || echo "ERROR: Install 'whois'")
-            echo -e "${G}Hash: ${NC}$h_res"
-            log_loot "pass_lab" "Generated $len chars + Bcrypt hash"
+            echo -e "${G}Hash:${NC} $h_res"
+            log_loot "pass_lab" "Generated $len chars + Bcrypt"
         }
     }
 
@@ -1009,31 +1011,27 @@ run_pass_lab() {
     [[ "$mode" == "dec" ]] && {
         check_step "cmd" "john" "John the Ripper is required." || return
         
-        # Если $1 пуст, запрашиваем хеш вручную
         local target_hash="$1"
-        [[ -z "$target_hash" ]] && { print_input "Enter Target Hash" "$2y$12$..."; read -r target_hash; }
+        [[ -z "$target_hash" ]] && { print_input "Enter Target Hash" ""; read -r target_hash; }
         [[ -z "$target_hash" ]] && return
 
         local tmp_h="/tmp/h_$(date +%s).txt"
         echo "$target_hash" > "$tmp_h"
 
-        # Авто-детекция формата (Эвристика по сигнатуре)
         local sig=$(echo "$target_hash" | cut -c1-5)
-        print_status "i" "Analyzing signature: $sig"
+        print_status "i" "Signature Analysis: $sig"
         
-        # Запуск John с умными правилами
-        print_status "w" "Starting Hybrid Attack (Press Ctrl+C to stop)..."
+        print_status "w" "Starting Hybrid Attack..."
         local john_fmt=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1)
         
         john --format=${john_fmt:-"auto"} --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
 
-        # Атомарный вывод результата
         local crack_res=$(john --show "$tmp_h" | head -n1)
         [[ "$crack_res" == *":"* ]] && {
             local plain=$(echo "$crack_res" | cut -d: -f2)
             print_status "s" "DECRYPTED: $plain"
-            log_loot "pass_lab" "CRACK SUCCESS: $target_hash -> $plain"
-        } || print_status "i" "Hash complex. Background process started."
+            log_loot "pass_lab" "SUCCESS: $target_hash -> $plain"
+        } || print_status "i" "Complexity High. Task moved to background."
         
         rm -f "$tmp_h"
     }
