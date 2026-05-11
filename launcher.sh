@@ -226,6 +226,33 @@ select_option() {
     local prompt="$1"; shift
     local options=("$@")
     local count=1
+    CHOICE="" # Обнуляем глобальный результат
+
+    # Прямой вывод на экран
+    echo -e "${W}[?] $prompt${NC}"
+    for opt in "${options[@]}"; do
+        echo -e " ${G}$count)${NC} ${opt%%:*}"
+        ((count++))
+    done
+
+    echo -en "${Y}>> ${NC}"
+    read -r user_input
+    
+    local index=$((user_input - 1))
+    
+    # Записываем результат в глобальную переменную
+    if [[ $index -ge 0 && $index -lt ${#options[@]} ]]; then
+        CHOICE="${options[$index]#*:}"
+    else
+        CHOICE="${options[0]#*:}"
+    fi
+}
+
+
+select_optionold() {
+    local prompt="$1"; shift
+    local options=("$@")
+    local count=1
 
     # Выводим вопрос и список ПРЯМО в терминал
     echo -e "${W}[?] $prompt${NC}" > /dev/tty
