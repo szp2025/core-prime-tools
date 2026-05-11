@@ -41,45 +41,45 @@ print_stats_line() {
 
 # --- Вспомогательные функции ---
 get_stats() {
-    # --- СЛОЙ 1: МЕТРИКИ (Арифметическая обработка) ---
+    # --- СЛОЙ 1: МЕТРИКИ ---
     local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
     local rom=$(df -h / | awk 'NR==2 {print $4}')
     local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}' || echo "N/A")
 
-    # --- СЛОЙ 2: УМНОЕ ОПРЕДЕЛЕНИЕ СЕТИ (No-IF) ---
-    # Проверяем наличие активных интерфейсов и маршрутов
-    local ifaces=$(ip -brief addr show up | awk '{print $1}' | grep -v "lo" | tr '\n' ' ' )
-    
-    # Резонансная проверка: сначала локальный шлюз, потом DNS
+    # --- СЛОЙ 2: АТОМАРНОЕ ОПРЕДЕЛЕНИЕ СЕТИ ---
+    local active_iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $5}')
     local net_status="${R}OFFLINE${NC}"
-    (ip route | grep -q default) && net_status="${G}ACTIVE${NC}"
-    (ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1) && net_status="${G}CONNECTED${NC}"
-
-    # Определение типа связи (WiFi vs Mobile)
     local net_type="NONE"
-    echo "$ifaces" | grep -q "wlan" && net_type="WLAN"
-    echo "$ifaces" | grep -qE "rmnet|wwan" && net_type="MOBILE"
-    echo "$ifaces" | grep -q "tun" && net_type="VPN"
 
-    # --- СЛОЙ 3: СЕРВИСЫ (Потоковая фильтрация) ---
+    # Проверка "живого" маршрута (без пинга)
+    [[ -n "$active_iface" ]] && net_status="${G}CONNECTED${NC}"
+
+    # Эвристическое определение типа (через системные свойства)
+    [[ -n "$active_iface" ]] && {
+        # Если есть каталог wireless - это WiFi
+        [[ -d "/sys/class/net/$active_iface/wireless" || -d "/sys/class/net/$active_iface/phy80211" ]] && net_type="WLAN"
+        # Если это tun/tap - это VPN
+        [[ "$active_iface" =~ ^(tun|tap|ppp) ]] && net_type="VPN"
+        # Если в названии rmnet или это специфический usb - это MOBILE
+        [[ "$active_iface" =~ ^(rmnet|wwan|ccmni) ]] && net_type="MOBILE"
+        # Универсальный fallback: если тип еще не определен, но это не lo
+        [[ "$net_type" == "NONE" ]] && net_type="ETH/OTHER"
+    }
+
+    # --- СЛОЙ 3: СЕРВИСЫ ---
     local active_srv=""
     local check_list=("av_server.py:AV" "share_server.py:SH" "upload_server.py:UP")
-    
-    # Используем конвейер для поиска процессов
     for srv in "${check_list[@]}"; do
         pgrep -f "${srv%%:*}" >/dev/null && active_srv+="${G}[${srv#*:}]${NC} "
     done
     active_srv=${active_srv:-"${R}NONE${NC}"}
 
-    # --- СЛОЙ 4: АБСТРАКТНЫЙ ВЫВОД ---
+    # --- СЛОЙ 4: ВЫВОД ---
     print_line
     print_stats_line "RAM" "$ram" "ROM" "$rom" "SD" "$sd_info"
     
-    # Выводим статус сети с указанием типа интерфейса
-    echo -e "${Y}NET: $net_status ($net_type) ${Y}│ ACTIVE SRV: $active_srv"
-    
-    # Добавляем инфо об активных интерфейсах (стелс-мониторинг)
-    [[ -n "$ifaces" ]] && echo -e "${B}INTERFACES: $ifaces${NC}"
+    # Теперь net_type точно не будет (none) при активном соединении
+    echo -e "${Y}NET: $net_status ${B}($net_type: $active_iface) ${Y}│ ACTIVE SRV: $active_srv"
     
     print_line
 }
