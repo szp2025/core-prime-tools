@@ -41,36 +41,48 @@ print_stats_line() {
 
 # --- Вспомогательные функции ---
 get_stats() {
-    # 1. Метрики (RAM, ROM, SD)
+    # --- СЛОЙ 1: МЕТРИКИ (Арифметическая обработка) ---
     local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
     local rom=$(df -h / | awk 'NR==2 {print $4}')
     local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}' || echo "N/A")
 
-    # 2. Сеть
+    # --- СЛОЙ 2: УМНОЕ ОПРЕДЕЛЕНИЕ СЕТИ (No-IF) ---
+    # Проверяем наличие активных интерфейсов и маршрутов
+    local ifaces=$(ip -brief addr show up | awk '{print $1}' | grep -v "lo" | tr '\n' ' ' )
+    
+    # Резонансная проверка: сначала локальный шлюз, потом DNS
     local net_status="${R}OFFLINE${NC}"
-    ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1 && net_status="${G}ONLINE${NC}"
+    (ip route | grep -q default) && net_status="${G}ACTIVE${NC}"
+    (ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1) && net_status="${G}CONNECTED${NC}"
 
-    # 3. Сервисы
+    # Определение типа связи (WiFi vs Mobile)
+    local net_type="NONE"
+    echo "$ifaces" | grep -q "wlan" && net_type="WLAN"
+    echo "$ifaces" | grep -qE "rmnet|wwan" && net_type="MOBILE"
+    echo "$ifaces" | grep -q "tun" && net_type="VPN"
+
+    # --- СЛОЙ 3: СЕРВИСЫ (Потоковая фильтрация) ---
     local active_srv=""
     local check_list=("av_server.py:AV" "share_server.py:SH" "upload_server.py:UP")
     
+    # Используем конвейер для поиска процессов
     for srv in "${check_list[@]}"; do
         pgrep -f "${srv%%:*}" >/dev/null && active_srv+="${G}[${srv#*:}]${NC} "
     done
-    active_srv=${active_srv:-${R}NONE${NC}}
+    active_srv=${active_srv:-"${R}NONE${NC}"}
 
-    # 4. Вывод через абстракцию (Никаких прямых echo)
-    print_line # Рисует разделитель -----------------------
-    
+    # --- СЛОЙ 4: АБСТРАКТНЫЙ ВЫВОД ---
+    print_line
     print_stats_line "RAM" "$ram" "ROM" "$rom" "SD" "$sd_info"
     
-    # Вторую строку выводим вручную через стилизованный статус, 
-    # либо расширяем print_stats_line
-    echo -e "${Y}NET: $net_status ${Y}│ ACTIVE SRV: $active_srv"
+    # Выводим статус сети с указанием типа интерфейса
+    echo -e "${Y}NET: $net_status ($net_type) ${Y}│ ACTIVE SRV: $active_srv"
+    
+    # Добавляем инфо об активных интерфейсах (стелс-мониторинг)
+    [[ -n "$ifaces" ]] && echo -e "${B}INTERFACES: $ifaces${NC}"
     
     print_line
 }
-
 
 pause() { echo -e "\n${Y}Press Enter to return...${NC}"; read -r _; }
 
