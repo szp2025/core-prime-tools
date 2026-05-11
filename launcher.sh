@@ -476,24 +476,20 @@ run_ghost_commander() {
 
 run_system_info() {
     clear
-    print_header "PRIME INTELLIGENCE & RECON v2.0"
+    print_header "PRIME INTELLIGENCE & RECON v2.1"
     echo ""
 
-    # Вызываем меню. Оно запишет цифру (1, 2 или 3) в CHOICE
     select_option "Select Intelligence Target:" \
         "LOCAL: Internal Node & USB Status" \
         "REMOTE: External Server/Site Recon" \
         "EXIT: Return to Main Menu"
     
     local btn="$CHOICE"
-
-    # Если ничего не выбрали или нажали выход (3)
     [[ -z "$btn" || "$btn" == "3" ]] && return
 
     case "$btn" in
         "1") # --- LOCAL ---
             print_status "i" "Gathering Local Intelligence..."
-            
             local kernel=$(uname -rs)
             local uptime=$(uptime -p)
             local internal_ip=$(hostname -I | awk '{print $1}' || echo "N/A")
@@ -502,37 +498,52 @@ run_system_info() {
             if command -v lsusb >/dev/null; then
                 usb_devices=$(lsusb)
             else
-                usb_devices=$(find /sys/bus/usb/devices/ -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
+                usb_devices=$(find /sys/bus/usb/devices/ -maxdepth 2 -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
             fi
             [[ -z "$usb_devices" ]] && usb_devices="No active USB connections detected."
 
             echo -e "\n${Y}--- LOCAL NODE REPORT ---${NC}"
-            print_list "System Core" \
-                "Kernel:  $kernel" \
-                "Uptime:  $uptime" \
-                "Priv IP: $internal_ip"
-            
+            print_list "System Core" "Kernel: $kernel" "Uptime: $uptime" "Priv IP: $internal_ip"
             print_list "USB Bus Scan" "$usb_devices"
             ;;
 
         "2") # --- REMOTE ---
+            check_step "cmd" "curl" "curl is required for remote recon." || { pause; return; }
+            check_step "cmd" "host" "dnsutils (host) is recommended."
+            
             print_input "Enter Target Domain or IP" "google.com"
             read -r r_target
             [[ -z "$r_target" ]] && return
 
-            print_status "w" "Executing Remote Reconnaissance..."
+            print_status "w" "Executing Deep Reconnaissance..."
             
-            # Сбор данных
-            local ip_map=$(host "$r_target" 2>/dev/null | head -n 3 || echo "Host command failed.")
-            local headers=$(curl -Is --connect-timeout 5 "$r_target" 2>/dev/null | grep -E "Server|X-Powered-By|Set-Cookie|Content-Type" || echo "Headers Hidden")
-            local owner=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Country:|Expires:" | head -n 5 || echo "Whois unavailable.")
+            # 1. Заголовки (основной источник)
+            local raw_headers=$(curl -Is --connect-timeout 5 "$r_target" 2>/dev/null)
+            
+            # 2. Поиск версии PHP и Сервера (расширенный фильтр)
+            local server_stack=$(echo "$raw_headers" | grep -Ei "Server|X-Powered-By|Via|X-AspNet-Version" || echo "Server Info: Hidden/Hardened")
+            
+            # 3. Технологические улики (PHP Hints)
+            local tech_hints=""
+            [[ "$raw_headers" == *"PHPSESSID"* ]] && tech_hints+="[!] PHP Session Detected (PHPSESSID)\n"
+            [[ "$raw_headers" == *"Laravel"* ]] && tech_hints+="[!] Framework: Laravel Detected\n"
+            [[ "$raw_headers" == *"wp-content"* || "$(curl -s --max-time 5 "$r_target" | grep -q "wp-content" && echo "yes")" == "yes" ]] && tech_hints+="[!] CMS: WordPress Detected\n"
+            
+            # 4. Попытка пробить версию через OPTIONS (если GET скрыт)
+            local alt_ver=$(curl -X OPTIONS -Is "$r_target" 2>/dev/null | grep -Ei "X-Powered-By|Server" | head -n 1)
+
+            # 5. DNS & WHOIS
+            local ip_map=$(host "$r_target" 2>/dev/null | head -n 3 || echo "DNS Lookup: Failed")
+            local owner=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Country:|Expires:" | head -n 5 || echo "WHOIS: Protected/Unavailable")
 
             echo -e "\n${Y}--- REMOTE TARGET REPORT: $r_target ---${NC}"
             print_list "Network Mapping" "$ip_map"
-            print_list "Server Stack" "$headers"
+            print_list "Server Stack" "$server_stack"
+            [[ -n "$tech_hints" ]] && print_list "Technology Hints" "$(echo -e "$tech_hints")"
+            [[ -n "$alt_ver" ]] && print_list "Alt Discovery (OPTIONS)" "$alt_ver"
             print_list "Intelligence Context" "$owner"
 
-            log_loot "recon" "Recon executed: $r_target"
+            log_loot "recon" "Deep Recon executed: $r_target"
             ;;
     esac
 
@@ -540,6 +551,7 @@ run_system_info() {
     print_status "s" "Diagnostic complete."
     pause
 }
+
 
 
 generate_phantom_server_code() {
