@@ -975,12 +975,16 @@ run_crypto_forge() {
 
 
 run_pass_lab() {
+    clear
     print_header "PRIME PASSWORD LABORATORY v13.6"
     
     # --- СЛОЙ 1: ВЫБОР ВЕКТОРА (Zero-IF Selection) ---
-    local mode=$(select_option "Select Operation:" \
+    # Если аргумент $1 передан (например, из Bridge), сразу идем в дешифровку
+    local mode="dec"
+    [[ -z "$1" ]] && mode=$(select_option "Select Operation:" \
         "GENERATE: Secure Sequence Creation:gen" \
         "DECRYPT: Generative Hash Cracking:dec")
+    
     [[ -z "$mode" ]] && return
 
     # --- СЛОЙ 2: ВЕТКА ГЕНЕРАЦИИ (gen) ---
@@ -1005,8 +1009,9 @@ run_pass_lab() {
     [[ "$mode" == "dec" ]] && {
         check_step "cmd" "john" "John the Ripper is required." || return
         
-        print_input "Enter Target Hash" "$2y$12$..."
-        read -r target_hash
+        # Если $1 пуст, запрашиваем хеш вручную
+        local target_hash="$1"
+        [[ -z "$target_hash" ]] && { print_input "Enter Target Hash" "$2y$12$..."; read -r target_hash; }
         [[ -z "$target_hash" ]] && return
 
         local tmp_h="/tmp/h_$(date +%s).txt"
@@ -1016,11 +1021,11 @@ run_pass_lab() {
         local sig=$(echo "$target_hash" | cut -c1-5)
         print_status "i" "Analyzing signature: $sig"
         
-        # Запуск John с умными правилами (Single -> Wordlist -> Inc)
-        # Мы используем --external=Default для попытки авто-подбора
+        # Запуск John с умными правилами
         print_status "w" "Starting Hybrid Attack (Press Ctrl+C to stop)..."
-        john --format=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1 || echo "auto") \
-             --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
+        local john_fmt=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1)
+        
+        john --format=${john_fmt:-"auto"} --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
 
         # Атомарный вывод результата
         local crack_res=$(john --show "$tmp_h" | head -n1)
@@ -1035,7 +1040,6 @@ run_pass_lab() {
 
     pause
 }
-
 
 run_vulnerability_scanner() {
     print_header "PRIME HEURISTIC VULN-SCANNER v7.0"
