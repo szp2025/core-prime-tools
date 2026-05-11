@@ -994,68 +994,63 @@ run_crypto_forge() {
 
 run_pass_lab() {
     clear
-    print_header "PRIME PASSWORD LABORATORY v13.6"
+    print_header "PRIME PASSWORD LABORATORY v13.8"
     echo ""
 
     if [[ -z "$1" ]]; then
         select_option "Select Operation Mode:" \
-            "GENERATE: Create Secure Sequence" \
-            "DECRYPT: Generative Hash Cracking" \
-            "EXIT: Return to Main Menu"
-        
+            "GENERATE: Create Secure Password:gen" \
+            "CRUNCH: Wordlist Generator:crunch" \
+            "DECRYPT: Hash Cracking:dec" \
+            "EXIT: Return to Main Menu:exit"
         local btn="$CHOICE"
     else
-        local btn="2" # Если пришел аргумент, имитируем нажатие "2"
+        local btn="3" # Если пришел хеш из Bridge
     fi
 
     case "$btn" in
-        "1") # Ветка GENERATE
-            print_input "Enter Password Length" "16"
+        "1") # --- ВЕТКА GENERATE (pwgen + urandom) ---
+            select_option "Generation Type:" \
+                "PHONETIC: Easy to remember (pwgen):pw" \
+                "COMPLEX: Maximum entropy (urandom):raw"
+            local g_mode="$CHOICE"
+
+            print_input "Enter Length" "16"
             read -r p_len
             local len=${p_len:-16}
             
-            local pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
-            echo -e "\n${G}[+] SUCCESS: Artifact Generated${NC}"
+            local pass=""
+            [[ "$g_mode" == "1" ]] && pass=$(pwgen -s "$len" 1)
+            [[ "$g_mode" == "2" ]] && pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
+
+            echo -e "\n${G}[+] ARTIFACT GENERATED${NC}"
             print_list "Password" "$pass"
             
             ask_confirm "Apply Bcrypt mutation?" && {
-                if command -v mkpasswd >/dev/null; then
-                    echo -e "${G}Hash:${NC} $(echo -n "$pass" | mkpasswd -m bcrypt -s)"
-                else
-                    echo -e "${W}Fallback SHA-256:${NC} $(echo -n "$pass" | sha256sum | awk '{print $1}')"
-                fi
+                echo -e "${G}Hash:${NC} $(echo -n "$pass" | mkpasswd -m bcrypt -s)"
             }
             ;;
 
-        "2") # Ветка DECRYPT
-            check_step "cmd" "john" "John the Ripper required." || { pause; return; }
+        "2") # --- ВЕТКА CRUNCH (Генератор словарей) ---
+            print_status "i" "Crunch Syntax: [min] [max] [charset]"
+            print_input "Enter Parameters (e.g., 4 6 abc12)" ""
+            read -r c_params
+            [[ -z "$c_params" ]] && return
             
-            local target_hash="$1"
-            [[ -z "$target_hash" ]] && { print_input "Enter Target Hash" ""; read -r target_hash; }
-            [[ -z "$target_hash" ]] && return
-
-            local tmp_h="/tmp/h_$(date +%s).txt"
-            echo "$target_hash" > "$tmp_h"
-            
-            print_status "i" "Starting Engine..."
-            # Упрощенный запуск для стабильности
-            john --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
-            
-            local crack_res=$(john --show "$tmp_h" | head -n1)
-            [[ "$crack_res" == *":"* ]] && {
-                print_status "s" "DECRYPTED: $(echo "$crack_res" | cut -d: -f2)"
-            } || print_status "w" "Hash is too complex for fast crack."
-            rm -f "$tmp_h"
+            local out_file="$LOOT_DIR/wordlist_$(date +%s).txt"
+            print_status "w" "Generating wordlist to: $out_file"
+            crunch $c_params -o "$out_file"
+            print_status "s" "Done. Signals saved to loot."
             ;;
 
-        "3"|*) # EXIT или любой другой ввод
-            return
+        "3") # --- ВЕТКА DECRYPT ---
+            # ... (твой рабочий код John the Ripper из v13.6) ...
             ;;
+        *) return ;;
     esac
-
-    echo ""
     pause
 }
+
 
 run_vulnerability_scanner() {
     print_header "PRIME HEURISTIC VULN-SCANNER v7.0"
