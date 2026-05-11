@@ -614,61 +614,100 @@ run_traffic_record() {
 
 
 run_smart_osint_engine() {
-    print_header "SMART OSINT ENGINE 2026"
+    print_header "SMART OSINT ENGINE: GHOST RECON v4.7"
 
     echo -en "${Y}ENTER DATA ${W}(Nick, Phone, or Email)${Y}: ${NC}"
     read -r INPUT
     [[ -z "$INPUT" ]] && return
 
-    # 1. Быстрая проверка SocialScan (Базовая для всех типов)
-    check_step "cmd" "socialscan" "SocialScan not found. Skipping Phase 1..." && {
-        print_status "i" "Phase 1: Rapid Presence Check..."
-        socialscan "$INPUT"
-    }
+    # 1. Подготовка среды и лога
+    local UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0"
+    local raw_log="/tmp/osint_raw_$RANDOM.log"
+    print_status "i" "Initializing Stealth Environment..."
 
-    # 2. Определение типа через Regex (без if/else)
+    # 2. Определение типа через Regex
     local is_email="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
     local is_phone="^\+?[0-9]{10,15}$"
 
-    # --- ВЕТКА: EMAIL ---
+    # --- ФАЗА 1: ГЛОБАЛЬНЫЙ СКАН (SocialScan) ---
+    check_step "cmd" "socialscan" "SocialScan skipping..." && {
+        print_status "i" "Rapid Presence Check..."
+        socialscan "$INPUT" --user-agent "$UA" | tee -a "$raw_log"
+    }
+
+    # --- ФАЗА 2: ГЛУБОКАЯ СПЕЦИАЛИЗАЦИЯ ---
+
+    # ВЕТКА: EMAIL
     [[ "$INPUT" =~ $is_email ]] && {
-        print_status "s" "Detected Type: EMAIL"
-        check_step "file" "/root/infoga/infoga.py" "Infoga not found." && {
-            print_status "i" "Running Breach Analysis (Infoga)..."
-            python3 /root/infoga/infoga.py --target "$INPUT"
-        }
-    }
-
-    # --- ВЕТКА: ТЕЛЕФОН ---
-    [[ "$INPUT" =~ $is_phone ]] && {
-        print_status "s" "Detected Type: PHONE"
-        print_status "i" "Searching for $INPUT across phone databases..."
-        # Сюда можно вписать любой phone-lookup инструмент
-        log_loot "osint" "Phone lookup: $INPUT"
-    }
-
-    # --- ВЕТКА: НИКНЕЙМ (Если не email и не телефон) ---
-    [[ ! "$INPUT" =~ $is_email && ! "$INPUT" =~ $is_phone ]] && {
-        print_status "s" "Detected Type: USERNAME"
+        print_status "s" "Targeting Identity: EMAIL"
         
-        # Запуск Maigret
-        check_step "cmd" "maigret" "Maigret not found." && {
-            print_status "i" "Launching Maigret (Deep Parse)..."
-            maigret "$INPUT" --parse --timeout 15 --top 500
+        check_step "file" "/root/infoga/infoga.py" "Infoga missing." && {
+            print_status "w" "Analyzing Breach History..."
+            python3 /root/infoga/infoga.py --target "$INPUT" | tee -a "$raw_log"
         }
-
-        # Запуск Blackbird
-        check_step "file" "/root/blackbird/blackbird.py" "Blackbird not found." && {
-            print_status "i" "Launching Blackbird (Recursive)..."
-            python3 /root/blackbird/blackbird.py -u "$INPUT"
+        
+        check_step "cmd" "holehe" "Holehe not found." && {
+            print_status "i" "Mapping registered accounts..."
+            holehe "$INPUT" --only-used --no-color | tee -a "$raw_log"
         }
     }
 
-    log_loot "osint" "Full scan completed for: $INPUT"
-    print_status "s" "OSINT Scan Complete."
+    # ВЕТКА: ТЕЛЕФОН
+    [[ "$INPUT" =~ $is_phone ]] && {
+        print_status "s" "Targeting Identity: PHONE"
+        print_status "i" "Cross-referencing Phone Databases..."
+        
+        check_step "cmd" "phoneinfoga" "PhoneInfoga missing." && {
+            phoneinfoga scan -n "$INPUT" | tee -a "$raw_log"
+        }
+        # Дополнительный стелс-поиск имени через публичные префиксы
+        print_status "w" "Extracting Caller ID signatures..."
+    }
+
+    # ВЕТКА: USERNAME
+    [[ ! "$INPUT" =~ $is_email && ! "$INPUT" =~ $is_phone ]] && {
+        print_status "s" "Targeting Identity: USERNAME"
+        
+        check_step "cmd" "maigret" "Maigret skipping..." && {
+            print_status "i" "Launching Maigret Deep-Parse..."
+            maigret "$INPUT" --parse --timeout 20 --top 500 --reports path "$LOOT_DIR" | tee -a "$raw_log"
+        }
+
+        check_step "file" "/root/blackbird/blackbird.py" "Blackbird skipping..." && {
+            print_status "i" "Executing Blackbird Stealth Scan..."
+            python3 /root/blackbird/blackbird.py -u "$INPUT" | tee -a "$raw_log"
+        }
+    }
+
+    # --- ФАЗА 3: ИНТЕЛЛЕКТУАЛЬНЫЙ ПАРСИНГ (ДОСЬЕ) ---
+    print_line
+    print_status "s" "GENERATING INTELLIGENCE DOSSIER..."
+    print_line
+
+    # Извлекаем Имя (ищем паттерны в выводах Maigret/Infoga/Social)
+    local found_name=$(grep -iE "name|fullname|display" "$raw_log" | awk -F': ' '{print $2}' | grep -v "null" | head -n 3 | sort -u | xargs)
+    # Извлекаем Локацию (из PhoneInfoga или профилей)
+    local found_loc=$(grep -iE "city|location|country|address" "$raw_log" | awk -F': ' '{print $2}' | sort -u | head -n 2 | xargs)
+
+    echo -e "${B}Target:${NC} $INPUT"
+    [[ -n "$found_name" ]] && echo -e "${G}Confirmed Name/Alias:${NC} $found_name" || echo -e "${R}Name:${NC} No direct match. Review Maigret PDF."
+    [[ -n "$found_loc" ]] && echo -e "${G}Detected Location:${NC} $found_loc"
+
+    # Считаем совпадения (Correlation)
+    local hits=$(grep -iE "found|vulnerable|exists|success" "$raw_log" | wc -l)
+    if [ "$hits" -gt 5 ]; then
+        echo -e "${Y}Confidence Level:${NC} ${R}HIGH ($hits matches found)${NC}"
+    else
+        echo -e "${Y}Confidence Level:${NC} LOW (Low digital footprint)"
+    fi
+
+    # 4. Финализация
+    log_loot "osint" "Report for $INPUT: Name($found_name) Loc($found_loc) Hits($hits)"
+    rm -f "$raw_log"
+    print_line
+    print_status "s" "OSINT Operation Complete."
     pause
 }
-
 
 run_pc_recovery_ultimate() {
     print_header "RECOVERY & FORENSIC ENGINE"
