@@ -94,33 +94,73 @@ exit_script() {
 
 show_progress() {
     local duration=$1
-    local message=${2:-"Processing"}
-    local col=$(tput cols 2>/dev/null || echo 40) # Резервное значение, если tput нет
-    local width=$(( col - 25 ))
-    [[ $width -lt 10 ]] && width=20 # Защита для узких экранов
+    local message=${2:-"SYNCHRONIZING CORE-PRIME LOOP"}
     
-    echo -ne "${Y}[*] ${message}${NC}\n"
-    echo -ne " Progress: ["
+    # 1. Адаптивность и защита от узких экранов (Termux/Mobile)
+    local col=$(tput cols 2>/dev/null || echo 60)
+    local width=$(( col - 35 ))
+    [[ $width -lt 15 ]] && width=25 # Защита: минимум 15 символов ширины бара
     
-    # Рисуем пустую шкалу
-    for ((i=0; i<width; i++)); do echo -ne " "; done
-    echo -ne "] 0%"
-    
-    # Возвращаемся в начало строки для заполнения
-    echo -ne "\r Progress: ["
-    
+    # Расчет времени без bc (живучесть)
+    [[ $duration -eq 0 ]] && duration=1
+    local delay=$(echo "$duration / $width" | bc -l 2>/dev/null)
+    # Если bc нет, используем безопасный резерв
+    if [[ -z "$delay" || "$delay" == "0" ]]; then
+        delay="0.05"
+    fi
+
+    # Цветовая карта для профессионального градиента (Yellow -> Cyan -> Green)
+    local c_low='\033[38;5;220m'  # Ярко-желтый
+    local c_mid='\033[38;5;39m'   # Небесно-голубой
+    local c_high='\033[38;5;82m'  # Салатовый
+    local c_head='\033[1;37m'     # Белый (голова)
+    local c_dim='\033[38;5;240m'  # Серый (фон)
+
+    # Заголовок задачи (Чисто и аккуратно)
+    echo -e "${Y}❯ ${message}${NC}"
+    echo -ne " ${c_dim}Status:${NC} ${Y}[ "
+
+    # 2. Основной цикл рендеринга (Плавность и градиент)
     for ((i=1; i<=width; i++)); do
         local percent=$(( i * 100 / width ))
-        echo -ne "▓"
-        # Простой расчет задержки без bc
-        sleep 0.1 # Фиксированная скорость или расчет: sleep $(( duration / width ))
-        echo -ne "\r Progress: ["
-        for ((j=0; j<i; j++)); do echo -ne "▓"; done
-        for ((j=i; j<width; j++)); do echo -ne " "; done
-        echo -ne "] ${percent}%"
+        
+        # Динамический выбор цвета в зависимости от прогресса
+        local current_color="$c_low"
+        if [[ $percent -gt 40 ]]; then current_color="$c_mid"; fi
+        if [[ $percent -gt 85 ]]; then current_color="$c_high"; fi
+        
+        # Отрисовка тела (градиент)
+        for ((j=1; j<i; j++)); do
+            # Уникальный выбор символа: тень -> блок -> стрелка
+            # Тело делаем из сплошного блока для мощности
+            echo -ne "${current_color}█${NC}"
+        done
+        
+        # Отрисовка головы (направленный Pipe style, белый акцент)
+        if [[ $percent -lt 100 ]]; then
+            echo -ne "${c_head}❯${NC}"
+        else
+            echo -ne "${current_color}█${NC}" # В конце голова становится телом
+        fi
+        
+        # Отрисовка пустоты (Серый фон для читаемости)
+        for ((j=i; j<width; j++)); do
+            echo -ne "${c_dim}░${NC}"
+        
+        done
+        
+        # Вывод процентов и возврат каретки (\r)
+        echo -ne " ] ${current_color}${percent}%${NC}\r"
+        
+        # Плавная задержка (расчетная)
+        sleep $delay
     done
-    echo -e "\n${G}[+] Task Synchronized.${NC}\n"
+    
+    # 3. Финализация (Чистый выход)
+    # Убираем каретку, чтобы следующий вывод не накладывался
+    echo -e "\n${G}✔️ CORE LOOP SECURED.${NC}\n"
 }
+
 
 
 # --- Универсальный динамический контроллер ---
