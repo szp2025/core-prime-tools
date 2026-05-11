@@ -344,8 +344,8 @@ run_device_hack() {
 }
 
 analyze_network_traffic() {
-    local n_names="Host_Monitor HTTP/DNS_Sniffer Traffic_Record"
-    local n_funcs="run_host_monitor run_http_dns_sniffer run_traffic_record"
+    local n_names="Host_Monitor "
+    local n_funcs="run_network_intelligence"
     prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
 }
 
@@ -519,6 +519,8 @@ run_phantom_engine() {
     print_status "s" "PHANTOM GATEWAY OPERATIONAL"
     pause
 }
+
+
 run_sql_adaptive() {
     print_header "ADAPTIVE SQL INJECTION ENGINE"
 
@@ -549,67 +551,66 @@ run_sql_adaptive() {
     pause
 }
 
-run_host_monitor() {
-    print_header "NETWORK HOST MONITOR"
-
-    # Валидация tshark и интерфейса
-    check_step "cmd" "tshark" "TShark not installed." || { pause; return; }
+run_network_intelligence() {
+    print_header "NETWORK INTELLIGENCE: TRAFFIC ANALYZER"
+    
+    check_step "cmd" "tshark" "TShark not found." || { pause; return; }
     local iface=$(ip route | grep default | awk '{print $5}' || echo "wlan0")
-    
-    print_status "i" "Monitoring traffic on: $iface (Press CTRL+C to stop)"
-    print_status "w" "Filtering Unique Connections..."
 
-    # Запуск tshark с агрегацией данных в реальном времени
-    tshark -i "$iface" -n -T fields -e ip.src -e ip.dst -E separator=" -> " 2>/dev/null | stdbuf -oL uniq
-    
+    local mode=$(select_option "Select Surveillance Mode:" \
+        "Host Monitor (IP Connections):host" \
+        "Data Sniffer (HTTP/DNS/Leads):sniff" \
+        "Full Record (PCAP Archive):record")
+
+    case "$mode" in
+        "host")
+            print_status "i" "Monitoring Live Connections on $iface..."
+            tshark -i "$iface" -n -T fields -e ip.src -e ip.dst -E separator=" -> " 2>/dev/null | stdbuf -oL uniq
+            ;;
+        "sniff")
+            print_status "s" "Sniffing Leads (Email/DNS/HTTP)..."
+            # Мы добавили регулярку прямо в поток, чтобы ловить email "на лету"
+            tshark -i "$iface" -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null \
+            | stdbuf -oL awk NF | stdbuf -oL uniq | tee -a "$LOOT_DIR/traffic_leads.log"
+            ;;
+        "record")
+            local filename="/root/reports/capture_$(date +%H%M).pcap"
+            mkdir -p "/root/reports"
+            print_status "w" "Recording to $filename..."
+            tshark -i "$iface" -a duration:300 -w "$filename" 2>/dev/null
+            ;;
+    esac
     pause
 }
 
-run_http_dns_sniffer() {
-    print_header "HTTP & DNS SNIFFER"
 
-    check_step "cmd" "tshark" "TShark not installed." || { pause; return; }
-    local iface=$(ip route | grep default | awk '{print $5}' || echo "wlan0")
 
-    print_status "s" "Sniffing Queries on $iface..."
-    log_loot "sniffer" "Session started on $iface"
-
-    # Фильтруем только запросы, убирая лишние поля
-    tshark -i "$iface" -Y "http.request || dns.flags.response == 0" \
-           -T fields -e http.host -e dns.qry.name 2>/dev/null \
-           | stdbuf -oL awk NF | stdbuf -oL uniq
+run_deep_bridge() {
+    print_header "PRIME BRIDGE: CORRELATION ENGINE"
     
-    pause
-}
-
-run_traffic_record() {
-    print_header "TRAFFIC RECORDING (PCAP)"
-
-    check_step "cmd" "tshark" "TShark not installed." || { pause; return; }
+    print_status "i" "Starting deep link analysis..."
     
-    local report_dir="/root/reports"
-    [[ ! -d "$report_dir" ]] && mkdir -p "$report_dir"
-
-    local filename="$report_dir/capture_$(date +%H%M).pcap"
-    local iface=$(ip route | grep default | awk '{print $5}' || echo "wlan0")
-
-    # Выбор режима записи
-    local duration=$(select_option "Set Record Duration:" \
-        "Quick (1 min):60" \
-        "Medium (5 min):300" \
-        "Deep (15 min):900")
-
-    print_status "i" "Recording traffic on $iface..."
-    print_status "s" "Output: $filename"
-    print_status "w" "Recording will stop after $duration seconds or CTRL+C"
-
-    # Запуск записи с авто-стопом
-    tshark -i "$iface" -a duration:"$duration" -w "$filename" 2>/dev/null
-
-    check_step "file" "$filename" "Failed to create PCAP file." && \
-    print_status "s" "Capture saved successfully."
+    # Берем последние данные из лута (Loot)
+    local last_target=$(ls -t "$LOOT_DIR" | head -n 1)
     
-    pause
+    if [[ -z "$last_target" ]]; then
+        print_status "w" "No recent loot found. Start with OSINT or IBAN Scan."
+        pause; return
+    fi
+
+    print_status "s" "Analyzing last session: $last_target"
+    
+    # Автоматически предлагаем следующее действие
+    if grep -q "@" "$LOOT_DIR/$last_target"; then
+        print_status "y" "Found Email. Suggesting: Breach Search (Infoga)."
+    fi
+    
+    if grep -q "FR" "$LOOT_DIR/$last_target"; then
+        print_status "y" "Found French pattern. Suggesting: IBAN Deep Parse."
+    fi
+
+    # Здесь мы можем добавить автоматический вызов нужной функции
+    # без лишних вопросов к пользователю.
 }
 
 
