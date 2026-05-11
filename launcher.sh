@@ -1232,7 +1232,7 @@ run_vulnerability_scanner() {
         echo "$sql_engine" | grep -q "active" && {
             # Здесь можно добавить вывод, но в фоне он пойдет в лог
             sqlmap -u "$target" --batch --random-agent --delay="$stealth_delay" \
-                   --check-waf --threads=1 >> "$results_file" 2>&1
+                  --threads=1 >> "$results_file" 2>&1
         }
     ) &
 
