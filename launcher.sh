@@ -991,9 +991,11 @@ run_smart_osint_engine() {
 }
 
 run_pc_recovery_ultimate() {
+    # Очистка экрана и заголовок в твоем стиле
+    clear
     print_header "RECOVERY & FORENSIC ENGINE"
 
-    # 1. Основное меню (используем твой стандартный селектор)
+    # 1. Основное меню (используем прямую передачу аргументов)
     local action=$(select_option "Select Forensic Action:" \
         "Passwords Extraction (LaZagne):extraction" \
         "Smart Password Reset (Win/Lin/Mac):reset" \
@@ -1003,7 +1005,7 @@ run_pc_recovery_ultimate() {
         "extraction")
             local lz_path="/root/lazagne/lazagne.py"
             if [[ -f "$lz_path" ]]; then
-                show_progress 2 "INITIATING LAZAGNE ENGINE" # Твой новый прогресс-бар
+                show_progress 2 "INITIATING LAZAGNE ENGINE"
                 print_status "i" "Running Extraction..."
                 python3 "$lz_path" all -oN /root/prime_loot/passwords.txt
                 log_loot "forensic" "Dumped to /root/prime_loot/passwords.txt"
@@ -1021,19 +1023,17 @@ run_pc_recovery_ultimate() {
             
             if [[ -n "$win_sam" ]]; then
                 print_status "s" "Windows SAM detected: $win_sam"
-                # Проверка наличия chntpw перед запуском
                 if command -v chntpw >/dev/null 2>&1; then
                     chntpw -i "$win_sam"
                 else
-                    print_status "e" "CHNTPW not installed. Run: apt install chntpw"
+                    print_status "e" "CHNTPW not installed."
                 fi
             else
-                # Блок для Unix-систем
+                # Блок Unix (Linux/macOS)
                 local os_type="Linux"
                 [[ "$OSTYPE" == "darwin"* ]] && os_type="macOS"
                 print_status "i" "OS: $os_type detected."
 
-                # Сбор пользователей
                 local users
                 if [[ "$os_type" == "macOS" ]]; then
                     users=$(dscl . list /Users | grep -v '^_\|root')
@@ -1044,20 +1044,20 @@ run_pc_recovery_ultimate() {
                 if [[ -z "$users" ]]; then
                     print_status "e" "No local users found."
                 else
-                    # ФИКС СЕЛЕКТА: Правильное формирование массива для твоей функции
-                    local user_menu=()
+                    # --- ИСПРАВЛЕННЫЙ СЕЛЕКТОР ПОЛЬЗОВАТЕЛЕЙ ---
+                    local user_menu=""
                     for u in $users; do
-                        user_menu+=("$u:$u")
+                        user_menu+="$u:$u " # Формируем строку аргументов
                     done
                     
-                    # Передаем массив правильно через "${user_menu[@]}"
-                    local target_user=$(select_option "Select Target User:" "${user_menu[@]}")
+                    # Передаем через eval или прямой список для надежности select_option
+                    local target_user=$(select_option "Select Target User:" $user_menu)
                     
                     if [[ -n "$target_user" && "$target_user" != "exit" ]]; then
                         if [[ "$os_type" == "Linux" ]]; then
                             print_status "!" "Wiping password for $target_user..."
                             sed -i "s/^$target_user:[^:]*:/$target_user::/" /etc/shadow
-                            print_status "s" "Linux password wiped (Empty login allowed)."
+                            print_status "s" "Linux password wiped."
                         elif [[ "$os_type" == "macOS" ]]; then
                             echo -en "${Y}Enter New Password: ${NC}"; read -r np
                             sudo dscl . -passwd /Users/"$target_user" "$np"
@@ -1067,8 +1067,9 @@ run_pc_recovery_ultimate() {
                 fi
             fi
             ;;
-        *) return ;;
+        "exit"|*) return ;;
     esac
+
     pause
 }
 
