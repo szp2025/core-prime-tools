@@ -997,53 +997,38 @@ run_pass_lab() {
     print_header "PRIME PASSWORD LABORATORY v13.6"
     echo ""
 
-    # --- СЛОЙ 1: ВЫБОР ВЕКТОРА ---
-    local mode=""
-    
     if [[ -z "$1" ]]; then
-        # Вызываем нашу функцию, которая пишет результат в CHOICE
         select_option "Select Operation Mode:" \
-            "GENERATE: Create Secure Sequence:gen" \
-            "DECRYPT: Generative Hash Cracking:dec" \
-            "EXIT: Return to Main Menu:exit"
-        mode="$CHOICE"
+            "GENERATE: Create Secure Sequence" \
+            "DECRYPT: Generative Hash Cracking" \
+            "EXIT: Return to Main Menu"
+        
+        local btn="$CHOICE"
     else
-        mode="dec"
+        local btn="2" # Если пришел аргумент, имитируем нажатие "2"
     fi
-    
-    # Отладочная проверка (если пусто - выходим)
-    [[ -z "$mode" || "$mode" == "exit" ]] && return
 
-    # --- СЛОЙ 2: ОБРАБОТКА ВЫБОРА (Через Case для надежности) ---
-    case "$mode" in
-        "gen")
+    case "$btn" in
+        "1") # Ветка GENERATE
             print_input "Enter Password Length" "16"
             read -r p_len
             local len=${p_len:-16}
             
-            # Генерация
             local pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
-            
-            echo -e "\n${Y}--- RESULT ---${NC}"
-            print_list "Generated Artifact" "$pass"
-            echo -e "${Y}--------------${NC}\n"
+            echo -e "\n${G}[+] SUCCESS: Artifact Generated${NC}"
+            print_list "Password" "$pass"
             
             ask_confirm "Apply Bcrypt mutation?" && {
-                print_status "i" "Computing hash..."
-                # Проверяем наличие mkpasswd или используем openssl как fallback
                 if command -v mkpasswd >/dev/null; then
-                    local h_res=$(echo -n "$pass" | mkpasswd -m bcrypt -s)
-                    echo -e "${G}Bcrypt Hash:${NC} $h_res"
+                    echo -e "${G}Hash:${NC} $(echo -n "$pass" | mkpasswd -m bcrypt -s)"
                 else
-                    print_status "w" "mkpasswd not found. Using SHA-256 fallback:"
-                    echo -n "$pass" | sha256sum | awk '{print $1}'
+                    echo -e "${W}Fallback SHA-256:${NC} $(echo -n "$pass" | sha256sum | awk '{print $1}')"
                 fi
-                log_loot "pass_lab" "Generated $len chars + Hash"
             }
             ;;
 
-        "dec")
-            check_step "cmd" "john" "John the Ripper is required." || { pause; return; }
+        "2") # Ветка DECRYPT
+            check_step "cmd" "john" "John the Ripper required." || { pause; return; }
             
             local target_hash="$1"
             [[ -z "$target_hash" ]] && { print_input "Enter Target Hash" ""; read -r target_hash; }
@@ -1052,21 +1037,19 @@ run_pass_lab() {
             local tmp_h="/tmp/h_$(date +%s).txt"
             echo "$target_hash" > "$tmp_h"
             
-            print_status "i" "Starting Hybrid Attack..."
-            local sig=$(echo "$target_hash" | cut -c1-5)
-            local john_fmt=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1)
+            print_status "i" "Starting Engine..."
+            # Упрощенный запуск для стабильности
+            john --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
             
-            # Запуск John
-            john --format=${john_fmt:-"auto"} --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
-
             local crack_res=$(john --show "$tmp_h" | head -n1)
             [[ "$crack_res" == *":"* ]] && {
-                local plain=$(echo "$crack_res" | cut -d: -f2)
-                print_status "s" "DECRYPTED: $plain"
-                log_loot "pass_lab" "SUCCESS: $target_hash -> $plain"
-            } || print_status "i" "Complexity High. Hash saved to background process."
-            
+                print_status "s" "DECRYPTED: $(echo "$crack_res" | cut -d: -f2)"
+            } || print_status "w" "Hash is too complex for fast crack."
             rm -f "$tmp_h"
+            ;;
+
+        "3"|*) # EXIT или любой другой ввод
+            return
             ;;
     esac
 
