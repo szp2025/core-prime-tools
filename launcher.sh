@@ -957,59 +957,66 @@ run_cert_forge() {
 }
 
 run_vulnerability_scanner() {
-    print_header "PRIME HEURISTIC VULN-SCANNER"
+    print_header "PRIME HEURISTIC VULN-SCANNER v7.0"
 
     echo -en "${Y}Enter Target Domain/URL: ${NC}"
     read -r target
     [[ -z "$target" ]] && return
 
-    # 1. Быстрая разведка (Порты) - Скрытый режим
-    print_status "i" "Phase 1: Deep Port & Service Discovery..."
-    # Используем -F для скорости и минимального шума
-    local open_ports=$(nmap -T4 -F "$target" | grep "open" | awk '{print $1}' | xargs)
+    local results_file="$LOOT_DIR/vuln_$(date +%s).log"
+    local signals_file="/tmp/signals_$RANDOM.tmp"
     
-    # 2. Поиск веб-уязвимостей (Heuristic Engine)
-    print_status "i" "Phase 2: Analyzing Web Architecture..."
+    # --- СЛОЙ 1: ПАССИВНЫЙ ГЕНЕРАТОР СИГНАЛОВ (Passive Ingestion) ---
+    print_status "i" "Ingesting target aura (Passive Mode)..."
     
-    local results_file="$LOOT_DIR/vuln_report_$(date +%s).log"
-    
-    # Запускаем фоновый процесс с адаптивными параметрами стелса
+    # Собираем заголовки, DNS-записи и мета-данные в один поток
     {
-        echo "=== VULNERABILITY REPORT FOR $target ==="
-        echo "Scan Date: $(date)"
-        echo "Open Ports: $open_ports"
-        echo "---------------------------------------"
-        
-        # Интеграция с адаптивным движком: 
-        # --tamper: обфускация запросов
-        # --delay: паузы между запросами (имитация человека)
-        # --random-agent: подмена браузера
-        print_status "w" "Testing SQLi paths (Stealth Mode)..."
-        sqlmap -u "$target" --batch --crawl=2 --level=1 --risk=1 --forms \
-               --identify-waf --tamper=between,randomcase,space2comment \
-               --delay=$(shuf -i 1-3 -n 1) --random-agent >> "$results_file" 2>&1
-        
-        # Скрытый фуззинг директорий через имитацию обычного GET-запроса
-        print_status "w" "Fuzzing sensitive directories..."
-        # Здесь можно добавить логику тихой проверки /admin, /config и т.д.
+        curl -Is --connect-timeout 5 -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" "$target"
+        host -t txt "$target" 
+        whois "$target" | grep -iE "city|country|orgname"
+    } > "$signals_file" 2>&1
+
+    # --- СЛОЙ 2: АДАПТИВНАЯ МАТРИЦА ПАРАМЕТРОВ (No-IF Logic) ---
+    # Мы используем математический расчет интенсивности на основе "шума" в сигналах
+    local entropy_level=$(wc -c < "$signals_file")
+    local stealth_delay=$(( (entropy_level % 5) + 2 )) # Динамическая пауза на основе размера ответа
+    
+    # Формируем боевой пресет через grep-активаторы
+    local sql_engine=$(grep -qiE "php|db|sql|id=" "$signals_file" && echo "active" || echo "dormant")
+    local scan_intensity=$(grep -qiE "cloudflare|akamai|sucuri" "$signals_file" && echo "-T1 --spoof-mac 0" || echo "-T3")
+
+    # --- СЛОЙ 3: ЦИКЛ АМОРФНОГО ИСПОЛНЕНИЯ ---
+    print_status "s" "Deploying Ghost-Engine (Adaptive Intensity: $stealth_delay)..."
+
+    {
+        # 1. Порты (Мимикрия под сетевой шум)
+        nmap $scan_intensity -n -Pn --version-intensity 0 "$target" 2>/dev/null
+
+        # 2. Инъекции (Только если сигнал "active")
+        # Вместо IF используем логическое И (&&), которое просто не сработает при "dormant"
+        echo "$sql_engine" | grep -q "active" && {
+            print_status "w" "Signal 'Active' detected. Mutating payloads..."
+            sqlmap -u "$target" --batch --random-agent --delay="$stealth_delay" \
+                   --tamper="between,randomcase,space2comment,versionedmorekeywords" \
+                   --check-waf --threads=1 >> "$results_file" 2>&1
+        }
     } &
 
-    # Анимация ожидания (твоя фирменная фишка)
-    show_progress 10 "Scanning for vulnerabilities..."
-    
-    # 3. Вывод результатов (Интеллектуальный парсинг)
-    print_status "s" "Scan Complete! Results saved to Loot."
-    
+    show_progress 15 "Processing heuristic feedback loops..."
+
+    # --- СЛОЙ 4: ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТЕЗ (The Result) ---
     print_line
-    echo -e "${R}DETECTED VULNERABILITIES:${NC}"
-    # Парсим лог на наличие подтвержденных дыр
-    if grep -qi "critical\|vulnerable\|sqlmap identified" "$results_file"; then
-        grep -Ei "Type:|Payload:|Parameter:|Title:" "$results_file" | sort -u
-    else
-        print_status "i" "No high-risk vulnerabilities found. Target is sterile."
-    fi
-    print_line
+    print_status "s" "INTELLIGENCE SYNTHESIS COMPLETE"
     
+    # Эвристический парсинг: выводим только те аномалии, которые имеют высокий "вес"
+    grep -Ei "critical|vulnerable|payload|exploit|dbms" "$results_file" | \
+    sed -r 's/(.*vulnerable.*)/\1 \o033[5m[HIGH PRIORITY]\o033[0m/' | sort -u
+
+    # Авто-интеграция в мост без условий
+    echo "SIGNAL_ORIGIN: $target | STRENGTH: $entropy_level | SCAN_LOG: $results_file" >> "$LOOT_DIR/bridge_signals.log"
+    
+    rm -f "$signals_file"
+    print_line
     pause
 }
 
