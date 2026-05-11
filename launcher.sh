@@ -592,55 +592,57 @@ run_network_intelligence() {
 }
 
 run_deep_bridge() {
-    print_header "PRIME BRIDGE: CORRELATION ENGINE"
+    print_header "PRIME BRIDGE: HEURISTIC INTELLIGENCE"
     
-    # 1. Сбор источников: последний лут + свежий трафик
-    local last_loot=$(ls -t "$LOOT_DIR" 2>/dev/null | head -n 1)
-    local traffic_log="$LOOT_DIR/traffic_leads.log"
     local combined_data="/tmp/bridge_pool.tmp"
+    cat "$LOOT_DIR"/* "$LOOT_DIR/traffic_leads.log" 2>/dev/null > "$combined_data"
     
-    print_status "i" "Pooling intelligence from loot and network leads..."
-    cat "$LOOT_DIR/$last_loot" "$traffic_log" 2>/dev/null > "$combined_data"
+    [[ ! -s "$combined_data" ]] && { print_status "w" "No intelligence signals detected."; pause; return; }
 
-    [[ ! -s "$combined_data" ]] && { print_status "w" "Intelligence pool empty."; pause; return; }
+    print_status "i" "Running Heuristic Analysis on $(wc -l < "$combined_data") signals..."
 
-    # 2. Адаптивная матрица действий (заменяем if на grep-активацию)
-    # Формат: "Паттерн:Описание:Функция"
-    local matrix=(
-        "@[A-Za-z0-9]:EMAIL DETECTED:run_smart_osint_engine"
-        "FR[0-9]\{2\}:FRENCH BANKING PATTERN:run_iban_analyzer"
-        "\$2[ayb]\$:BCRYPT HASH DETECTED:run_prime_decryptor"
-        "\.onion:DARK WEB LINK DETECTED:run_onion_scanner"
-    )
+    # Эвристический перебор всех строк
+    while read -r line; do
+        # 1. Анализ энтропии и формата (без жесткой матрицы)
+        case "${#line}" in
+            32|40|64) # Длины MD5, SHA1, SHA256
+                print_status "y" "SIGNAL: High-entropy string detected (${#line} chars). Possible HASH."
+                suggest_action "run_prime_decryptor" "$line"
+                ;;
+            27|34) # Стандарты IBAN
+                [[ "$line" =~ ^[A-Z]{2} ]] && {
+                    print_status "y" "SIGNAL: International banking format detected."
+                    suggest_action "run_iban_analyzer" "$line"
+                }
+                ;;
+        esac
 
-    print_status "s" "Analyzing correlation matrix..."
-    
-    for entry in "${matrix[@]}"; do
-        local pattern=$(echo "$entry" | cut -d: -f1)
-        local desc=$(echo "$entry" | cut -d: -f2)
-        local func=$(echo "$entry" | cut -d: -f3)
-
-        grep -q "$pattern" "$combined_data" && {
-            print_status "y" "CORRELATION: $desc"
-            
-            # Авто-предложение или переход
-            echo -en "${B}Execute linked module ${W}($func)${B}? (y/n): ${NC}"
-            read -n 1 -r; echo
-            [[ $REPLY =~ ^[Yy]$ ]] && $func
+        # 2. Семантический поиск (Ключевые маркеры будущего)
+        echo "$line" | grep -qiE "pass|secret|key|token|auth" && {
+            print_status "w" "SIGNAL: Identity credentials detected in stream."
+            suggest_action "run_prime_decryptor" "$line"
         }
-    done
 
-    # 3. Вектор DARK WEB (Ahmia/Torch Search)
-    grep -qE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+" "$combined_data" && {
-        print_status "w" "Preparing Onion-Leaking check for detected identities..."
-        # Здесь мы в будущем добавим: curl --socks5-hostname localhost:9050 ...
-        log_loot "darkweb" "Target identity queued for Tor-search."
-    }
+        # 3. Onion/Deep Web детекция
+        [[ "$line" == *".onion"* ]] && {
+            print_status "r" "SIGNAL: Dark Web gateway identified."
+            # Здесь будет твой будущий Onion-модуль
+        }
+
+    done < <(sort -u "$combined_data" | grep -v '^$')
 
     rm -f "$combined_data"
     pause
 }
 
+# Вспомогательная функция для эвристики
+suggest_action() {
+    local func=$1
+    local data=$2
+    echo -en "${B}>>> Intelligence suggests ${W}$func${B} for data: ${Y}${data:0:15}...${NC} Execute? (y/n): "
+    read -n 1 -r; echo
+    [[ $REPLY =~ ^[Yy]$ ]] && $func "$data"
+}
 
 run_smart_osint_engine() {
     print_header "SMART OSINT ENGINE: GHOST RECON v4.7"
