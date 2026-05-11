@@ -1006,65 +1006,82 @@ run_pass_lab() {
     echo ""
 
     # --- СЛОЙ 1: ВЫБОР ВЕКТОРА ---
-    local mode="dec"
+    local mode=""
+    
     if [[ -z "$1" ]]; then
-        # Вызываем функцию напрямую
+        # Вызываем нашу функцию, которая пишет результат в CHOICE
         select_option "Select Operation Mode:" \
             "GENERATE: Create Secure Sequence:gen" \
             "DECRYPT: Generative Hash Cracking:dec" \
             "EXIT: Return to Main Menu:exit"
         mode="$CHOICE"
+    else
+        mode="dec"
     fi
     
-    [[ "$mode" == "exit" || -z "$mode" ]] && return
+    # Отладочная проверка (если пусто - выходим)
+    [[ -z "$mode" || "$mode" == "exit" ]] && return
 
-    # --- СЛОЙ 2: ВЕТКА ГЕНЕРАЦИИ (gen) ---
-    [[ "$mode" == "gen" ]] && {
-        print_input "Enter Password Length" "16"
-        read -r p_len
-        local len=${p_len:-16}
-        
-        local pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
-        print_line
-        print_list "Generated Artifact" "$pass"
-        print_line
-        
-        ask_confirm "Apply Bcrypt mutation?" && {
-            local h_res=$(echo -n "$pass" | mkpasswd -m bcrypt -s 2>/dev/null || echo "ERROR: Install 'whois'")
-            echo -e "${G}Hash:${NC} $h_res"
-            log_loot "pass_lab" "Generated $len chars + Bcrypt"
-        }
-    }
+    # --- СЛОЙ 2: ОБРАБОТКА ВЫБОРА (Через Case для надежности) ---
+    case "$mode" in
+        "gen")
+            print_input "Enter Password Length" "16"
+            read -r p_len
+            local len=${p_len:-16}
+            
+            # Генерация
+            local pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
+            
+            echo -e "\n${Y}--- RESULT ---${NC}"
+            print_list "Generated Artifact" "$pass"
+            echo -e "${Y}--------------${NC}\n"
+            
+            ask_confirm "Apply Bcrypt mutation?" && {
+                print_status "i" "Computing hash..."
+                # Проверяем наличие mkpasswd или используем openssl как fallback
+                if command -v mkpasswd >/dev/null; then
+                    local h_res=$(echo -n "$pass" | mkpasswd -m bcrypt -s)
+                    echo -e "${G}Bcrypt Hash:${NC} $h_res"
+                else
+                    print_status "w" "mkpasswd not found. Using SHA-256 fallback:"
+                    echo -n "$pass" | sha256sum | awk '{print $1}'
+                fi
+                log_loot "pass_lab" "Generated $len chars + Hash"
+            }
+            ;;
 
-    # --- СЛОЙ 3: ВЕТКА ДЕШИФРОВКИ (dec) ---
-    [[ "$mode" == "dec" ]] && {
-        check_step "cmd" "john" "John the Ripper is required." || return
-        
-        local target_hash="$1"
-        [[ -z "$target_hash" ]] && { print_input "Enter Target Hash" ""; read -r target_hash; }
-        [[ -z "$target_hash" ]] && return
+        "dec")
+            check_step "cmd" "john" "John the Ripper is required." || { pause; return; }
+            
+            local target_hash="$1"
+            [[ -z "$target_hash" ]] && { print_input "Enter Target Hash" ""; read -r target_hash; }
+            [[ -z "$target_hash" ]] && return
 
-        local tmp_h="/tmp/h_$(date +%s).txt"
-        echo "$target_hash" > "$tmp_h"
-        
-        print_status "i" "Starting Hybrid Attack..."
-        local sig=$(echo "$target_hash" | cut -c1-5)
-        local john_fmt=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1)
-        
-        john --format=${john_fmt:-"auto"} --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
+            local tmp_h="/tmp/h_$(date +%s).txt"
+            echo "$target_hash" > "$tmp_h"
+            
+            print_status "i" "Starting Hybrid Attack..."
+            local sig=$(echo "$target_hash" | cut -c1-5)
+            local john_fmt=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1)
+            
+            # Запуск John
+            john --format=${john_fmt:-"auto"} --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
 
-        local crack_res=$(john --show "$tmp_h" | head -n1)
-        [[ "$crack_res" == *":"* ]] && {
-            local plain=$(echo "$crack_res" | cut -d: -f2)
-            print_status "s" "DECRYPTED: $plain"
-            log_loot "pass_lab" "SUCCESS: $target_hash -> $plain"
-        } || print_status "i" "Task moved to background."
-        
-        rm -f "$tmp_h"
-    }
+            local crack_res=$(john --show "$tmp_h" | head -n1)
+            [[ "$crack_res" == *":"* ]] && {
+                local plain=$(echo "$crack_res" | cut -d: -f2)
+                print_status "s" "DECRYPTED: $plain"
+                log_loot "pass_lab" "SUCCESS: $target_hash -> $plain"
+            } || print_status "i" "Complexity High. Hash saved to background process."
+            
+            rm -f "$tmp_h"
+            ;;
+    esac
 
+    echo ""
     pause
 }
+
 run_vulnerability_scanner() {
     print_header "PRIME HEURISTIC VULN-SCANNER v7.0"
 
