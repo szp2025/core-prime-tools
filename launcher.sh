@@ -554,63 +554,91 @@ run_sql_adaptive() {
 run_network_intelligence() {
     print_header "NETWORK INTELLIGENCE: TRAFFIC ANALYZER"
     
+    # Авто-определение активного интерфейса (без лишних вопросов)
     check_step "cmd" "tshark" "TShark not found." || { pause; return; }
-    local iface=$(ip route | grep default | awk '{print $5}' || echo "wlan0")
+    local iface=$(ip route | grep default | awk '{print $5}' || echo "eth0")
 
+    # Универсальный переключатель режимов
     local mode=$(select_option "Select Surveillance Mode:" \
         "Host Monitor (IP Connections):host" \
-        "Data Sniffer (HTTP/DNS/Leads):sniff" \
-        "Full Record (PCAP Archive):record")
+        "Data Sniffer (Live Leads):sniff" \
+        "Traffic Record (PCAP Archive):record")
 
     case "$mode" in
         "host")
             print_status "i" "Monitoring Live Connections on $iface..."
+            # Вывод уникальных пар IP в реальном времени
             tshark -i "$iface" -n -T fields -e ip.src -e ip.dst -E separator=" -> " 2>/dev/null | stdbuf -oL uniq
             ;;
         "sniff")
             print_status "s" "Sniffing Leads (Email/DNS/HTTP)..."
-            # Мы добавили регулярку прямо в поток, чтобы ловить email "на лету"
+            # Перехват доменов и потенциальных email-следов с записью в лог для Моста
             tshark -i "$iface" -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null \
             | stdbuf -oL awk NF | stdbuf -oL uniq | tee -a "$LOOT_DIR/traffic_leads.log"
             ;;
         "record")
-            local filename="/root/reports/capture_$(date +%H%M).pcap"
-            mkdir -p "/root/reports"
-            print_status "w" "Recording to $filename..."
-            tshark -i "$iface" -a duration:300 -w "$filename" 2>/dev/null
+            local report_dir="/root/reports"
+            mkdir -p "$report_dir"
+            local filename="$report_dir/capture_$(date +%H%M).pcap"
+            
+            local duration=$(select_option "Set Record Duration:" "1 min:60" "5 min:300" "15 min:900")
+            
+            print_status "w" "Recording to $filename ($duration sec)..."
+            tshark -i "$iface" -a duration:"$duration" -w "$filename" 2>/dev/null
+            [[ -f "$filename" ]] && print_status "s" "Capture saved to reports."
             ;;
     esac
     pause
 }
 
-
-
 run_deep_bridge() {
     print_header "PRIME BRIDGE: CORRELATION ENGINE"
     
-    print_status "i" "Starting deep link analysis..."
+    # 1. Сбор источников: последний лут + свежий трафик
+    local last_loot=$(ls -t "$LOOT_DIR" 2>/dev/null | head -n 1)
+    local traffic_log="$LOOT_DIR/traffic_leads.log"
+    local combined_data="/tmp/bridge_pool.tmp"
     
-    # Берем последние данные из лута (Loot)
-    local last_target=$(ls -t "$LOOT_DIR" | head -n 1)
-    
-    if [[ -z "$last_target" ]]; then
-        print_status "w" "No recent loot found. Start with OSINT or IBAN Scan."
-        pause; return
-    fi
+    print_status "i" "Pooling intelligence from loot and network leads..."
+    cat "$LOOT_DIR/$last_loot" "$traffic_log" 2>/dev/null > "$combined_data"
 
-    print_status "s" "Analyzing last session: $last_target"
-    
-    # Автоматически предлагаем следующее действие
-    if grep -q "@" "$LOOT_DIR/$last_target"; then
-        print_status "y" "Found Email. Suggesting: Breach Search (Infoga)."
-    fi
-    
-    if grep -q "FR" "$LOOT_DIR/$last_target"; then
-        print_status "y" "Found French pattern. Suggesting: IBAN Deep Parse."
-    fi
+    [[ ! -s "$combined_data" ]] && { print_status "w" "Intelligence pool empty."; pause; return; }
 
-    # Здесь мы можем добавить автоматический вызов нужной функции
-    # без лишних вопросов к пользователю.
+    # 2. Адаптивная матрица действий (заменяем if на grep-активацию)
+    # Формат: "Паттерн:Описание:Функция"
+    local matrix=(
+        "@[A-Za-z0-9]:EMAIL DETECTED:run_smart_osint_engine"
+        "FR[0-9]\{2\}:FRENCH BANKING PATTERN:run_iban_analyzer"
+        "\$2[ayb]\$:BCRYPT HASH DETECTED:run_prime_decryptor"
+        "\.onion:DARK WEB LINK DETECTED:run_onion_scanner"
+    )
+
+    print_status "s" "Analyzing correlation matrix..."
+    
+    for entry in "${matrix[@]}"; do
+        local pattern=$(echo "$entry" | cut -d: -f1)
+        local desc=$(echo "$entry" | cut -d: -f2)
+        local func=$(echo "$entry" | cut -d: -f3)
+
+        grep -q "$pattern" "$combined_data" && {
+            print_status "y" "CORRELATION: $desc"
+            
+            # Авто-предложение или переход
+            echo -en "${B}Execute linked module ${W}($func)${B}? (y/n): ${NC}"
+            read -n 1 -r; echo
+            [[ $REPLY =~ ^[Yy]$ ]] && $func
+        }
+    done
+
+    # 3. Вектор DARK WEB (Ahmia/Torch Search)
+    grep -qE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+" "$combined_data" && {
+        print_status "w" "Preparing Onion-Leaking check for detected identities..."
+        # Здесь мы в будущем добавим: curl --socks5-hostname localhost:9050 ...
+        log_loot "darkweb" "Target identity queued for Tor-search."
+    }
+
+    rm -f "$combined_data"
+    pause
 }
 
 
