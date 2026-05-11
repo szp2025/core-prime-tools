@@ -329,8 +329,8 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG Adaptive_SQL_Injection DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN PWD_DECRYPTOR CERT_FORGE CERT_READER NET_SCAN_v2 ULTIMATE_EXPLOIT PC_RECOVERY VIEW_LOOT SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_prime_decryptor run_cert_forge run_cert_analyzer run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN PWD_DECRYPTOR CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_prime_decryptor run_cert_forge run_heuristic_scanner_v2 run_prime_exploiter_v4 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -846,123 +846,73 @@ run_pc_recovery_ultimate() {
 }
 
 
-run_cert_analyzer() {
-    print_header "PRIME CRYPTO-INTELLIGENCE ANALYZER v9.0"
-
-    echo -en "${Y}Enter Target (File, IP or Domain): ${NC}"
-    read -r input
-    [[ -z "$input" ]] && return
-
-    local tmp_cert="/tmp/analyser_$RANDOM.crt"
-    
-    # --- СЛОЙ 1: ЭВРИСТИЧЕСКИЙ ЗАХВАТ ДАННЫХ (Universal Ingestion) ---
-    print_status "i" "Detecting input signature and extracting crypto-data..."
-
-    # Пытаемся получить данные: если это файл - читаем, если нет - тянем из сети
-    { 
-        cat "$input" 2>/dev/null || \
-        timeout 5 openssl s_client -connect "${input}:443" -servername "$input" </dev/null 2>/dev/null | \
-        openssl x509 
-    } > "$tmp_cert" 2>/dev/null
-
-    [[ ! -s "$tmp_cert" ]] && { print_status "e" "Source is sterile or unreachable."; return; }
-
-    # --- СЛОЙ 2: АНАЛИЗ ГЛУБИННЫХ АНОМАЛИЙ (No-IF Logic) ---
-    print_status "s" "Running Heuristic Crypto-Analysis..."
-    
-    # Извлекаем мета-данные в поток
-    local cert_info=$(openssl x509 -in "$tmp_cert" -text -noout)
-    
-    # Матрица триггеров уязвимости (Интеллектуальный поиск)
-    # Ищем: слабые ключи, старые алгоритмы, самоподписанные сертификаты
-    local triggers=(
-        "sha1WithRSAEncryption:CRITICAL: Obsolete Hashing (SHA-1) - Vulnerable to Collision"
-        "RSA Public-Key: (1024 bit):WARNING: Weak Key Length (1024 bit) - Bruteforce Target"
-        "Issuer:.*Subject:.*:ALERT: Self-Signed Certificate - Potential Honeypot or MITM"
-    )
-
-    # --- СЛОЙ 3: ВЫВОД И КОРРЕЛЯЦИЯ (Intelligence Output) ---
-    echo -e "${B}Certificate Identity:${NC}"
-    echo "$cert_info" | grep -E "Subject:|Issuer:|Not After:" | sed 's/^[[:space:]]*//; s/^/  /'
-
-    print_line
-    echo -e "${Y}HEURISTIC FINDINGS:${NC}"
-    
-    # Потоковая активация триггеров без IF
-    for trigger in "${triggers[@]}"; do
-        local pattern=$(echo "$trigger" | cut -d: -f1)
-        local severity=$(echo "$trigger" | cut -d: -f2)
-        local message=$(echo "$trigger" | cut -d: -f3)
-        
-        echo "$cert_info" | grep -qiE "$pattern" && {
-            echo -e "  [${R}${severity}${NC}] $message"
-            # Логируем для Моста
-            echo "CRYPTO_ALERT: $message | TARGET: $input" >> "$LOOT_DIR/bridge_signals.log"
-        }
-    done
-
-    # --- СЛОЙ 4: ПРОВЕРКА ВРЕМЕННОГО КОНТИНУУМА ---
-    # Проверяем на "протухлость" сертификата
-    openssl x509 -in "$tmp_cert" -checkend 0 > /dev/null || {
-        print_status "r" "STATUS: EXPIRED - Potential access vector through expired trust."
-    }
-
-    rm -f "$tmp_cert"
-    pause
-}
-
-
-run_cert_creator() {
-    print_header "PRIME CRYPTO-FORGE: PURE LOGIC v10.1"
+run_crypto_forge() {
+    print_header "PRIME CRYPTO-FORGE & MIRROR v12.0"
 
     check_step "cmd" "openssl" "OpenSSL required." || { pause; return; }
 
-    # --- СЛОЙ 1: ГЕНЕРАТОР ТАКТИЧЕСКИХ ПРЕСЕТОВ ---
-    # Формат: "Ключ:Параметры_Ключа:Дни:Субъект"
-    local preset=$(select_option "Select Mimicry Profile:" \
-        "Stealth (EC-256):ec:-pkeyopt ec_paramgen_curve:prime256v1:3650:/C=US/O=Internal/CN=api.local" \
-        "Enterprise (RSA-4096):rsa:4096:365:/C=US/O=Microsoft Azure/CN=*.azure-edge.net" \
-        "Legacy (RSA-2048):rsa:2048:365:/C=US/O=Localhost/CN=localhost")
+    # Интеллектуальный запрос: принимает домен, файл или команду на создание
+    print_input "Enter Target (Domain, IP, File or 'new' for fresh cert)" "google.com"
+    read -r target
+    [[ -z "$target" ]] && return
 
-    # Разбор пресета в поток переменных
-    local type=$(echo "$preset" | cut -d: -f1)
-    local strength=$(echo "$preset" | cut -d: -f2)
-    local opt=$(echo "$preset" | cut -d: -f3)
-    local days=$(echo "$preset" | cut -d: -f4)
-    local subj=$(echo "$preset" | cut -d: -f5)
-
-    # --- СЛОЙ 2: АДАПТАЦИЯ ВВОДА ---
-    print_input "Override Domain/CN (Enter to skip)" ""
-    read -r CUSTOM_CN
-    # Эвристическая подмена CN без if
-    subj=$(echo "$subj" | sed "s/CN=[^/]*/CN=${CUSTOM_CN:-$(echo "$subj" | grep -oP 'CN=\K[^/]+')}/")
-    local filename=$(echo "$subj" | grep -oP 'CN=\K[^/]+' | tr -d '*')
-
-    # --- СЛОЙ 3: УНИВЕРСАЛЬНАЯ КОВКА (The Unified Forge) ---
-    print_status "i" "Forging artifact: ${filename} (Type: $type)..."
-
-    # Универсальный вызов: для RSA это 'newkey rsa:2048', для EC это 'newkey ec' + опции
-    # Мы используем массив для аргументов, чтобы избежать кавычек и лишних веток
-    local cmd_args=(-x509 -newkey "${type}${type:+:}${strength}" -nodes -keyout "${filename}.key" -out "${filename}.crt" -days "$days" -subj "$subj")
+    local tmp_data="/tmp/forge_$(date +%s).tmp"
     
-    # Добавляем специфические опции для EC, если они есть в 'opt' (через расширение переменной)
-    [[ "$type" == "ec" ]] && cmd_args+=($opt)
+    # --- ЭВРИСТИЧЕСКИЙ ЗАХВАТ (Analysis) ---
+    print_status "i" "Ingesting cryptographic signals..."
 
-    openssl req "${cmd_args[@]}" 2>/dev/null
+    # Пытаемся собрать данные из всех возможных источников в один поток
+    [[ "$target" != "new" ]] && {
+        { cat "$target" 2>/dev/null || \
+          timeout 5 openssl s_client -connect "${target}:443" -servername "$target" </dev/null 2>/dev/null | openssl x509; \
+        } > "$tmp_data" 2>/dev/null
+    }
 
-    # --- СЛОЙ 4: СТЕЛС-ЗАЧИСТКА И ЛОГИРОВАНИЕ ---
-    # Потоковая обработка результата: если файл есть, он будет обработан sed
-    find . -name "${filename}.crt" -exec sed -i '/OpenSSL/d' {} + 2>/dev/null
+    # --- АВТОМАТИЧЕСКИЙ ВЫБОР РЕЖИМА (Intelligence) ---
+    # Режим определяется наличием данных: если данные есть — зеркалим, если нет — куем новое
+    local mode=$( [[ -s "$tmp_data" ]] && echo "MIRROR" || echo "CREATE" )
+    print_status "s" "Mode Identified: $mode"
+
+    # --- УНИВЕРСАЛЬНЫЙ ДВИЖОК ТРАНСФОРМАЦИИ ---
+    case "$mode" in
+        "MIRROR")
+            print_status "w" "Cloning target DNA for $target..."
+            local cert_text=$(openssl x509 -in "$tmp_data" -text -noout)
+            local subj=$(echo "$cert_text" | grep "subject=" | sed 's/^subject= //; s/^subject=//')
+            # Эвристика алгоритма: подбираем rsa или ec на основе оригинала
+            local algo=$(echo "$cert_text" | grep -qiE "RSA.*(2048|4096)" && echo "rsa:2048" || echo "ec")
+            local opt=$( [[ "$algo" == "ec" ]] && echo "-pkeyopt ec_paramgen_curve:prime256v1" || echo "" )
+            ;;
+        "CREATE")
+            print_status "i" "Initializing fresh identity Forge..."
+            local subj="/C=US/O=Prime_Intelligence/CN=${target:-prime.local}"
+            local algo="rsa:2048"
+            local opt=""
+            ;;
+    esac
+
+    # --- ЕДИНАЯ КОВКА (The Unified Forge) ---
+    local out_name="${LOOT_DIR}/${target//./_}_forge"
     
-    # Регистрация успеха (через проверку существования файла без явного IF в логике выполнения)
-    ls "${filename}.crt" &>/dev/null && {
-        print_status "s" "Artifact forged and de-identified."
-        print_list "Files" "${filename}.key" "${filename}.crt"
-        echo "FORGE_SUCCESS: $type | TARGET: $filename" >> "$LOOT_DIR/bridge_signals.log"
-    } || print_status "e" "Forge rejected parameters."
+    # Универсальная команда генерации
+    openssl req -x509 -newkey "$algo" $opt -nodes -days 365 \
+        -subj "$subj" -keyout "${out_name}.key" -out "${out_name}.crt" 2>/dev/null && {
+        
+        # Стелс-зачистка (удаление меток инструмента)
+        sed -i '/OpenSSL/d' "${out_name}.crt" 2>/dev/null
+        
+        print_status "s" "Cryptographic Artifact Synthesized."
+        print_list "Assets Generated" "${out_name}.key" "${out_name}.crt"
+        
+        # Интеграция в Intelligence Bridge
+        echo "CRYPTO_FORGE: [$mode] Success | Target: $target | Algo: $algo" >> "$LOOT_DIR/bridge_signals.log"
+        log_loot "crypto" "Generated $mode certificate for $target"
+    } || print_status "e" "Forge rejected the sequence: verify OpenSSL integrity."
 
+    rm -f "$tmp_data"
     pause
 }
+
 
 run_pwd_gen() {
     print_header "PRIME PASSWORD GENERATOR"
@@ -996,61 +946,6 @@ run_pwd_gen() {
 }
 
 
-run_cert_forge() {
-    print_header "PRIME MORPHIC MIRROR v11.0"
-
-    check_step "cmd" "openssl" "OpenSSL required." || { pause; return; }
-    
-    print_input "Enter Target to Mirror (Domain/IP)" "google.com"
-    read -r target
-    [[ -z "$target" ]] && return
-
-    # --- СЛОЙ 1: ГЕНЕТИЧЕСКИЙ АНАЛИЗ (Signal Extraction) ---
-    print_status "i" "Extracting Target DNA from $target..."
-    
-    # Собираем всё: Subject, Алгоритм, Длину ключа в один поток
-    local target_dna=$(timeout 5 openssl s_client -connect "${target}:443" -servername "$target" </dev/null 2>/dev/null | \
-                       openssl x509 -noout -subject -text 2>/dev/null)
-    
-    [[ -z "$target_dna" ]] && { print_status "e" "Target DNA not found. Mirroring aborted."; pause; return; }
-
-    # --- СЛОЙ 2: ЭВРИСТИЧЕСКАЯ ПОДМЕНА ПАРАМЕТРОВ (The Morph) ---
-    # Извлекаем Subject (убираем приставку subject=)
-    local subj=$(echo "$target_dna" | grep "subject=" | sed 's/^subject= //; s/^subject=//')
-    
-    # Интеллектуальный подбор алгоритма (Ищем RSA или EC в тексте оригинала)
-    # Если в оригинале Public Key: (2048 bit) -> ставим rsa:2048
-    # Если в оригинале id-ecPublicKey -> ставим ec
-    local algo_signal=$(echo "$target_dna" | grep -qiE "Public-Key:.*(2048|4096)" && echo "rsa:2048" || echo "ec")
-    local ec_param=$(echo "$algo_signal" | grep -q "ec" && echo "-pkeyopt ec_paramgen_curve:prime256v1" || echo "")
-
-    # --- СЛОЙ 3: УНИВЕРСАЛЬНАЯ КОВКА (Morphic Forge) ---
-    print_status "s" "DNA Cloned. Subject: $subj"
-    print_status "w" "Synthesizing Mirror Identity [Algorithm: $algo_signal]..."
-
-    local output_base="${LOOT_DIR}/${target//./_}_mirror"
-
-    # Универсальная команда генерации без ветвлений
-    openssl req -x509 -newkey "$algo_signal" $ec_param -nodes -days 365 \
-        -subj "$subj" \
-        -keyout "${output_base}.key" \
-        -out "${output_base}.crt" 2>/dev/null && {
-
-        # --- СЛОЙ 4: СТЕЛС-ЗАЧИСТКА И ЛОГИРОВАНИЕ ---
-        # Удаляем временные метки генератора, чтобы подделка была чистой
-        sed -i '/OpenSSL/d' "${output_base}.crt" 2>/dev/null
-        
-        print_status "s" "Mirror Identity Synthesized. Signature Matched."
-        print_list "Mirror Assets" "${output_base}.key" "${output_base}.crt"
-        
-        # Регистрация в Мосту для MITM-атак
-        echo "MIRROR_FORGE: Identity Cloned | TARGET: $target | ALGO: $algo_signal" >> "$LOOT_DIR/bridge_signals.log"
-        log_loot "crypto" "Morphic mirror for $target created"
-
-    } || print_status "e" "Synthesis failed: Identity rejection."
-
-    pause
-}
 
 run_vulnerability_scanner() {
     print_header "PRIME HEURISTIC VULN-SCANNER v7.0"
