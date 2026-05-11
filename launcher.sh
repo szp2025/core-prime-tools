@@ -139,10 +139,45 @@ print_status() {
 }
 
 log_loot() {
-    local module="$1"
+    local module="${1:-unknown}"
     local data="$2"
-    local file="/root/prime_loot/${module}_results.txt"
-    echo "[$(date +%T)] $data" >> "$file"
+    local loot_dir="/root/prime_loot"
+    local master_log="${loot_dir}/master_intelligence.log"
+    local module_file="${loot_dir}/${module}_results.txt"
+
+    # --- СЛОЙ 1: БЕЗУСЛОВНАЯ ИНФРАСТРУКТУРА ---
+    # Создаем, если нет, и фиксируем права одной строкой
+    [[ -d "$loot_dir" ]] || (mkdir -p "$loot_dir" && chmod 700 "$loot_dir")
+
+    # --- СЛОЙ 2: ПОТОКОВАЯ МАРКИРОВКА (Severity) ---
+    # Используем grep как фильтр: если нашел — severity станет CRITICAL, иначе INFO
+    local severity="INFO"
+    echo "$data" | grep -qiE "password|pwd|root|admin|vuln|critical|key|access|granted" && severity="CRITICAL"
+    echo "$data" | grep -qiE "user|ip|domain|node" && [[ "$severity" == "INFO" ]] && severity="TARGET"
+
+    # --- СЛОЙ 3: ФОРМИРОВАНИЕ ОТПЕЧАТКА ---
+    local entry="[$(date '+%Y-%m-%d %H:%M:%S')] [$severity] [$module] -> $data"
+
+    # --- СЛОЙ 4: АТОМАРНАЯ ЗАПИСЬ ---
+    # Пишем в файл модуля и сразу принуждаем к правам 600
+    echo "$entry" >> "$module_file" && chmod 600 "$module_file" 2>/dev/null
+
+    # Короткое замыкание для критических данных (заменяет IF)
+    [[ "$severity" == "CRITICAL" ]] && {
+        echo "$entry" >> "$master_log"
+        echo "SIGNAL_ID:$(date +%s) | DATA:$data" >> "${loot_dir}/bridge_signals.log"
+        chmod 600 "$master_log" "${loot_dir}/bridge_signals.log" 2>/dev/null
+    }
+
+    # --- СЛОЙ 5: МЕХАНИЧЕСКАЯ РОТАЦИЯ (No-IF) ---
+    # Используем арифметическое сравнение прямо в условии выполнения
+    (( $(stat -c%s "$module_file" 2>/dev/null || echo 0) > 1048576 )) && {
+        local tmp="${module_file}.tmp"
+        tail -n 100 "$module_file" > "$tmp" && mv "$tmp" "$module_file" && chmod 600 "$module_file"
+    }
+
+    # Финальный алерт через оператор &&
+    [[ "$severity" == "CRITICAL" ]] && echo -e "  ${R}[!] CRITICAL SECURED${NC}"
 }
 
 # Аргументы: $1 - тип проверки (cmd, file, port, dir), $2 - цель, $3 - текст ошибки
