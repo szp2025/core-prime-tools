@@ -376,8 +376,8 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PWD_GEN PWD_DECRYPTOR CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pwd_gen run_prime_decryptor run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_scan run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -671,46 +671,58 @@ run_network_intelligence() {
 }
 
 run_deep_bridge() {
-    print_header "PRIME BRIDGE: HEURISTIC INTELLIGENCE"
+    print_header "PRIME BRIDGE: NEURAL INTELLIGENCE LINK"
     
-    local combined_data="/tmp/bridge_pool.tmp"
-    cat "$LOOT_DIR"/* "$LOOT_DIR/traffic_leads.log" 2>/dev/null > "$combined_data"
+    local pool="/tmp/bridge_pool.tmp"
+    local master_loot="/root/prime_loot/master_intelligence.log"
     
-    [[ ! -s "$combined_data" ]] && { print_status "w" "No intelligence signals detected."; pause; return; }
+    # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (No-IF) ---
+    # Собираем данные из всех модулей, убираем дубликаты и пустые строки
+    sort -u "$LOOT_DIR"/*.txt "$master_loot" 2>/dev/null | grep -v '^$' > "$pool"
+    
+    # Проверка наполненности пула через короткое замыкание
+    [[ ! -s "$pool" ]] && { print_status "w" "Awaiting intelligence signals..."; pause; return; }
 
-    print_status "i" "Running Heuristic Analysis on $(wc -l < "$combined_data") signals..."
+    print_status "i" "Analyzing $(wc -l < "$pool") intelligence threads..."
+    print_line
 
-    # Эвристический перебор всех строк
+    # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ---
     while read -r line; do
-        # 1. Анализ энтропии и формата (без жесткой матрицы)
-        case "${#line}" in
-            32|40|64) # Длины MD5, SHA1, SHA256
-                print_status "y" "SIGNAL: High-entropy string detected (${#line} chars). Possible HASH."
-                suggest_action "run_prime_decryptor" "$line"
-                ;;
-            27|34) # Стандарты IBAN
-                [[ "$line" =~ ^[A-Z]{2} ]] && {
-                    print_status "y" "SIGNAL: International banking format detected."
-                    suggest_action "run_iban_analyzer" "$line"
-                }
-                ;;
-        esac
+        # Извлекаем чистые данные (отсекаем таймстампы и теги для анализа)
+        local raw_data=$(echo "$line" | awk -F ' -> ' '{print $2}' | xargs || echo "$line")
+        local len="${#raw_data}"
 
-        # 2. Семантический поиск (Ключевые маркеры будущего)
-        echo "$line" | grep -qiE "pass|secret|key|token|auth" && {
-            print_status "w" "SIGNAL: Identity credentials detected in stream."
-            suggest_action "run_prime_decryptor" "$line"
+        # 1. Детекция Крипто-сигнатур (Хеши)
+        # MD5(32), SHA1(40), SHA256(64), Bcrypt(60)
+        [[ "$len" =~ ^(32|40|64|60)$ ]] && {
+            print_status "y" "RESONANCE: Possible Hash Artifact ($len chars)."
+            suggest_action "run_pass_lab" "$raw_data" # Теперь вызываем единый PASS_LAB
         }
 
-        # 3. Onion/Deep Web детекция
-        [[ "$line" == *".onion"* ]] && {
-            print_status "r" "SIGNAL: Dark Web gateway identified."
-            # Здесь будет твой будущий Onion-модуль
+        # 2. Детекция Банковских Сигнатур (IBAN)
+        [[ "$raw_data" =~ ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30} ]] && {
+            print_status "y" "RESONANCE: Financial Asset (IBAN) detected."
+            suggest_action "run_iban_scan" "$raw_data"
         }
 
-    done < <(sort -u "$combined_data" | grep -v '^$')
+        # 3. Семантические Маркеры (Доступы)
+        echo "$raw_data" | grep -qiE "pass|secret|key|token|auth|admin" && {
+            print_status "w" "RESONANCE: Identity Leak detected."
+            suggest_action "run_pass_lab" "$raw_data"
+        }
 
-    rm -f "$combined_data"
+        # 4. Детекция Скрытых Сетей (Onion/I2P)
+        [[ "$raw_data" =~ \.(onion|i2p) ]] && {
+            print_status "r" "RESONANCE: Dark Web Gateway found."
+            # Здесь будет вызов прокси-модуля в будущем
+        }
+
+    done < "$pool"
+
+    # --- СЛОЙ 3: ОЧИСТКА ТРЕКА ---
+    rm -f "$pool"
+    print_line
+    print_status "i" "Intelligence synchronization complete."
     pause
 }
 
@@ -962,37 +974,67 @@ run_crypto_forge() {
 }
 
 
-run_pwd_gen() {
-    print_header "PRIME PASSWORD GENERATOR"
+run_pass_lab() {
+    print_header "PRIME PASSWORD LABORATORY v13.6"
+    
+    # --- СЛОЙ 1: ВЫБОР ВЕКТОРА (Zero-IF Selection) ---
+    local mode=$(select_option "Select Operation:" \
+        "GENERATE: Secure Sequence Creation:gen" \
+        "DECRYPT: Generative Hash Cracking:dec")
+    [[ -z "$mode" ]] && return
 
-    # 1. Запрос длины с дефолтом
-    print_input "Enter Password Length" "16"
-    read -r P_LEN
-    # Валидация через регулярку: если не число, ставим 16
-    [[ "$P_LEN" =~ ^[0-9]+$ ]] || P_LEN=16
-
-    print_status "i" "Generating secure sequence..."
-    
-    # 2. Генерация (использование /dev/urandom)
-    local RESULT=$(cat /dev/urandom | tr -dc 'A-Za-z0-9!@#$%^&*()_+=' | head -c "$P_LEN")
-    
-    # Вывод результата через print_list (один элемент тоже список)
-    print_list "Generated Password" "$RESULT"
-    
-    # 3. Хеширование через цепочку логики (без IF)
-    ask_confirm "Hash it with Bcrypt?" && {
-        check_step "cmd" "mkpasswd" "whois package (mkpasswd) required." && {
-            print_status "i" "Bcrypt Hash:"
-            echo -n "$RESULT" | mkpasswd -m bcrypt -s
+    # --- СЛОЙ 2: ВЕТКА ГЕНЕРАЦИИ (gen) ---
+    [[ "$mode" == "gen" ]] && {
+        print_input "Length" "16"
+        read -r p_len
+        local len=${p_len:-16}
+        
+        # Генерация через /dev/urandom без лишних труб
+        local pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
+        print_list "Secure Artifact" "$pass"
+        
+        # Предложение хеширования (bcrypt)
+        ask_confirm "Apply Bcrypt mutation?" && {
+            local h_res=$(echo -n "$pass" | mkpasswd -m bcrypt -s 2>/dev/null || echo "ERROR: Install 'whois'")
+            echo -e "${G}Hash: ${NC}$h_res"
+            log_loot "pass_lab" "Generated $len chars + Bcrypt hash"
         }
     }
 
-    # Логируем факт генерации (без самого пароля в целях безопасности!)
-    log_loot "crypto" "Generated $P_LEN chars password and requested hash"
+    # --- СЛОЙ 3: ВЕТКА ДЕШИФРОВКИ (dec) ---
+    [[ "$mode" == "dec" ]] && {
+        check_step "cmd" "john" "John the Ripper is required." || return
+        
+        print_input "Enter Target Hash" "$2y$12$..."
+        read -r target_hash
+        [[ -z "$target_hash" ]] && return
+
+        local tmp_h="/tmp/h_$(date +%s).txt"
+        echo "$target_hash" > "$tmp_h"
+
+        # Авто-детекция формата (Эвристика по сигнатуре)
+        local sig=$(echo "$target_hash" | cut -c1-5)
+        print_status "i" "Analyzing signature: $sig"
+        
+        # Запуск John с умными правилами (Single -> Wordlist -> Inc)
+        # Мы используем --external=Default для попытки авто-подбора
+        print_status "w" "Starting Hybrid Attack (Press Ctrl+C to stop)..."
+        john --format=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1 || echo "auto") \
+             --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
+
+        # Атомарный вывод результата
+        local crack_res=$(john --show "$tmp_h" | head -n1)
+        [[ "$crack_res" == *":"* ]] && {
+            local plain=$(echo "$crack_res" | cut -d: -f2)
+            print_status "s" "DECRYPTED: $plain"
+            log_loot "pass_lab" "CRACK SUCCESS: $target_hash -> $plain"
+        } || print_status "i" "Hash complex. Background process started."
+        
+        rm -f "$tmp_h"
+    }
 
     pause
 }
-
 
 
 run_vulnerability_scanner() {
@@ -1418,69 +1460,6 @@ run_upload_server() {
 
     pause
 }
-
-run_prime_decryptor() {
-    print_header "PRIME DECRYPTOR: GENERATIVE ENGINE"
-
-    # 1. Валидация инструментов
-    check_step "cmd" "john" "John the Ripper is required." || { 
-        print_status "e" "Install: apt install john"
-        pause; return 
-    }
-
-    print_input "Enter Hash to crack" "$2y$12$..."
-    read -r user_hash
-    [[ -z "$user_hash" ]] && return
-
-    # 2. Интеллектуальный анализ типа хеша
-    local hash_file="/tmp/target_hash.txt"
-    echo "$user_hash" > "$hash_file"
-    
-    print_status "i" "Analyzing hash signature..."
-    local format=$(john --list=formats | grep -iE "$(echo "$user_hash" | cut -c1-5)" | head -n 1 || echo "auto")
-    print_status "s" "Potential Format Detected: $format"
-
-    # 3. Настройка генеративного режима
-    local mode=$(select_option "Select Attack Mode:" \
-        "Single Crack (Fast/Names):single" \
-        "Wordlist + Mutations (Balanced):wordlist" \
-        "Incremental (Brute-force/Slow):incremental")
-
-    print_status "w" "Starting Engine. Press Ctrl+C to pause/save status."
-    print_line
-
-    # 4. Выполнение (Генерация на лету)
-    case "$mode" in
-        "single")
-            # Использует информацию о пользователе из хеша (если есть)
-            john --single "$hash_file"
-            ;;
-        "wordlist")
-            # Используем встроенный генератор мутаций (--rules)
-            # Это позволяет из 100 слов сделать 10,000 вариантов "на лету"
-            john --wordlist=/usr/share/john/password.lst --rules "$hash_file"
-            ;;
-        "incremental")
-            # Полный перебор, если ничего не помогло
-            john --incremental "$hash_file"
-            ;;
-    esac
-
-    # 5. Анализ результата
-    print_line
-    local result=$(john --show "$hash_file" | head -n 1)
-    if [[ "$result" == *":"* ]]; then
-        local pass=$(echo "$result" | cut -d: -f2)
-        print_status "s" "PASSWORD DECRYPTED: $pass"
-        log_loot "decryptor" "SUCCESS: $user_hash -> $pass"
-    else
-        print_status "i" "Hash not cracked yet. John is still processing in background."
-    fi
-
-    rm -f "$hash_file"
-    pause
-}
-
 
 
 # --- Точка входа ---
