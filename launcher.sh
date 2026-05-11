@@ -1003,17 +1003,19 @@ run_crypto_forge() {
 run_pass_lab() {
     clear
     print_header "PRIME PASSWORD LABORATORY v13.6"
-    echo "" # Отступ после заголовка
+    echo ""
 
     # --- СЛОЙ 1: ВЫБОР ВЕКТОРА ---
     local mode="dec"
-    # Если аргумента нет, вызываем меню
-    [[ -z "$1" ]] && mode=$(select_option "Select Operation Mode:" \
-        "GENERATE: Create Secure Sequence:gen" \
-        "DECRYPT: Generative Hash Cracking:dec" \
-        "EXIT: Return to Main Menu:exit")
+    if [[ -z "$1" ]]; then
+        # Вызываем функцию напрямую
+        select_option "Select Operation Mode:" \
+            "GENERATE: Create Secure Sequence:gen" \
+            "DECRYPT: Generative Hash Cracking:dec" \
+            "EXIT: Return to Main Menu:exit"
+        mode="$CHOICE"
+    fi
     
-    # Если выбрали выход - уходим
     [[ "$mode" == "exit" || -z "$mode" ]] && return
 
     # --- СЛОЙ 2: ВЕТКА ГЕНЕРАЦИИ (gen) ---
@@ -1044,11 +1046,9 @@ run_pass_lab() {
 
         local tmp_h="/tmp/h_$(date +%s).txt"
         echo "$target_hash" > "$tmp_h"
-
-        local sig=$(echo "$target_hash" | cut -c1-5)
-        print_status "i" "Signature Analysis: $sig"
         
-        print_status "w" "Starting Hybrid Attack..."
+        print_status "i" "Starting Hybrid Attack..."
+        local sig=$(echo "$target_hash" | cut -c1-5)
         local john_fmt=$(john --list=formats | grep -iE "$sig" | head -n1 | cut -d, -f1)
         
         john --format=${john_fmt:-"auto"} --wordlist=/usr/share/john/password.lst --rules "$tmp_h" 2>/dev/null
@@ -1058,14 +1058,13 @@ run_pass_lab() {
             local plain=$(echo "$crack_res" | cut -d: -f2)
             print_status "s" "DECRYPTED: $plain"
             log_loot "pass_lab" "SUCCESS: $target_hash -> $plain"
-        } || print_status "i" "Complexity High. Task moved to background."
+        } || print_status "i" "Task moved to background."
         
         rm -f "$tmp_h"
     }
 
     pause
 }
-
 run_vulnerability_scanner() {
     print_header "PRIME HEURISTIC VULN-SCANNER v7.0"
 
