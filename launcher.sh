@@ -479,29 +479,30 @@ run_system_info() {
     print_header "PRIME INTELLIGENCE & RECON v2.0"
     echo ""
 
-    # Выбор вектора анализа
+    # Вызываем меню. Оно запишет цифру (1, 2 или 3) в CHOICE
     select_option "Select Intelligence Target:" \
-        "LOCAL: Internal Node & USB Status:local" \
-        "REMOTE: External Server/Site Recon:remote" \
-        "EXIT: Return to Main Menu:exit"
+        "LOCAL: Internal Node & USB Status" \
+        "REMOTE: External Server/Site Recon" \
+        "EXIT: Return to Main Menu"
     
-    local target="$CHOICE"
-    [[ "$target" == "exit" || -z "$target" ]] && return
+    local btn="$CHOICE"
 
-    case "$target" in
-        "local")
+    # Если ничего не выбрали или нажали выход (3)
+    [[ -z "$btn" || "$btn" == "3" ]] && return
+
+    case "$btn" in
+        "1") # --- LOCAL ---
             print_status "i" "Gathering Local Intelligence..."
             
             local kernel=$(uname -rs)
             local uptime=$(uptime -p)
             local internal_ip=$(hostname -I | awk '{print $1}' || echo "N/A")
             
-            # Опрос USB
             local usb_devices
             if command -v lsusb >/dev/null; then
                 usb_devices=$(lsusb)
             else
-                usb_devices=$(find /sys/bus/usb/devices/ihi -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
+                usb_devices=$(find /sys/bus/usb/devices/ -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
             fi
             [[ -z "$usb_devices" ]] && usb_devices="No active USB connections detected."
 
@@ -514,21 +515,16 @@ run_system_info() {
             print_list "USB Bus Scan" "$usb_devices"
             ;;
 
-        "remote")
+        "2") # --- REMOTE ---
             print_input "Enter Target Domain or IP" "google.com"
             read -r r_target
             [[ -z "$r_target" ]] && return
 
             print_status "w" "Executing Remote Reconnaissance..."
             
-            # 1. DNS & IP (host)
+            # Сбор данных
             local ip_map=$(host "$r_target" 2>/dev/null | head -n 3 || echo "Host command failed.")
-            
-            # 2. HTTP Fingerprint (curl)
-            # Извлекаем сервер и технологии (как в phpinfo)
             local headers=$(curl -Is --connect-timeout 5 "$r_target" 2>/dev/null | grep -E "Server|X-Powered-By|Set-Cookie|Content-Type" || echo "Headers Hidden")
-
-            # 3. Ownership (whois)
             local owner=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Country:|Expires:" | head -n 5 || echo "Whois unavailable.")
 
             echo -e "\n${Y}--- REMOTE TARGET REPORT: $r_target ---${NC}"
@@ -544,6 +540,7 @@ run_system_info() {
     print_status "s" "Diagnostic complete."
     pause
 }
+
 
 generate_phantom_server_code() {
     local target_file="$1"
