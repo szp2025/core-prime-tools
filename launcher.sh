@@ -355,17 +355,29 @@ smart_cat() {
 
 
 get_tool_info() {
-    local func_name="$1"
-    case "$func_name" in
-        "pc_gen_payload") echo "Генерация реверс-шеллов для Bash. Авто-определение LHOST." ;;
-        "run_pc_recovery_ultimate") echo "Извлечение паролей (LaZagne) и сброс SAM (Windows) или Shadow (Linux)." ;;
-        "run_forensic_scanner") echo "Автономный аудит и лечение: поиск зомби-процессов, блокировка портов и карантин." ;;
-        "run_ghost_commander") echo "Управление Android устройствами через ADB: зеркалирование, файлы, биометрия." ;;
-        "run_smart_osint_engine") echo "Поиск информации по открытым источникам (IP, Email, Phone, Domain)." ;;
-        *) echo "Описание для данной функции еще не добавлено." ;;
+    case "$1" in
+        "pc_gen_payload")           echo "Генерация реверс-шеллов (Bash/Python). Авто-LHOST." ;;
+        "run_pc_recovery_ultimate") echo "Сброс паролей Win/Lin и извлечение данных (LaZagne)." ;;
+        "run_forensic_scanner")     echo "Автономное лечение: килл-процессов, блок портов, карантин." ;;
+        "run_ghost_commander")      echo "ADB-контроль Android: зеркало, биометрия, файловая система." ;;
+        "run_smart_osint_engine")   echo "Сбор данных по открытым источникам (IP/Email/Phone)." ;;
+        "run_sql_adaptive")         echo "Адаптивные SQL-инъекции и аудит баз данных." ;;
+        *)                          echo "Описание функционала в разработке..." ;;
     esac
 }
 
+
+show_menu_info() {
+    local funcs=$1
+    echo -e "${B}┌── INFO CENTER ──────────────────────────────────────────┐${NC}"
+    local i=1
+    for f in $funcs; do
+        local desc=$(get_tool_info "$f")
+        printf "${B}│${NC}  ${Y}%02d.${NC} %-50s ${B}│${NC}\n" "$i" "$desc"
+        ((i++))
+    done
+    echo -e "${B}└─────────────────────────────────────────────────────────┘${NC}"
+}
 
 
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
@@ -494,13 +506,12 @@ run_device_hack() {
 pc_password_recovery() {
     print_header "PC TARGET CONTROL CENTER"
     
-    # Краткая справка перед выбором
-    echo -e "${B}INFO:${NC} $(get_tool_info "pc_gen_payload") | $(get_tool_info "run_forensic_scanner")"
-    echo "------------------------------------------------"
-
-    local p_names="Generate_Reverse_Shell Extract_Reset_Passwords Forensic_Auto_Defense"
     local p_funcs="pc_gen_payload run_pc_recovery_ultimate run_forensic_scanner"
-    
+    local p_names="Generate_Reverse_Shell Extract_Reset_Passwords Forensic_Auto_Defense"
+
+    # Динамический вывод справки
+    show_menu_info "$p_funcs"
+
     prime_dynamic_controller "PC TARGET CONTROL" "$p_names" "$p_funcs"
 }
 
