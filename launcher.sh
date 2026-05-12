@@ -850,31 +850,26 @@ run_system_info() {
 
 
 # --- Анализ Bluetooth устройств ---
-Scan_bluetooth_devices() {
+scan_bluetooth_devices() {
     print_header "BLUETOOTH RADAR"
     
-    # 1. Проверка наличия инструментов (BlueZ Stack)
+    # 1. Проверка наличия инструментов (используем актуальный пакет bluez)
     if ! command -v hcitool >/dev/null 2>&1; then
         print_status "e" "Engine 'bluez' not found."
         
-        # Эвристика установки в зависимости от прав доступа
         if [[ $(id -u) -eq 0 ]]; then
             print_status "w" "Root detected. Deploying 'bluez' core..."
             apt-get update && apt-get install bluez -y
         else
-            # Для Samsung A14 (Non-Root)
-            print_status "i" "On Samsung (Non-Root), Bluetooth stack is restricted."
-            print_status "!" "Manual install: apt update && apt install bluez"
+            print_status "i" "Non-Root environment (Samsung A14?)."
+            print_status "!" "Please run: apt update && apt install bluez"
+            pause && return
         fi
-        
-        # Повторная проверка после попытки установки
-        command -v hcitool >/dev/null 2>&1 || { pause; return; }
     fi
 
-    # 2. Адаптация под Root (Wiko Lenny 3)
-    # Пытаемся принудительно поднять интерфейс, если есть права
+    # 2. Попытка активации интерфейса (только для Wiko/Root)
     if [[ $(id -u) -eq 0 ]]; then
-        print_status "i" "Activating Bluetooth Interface (hci0)..."
+        print_status "i" "Activating Bluetooth Interface..."
         hciconfig hci0 up >/dev/null 2>&1
     fi
 
@@ -884,28 +879,31 @@ Scan_bluetooth_devices() {
     # 3. Исполнение сканирования
     print_status "!" "Searching for active signals..."
     
-    # Пытаемся получить данные, подавляя системные ошибки сокетов (важно для Samsung)
+    # Подавляем системный мусор и ошибки доступа к сокетам
     local scan_output
     scan_output=$(hcitool scan 2>/dev/null)
 
     if [[ -z "$scan_output" || "$scan_output" == *"Scanning"* ]]; then
         print_status "e" "No devices found or Adapter blocked."
         
-        # Пояснение для нерутированных устройств (Samsung)
+        # Эвристическая подсказка для Samsung
         if [[ $(id -u) -ne 0 ]]; then
-            print_status "w" "Note: Non-root kernel (Samsung) usually blocks direct BT access."
+            print_status "w" "Note: Direct Bluetooth access is often restricted on Non-Root devices."
         fi
     else
-        # Вывод результатов без технического заголовка
+        # Чистый вывод найденных устройств
         echo -e "$scan_output" | grep -v "Scanning"
         print_status "s" "Scan completed."
         
-        # Логируем результат для Intelligence Center
-        echo -e "$scan_output" >> "/root/prime_loot/bluetooth_$(date +%F).log" 2>/dev/null
+        # Автоматическое сохранение логов
+        mkdir -p /root/prime_loot
+        echo "[$(date)] BT Scan Results:" >> /root/prime_loot/bluetooth.log
+        echo -e "$scan_output" >> /root/prime_loot/bluetooth.log
     fi
     
     pause
 }
+
 
 
 # --- Глубокий аудит системы ---
