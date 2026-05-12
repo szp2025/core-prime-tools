@@ -697,6 +697,38 @@ run_ghost_commander() {
 }
 
 
+# --- [ SYSTEM UPDATE ENGINE v35.4 ] ---
+update_prime() {
+    print_header "SYSTEM UPDATE & SYNC"
+    
+    local upd_path="/root/updlauncher.sh"
+    local upd_url="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/updlauncher.sh"
+
+    # 1. Логика проверки: Сначала ищем локально, потом в сети
+    if [[ -f "$upd_path" ]]; then
+        echo -e "${G}[+] Локальный апдейтер найден. Запуск...${NC}"
+        chmod +x "$upd_path"
+    else
+        echo -e "${Y}[!] Апдейтер не найден. Загрузка из репозитория...${NC}"
+        if curl -s -L "$upd_url" -o "$upd_path"; then
+            chmod +x "$upd_path"
+            echo -e "${G}[+] Апдейтер успешно загружен.${NC}"
+        else
+            echo -e "${R}[!] Ошибка: Не удалось загрузить апдейтер. Проверьте сеть.${NC}"
+            pause
+            return 1
+        fi
+    fi
+
+    # 2. Безопасная передача управления
+    echo -e "${B}[*] Переподключение к потоку обновления...${NC}"
+    show_progress 1 "HANDOVER TO UPDATER"
+    
+    # Запускаем через bash, чтобы гарантировать выполнение
+    exec bash "$upd_path"
+}
+
+
 run_system_info() {
     clear
     print_header "PRIME INTELLIGENCE & RECON v2.1"
