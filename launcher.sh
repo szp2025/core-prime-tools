@@ -514,7 +514,8 @@ run_main_menu() {
     local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
     local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_system_info run_servers run_repair update_prime exit_script"
 
-    # Динамическая справка для всех ключевых модулей системы
+ 
+   # Динамическая справка для всех ключевых модулей системы
     # Это создаст аккуратную информационную панель перед выбором
     show_menu_info "$main_funcs"
     # Основной контроллер
