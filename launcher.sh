@@ -551,6 +551,20 @@ pc_password_recovery() {
     prime_dynamic_controller "PC TARGET CONTROL" "$p_names" "$p_funcs"
 }
 
+
+# --- SECURITY & DATA HUB ---
+run_servers() {
+    print_header "SECURITY & DATA HUB"
+    
+    local s_names="AV-Scanner Share-File Upload-Inbound"
+    local s_funcs="run_av_srv run_share_srv run_upload_srv"
+
+    # Теперь здесь тоже есть динамическая справка!
+    show_menu_info "$s_funcs"
+
+    prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
+}
+
 # Вспомогательные функции-мостики (для чистоты кода)
 pc_gen_payload() {
     print_header "PAYLOAD GENERATOR"
@@ -567,19 +581,6 @@ pc_gen_payload() {
 pc_steal_creds() { run_pc_recovery_ultimate; }
 pc_post_exploit() { run_forensic_scanner; }
 
-
-# --- SECURITY & DATA HUB ---
-run_servers() {
-    print_header "SECURITY & DATA HUB"
-    
-    local s_names="AV-Scanner Share-File Upload-Inbound"
-    local s_funcs="run_av_srv run_share_srv run_upload_srv"
-
-    # Теперь здесь тоже есть динамическая справка!
-    show_menu_info "$s_funcs"
-
-    prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
-}
 
 
 # --- Модули по меню ---
@@ -849,27 +850,31 @@ run_system_info() {
 
 
 # --- Анализ Bluetooth устройств ---
-scan_bluetooth_devices() {
+Scan_bluetooth_devices() {
     print_header "BLUETOOTH RADAR"
     
-    # 1. Проверка наличия инструментов
+    # 1. Проверка наличия инструментов (BlueZ Stack)
     if ! command -v hcitool >/dev/null 2>&1; then
-        print_status "e" "Engine 'bluez-utils' not found."
+        print_status "e" "Engine 'bluez' not found."
         
-        # Эвристика: подсказка в зависимости от прав
-        if [[ $(id -u) -ne 0 ]]; then
-            print_status "i" "On Samsung (Non-Root), Bluetooth access is restricted."
-            print_status "!" "Try: apt update && apt install bluez-utils"
+        # Эвристика установки в зависимости от прав доступа
+        if [[ $(id -u) -eq 0 ]]; then
+            print_status "w" "Root detected. Deploying 'bluez' core..."
+            apt-get update && apt-get install bluez -y
         else
-            print_status "w" "Root detected. Installing missing bridge..."
-            apt-get update && apt-get install bluez-utils -y
+            # Для Samsung A14 (Non-Root)
+            print_status "i" "On Samsung (Non-Root), Bluetooth stack is restricted."
+            print_status "!" "Manual install: apt update && apt install bluez"
         fi
-        pause && return
+        
+        # Повторная проверка после попытки установки
+        command -v hcitool >/dev/null 2>&1 || { pause; return; }
     fi
 
-    # 2. Проверка статуса адаптера (только для Wiko/Root)
+    # 2. Адаптация под Root (Wiko Lenny 3)
+    # Пытаемся принудительно поднять интерфейс, если есть права
     if [[ $(id -u) -eq 0 ]]; then
-        print_status "i" "Activating Bluetooth Interface..."
+        print_status "i" "Activating Bluetooth Interface (hci0)..."
         hciconfig hci0 up >/dev/null 2>&1
     fi
 
@@ -879,16 +884,24 @@ scan_bluetooth_devices() {
     # 3. Исполнение сканирования
     print_status "!" "Searching for active signals..."
     
-    # Пытаемся сканировать, подавляя системные ошибки сокетов
+    # Пытаемся получить данные, подавляя системные ошибки сокетов (важно для Samsung)
     local scan_output
     scan_output=$(hcitool scan 2>/dev/null)
 
     if [[ -z "$scan_output" || "$scan_output" == *"Scanning"* ]]; then
         print_status "e" "No devices found or Adapter blocked."
-        [[ $(id -u) -ne 0 ]] && print_status "w" "Note: Non-root users often can't access BT stack."
+        
+        # Пояснение для нерутированных устройств (Samsung)
+        if [[ $(id -u) -ne 0 ]]; then
+            print_status "w" "Note: Non-root kernel (Samsung) usually blocks direct BT access."
+        fi
     else
+        # Вывод результатов без технического заголовка
         echo -e "$scan_output" | grep -v "Scanning"
         print_status "s" "Scan completed."
+        
+        # Логируем результат для Intelligence Center
+        echo -e "$scan_output" >> "/root/prime_loot/bluetooth_$(date +%F).log" 2>/dev/null
     fi
     
     pause
