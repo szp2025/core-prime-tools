@@ -470,29 +470,18 @@ run_main_menu() {
 # --- Модули: DEVICE & NETWORK ---
 # --- Модули: DEVICE & NETWORK (OPTIMIZED v35.4) ---
 run_device_hack() {
-    # 1. Формируем список только актуальных функций
-    # Мы оставили: TShark (трафик), Bluetooth (периферия) и Smart Audit (анализ уязвимостей)
-    # Добавили: Network_Mapper (вместо ручного поиска эксплойтов)
+    # Теперь у нас 3 кита: Сеть, Bluetooth и Системный аудит
+    local dh_names="Network_Intelligence Bluetooth_Scan Smart_Audit"
+    local dh_funcs="run_network_analyzer scan_bluetooth_devices run_deep_audit"
     
-    local dh_names="TShark_Sniffer Bluetooth_Scan Smart_Audit Network_Mapper"
-    local dh_funcs="analyze_network_traffic scan_bluetooth_devices run_deep_audit run_network_mapping"
-    
-    # 2. Запуск через динамический контроллер
-    # Важно: Названия функций в dh_funcs должны существовать в твоем launcher.sh
     prime_dynamic_controller "DEVICE & NETWORK ANALYSIS" "$dh_names" "$dh_funcs"
 }
 
 
-analyze_network_traffic() {
-    local n_names="Host_Monitor "
-    local n_funcs="run_network_intelligence"
-    prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
-}
-
 # --- Модули: RECOVERY & PASSWORDS ---
 pc_password_recovery() {
-    local p_names="Extract_Reset_OS_Password Heuristic_Scan_PC"
-    local p_funcs="run_pc_recovery_ultimate smart_threat_scan"
+    local p_names="Extract_Reset_OS_Password Forensic_Threat_Scan"
+    local p_funcs="run_pc_recovery_ultimate run_forensic_scanner"
     prime_dynamic_controller "PC RECOVERY & FORENSIC" "$p_names" "$p_funcs"
 }
 
@@ -518,6 +507,91 @@ run_servers() {
 
 
 # --- Модули по меню ---
+
+run_forensic_scanner() {
+    print_header "AUTONOMOUS DEFENSE & REMEDIATION"
+    
+    # 1. Транспорт (Выбор цели)
+    local target=$(select_option "Select Target for Auto-Sanitization:" \
+        "Local (Current Device):local" \
+        "Android/IoT (via ADB/USB):adb" \
+        "Remote Server (via SSH/IP):ssh" \
+        "Back:exit")
+
+    [[ "$target" == "exit" || -z "$target" ]] && return
+    local cmd_prefix=""
+    
+    case "$target" in
+        "adb")
+            check_step "cmd" "adb" "ADB not installed." || return
+            adb wait-for-device
+            cmd_prefix="adb shell " ;;
+        "ssh")
+            echo -en "${Y}Enter Remote User@IP: ${NC}"; read -r rh
+            [[ -z "$rh" ]] && return
+            cmd_prefix="ssh $rh " ;;
+    esac
+
+    show_progress 5 "ENGAGING AUTONOMOUS PURGE"
+
+    # --- ФАЗА 1: АВТО-ЛИКВИДАЦИЯ ПРОЦЕССОВ ---
+    print_status "!" "Phase 1: Terminal Process Neutralization..."
+    # Автоматический поиск и убийство зомби (Z) и подозрительных (D) процессов
+    local bad_procs=$($cmd_prefix "ps -eo pid,stat,comm | awk '\$2~/[ZDe]/ {print \$1}'")
+    
+    if [[ -n "$bad_procs" ]]; then
+        for pid in $bad_procs; do
+            print_status "w" "Autonomous Kill: PID $pid (Suspicious State)"
+            $cmd_prefix "kill -9 $pid" 2>/dev/null
+        done
+        print_status "s" "All suspicious processes neutralized."
+    else
+        print_status "s" "Process tree secure."
+    fi
+
+    # --- ФАЗА 2: АВТО-БЛОКИРОВКА ПОРТОВ ---
+    print_status "!" "Phase 2: Shadow Port Isolation..."
+    # Список критических портов для авто-блокировки (бэкдоры, шеллы)
+    local ports=$($cmd_prefix "netstat -an | grep LISTEN | awk '{print \$4}' | awk -F: '{print \$NF}'")
+    local blacklisted_ports="4444 5555 6666 7777 8888 9999"
+
+    for port in $ports; do
+        for bl in $blacklisted_ports; do
+            if [[ "$port" == "$bl" ]]; then
+                print_status "w" "Auto-Blocking DANGER Port: $port"
+                $cmd_prefix "iptables -A INPUT -p tcp --dport $port -j DROP" 2>/dev/null
+                $cmd_prefix "fuser -k -n tcp $port" 2>/dev/null # Убиваем процесс, занявший порт
+            fi
+        done
+    done
+
+    # --- ФАЗА 3: МГНОВЕННЫЙ КАРАНТИН ФАЙЛОВ ---
+    print_status "!" "Phase 3: Automated File Quarantine..."
+    local scan_path="/etc /usr/bin /tmp"
+    [[ "$target" == "adb" ]] && scan_path="/data/local/tmp /system/bin /cache"
+    
+    local suspect_files=$($cmd_prefix "find $scan_path -mtime -1 -type f 2>/dev/null")
+
+    if [[ -n "$suspect_files" ]]; then
+        $cmd_prefix "mkdir -p /root/quarantine_vault" 2>/dev/null
+        for file in $suspect_files; do
+            local filename=$(basename "$file")
+            print_status "w" "Isolating: $file"
+            # Перемещаем и лишаем прав на исполнение
+            $cmd_prefix "mv $file /root/quarantine_vault/${filename}.dead && chmod 000 /root/quarantine_vault/${filename}.dead"
+        done
+        print_status "s" "Modified files relocated to /root/quarantine_vault/"
+    else
+        print_status "s" "File system integrity: SECURE."
+    fi
+
+    print_status "s" "Target $target successfully sanitized. State: PROTECTED."
+    pause
+}
+
+
+
+
 run_ghost_commander() {
     print_header "GHOST COMMANDER (ANDROID/IOT)"
 
@@ -663,16 +737,41 @@ run_deep_audit() {
 }
 
 # --- Сетевое мапирование (Network Mapper) ---
-run_network_mapping() {
-    print_header "NETWORK TOPOLOGY MAPPER"
-    echo -en "${Y}Enter IP Range (e.g. 192.168.1.0/24): ${NC}"; read -r range
-    [[ -z "$range" ]] && range="127.0.0.1"
 
-    show_progress 5 "MAPPING NODES"
-    nmap -T4 -F "$range"
-    pause
+run_network_analyzer() {
+    print_header "NETWORK INTELLIGENCE & TOPOLOGY"
+
+    # 1. Выбор режима работы
+    local action=$(select_option "Select Operation Mode:" \
+        "Network Mapping (Scan Nodes):map" \
+        "Traffic Analysis (TShark):sniff" \
+        "Full Intelligence Loop:full" \
+        "Back to Menu:exit")
+
+    case "$action" in
+        "map"|"full")
+            echo -en "${Y}Enter Target Range (e.g. 192.168.1.0/24): ${NC}"; read -r range
+            [[ -z "$range" ]] && range="127.0.0.1"
+            
+            show_progress 4 "MAPPING NETWORK TOPOLOGY"
+            nmap -T4 -F "$range"
+            [[ "$action" == "map" ]] && { pause; return; }
+            ;;
+    esac
+
+    case "$action" in
+        "sniff"|"full")
+            print_status "i" "Initializing TShark Core..."
+            
+            # Подменю для TShark (твоя старая логика)
+            local n_names="Live_Host_Monitor Deep_Packet_Inspection"
+            local n_funcs="run_network_intelligence run_packet_dump"
+            
+            prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
+            ;;
+        "exit"|*) return ;;
+    esac
 }
-
 
 
 
