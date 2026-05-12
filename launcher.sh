@@ -354,6 +354,18 @@ smart_cat() {
 }
 
 
+get_tool_info() {
+    local func_name="$1"
+    case "$func_name" in
+        "pc_gen_payload") echo "Генерация реверс-шеллов для Bash. Авто-определение LHOST." ;;
+        "run_pc_recovery_ultimate") echo "Извлечение паролей (LaZagne) и сброс SAM (Windows) или Shadow (Linux)." ;;
+        "run_forensic_scanner") echo "Автономный аудит и лечение: поиск зомби-процессов, блокировка портов и карантин." ;;
+        "run_ghost_commander") echo "Управление Android устройствами через ADB: зеркалирование, файлы, биометрия." ;;
+        "run_smart_osint_engine") echo "Поиск информации по открытым источникам (IP, Email, Phone, Domain)." ;;
+        *) echo "Описание для данной функции еще не добавлено." ;;
+    esac
+}
+
 
 
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
@@ -480,11 +492,16 @@ run_device_hack() {
 
 # --- Модули: RECOVERY & PASSWORDS ---
 pc_password_recovery() {
-    # Теперь здесь весь цикл работы с целью
+    print_header "PC TARGET CONTROL CENTER"
+    
+    # Краткая справка перед выбором
+    echo -e "${B}INFO:${NC} $(get_tool_info "pc_gen_payload") | $(get_tool_info "run_forensic_scanner")"
+    echo "------------------------------------------------"
+
     local p_names="Generate_Reverse_Shell Extract_Reset_Passwords Forensic_Auto_Defense"
     local p_funcs="pc_gen_payload run_pc_recovery_ultimate run_forensic_scanner"
     
-    prime_dynamic_controller "PC TARGET CONTROL CENTER" "$p_names" "$p_funcs"
+    prime_dynamic_controller "PC TARGET CONTROL" "$p_names" "$p_funcs"
 }
 
 # Вспомогательные функции-мостики (для чистоты кода)
