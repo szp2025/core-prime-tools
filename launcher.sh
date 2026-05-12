@@ -885,38 +885,54 @@ run_deep_audit() {
 # --- Сетевое мапирование (Network Mapper) ---
 
 run_network_analyzer() {
+    clear
     print_header "NETWORK INTELLIGENCE & TOPOLOGY"
 
-    # 1. Выбор режима работы
-    local action=$(select_option "Select Operation Mode:" \
-        "Network Mapping (Scan Nodes):map" \
-        "Traffic Analysis (TShark):sniff" \
-        "Full Intelligence Loop:full" \
-        "Back to Menu:exit")
+    # 1. Выбор режима (Исправленная логика выбора)
+    select_option "SELECT OPERATION MODE:" \
+        "Network Mapping (Fast Scan)" \
+        "Traffic Analysis (TShark)" \
+        "Full Intelligence Loop" \
+        "Back"
+    
+    local btn="$CHOICE"
+    [[ -z "$btn" || "$btn" == "4" ]] && return
 
-    case "$action" in
-        "map"|"full")
-            echo -en "${Y}Enter Target Range (e.g. 192.168.1.0/24): ${NC}"; read -r range
-            [[ -z "$range" ]] && range="127.0.0.1"
-            
-            show_progress 4 "MAPPING NETWORK TOPOLOGY"
-            nmap -T4 -F "$range"
-            [[ "$action" == "map" ]] && { pause; return; }
-            ;;
-    esac
+    # 2. Логика Mapping (пункты 1 и 3)
+    if [[ "$btn" == "1" || "$btn" == "3" ]]; then
+        # Эвристика: берем текущую подсеть из лаунчера
+        local def_range=$(echo "${CURRENT_IP:-127.0.0.1}" | cut -d. -f1-3)".0/24"
+        
+        echo -en "${Y}Enter Target Range ${W}[Default: $def_range]${Y}: ${NC}"
+        read -r range
+        range="${range:-$def_range}"
+        
+        show_progress 2 "MAPPING TOPOLOGY"
+        
+        # УЛЬТРА-БЫСТРЫЙ СКАН:
+        # -sn: Ping scan (без портов, только живые хосты)
+        # -n:  ОТКЛЮЧАЕМ DNS (убирает зависание!)
+        # -T4: Агрессивный тайминг
+        nmap -sn -n -T4 "$range" | grep "Nmap scan report" | awk '{print $5 " -> [ONLINE]"}'
+        
+        [[ "$btn" == "1" ]] && { echo ""; pause; return; }
+    fi
 
-    case "$action" in
-        "sniff"|"full")
-            print_status "i" "Initializing TShark Core..."
-            
-            # Подменю для TShark (твоя старая логика)
-            local n_names="Live_Host_Monitor Deep_Packet_Inspection"
-            local n_funcs="run_network_intelligence run_packet_dump"
-            
-            prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
-            ;;
-        "exit"|*) return ;;
-    esac
+    # 3. Логика Sniffing (пункты 2 и 3)
+    if [[ "$btn" == "2" || "$btn" == "3" ]]; then
+        print_status "i" "Initializing TShark Core..."
+        
+        # Если TShark не установлен, ставим быстро
+        if ! command -v tshark >/dev/null; then
+             print_status "e" "TShark not found. Run 'apt install tshark' first."
+             pause && return
+        fi
+
+        local n_names="Live_Host_Monitor Deep_Packet_Inspection"
+        local n_funcs="run_network_intelligence run_packet_dump"
+        
+        prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
+    fi
 }
 
 
