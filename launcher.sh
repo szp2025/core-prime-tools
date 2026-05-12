@@ -356,13 +356,41 @@ smart_cat() {
 
 get_tool_info() {
     case "$1" in
-        "pc_gen_payload")           echo "Генерация реверс-шеллов (Bash/Python). Авто-LHOST." ;;
-        "run_pc_recovery_ultimate") echo "Сброс паролей Win/Lin и извлечение данных (LaZagne)." ;;
-        "run_forensic_scanner")     echo "Автономное лечение: килл-процессов, блок портов, карантин." ;;
-        "run_ghost_commander")      echo "ADB-контроль Android: зеркало, биометрия, файловая система." ;;
-        "run_smart_osint_engine")   echo "Сбор данных по открытым источникам (IP/Email/Phone)." ;;
-        "run_sql_adaptive")         echo "Адаптивные SQL-инъекции и аудит баз данных." ;;
-        *)                          echo "Описание функционала в разработке..." ;;
+        # --- Главное меню (Main Menu) ---
+        "run_ghost_commander")      echo "ADB-контроль Android: зеркало, биометрия, Shell, управление файлами." ;;
+        "run_phantom_engine")       echo "Social Engineering Framework: создание фишинг-страниц и сбор сессий." ;;
+        "run_sql_adaptive")         echo "Инструментарий для SQL-инъекций: адаптивный поиск и дамп баз данных." ;;
+        "run_device_hack")          echo "Комплексный анализ: сетевая разведка, Bluetooth и глубокий аудит." ;;
+        "run_smart_osint_engine")   echo "OSINT-движок: поиск по IP, почте, телефонам и доменам." ;;
+        "run_iban_analyzer")        echo "Финансовый анализ: проверка IBAN, банковских кодов и транзакций." ;;
+        "run_pass_lab")             echo "Лаборатория паролей: генерация словарей и анализ стойкости хэшей." ;;
+        "run_crypto_forge")         echo "Криптографический модуль: шифрование, расшифровка и работа с ключами." ;;
+        "run_vulnerability_scanner") echo "Ghost Engine: сканер уязвимостей и поиск векторов для проникновения." ;;
+        "run_prime_exploiter_v5")   echo "Ultimate Exploiter: база эксплойтов для известных CVE и 0-day." ;;
+        "pc_password_recovery")     echo "Хаб управления ПК: эксплойты, сброс паролей и форензика." ;;
+        "run_view_loot")            echo "Просмотр добычи (Intelligence Center): логи, пароли, дампы." ;;
+        "run_system_info")          echo "Мониторинг системы: параметры CPU, RAM, Network и статус защиты." ;;
+        "run_servers")              echo "Service Hub: запуск локальных серверов для обмена файлами и скана." ;;
+        "run_repair")               echo "Инструменты самовосстановления и очистки мусора в ядре Prime." ;;
+        "update_prime")             echo "Обновление ядра до последней версии с GitHub репозитория." ;;
+        "exit_script")              echo "Безопасное завершение работы и очистка временных сессий." ;;
+
+        # --- Подменю: DEVICE_HACK ---
+        "run_network_analyzer")     echo "Network Intelligence: анализ трафика и обнаружение устройств в сети." ;;
+        "scan_bluetooth_devices")   echo "Bluetooth Scan: перехват ID и анализ уязвимостей BT-протоколов." ;;
+        "run_deep_audit")           echo "Smart Audit: глубокая проверка безопасности текущей системы." ;;
+
+        # --- Подменю: PC_RECOVERY & EXPLOIT (уже были) ---
+        "pc_gen_payload")           echo "Генерация реверс-шеллов (Bash/Python). Авто-настройка LHOST." ;;
+        "run_pc_recovery_ultimate") echo "Сброс паролей Win/Lin/Mac и извлечение данных (LaZagne)." ;;
+        "run_forensic_scanner")     echo "Автономная защита: килл-процессов, блок портов, карантин." ;;
+
+        # --- Подменю: SERVICE_HUB (run_servers) ---
+        "run_av_srv")               echo "AV-Scanner Server: удаленная проверка файлов на сигнатуры вирусов." ;;
+        "run_share_srv")            echo "Share-File: быстрый HTTP-сервер для раздачи файлов в локальной сети." ;;
+        "run_upload_srv")           echo "Upload-Inbound: защищенный приемник для входящих файлов." ;;
+
+        *)                          echo "Описание функционала находится в стадии разработки..." ;;
     esac
 }
 
@@ -485,19 +513,26 @@ EOF
 run_main_menu() {
     local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
     local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_system_info run_servers run_repair update_prime exit_script"
-    
+
+    # Динамическая справка для всех ключевых модулей системы
+    # Это создаст аккуратную информационную панель перед выбором
+    show_menu_info "$main_funcs"
+    # Основной контроллер
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
 
-
-
-# --- Модули: DEVICE & NETWORK ---
-# --- Модули: DEVICE & NETWORK (OPTIMIZED v35.4) ---
+# --- Модули: DEVICE & NETWORK (FULL INFO v35.4) ---
 run_device_hack() {
-    # Теперь у нас 3 кита: Сеть, Bluetooth и Системный аудит
-    local dh_names="Network_Intelligence Bluetooth_Scan Smart_Audit"
-    local dh_funcs="run_network_analyzer scan_bluetooth_devices run_deep_audit"
+    print_header "DEVICE & NETWORK ANALYSIS"
     
+    # Определяем функции и их отображаемые имена
+    local dh_funcs="run_network_analyzer scan_bluetooth_devices run_deep_audit"
+    local dh_names="Network_Intelligence Bluetooth_Scan Smart_Audit"
+    
+    # Динамический вывод справки из нашего общего словаря get_tool_info
+    show_menu_info "$dh_funcs"
+    
+    # Запуск контроллера
     prime_dynamic_controller "DEVICE & NETWORK ANALYSIS" "$dh_names" "$dh_funcs"
 }
 
@@ -534,8 +569,14 @@ pc_post_exploit() { run_forensic_scanner; }
 
 # --- SECURITY & DATA HUB ---
 run_servers() {
+    print_header "SECURITY & DATA HUB"
+    
     local s_names="AV-Scanner Share-File Upload-Inbound"
     local s_funcs="run_av_srv run_share_srv run_upload_srv"
+
+    # Теперь здесь тоже есть динамическая справка!
+    show_menu_info "$s_funcs"
+
     prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
 }
 
