@@ -851,18 +851,49 @@ run_system_info() {
 # --- Анализ Bluetooth устройств ---
 scan_bluetooth_devices() {
     print_header "BLUETOOTH RADAR"
-    print_status "i" "Initializing BlueZ Stack..."
     
-    # Проверка наличия утилиты hcitool
-    if command -v hcitool >/dev/null 2>&1; then
-        show_progress 3 "SCANNING PROXIMITY SPECTRUM"
-        print_status "!" "Searching for active signals..."
-        hcitool scan || print_status "e" "Bluetooth adapter not found or disabled."
-    else
-        print_status "e" "bluez-utils not installed. Run: apt install bluez-utils"
+    # 1. Проверка наличия инструментов
+    if ! command -v hcitool >/dev/null 2>&1; then
+        print_status "e" "Engine 'bluez-utils' not found."
+        
+        # Эвристика: подсказка в зависимости от прав
+        if [[ $(id -u) -ne 0 ]]; then
+            print_status "i" "On Samsung (Non-Root), Bluetooth access is restricted."
+            print_status "!" "Try: apt update && apt install bluez-utils"
+        else
+            print_status "w" "Root detected. Installing missing bridge..."
+            apt-get update && apt-get install bluez-utils -y
+        fi
+        pause && return
     fi
+
+    # 2. Проверка статуса адаптера (только для Wiko/Root)
+    if [[ $(id -u) -eq 0 ]]; then
+        print_status "i" "Activating Bluetooth Interface..."
+        hciconfig hci0 up >/dev/null 2>&1
+    fi
+
+    print_status "i" "Initializing BlueZ Stack..."
+    show_progress 3 "SCANNING PROXIMITY SPECTRUM"
+    
+    # 3. Исполнение сканирования
+    print_status "!" "Searching for active signals..."
+    
+    # Пытаемся сканировать, подавляя системные ошибки сокетов
+    local scan_output
+    scan_output=$(hcitool scan 2>/dev/null)
+
+    if [[ -z "$scan_output" || "$scan_output" == *"Scanning"* ]]; then
+        print_status "e" "No devices found or Adapter blocked."
+        [[ $(id -u) -ne 0 ]] && print_status "w" "Note: Non-root users often can't access BT stack."
+    else
+        echo -e "$scan_output" | grep -v "Scanning"
+        print_status "s" "Scan completed."
+    fi
+    
     pause
 }
+
 
 # --- Глубокий аудит системы ---
 run_deep_audit() {
@@ -888,9 +919,9 @@ run_network_analyzer() {
     clear
     print_header "NETWORK INTELLIGENCE & TOPOLOGY"
 
-    # 1. Выбор режима (Исправленная логика выбора)
+    # 1. Выбор режима
     select_option "SELECT OPERATION MODE:" \
-        "Network Mapping (Fast Scan)" \
+        "Network Mapping (Hybrid Scan)" \
         "Traffic Analysis (TShark)" \
         "Full Intelligence Loop" \
         "Back"
@@ -900,7 +931,7 @@ run_network_analyzer() {
 
     # 2. Логика Mapping (пункты 1 и 3)
     if [[ "$btn" == "1" || "$btn" == "3" ]]; then
-        # Эвристика: берем текущую подсеть из лаунчера
+        # Эвристика: подтягиваем текущую подсеть
         local def_range=$(echo "${CURRENT_IP:-127.0.0.1}" | cut -d. -f1-3)".0/24"
         
         echo -en "${Y}Enter Target Range ${W}[Default: $def_range]${Y}: ${NC}"
@@ -908,12 +939,17 @@ run_network_analyzer() {
         range="${range:-$def_range}"
         
         show_progress 2 "MAPPING TOPOLOGY"
+
+        # --- ГИБРИДНЫЙ ДВИЖОК СКАННИРОВАНИЯ (v35.4) ---
+        # Проверяем root-статус (для адаптации под Samsung A14 vs Wiko)
+        local nmap_cmd="nmap -sn -n -T4"
+        if [[ $(id -u) -ne 0 ]]; then
+            # Режим для Samsung (Non-Root/Termux): убираем AF_NETLINK ошибки
+            nmap_cmd+=" --unprivileged --send-ip"
+        fi
         
-        # УЛЬТРА-БЫСТРЫЙ СКАН:
-        # -sn: Ping scan (без портов, только живые хосты)
-        # -n:  ОТКЛЮЧАЕМ DNS (убирает зависание!)
-        # -T4: Агрессивный тайминг
-        nmap -sn -n -T4 "$range" | grep "Nmap scan report" | awk '{print $5 " -> [ONLINE]"}'
+        # Исполнение без DNS-зависаний
+        $nmap_cmd "$range" | grep "Nmap scan report" | awk '{print $5 " -> [ONLINE]"}' | sort -u
         
         [[ "$btn" == "1" ]] && { echo ""; pause; return; }
     fi
@@ -922,10 +958,14 @@ run_network_analyzer() {
     if [[ "$btn" == "2" || "$btn" == "3" ]]; then
         print_status "i" "Initializing TShark Core..."
         
-        # Если TShark не установлен, ставим быстро
         if ! command -v tshark >/dev/null; then
              print_status "e" "TShark not found. Run 'apt install tshark' first."
              pause && return
+        fi
+
+        # Проверка прав для сниффинга (TShark требует доступ к интерфейсам)
+        if [[ $(id -u) -ne 0 ]]; then
+             print_status "w" "Warning: Non-root detected. Traffic capture may be limited on Samsung A14."
         fi
 
         local n_names="Live_Host_Monitor Deep_Packet_Inspection"
@@ -934,6 +974,7 @@ run_network_analyzer() {
         prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
     fi
 }
+
 
 
 
