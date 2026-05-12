@@ -667,7 +667,7 @@ run_forensic_scanner() {
 
 
 
-Run_ghost_commander() {
+run_ghost_commander() {
     print_header "GHOST COMMANDER (ANDROID/IOT)"
 
     # 1. Валидация наличия ADB (вместо поиска тяжелой папки Ghost)
