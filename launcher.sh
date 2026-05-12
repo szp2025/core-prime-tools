@@ -701,31 +701,51 @@ run_ghost_commander() {
 update_prime() {
     print_header "SYSTEM UPDATE & SYNC"
     
-    local upd_path="/root/updlauncher.sh"
-    local upd_url="https://raw.githubusercontent.com/szp2025/core-prime-tools/main/updlauncher.sh"
+    local target_path="/root/launcher.sh"
+    local repo_url="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
+    local alias_cmd="alias launcher='bash /root/launcher.sh'"
 
-    # 1. Логика проверки: Сначала ищем локально, потом в сети
-    if [[ -f "$upd_path" ]]; then
-        echo -e "${G}[+] Локальный апдейтер найден. Запуск...${NC}"
-        chmod +x "$upd_path"
-    else
-        echo -e "${Y}[!] Апдейтер не найден. Загрузка из репозитория...${NC}"
-        if curl -s -L "$upd_url" -o "$upd_path"; then
-            chmod +x "$upd_path"
-            echo -e "${G}[+] Апдейтер успешно загружен.${NC}"
+    echo -e "${B}[*] Подключение к GitHub...${NC}"
+    show_progress 2 "FETCHING LATEST SOURCE"
+
+    # 1. Загрузка новой версии
+    if curl -s -L "$repo_url" -o "${target_path}.tmp"; then
+        if [[ -s "${target_path}.tmp" ]]; then
+            # Заменяем старый файл новым
+            mv "${target_path}.tmp" "$target_path"
+            
+            # 2. Установка прав (обязательно исполняемый)
+            chmod 755 "$target_path"
+            chown root:root "$target_path"
+
+            # 3. Проверка и фиксация Alias
+            # Проверяем, есть ли alias в .bashrc, если нет — добавляем
+            if ! grep -q "alias launcher=" ~/.bashrc; then
+                echo "$alias_cmd" >> ~/.bashrc
+                echo -e "${Y}[!] Alias 'launcher' был восстановлен в ~/.bashrc${NC}"
+            fi
+
+            # Дублируем в системный путь для мгновенного доступа
+            ln -sf "$target_path" /usr/local/bin/launcher
+            chmod +x /usr/local/bin/launcher
+
+            echo -e "------------------------------------------------"
+            echo -e "${G}[SUCCESS] Код обновлен, права установлены, alias активен!${NC}"
+            echo -e "${Y}[!] Перезапуск...${NC}"
+            sleep 1
+            
+            # 4. Мгновенный перезапуск
+            exec bash "$target_path"
         else
-            echo -e "${R}[!] Ошибка: Не удалось загрузить апдейтер. Проверьте сеть.${NC}"
+            echo -e "${R}[!] Ошибка: Файл пуст.${NC}"
+            rm -f "${target_path}.tmp"
             pause
-            return 1
         fi
+    else
+        echo -e "${R}[!] Ошибка: Нет связи с репозиторием.${NC}"
+        rm -f "${target_path}.tmp"
+        pause
     fi
-
-    # 2. Безопасная передача управления
-    echo -e "${B}[*] Переподключение к потоку обновления...${NC}"
-    show_progress 1 "HANDOVER TO UPDATER"
-    
-    # Запускаем через bash, чтобы гарантировать выполнение
-    exec bash "$upd_path"
 }
 
 
