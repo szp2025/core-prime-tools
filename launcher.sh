@@ -1179,100 +1179,90 @@ suggest_action() {
 }
 
 run_smart_osint_engine() {
-    print_header "SMART OSINT ENGINE: GHOST RECON v4.7"
+    clear
+    print_header "PRIME RECON: ULTIMATE OSINT CORE v5.5"
 
-    echo -en "${Y}ENTER DATA ${W}(Nick, Phone, or Email)${Y}: ${NC}"
+    echo -en "${Y}TARGET ${W}(Nick, Phone, or Email)${Y}: ${NC}"
     read -r INPUT
     [[ -z "$INPUT" ]] && return
 
-    # 1. Подготовка среды и лога
-    local UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0"
-    local raw_log="/tmp/osint_raw_$RANDOM.log"
-    print_status "i" "Initializing Stealth Environment..."
+    local raw_log="/tmp/prime_recon_$RANDOM.log"
+    local UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    
+    print_status "i" "Initializing Neural Recon Interface..."
+    show_progress 2 "SYNCHRONIZING OSINT CHANNELS"
 
-    # 2. Определение типа через Regex
+    # --- 1. ОПРЕДЕЛЕНИЕ ТИПА ЦЕЛИ ---
     local is_email="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
     local is_phone="^\+?[0-9]{10,15}$"
 
-    # --- ФАЗА 1: ГЛОБАЛЬНЫЙ СКАН (SocialScan) ---
-    check_step "cmd" "socialscan" "SocialScan skipping..." && {
-        print_status "i" "Rapid Presence Check..."
-        socialscan "$INPUT" --user-agent "$UA" | tee -a "$raw_log"
-    }
+    # --- 2. SOCIAL SCAN (Заменяет Blackbird, Maigret, SocialScan) ---
+    if [[ ! "$INPUT" =~ $is_email && ! "$INPUT" =~ $is_phone ]]; then
+        print_status "i" "Scanning Social Signatures (Ghost Mode)..."
+        # Наш собственный массив для проверки (быстрее и легче оригиналов)
+        local sites=(
+            "https://github.com/|GitHub"
+            "https://twitter.com/|Twitter"
+            "https://instagram.com/|Instagram"
+            "https://vk.com/|VK"
+            "https://t.me/|Telegram"
+            "https://ok.ru/|Odnoklassniki"
+            "https://www.pinterest.com/|Pinterest"
+            "https://www.reddit.com/user/|Reddit"
+        )
 
-    # --- ФАЗА 2: ГЛУБОКАЯ СПЕЦИАЛИЗАЦИЯ ---
-
-    # ВЕТКА: EMAIL
-    [[ "$INPUT" =~ $is_email ]] && {
-        print_status "s" "Targeting Identity: EMAIL"
-        
-        check_step "file" "/root/infoga/infoga.py" "Infoga missing." && {
-            print_status "w" "Analyzing Breach History..."
-            python3 /root/infoga/infoga.py --target "$INPUT" | tee -a "$raw_log"
-        }
-        
-        check_step "cmd" "holehe" "Holehe not found." && {
-            print_status "i" "Mapping registered accounts..."
-            holehe "$INPUT" --only-used --no-color | tee -a "$raw_log"
-        }
-    }
-
-    # ВЕТКА: ТЕЛЕФОН
-    [[ "$INPUT" =~ $is_phone ]] && {
-        print_status "s" "Targeting Identity: PHONE"
-        print_status "i" "Cross-referencing Phone Databases..."
-        
-        check_step "cmd" "phoneinfoga" "PhoneInfoga missing." && {
-            phoneinfoga scan -n "$INPUT" | tee -a "$raw_log"
-        }
-        # Дополнительный стелс-поиск имени через публичные префиксы
-        print_status "w" "Extracting Caller ID signatures..."
-    }
-
-    # ВЕТКА: USERNAME
-    [[ ! "$INPUT" =~ $is_email && ! "$INPUT" =~ $is_phone ]] && {
-        print_status "s" "Targeting Identity: USERNAME"
-        
-        check_step "cmd" "maigret" "Maigret skipping..." && {
-            print_status "i" "Launching Maigret Deep-Parse..."
-            maigret "$INPUT" --parse --timeout 20 --top 500 --reports path "$LOOT_DIR" | tee -a "$raw_log"
-        }
-
-        check_step "file" "/root/blackbird/blackbird.py" "Blackbird skipping..." && {
-            print_status "i" "Executing Blackbird Stealth Scan..."
-            python3 /root/blackbird/blackbird.py -u "$INPUT" | tee -a "$raw_log"
-        }
-    }
-
-    # --- ФАЗА 3: ИНТЕЛЛЕКТУАЛЬНЫЙ ПАРСИНГ (ДОСЬЕ) ---
-    print_line
-    print_status "s" "GENERATING INTELLIGENCE DOSSIER..."
-    print_line
-
-    # Извлекаем Имя (ищем паттерны в выводах Maigret/Infoga/Social)
-    local found_name=$(grep -iE "name|fullname|display" "$raw_log" | awk -F': ' '{print $2}' | grep -v "null" | head -n 3 | sort -u | xargs)
-    # Извлекаем Локацию (из PhoneInfoga или профилей)
-    local found_loc=$(grep -iE "city|location|country|address" "$raw_log" | awk -F': ' '{print $2}' | sort -u | head -n 2 | xargs)
-
-    echo -e "${B}Target:${NC} $INPUT"
-    [[ -n "$found_name" ]] && echo -e "${G}Confirmed Name/Alias:${NC} $found_name" || echo -e "${R}Name:${NC} No direct match. Review Maigret PDF."
-    [[ -n "$found_loc" ]] && echo -e "${G}Detected Location:${NC} $found_loc"
-
-    # Считаем совпадения (Correlation)
-    local hits=$(grep -iE "found|vulnerable|exists|success" "$raw_log" | wc -l)
-    if [ "$hits" -gt 5 ]; then
-        echo -e "${Y}Confidence Level:${NC} ${R}HIGH ($hits matches found)${NC}"
-    else
-        echo -e "${Y}Confidence Level:${NC} LOW (Low digital footprint)"
+        for entry in "${sites[@]}"; do
+            local url="${entry%%|*}"
+            local name="${entry##*|}"
+            # Проверка статус-кода 200 (Found)
+            local status=$(curl -s -o /dev/null -L -w "%{http_code}" -A "$UA" "${url}${INPUT}" --connect-timeout 5)
+            if [ "$status" == "200" ]; then
+                echo "[+] FOUND on $name: ${url}${INPUT}" | tee -a "$raw_log"
+                print_status "s" "Match confirmed: $name"
+            fi
+        done
     fi
 
-    # 4. Финализация
-    log_loot "osint" "Report for $INPUT: Name($found_name) Loc($found_loc) Hits($hits)"
+    # --- 3. PHONE INTEL (Заменяет PhoneInfoga) ---
+    if [[ "$INPUT" =~ $is_phone ]]; then
+        print_status "i" "Deep-Querying Global Phone Databases..."
+        # Прямой запрос к API (бездисковый метод)
+        curl -s "https://htmlweb.ru/geo/api.php?json&telcod=${INPUT}" >> "$raw_log" 2>/dev/null
+        # Извлекаем данные из JSON ответа
+        local phone_info=$(grep -oE '"name":"[^"]+"|"oper":"[^"]+"' "$raw_log" | sed 's/"//g')
+        [[ -n "$phone_info" ]] && print_status "s" "Operator Data: $phone_info"
+    fi
+
+    # --- 4. DATA BREACH ANALYZER (Заменяет Infoga и Holehe) ---
+    if [[ "$INPUT" =~ $is_email ]]; then
+        print_status "i" "Cross-referencing Leak Databases..."
+        # Проверка через прокси-агрегаторы утечек
+        curl -s "https://api.proxynova.com/comb?query=${INPUT}" >> "$raw_log" 2>/dev/null
+        if grep -q "results" "$raw_log"; then
+            print_status "w" "Breach Detected: Target found in global COMB leak."
+            echo "[!] WARNING: Data leak detected for $INPUT" >> "$raw_log"
+        fi
+    fi
+
+    # --- 5. ГЕНЕРАЦИЯ ФИНАЛЬНОГО ДОСЬЕ ---
+    print_line
+    print_status "s" "INTELLIGENCE DOSSIER GENERATED"
+    print_line
+    
+    local hits=$(grep -cE "FOUND|!|oper" "$raw_log")
+    echo -e "${B}Target Identification:${NC} $INPUT"
+    echo -e "${Y}Correlation Level:${NC} $hits matches found."
+    
+    echo -e "\n${G}--- DETAILED FINDINGS ---${NC}"
+    grep -E "FOUND|oper|name|location|WARNING" "$raw_log" | sort -u
+    
+    log_loot "osint" "Dossier for $INPUT created. Hits: $hits"
     rm -f "$raw_log"
     print_line
-    print_status "s" "OSINT Operation Complete."
     pause
 }
+
+
 
 run_pc_recovery_ultimate() {
     clear
