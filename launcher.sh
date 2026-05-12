@@ -667,34 +667,52 @@ run_forensic_scanner() {
 
 
 
-run_ghost_commander() {
+Run_ghost_commander() {
     print_header "GHOST COMMANDER (ANDROID/IOT)"
 
-    # 1. Валидация наличия
-    local GHOST_PATH=$(find /root /home /opt /sdcard -maxdepth 2 -type d -name "Ghost" 2>/dev/null | head -n1)
-    check_step "dir" "$GHOST_PATH" "Ghost Framework not found." || { pause; return; }
+    # 1. Валидация наличия ADB (вместо поиска тяжелой папки Ghost)
+    if ! command -v adb >/dev/null 2>&1; then
+        print_status "e" "ADB Engine not found. Installing lightweight bridge..."
+        apt-get update && apt-get install android-sdk-platform-tools-common -y
+    fi
 
-    echo -en "${Y}Enter Target IP ${W}(Leave empty for Manual Console)${Y}: ${NC}"
+    echo -en "${Y}Enter Target IP ${W}(Leave empty for Scan)${Y}: ${NC}"
     read -r TARGET_IP
 
-    # 2. Ручной режим (универсальный запуск)
-    check_empty_run "$TARGET_IP" "$GHOST_PATH" "python3 -m ghost" && return
+    # 2. Режим сканирования (если IP пустой)
+    if [[ -z "$TARGET_IP" ]]; then
+        print_status "i" "Scanning local network for ADB signatures..."
+        # Быстрый скан порта 5555 в подсети
+        local subnet=$(echo "$CURRENT_IP" | cut -d. -f1-3)
+        nmap -p 5555 --open "$subnet.0/24" -n -Pn | grep "Nmap scan report" | awk '{print $5}'
+        pause && return
+    fi
 
     # 3. Автоматический режим: Проверка связи
-    print_status "i" "Pre-scanning target $TARGET_IP:5555..."
+    print_status "i" "Initializing ghost bridge to $TARGET_IP:5555..."
     
-    # Используем check_step для порта и ask_confirm для логики пропуска ошибок
-    check_step "port" "$TARGET_IP:5555" "Port 5555 (ADB) is closed." || \
-    ask_confirm "Force connection attempt?" || return
+    # Проверка порта через таймаут (быстрее чем nmap)
+    timeout 2 bash -c "</dev/tcp/$TARGET_IP/5555" 2>/dev/null || {
+        print_status "w" "Target $TARGET_IP:5555 seems offline."
+        ask_confirm "Force ghost-connect attempt?" || return
+    }
 
-    # 4. Исполнение
-    print_status "s" "Executing Auto-Connect to $TARGET_IP..."
-    log_loot "ghost" "Connection attempt: $TARGET_IP"
+    # 4. Исполнение (Нативный ADB вместо тяжелого Python-модуля)
+    print_status "s" "Executing Ghost-Protocol to $TARGET_IP..."
+    log_loot "ghost" "Session established: $TARGET_IP"
     
-    (cd "$GHOST_PATH" && python3 -m ghost --execute "connect $TARGET_IP")
-
+    # Прямое подключение
+    adb connect "$TARGET_IP:5555"
+    
+    # Открываем интерактивную оболочку призрака
+    print_status "i" "Dropping into Ghost Shell..."
+    adb -s "$TARGET_IP:5555" shell
+    
+    # После выхода — отключаемся, не оставляя следов
+    adb disconnect "$TARGET_IP:5555" >/dev/null 2>&1
     pause
 }
+
 
 
 # --- [ SYSTEM UPDATE ENGINE v35.4 ] ---
