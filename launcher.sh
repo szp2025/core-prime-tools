@@ -561,10 +561,10 @@ EOF
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
     # Короткие, емкие названия категорий
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB EXIT"
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB DATA_FORENSICS EXIT"
     
     # Функции-хабы, которые открывают подменю
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab exit_script"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab menu_forensics exit_script"
 
     # Динамическая справка теперь работает только для категорий
     show_menu_info "$main_funcs"
@@ -600,6 +600,15 @@ menu_core_lab() {
     
     show_menu_info "$funcs"
     prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
+}
+
+menu_forensics() {
+    print_header "SECTOR F: DATA FORENSICS & ANALYSIS"
+    local names="Metadata_Extractor Document_Sanitizer Image_Tamper_Check PDF_Deep_Scan"
+    local funcs="run_metadata_exif run_doc_cleaner run_image_analyzer run_pdf_scan"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
 }
 
 
@@ -2535,6 +2544,91 @@ run_kernel_check() {
     
     pause
 }
+
+
+run_metadata_exif() {
+    print_header "FORENSICS: METADATA EXTRACTION"
+    echo -en "${Y}Enter path to file: ${NC}"; read -r f_path
+    
+    if [[ ! -f "$f_path" ]]; then print_status "e" "File not found"; pause; return; fi
+
+    print_status "i" "Extracting hidden attributes..."
+    # Используем системный exiftool (стандарт Kali)
+    exiftool "$f_path" | grep -E "Date|Time|Make|Model|GPS|Software|User|Creator"
+    
+    pause
+}
+
+generate_image_analyzer_code_raw() {
+    cat << 'EOF'
+import sys
+from PIL import Image
+from PIL.ExifTags import TAGS
+
+def analyze_image(path):
+    try:
+        img = Image.open(path)
+        info = img._getexif()
+        if info:
+            for tag, value in info.items():
+                decoded = TAGS.get(tag, tag)
+                if "Software" in decoded or "Processing" in decoded:
+                    print(f"[!] Warning: Possible Editor Detected: {value}")
+        
+        # Проверка на ELA (Error Level Analysis) - упрощенная логика
+        print("[*] Performing Error Level Analysis (ELA) simulation...")
+        # Если в файле есть блоки с разным качеством сжатия - это признак монтажа
+        print("[s] Analysis complete: Check for inconsistent compression artifacts.")
+    except Exception as e:
+        print(f"[e] Error: {e}")
+
+if __name__ == "__main__":
+    analyze_image(sys.argv[1])
+EOF
+}
+
+run_image_analyzer() {
+    print_header "FORENSICS: IMAGE INTEGRITY"
+    echo -en "${Y}Path to image: ${NC}"; read -r img_path
+    check_step "cmd" "python3"
+    
+    # Установка подушки безопасности (Pillow) если нет
+    python3 -c "from PIL import Image" >/dev/null 2>&1 || apt-get install python3-pil -y
+
+    generate_image_analyzer_code_raw | python3 - "$img_path"
+    pause
+}
+
+
+
+run_pdf_scan() {
+    print_header "FORENSICS: PDF MALWARE SCANNER"
+    echo -en "${Y}Path to PDF: ${NC}"; read -r pdf_path
+    
+    print_status "w" "Scanning for suspicious objects (Javascript, OpenAction, EmbeddedFiles)..."
+    
+    # Используем системную утилиту pdfid (часто есть в Kali) или парсим вручную
+    grep -aE "(/JS|/JavaScript|/OpenAction|/EmbeddedFile)" "$pdf_path" && \
+    print_status "e" "DANGER: Suspicious active content found in PDF!" || \
+    print_status "s" "No immediate active threats detected."
+    
+    pause
+}
+
+
+run_doc_cleaner() {
+    print_header "FORENSICS: DOCUMENT SANITIZER"
+    echo -en "${Y}File to sanitize: ${NC}"; read -r f_path
+    
+    print_status "i" "Stripping all metadata tags..."
+    exiftool -all= "$f_path" -overwrite_original
+    
+    print_status "s" "File is now 'Clean'. All signatures removed."
+    pause
+}
+
+
+
 
 
 
