@@ -603,9 +603,9 @@ menu_core_lab() {
 }
 
 menu_forensics() {
-    print_header "SECTOR F: DATA FORENSICS & ANALYSIS"
-    local names="Metadata_Extractor Document_Sanitizer Image_Tamper_Check PDF_Deep_Scan"
-    local funcs="run_metadata_exif run_doc_cleaner run_image_analyzer run_pdf_scan"
+    print_header "SECTOR F: DATA FORENSICS & RECOVERY"
+    local names="Metadata_Extractor Image_Tamper_Check PDF_Deep_Scan Binary_Analyzer Disk_Raw_Recovery Document_Sanitizer"
+    local funcs="run_metadata_exif run_image_analyzer run_pdf_scan run_bin_analyst run_raw_recovery run_doc_cleaner"
     
     show_menu_info "$funcs"
     prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
@@ -2628,10 +2628,126 @@ run_doc_cleaner() {
 }
 
 
+run_bin_analyst() {
+    print_header "FORENSICS: BINARY ANALYSIS"
+    echo -en "${Y}Path to binary (.exe/.bin/.elf): ${NC}"; read -r b_path
+    
+    if [[ ! -f "$b_path" ]]; then print_status "e" "File not found"; pause; return; fi
+
+    print_status "i" "Identifying file signature..."
+    file "$b_path"
+    
+    print_status "w" "Extracting readable strings (min length 6)..."
+    strings -n 6 "$b_path" | head -n 20
+    
+    print_status "i" "Checking for packers (UPX/etc)..."
+    grep -aE "(UPX!|ASPack|Enigma)" "$b_path" >/dev/null && \
+    print_status "w" "ALERT: Binary might be packed/obfuscated." || \
+    print_status "s" "No common packers detected."
+    
+    pause
+}
 
 
+# --- Вспомогательный селектор устройств ---
+select_target_storage() {
+    print_status "i" "Searching for connected mass storage devices..."
+    
+    # Выводим только диски, которые не являются системными (исключаем /, /boot и т.д.)
+    # Показываем: Имя, Размер, Модель, Серийник, Точку монтирования
+    local devices=$(lsblk -dno NAME,SIZE,MODEL,SERIAL,TRAN | grep -E "usb|sata|nvme")
+    
+    if [[ -z "$devices" ]]; then
+        print_status "e" "No external storage detected."
+        return 1
+    fi
+
+    echo -e "\n${B}#  NAME  SIZE  MODEL / SERIAL${NC}"
+    echo -e "${B}------------------------------------------------------------${NC}"
+    
+    local i=1
+    local dev_list=()
+    while read -r line; do
+        echo -e "${G}$i)${NC} /dev/$line"
+        dev_list+=("/dev/$(echo $line | awk '{print $1}')")
+        ((i++))
+    done <<< "$devices"
+    echo -e "${B}------------------------------------------------------------${NC}"
+
+    echo -en "${Y}Выберите номер карты памяти (1-$((${#dev_list[@]}))): ${NC}"; read -r choice
+    
+    if [[ "$choice" -ge 1 && "$choice" -le "${#dev_list[@]}" ]]; then
+        TARGET_DEV="${dev_list[$((choice-1))]}"
+        print_status "s" "Selected: $TARGET_DEV"
+        return 0
+    else
+        print_status "e" "Invalid selection."
+        return 1
+    fi
+}
+
+# --- Обновленная основная функция ---
+run_raw_recovery() {
+    print_header "FORENSICS: AUTOMATIC STORAGE RECOVERY"
+    
+    # 1. Сначала выбираем карту памяти
+    if ! select_target_storage; then
+        pause; return
+    fi
+    
+    # Теперь TARGET_DEV содержит путь, например /dev/sdb
+    local dev_path="$TARGET_DEV"
+
+    # 2. Авто-диагностика аппаратной части (теперь прицельно по выбранному устройству)
+    local dev_name=$(basename "$dev_path")
+    print_status "i" "Hardware Health Check for $dev_name..."
+    dmesg | grep -i "$dev_name" | tail -n 10 | sed 's/^/  /'
+    echo -e "${B}------------------------------------------------------------${NC}"
+
+    # 3. Меню выбора стратегии (используем те же функции, что и раньше)
+    local options="PARTITION_FIX DEEP_CARVING IMAGE_DUMP BACK"
+    local opt_funcs="recover_partition_logic run_foremost_logic run_dd_logic run_main_menu"
+    
+    prime_dynamic_controller "RECOVERY ENGINE [$dev_path]" "$options" "$opt_funcs"
+}
 
 
+recover_partition_logic() {
+    # Параметр $dev_path передается неявно из родительской функции
+    check_step "pkg" "testdisk"
+    print_status "w" "Launching Partition Repair..."
+    print_status "i" "Instruction: [Analyze] -> [Quick Search] -> [Write]"
+    sleep 2
+    testdisk "$dev_path"
+    pause
+}
+
+run_foremost_logic() {
+    check_step "pkg" "foremost"
+    local rec_dir="$PRIME_LOOT/recovered_$(date +%s)"
+    mkdir -p "$rec_dir"
+    
+    print_status "w" "Starting Deep Carving. No File System needed."
+    print_status "i" "Output directory: $rec_dir"
+    
+    # Набор сигнатур: jpg, pdf, exe, zip, doc, png, mp4
+    foremost -v -t jpg,pdf,exe,zip,doc,png,mp4 -i "$dev_path" -o "$rec_dir"
+    
+    print_status "s" "Extraction complete. Data saved in Loot."
+    pause
+}
+
+run_dd_logic() {
+    local img_file="$PRIME_LOOT/disk_backup_$(date +%s).img"
+    print_status "w" "Creating binary image dump... DONT UNPLUG DEVICE!"
+    
+    # Используем dd с индикатором прогресса
+    dd if="$dev_path" of="$img_file" bs=4M status=progress conv=noerror,sync
+    
+    print_status "s" "Image secured: $img_file"
+    print_status "i" "You can now run Foremost on this .img file later."
+    pause
+}
 
 
 # --- Точка входа ---
