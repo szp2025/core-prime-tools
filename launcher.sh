@@ -2842,6 +2842,19 @@ run_service_manager() {
     pause
 }
 
+
+menu_intelligence() {
+    print_header "SECTOR I: INTELLIGENCE & OSINT"
+    print_status "i" "Status: Global Search Modules Active"
+    echo -e "${B}------------------------------------------------------------${NC}"
+
+    local names="Phone_Lookup Name_Search Social_Scanner Email_Hunter"
+    local funcs="run_phone_osint run_name_osint run_soc_scan run_email_hunt"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
+}
+
 run_system_pulse() {
     print_header "SECTOR Z: LIVE SYSTEM PULSE"
     print_status "i" "Monitoring net-connections (Top 10)..."
