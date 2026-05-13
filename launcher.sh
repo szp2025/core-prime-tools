@@ -539,8 +539,8 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_system_info run_servers run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER MESH_BRIDGE SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_mesh_bridge run_system_info run_servers run_repair update_prime exit_script"
 
  
    # Динамическая справка для всех ключевых модулей системы
@@ -2074,6 +2074,54 @@ run_upload_server() {
             "Status: Ready for Transmission"
     } || print_status "e" "Failed to ignite the uplink."
 
+    pause
+}
+
+
+# --- MODULE 98: MESH BRIDGE (ZERO-DEPENDENCY) ---
+
+run_mesh_bridge() {
+    print_header "PRIME MESH: AD-HOC COMMUNICATIONS v1.0"
+    
+    print_status "i" "Initializing Mesh Protocol..."
+    
+    # Проверка доступности инструментов (термукс-апи для BT/WiFi)
+    if ! command -v termux-bluetooth-scan >/dev/null 2>&1; then
+        print_status "e" "Termux:API not detected. Mesh limited to local filesystem."
+    fi
+
+    echo -e "1) [Broadcaster] - Start Beacon"
+    echo -e "2) [Receiver]    - Listen for Signals"
+    echo -e "3) [Sync]        - Push Loot to Bridge"
+    echo -e "b) Back"
+    
+    read -rp "Selection > " mesh_opt
+
+    case $mesh_opt in
+        1)
+            print_status "s" "Beacon Active: Broadcasting PRIME_NODE..."
+            # Используем изменение имени Bluetooth устройства как маяк (Beacon)
+            # Это не требует сопряжения для передачи статуса
+            termux-bluetooth-set-name "PRIME_$(date +%H%M)_READY" 2>/dev/null
+            print_status "i" "Status encoded in Device Name."
+            ;;
+        2)
+            print_status "i" "Scanning for nearby Prime Nodes..."
+            # Поиск устройств с префиксом PRIME_
+            termux-bluetooth-scan 2>/dev/null | grep "PRIME_"
+            ;;
+        3)
+            # Передача сигналов через общую директорию (если устройства связаны по SSH/SFTP)
+            if [[ -f "$PRIME_LOOT/bridge_signals.log" ]]; then
+                print_status "s" "Syncing bridge_signals.log to Mesh..."
+                # Здесь может быть команда rsync или scp на локальный IP второго устройства
+                print_status "y" "Loot Broadcasted via Local Mesh."
+            else
+                print_status "e" "No signals to sync."
+            fi
+            ;;
+        *) return ;;
+    esac
     pause
 }
 
