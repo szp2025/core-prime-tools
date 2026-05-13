@@ -14,6 +14,73 @@ fi
 CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 [ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
 
+SILENT="> /dev/null 2>&1"
+# Использование:
+command -v curl eval $SILENT
+
+BASE_DIR="/root/core-prime-tools"
+MOD_DIR="$BASE_DIR/modules"
+
+
+
+# 1. Тихий режим для команд
+run_silent() {
+    "$@" > /dev/null 2>&1
+}
+
+# 2. Быстрая проверка и установка пакетов
+# @param {string} package - Название пакета
+ensure_pkg() {
+    local pkg=$1
+    if ! command -v "$pkg" > /dev/null 2>&1; then
+        log_msg "info" "Установка $pkg..."
+        apt-get install -y "$pkg" > /dev/null 2>&1
+    fi
+}
+
+# 3. Пауза (Enter)
+wait_user() {
+    spacer
+    echo -ne "${YELLOW}Нажмите [Enter] для возврата в меню...${NC}"
+    read -r
+}
+
+# 4. Проверка директории модуля
+# @param {string} dir_name - Имя папки
+ensure_dir() {
+    if [ ! -d "$1" ]; then
+        run_silent mkdir -p "$1"
+        log_msg "success" "Создана директория: $1"
+    fi
+}
+
+
+/**
+ * Проверка кода завершения последней команды.
+ * @param {string} success_msg - Сообщение при успехе.
+ * @param {string} error_msg - Сообщение при ошибке.
+ * @param {boolean} fatal - Нужно ли остановить скрипт при ошибке (1 - да, 0 - нет).
+ */
+check_status() {
+    local status=$?
+    local success_msg="$1"
+    local error_msg="$2"
+    local fatal="${3:-0}"
+
+    if [ $status -eq 0 ]; then
+        log_msg "success" "$success_msg"
+    else
+        log_msg "error" "$error_msg"
+        if [ "$fatal" -eq 1 ]; then
+            log_msg "error" "Критический сбой. Работа остановлена."
+            exit 1
+        fi
+    fi
+}
+
+
+
+
 # Настройка DNS для локальных сервисов (например, scanclamavlocal)
 if command -v dnsmasq >/dev/null 2>&1; then
     cat << EOD > /etc/dnsmasq.conf
