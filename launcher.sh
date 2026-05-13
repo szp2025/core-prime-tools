@@ -558,108 +558,7 @@ EOF
 
 
 # --- Конец  Модулей ---
-# --- ГЛАВНОЕ МЕНЮ ---
-run_main_menu() {
-    # Короткие, емкие названия категорий
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB DATA_FORENSICS EXIT"
-    
-    # Функции-хабы, которые открывают подменю
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab menu_forensics exit_script"
 
-    # Динамическая справка теперь работает только для категорий
-    show_menu_info "$main_funcs"
-
-    # Главный контроллер с обновленным заголовком
-    prime_dynamic_controller "PRIME MASTER EXECUTIVE v$CURRENT_VERSION" "$main_names" "$main_funcs"
-}
-
-menu_cyber_ops() {
-    print_header "CYBER OPERATIONS SECTOR"
-    local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
-    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
-    
-    show_menu_info "$funcs"
-    prime_dynamic_controller "CYBER OPERATIONS" "$names" "$funcs"
-}
-
-
-menu_net_infra() {
-    print_header "NETWORK INFRASTRUCTURE"
-    local names="Device_Hack Mesh_Bridge Service_Hub Phantom_Engine"
-    local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
-    
-    show_menu_info "$funcs"
-    prime_dynamic_controller "NETWORK & INFRA" "$names" "$funcs"
-}
-
-
-menu_core_lab() {
-    print_header "SECTOR X: LOW-LEVEL CORE RESEARCH"
-    local names="Memory_Infiltrator Raw_Packet_Forge Wireless_Silent_Pulse Kernel_Audit"
-    local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
-    
-    show_menu_info "$funcs"
-    prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
-}
-
-menu_forensics() {
-    print_header "SECTOR F: DATA FORENSICS & RECOVERY"
-    local names="AUTO_ANALYZE Disk_Raw_Recovery Document_Sanitizer"
-    local funcs="run_auto_forensics run_raw_recovery run_doc_cleaner"
-    
-    show_menu_info "$funcs"
-    prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
-}
-
-
-# --- Модули: DEVICE & NETWORK (FULL INFO v35.4) ---
-run_device_hack() {
-    print_header "DEVICE & NETWORK ANALYSIS"
-    
-    # Определяем функции и их отображаемые имена
-    local dh_funcs="run_network_analyzer scan_bluetooth_devices run_deep_audit"
-    local dh_names="Network_Intelligence Bluetooth_Scan Smart_Audit"
-    
-    # Динамический вывод справки из нашего общего словаря get_tool_info
-    show_menu_info "$dh_funcs"
-    
-    # Запуск контроллера
-    prime_dynamic_controller "DEVICE & NETWORK ANALYSIS" "$dh_names" "$dh_funcs"
-}
-
-
-# --- Модули: RECOVERY & PASSWORDS ---
-pc_password_recovery() {
-    print_header "PC TARGET CONTROL CENTER"
-    
-    local p_funcs="pc_gen_payload run_pc_recovery_ultimate run_forensic_scanner"
-    local p_names="Generate_Reverse_Shell Extract_Reset_Passwords Forensic_Auto_Defense"
-
-    # Динамический вывод справки
-    show_menu_info "$p_funcs"
-
-    prime_dynamic_controller "PC TARGET CONTROL" "$p_names" "$p_funcs"
-}
-
-
-# --- SECURITY & DATA HUB ---
-run_servers() {
-    print_header "SECURITY & DATA HUB"
-    
-    # Список имен для отображения в UI
-    local s_names="AV-Scanner Share-File Upload-Inbound"
-    
-    # Список соответствующих функций запуска
-    # Убедись, что эти функции (run_av_srv и т.д.) теперь просто 
-    # вызывают run_live_service с нужными параметрами.
-    local s_funcs="run_av_srv run_share_srv run_upload_srv"
-
-    # Динамическая справка подтягивает описание функций (если оно есть)
-    show_menu_info "$s_funcs"
-
-    # Запуск интерактивного контроллера
-    prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
-}
 
 
 run_system_pulse() {
@@ -2786,6 +2685,112 @@ run_dd_logic() {
 
 
 # --- Точка входа ---
+
+
+# --- ГЛАВНОЕ МЕНЮ ---
+run_main_menu() {
+    # Короткие, емкие названия категорий
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB DATA_FORENSICS EXIT"
+    
+    # Функции-хабы, которые открывают подменю
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab menu_forensics exit_script"
+
+    # Динамическая справка теперь работает только для категорий
+    show_menu_info "$main_funcs"
+
+    # Главный контроллер с обновленным заголовком
+    prime_dynamic_controller "PRIME MASTER EXECUTIVE v$CURRENT_VERSION" "$main_names" "$main_funcs"
+}
+
+menu_cyber_ops() {
+    print_header "CYBER OPERATIONS SECTOR"
+    local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
+    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "CYBER OPERATIONS" "$names" "$funcs"
+}
+
+
+menu_net_infra() {
+    print_header "NETWORK INFRASTRUCTURE"
+    local names="Device_Hack Mesh_Bridge Service_Hub Phantom_Engine"
+    local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "NETWORK & INFRA" "$names" "$funcs"
+}
+
+
+menu_core_lab() {
+    print_header "SECTOR X: LOW-LEVEL CORE RESEARCH"
+    local names="Memory_Infiltrator Raw_Packet_Forge Wireless_Silent_Pulse Kernel_Audit"
+    local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
+}
+
+menu_forensics() {
+    print_header "SECTOR F: DATA FORENSICS & RECOVERY"
+    local names="AUTO_ANALYZE Disk_Raw_Recovery Document_Sanitizer"
+    local funcs="run_auto_forensics run_raw_recovery run_doc_cleaner"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
+}
+
+
+# --- Модули: DEVICE & NETWORK (FULL INFO v35.4) ---
+run_device_hack() {
+    print_header "DEVICE & NETWORK ANALYSIS"
+    
+    # Определяем функции и их отображаемые имена
+    local dh_funcs="run_network_analyzer scan_bluetooth_devices run_deep_audit"
+    local dh_names="Network_Intelligence Bluetooth_Scan Smart_Audit"
+    
+    # Динамический вывод справки из нашего общего словаря get_tool_info
+    show_menu_info "$dh_funcs"
+    
+    # Запуск контроллера
+    prime_dynamic_controller "DEVICE & NETWORK ANALYSIS" "$dh_names" "$dh_funcs"
+}
+
+
+# --- Модули: RECOVERY & PASSWORDS ---
+pc_password_recovery() {
+    print_header "PC TARGET CONTROL CENTER"
+    
+    local p_funcs="pc_gen_payload run_pc_recovery_ultimate run_forensic_scanner"
+    local p_names="Generate_Reverse_Shell Extract_Reset_Passwords Forensic_Auto_Defense"
+
+    # Динамический вывод справки
+    show_menu_info "$p_funcs"
+
+    prime_dynamic_controller "PC TARGET CONTROL" "$p_names" "$p_funcs"
+}
+
+
+# --- SECURITY & DATA HUB ---
+run_servers() {
+    print_header "SECURITY & DATA HUB"
+    
+    # Список имен для отображения в UI
+    local s_names="AV-Scanner Share-File Upload-Inbound"
+    
+    # Список соответствующих функций запуска
+    # Убедись, что эти функции (run_av_srv и т.д.) теперь просто 
+    # вызывают run_live_service с нужными параметрами.
+    local s_funcs="run_av_srv run_share_srv run_upload_srv"
+
+    # Динамическая справка подтягивает описание функций (если оно есть)
+    show_menu_info "$s_funcs"
+
+    # Запуск интерактивного контроллера
+    prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
+}
+
+
 #repair
 run_main_menu
 
