@@ -2741,6 +2741,19 @@ menu_forensics() {
 }
 
 
+menu_crypto_lab() {
+    print_header "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY"
+    print_status "i" "Engine: OpenSSL $(openssl version | awk '{print $2}')"
+    echo -e "${B}------------------------------------------------------------${NC}"
+
+    local names="Hash_Analyzer File_Encryptor Stegano_Deep_Hide SSH_Key_Gen"
+    local funcs="run_hash_analyzer run_file_cryptor run_stegano_lab run_ssh_keygen"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "CRYPTO_LAB" "$names" "$funcs"
+}
+
+
 # --- Модули: DEVICE & NETWORK (FULL INFO v35.4) ---
 run_device_hack() {
     print_header "DEVICE & NETWORK ANALYSIS"
