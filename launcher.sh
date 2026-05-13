@@ -285,8 +285,37 @@ ask_confirm() {
 }
 
 
+
 # Аргументы: $1 - текст вопроса, $2... - варианты (формат "описание:аргументы")
 select_option() {
+    local prompt="$1"; shift
+    local options=("$@")
+    local count=1
+    local total=${#options[@]}
+
+    echo -e "${W}[?] $prompt${NC}"
+
+    for ((i=0; i<total; i++)); do
+        local opt="${options[$i]}"
+        # Форматируем строку: номер и текст (ограничиваем длину для колонки)
+        local display_text="${G}$count)${NC} ${opt%%:*}"
+        
+        # Печатаем элемент с фиксированной шириной колонки (например, 25 символов)
+        printf " %-35b" "$display_text"
+
+        # Если индекс четный (вторая колонка) или это последний элемент — переходим на новую строку
+        if (( count % 2 == 0 )) || (( count == total )); then
+            echo ""
+        fi
+        ((count++))
+    done
+
+    echo -en "${Y}>> ${NC}"
+    read -r user_input
+    CHOICE="$user_input"
+}
+
+select_optionold() {
     local prompt="$1"; shift
     local options=("$@")
     local count=1
@@ -304,29 +333,6 @@ select_option() {
 }
 
 
-
-select_optionold() {
-    local prompt="$1"; shift
-    local options=("$@")
-    local count=1
-
-    # Выводим вопрос и список ПРЯМО в терминал
-    echo -e "${W}[?] $prompt${NC}" > /dev/tty
-    for opt in "${options[@]}"; do
-        echo -e " ${G}$count)${NC} ${opt%%:*}" > /dev/tty
-        ((count++))
-    done
-
-    echo -en "${Y}>> ${NC}" > /dev/tty
-    read -r choice < /dev/tty # Читаем ввод тоже напрямую из терминала
-    
-    local index=$((choice - 1))
-    
-    # А вот результат возвращаем в stdout, чтобы его поймала переменная
-    [[ $index -ge 0 && $index -lt ${#options[@]} ]] \
-        && echo "${options[$index]#*:}" \
-        || echo "${options[0]#*:}"
-}
 
 # Для красивых запросов ввода
 print_input() {
@@ -378,7 +384,6 @@ prime_obfuscate() {
     done
     echo -n "$result"
 }
-
 
 
 get_tool_info() {
@@ -436,103 +441,120 @@ show_menu_info() {
 
 
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
+
+generate_core_form_template() {
+    cat << 'EOF'
+def render_prime_form(action_url, fields=None, btn_text="INITIATE TRANSFER"):
+    if fields is None: fields = [{"type": "file", "name": "file", "label": "Drop files here or click to upload"}]
+    
+    inputs_html = ""
+    js_needed = False
+    
+    for field in fields:
+        f_type = field.get("type", "text")
+        f_name = field.get("name", "input")
+        f_label = field.get("label", "Field")
+        
+        if f_type == "file":
+            js_needed = True
+            inputs_html += f"""
+            <div class="drop-zone" id="drop-zone">
+                <span class="drop-zone__prompt">{f_label}</span>
+                <input type="file" name="{f_name}" class="drop-zone__input" id="file-input">
+            </div>
+            """
+        else:
+            inputs_html += f"""
+            <div style="margin: 15px 0;">
+                <label style="font-size:0.7rem; opacity:0.6; display:block;">{f_label}</label>
+                <input type="{f_type}" name="{f_name}" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; padding:10px; width:100%; border-radius:0.5rem;">
+            </div>
+            """
+
+    script = """
+    <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    if(dropZone) {
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            if(fileInput.files.length) updatePrompt(dropZone, fileInput.files[0].name);
+        });
+        ['dragover', 'dragleave', 'drop', 'dragend'].forEach(type => {
+            dropZone.addEventListener(type, e => { e.preventDefault(); });
+        });
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('drop-zone--over'));
+        ['dragleave', 'drop', 'dragend'].forEach(type => {
+            dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over'));
+        });
+        dropZone.addEventListener('drop', e => {
+            if(e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updatePrompt(dropZone, e.dataTransfer.files[0].name);
+            }
+        });
+    }
+    function updatePrompt(zone, name) { zone.querySelector('.drop-zone__prompt').textContent = 'READY: ' + name; zone.style.borderColor = '#00ff41'; }
+    </script>
+    """ if js_needed else ""
+
+    return f"""
+    <form method="post" action="{action_url}" enctype="multipart/form-data">
+        {inputs_html}
+        <button type="submit" style="margin-top:20px;">{btn_text}</button>
+    </form>
+    {script}
+    """
+EOF
+}
+
+
+
 generate_core_template() {
     cat << 'EOF'
 def render_prime_page(title, content):
+    style = """
+    <style>
+        :root { --accent: #00ff41; --bg: #0a0a0c; --glass: rgba(20, 20, 25, 0.8); }
+        body { background: var(--bg); color: #e0e0e0; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; }
+        .prime-card { background: var(--glass); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.5rem; padding: 2rem; width: 95%; max-width: 900px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        h2 { background: linear-gradient(to right, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
+        
+        /* Адаптивная сетка Share */
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+        .file-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; padding: 1rem; text-align: center; transition: 0.2s; text-decoration: none; color: inherit; }
+        .file-item:hover { border-color: var(--accent); background: rgba(0,255,65,0.05); transform: translateY(-3px); }
+        .file-icon { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+        
+        /* Умный Drag & Drop */
+        .drop-zone { border: 2px dashed rgba(0,255,65,0.3); border-radius: 1rem; padding: 2rem; transition: 0.3s; cursor: pointer; position: relative; }
+        .drop-zone--over { border-color: var(--accent); background: rgba(0,255,65,0.05); box-shadow: inset 0 0 20px rgba(0,255,65,0.1); }
+        .drop-zone__input { display: none; }
+        
+        button { background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 0.5rem; font-weight: bold; width: 100%; cursor: pointer; transition: 0.2s; }
+        button:hover { opacity: 0.8; transform: scale(1.01); }
+        pre { background: #000; color: #0cf; padding: 1rem; border-radius: 0.5rem; overflow: auto; max-height: 300px; font-size: 0.8rem; border-left: 3px solid var(--accent); }
+    </style>
+    """
     return f"""
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="ru">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{title}</title>
-        <style>
-            /* Автоматическая адаптация под ЛЮБУЮ систему будущего */
-            :root {{
-                --bg-color: light-dark(#ffffff, #0a0a0a);
-                --text-color: light-dark(#1a1a1a, #00ff41);
-                --accent-color: light-dark(#007aff, #0cf); /* Синий для светлых, Циан для темных */
-                --border-style: light-dark(solid, dashed);
-            }}
-
-            @media (prefers-color-scheme: dark) {{
-                :root {{ color-scheme: dark; }}
-            }}
-
-            body {{
-                background-color: canvas;
-                color: canvastext;
-                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                margin: 0;
-                overflow: hidden;
-                transition: all 0.3s ease;
-            }}
-
-            .container {{
-                padding: 2rem;
-                border: 1px var(--border-style) var(--text-color);
-                border-radius: 8px;
-                background: rgba(0,0,0,0.05);
-                backdrop-filter: blur(10px);
-                max-width: 400px;
-                width: 90%;
-                text-align: center;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            }}
-
-            input {{
-                width: 100%;
-                padding: 12px;
-                margin: 10px 0;
-                background: transparent;
-                border: 1px solid var(--text-color);
-                color: var(--text-color);
-                border-radius: 4px;
-                box-sizing: border-box;
-            }}
-
-            button {{
-                width: 100%;
-                padding: 15px;
-                background: var(--text-color);
-                color: black;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-                cursor: pointer;
-                text-transform: uppercase;
-                transition: opacity 0.2s;
-            }}
-
-            button:hover {{ opacity: 0.8; }}
-            
-            .status-box {{
-                font-size: 0.7em;
-                letter-spacing: 2px;
-                margin-bottom: 20px;
-                opacity: 0.7;
-            }}
-        </style>
+        {style}
     </head>
     <body>
-        <div class="container">
-            <div class="status-box">SYSTEM_NODE_v4.0 // {title}</div>
+        <div class="prime-card">
+            <small style="color:var(--accent); letter-spacing:2px;">SECURE_UPLINK_v4.2</small>
+            <h2>{title}</h2>
             {content}
-            <div style="font-size:0.6em; margin-top:20px; opacity:0.4;">
-                &copy; 2024-2027 SECURE_UPLINK. All rights reserved.
-            </div>
         </div>
     </body>
     </html>
     """
 EOF
 }
-
 
 
 # --- Конец  Модулей ---
@@ -583,12 +605,18 @@ pc_password_recovery() {
 run_servers() {
     print_header "SECURITY & DATA HUB"
     
+    # Список имен для отображения в UI
     local s_names="AV-Scanner Share-File Upload-Inbound"
+    
+    # Список соответствующих функций запуска
+    # Убедись, что эти функции (run_av_srv и т.д.) теперь просто 
+    # вызывают run_live_service с нужными параметрами.
     local s_funcs="run_av_srv run_share_srv run_upload_srv"
 
-    # Теперь здесь тоже есть динамическая справка!
+    # Динамическая справка подтягивает описание функций (если оно есть)
     show_menu_info "$s_funcs"
 
+    # Запуск интерактивного контроллера
     prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
 }
 
@@ -1996,49 +2024,229 @@ EOF
 }
 
 
+# Функция-генератор для AV-Server (v1.2)
+# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
+generate_av_server_code_raw() {
+    # Загружаем UI шаблоны в переменные
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    # Выбрасываем код прямо в stdout (через cat без записи в файл)
+    cat << EOF
+from flask import Flask, request, render_template_string
+import subprocess, os, shutil
+
+app = Flask(__name__)
+CLAM_PATH = shutil.which('clamdscan') or shutil.which('clamscan') or '/usr/bin/clamscan'
+
+$templates
+
+@app.route('/')
+def index():
+    fields = [
+        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_ANALYSIS"}
+    ]
+    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE DEEP SCAN")
+    return render_template_string(render_prime_page("SECURE_GATEWAY", form_html))
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "No data", 400
+    
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    
+    try:
+        cmd = [CLAM_PATH, '--no-summary', '--max-filesize=20M', tmp_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        scan_output = res.stdout if res.stdout else res.stderr
+        if not scan_output and res.returncode == 0:
+            scan_output = f"{f.filename}: OK"
+    except Exception as e:
+        scan_output = f"SYSTEM_ERROR: {str(e)}"
+    finally:
+        if os.path.exists(tmp_path): os.remove(tmp_path)
+
+    is_infected = "FOUND" in scan_output or "Infected" in scan_output
+    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_VERIFIED"
+    status_class = "infected" if is_infected else "clean"
+
+    content = f"""
+    <div class="status-box {status_class}">{status_msg}</div>
+    <pre>{{{{ output }}}}</pre>
+    <a href="/" class="btn">[ RETURN ]</a>
+    """
+    return render_template_string(render_prime_page("SCAN_RESULTS", content), output=scan_output)
+
+if __name__ == '__main__':
+    # В режиме Live/Memory SSL сертификаты (файлы) опциональны. 
+    # Запускаем чистый HTTP для максимальной скорости на Wiko.
+    app.run(host='0.0.0.0', port=5000, debug=False)
+EOF
+}
+
+
+# Функция-генератор для Share-Server (v1.0)
+# --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
+generate_share_server_code_raw() {
+    # Загружаем только базовый шаблон страницы
+    local template=$(generate_core_template)
+
+    cat << EOF
+from flask import Flask, render_template_string, send_from_directory
+import os
+
+app = Flask(__name__)
+SHARE_DIR = '/root/share'
+
+if not os.path.exists(SHARE_DIR):
+    os.makedirs(SHARE_DIR, exist_ok=True)
+
+$template
+
+def get_file_icon(filename):
+    """Определяет иконку в зависимости от расширения файла."""
+    ext = filename.split('.')[-1].lower() if '.' in filename else ''
+    icons = {
+        'pdf': '📕',
+        'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'webp': '🖼️',
+        'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
+        'py': '💻', 'js': '💻', 'html': '💻', 'sh': '💻', 'css': '💻',
+        'txt': '📄', 'md': '📝', 'doc': '📄', 'docx': '📄',
+        'mp4': '🎬', 'mkv': '🎬', 'mov': '🎬',
+        'mp3': '🎵', 'wav': '🎵', 'flac': '🎵'
+    }
+    return icons.get(ext, '📄')
+
+@app.route('/')
+def index():
+    try:
+        files = sorted(os.listdir(SHARE_DIR))
+    except:
+        files = []
+    
+    # Формируем сетку файлов с использованием новых стилей .file-grid и .file-item
+    grid_content = '<div class="file-grid">'
+    for f in files:
+        icon = get_file_icon(f)
+        grid_content += f"""
+        <a href="/get/{f}" class="file-item" target="_blank">
+            <span class="file-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px;">{icon}</span>
+            <div style="font-size: 0.8rem; word-break: break-all; line-height: 1.2;">{f}</div>
+        </a>
+        """
+    
+    if not files:
+        grid_content += '<p style="color: var(--accent); font-style: italic; grid-column: 1/-1; opacity: 0.5;">[ SECTOR_EMPTY: No data detected ]</p>'
+    
+    grid_content += '</div>'
+    grid_content += f'<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 0.7rem; opacity: 0.5;">MOUNT_POINT: {SHARE_DIR}</div>'
+
+    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION", grid_content))
+
+@app.route('/get/<filename>')
+def get_file(filename):
+    return send_from_directory(SHARE_DIR, filename)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5002, debug=False)
+EOF
+}
+
+
+# Функция-генератор для Upload-Server (v1.0)
+generate_upload_server_code_raw() {
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    cat << EOF
+from flask import Flask, request, render_template_string
+import os
+
+app = Flask(__name__)
+# Сохраняем во входящую папку внутри PRIME_LOOT
+UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+$templates
+
+@app.route('/')
+def index():
+    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE UPLOAD")
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX", form_html))
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files: return "TRANSFER_ERROR", 400
+    f = request.files['file']
+    if f.filename == '': return "EMPTY_FILENAME", 400
+    
+    f.save(os.path.join(UPLOAD_DIR, f.filename))
+    return "SUCCESS: File received in secure sector."
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=False)
+EOF
+}
+
+
 # --- Server Generating---
+
+# --- PRIME IGNITION: RUN WITHOUT FILES ---
+
+run_live_service() {
+    local service_type="$1" # av, share, upload
+    local port="$2"
+    
+    print_header "PRIME LIVE NODE: ${service_type^^}_SERVICE"
+    
+    # 1. Проверка портов и очистка
+    print_status "i" "Clearing port $port and prepping memory..."
+    fuser -k "$port/tcp" >/dev/null 2>&1
+
+    # 2. Определение генератора
+    local code_gen_func="generate_${service_type}_server_code_raw"
+    
+    # 3. Запуск через пайп прямо в интерпретатор
+    print_status "w" "Igniting engine on port $port [MEMORY_ONLY_MODE]"
+    
+    (
+        $code_gen_func | python3 - > /dev/null 2>&1 &
+    ) && {
+        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
+        print_status "s" "SERVICE ONLINE: http://$ip_addr:$port"
+        log_loot "service" "${service_type^^} started on port $port"
+    } || print_status "e" "Ignition failed."
+
+    pause
+}
+
 
 run_av_server() {
     print_header "PRIME SECURITY HUB: CLAMAV GATEWAY"
 
-    local srv_path="/root/av_server.py"
-    
     # 1. Проверка зависимостей (Python + ClamAV)
     check_step "cmd" "python3" "Python3 missing." || { pause; return; }
-    check_step "cmd" "clamscan" "ClamAV not found. Installing..." || {
-        # Если ClamAV нет, пытаемся поставить (для Kali/NetHunter)
-        apt-get update && apt-get install clamav -y
-    }
-
-    # 2. Обновление движка сервера
-    print_status "i" "Generating Engine v1.2 with Core UI Templates..."
-    generate_av_server_code "$srv_path" "1.2"
-
-    # 3. Запуск (с проверкой портов)
-    print_status "w" "Cleaning port 5000 and establishing SSL Tunnel..."
     
-    # Запускаем сервер в фоне через суб-оболочку
-    (
-        python3 "$srv_path" > /dev/null 2>&1 &
-    ) && {
-        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
-        print_status "s" "SECURITY GATEWAY DEPLOYED SUCCESSFULLY"
-        log_loot "service" "AV-Server started on https://$ip_addr:5000"
-        
-        print_list "Access Details" \
-            "URL: https://$ip_addr:5000" \
-            "Encryption: SSL/TLS (Self-Signed)" \
-            "Scanner: ClamAV Engine"
-    } || print_status "e" "Failed to ignite the engine."
+    # Для ClamAV оставляем авто-установку, так как это бинарная зависимость
+    if ! command -v clamscan >/dev/null 2>&1; then
+        print_status "w" "ClamAV not found. Attempting deployment..."
+        apt-get update && apt-get install clamav -y
+    fi
 
-    pause
+    # 2. Запуск через "Живой движок" (без создания файлов)
+    # Передаем тип "av" и порт "5000"
+    run_live_service "av" "5000"
 }
 
 
 run_share_server() {
     print_header "SHARE SECTOR: SECURE FILE DISTRIBUTION"
 
-    local srv_path="/root/share_server.py"
     local share_dir="/root/share"
     
     # 1. Проверка и подготовка инфраструктуры
@@ -2047,62 +2255,23 @@ run_share_server() {
         print_status "i" "Created transmission sector at $share_dir"
     }
 
-    # 2. Генерация кода с использованием визуального ядра
-    print_status "i" "Generating Engine v1.0 [Core UI Integrated]..."
-    generate_share_server_code "$srv_path" "1.0"
+    # 2. Проверка окружения
+    check_step "cmd" "python3" "Python3 missing." || { pause; return; }
 
-    # 3. Запуск сервера
-    print_status "w" "Igniting Share-Server on port 5002..."
-    
-    # Очистка порта и запуск
-    fuser -k 5002/tcp >/dev/null 2>&1
-    (
-        python3 "$srv_path" > /dev/null 2>&1 &
-    ) && {
-        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
-        print_status "s" "TRANSMISSION NODE ONLINE"
-        log_loot "service" "Share-Server activated: http://$ip_addr:5002"
-        
-        print_list "Node Intelligence" \
-            "Access: http://$ip_addr:5002" \
-            "Storage: $share_dir" \
-            "Mode: Read-Only (Secure Fetch)"
-    } || print_status "e" "Failed to establish transmission node."
-
-    pause
+    # 3. Запуск через универсальный движок
+    # Тип "share", порт 5002
+    run_live_service "share" "5002"
 }
 
 run_upload_server() {
     print_header "INBOUND DROP BOX: SECURE UPLINK"
 
-    local srv_path="/root/upload_server.py"
-    
     # 1. Проверка окружения
     check_step "cmd" "python3" "Python3 missing." || { pause; return; }
 
-    # 2. Генерация кода с интеграцией Core UI
-    print_status "i" "Generating Upload Engine v1.0 [Full UI Stack]..."
-    generate_upload_server_code "$srv_path" "1.0"
-
-    # 3. Запуск и мониторинг
-    print_status "w" "Establishing Uplink on port 5001..."
-    
-    # Очистка порта и тихий запуск
-    fuser -k 5001/tcp >/dev/null 2>&1
-    (
-        python3 "$srv_path" > /dev/null 2>&1 &
-    ) && {
-        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
-        print_status "s" "UPLINK NODE OPERATIONAL"
-        log_loot "service" "Upload-Server activated: http://$ip_addr:5001"
-        
-        print_list "Drop Box Intelligence" \
-            "Access: http://$ip_addr:5001" \
-            "Protocol: HTTP Inbound" \
-            "Status: Ready for Transmission"
-    } || print_status "e" "Failed to ignite the uplink."
-
-    pause
+    # 2. Запуск через универсальный "живой" движок
+    # Мы передаем идентификатор "upload" и порт 5001
+    run_live_service "upload" "5001"
 }
 
 
