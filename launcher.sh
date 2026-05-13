@@ -560,16 +560,39 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER MESH_BRIDGE POLYMORPH_GEN SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_mesh_bridge generate_poly_payload run_system_info run_servers run_repair update_prime exit_script"
+    # Короткие, емкие названия категорий
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE EXIT"
+    
+    # Функции-хабы, которые открывают подменю
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core exit_script"
 
- 
-   # Динамическая справка для всех ключевых модулей системы
-    # Это создаст аккуратную информационную панель перед выбором
+    # Динамическая справка теперь работает только для категорий
     show_menu_info "$main_funcs"
-    # Основной контроллер
-    prime_dynamic_controller "PRIME MASTER v$CURRENT_VERSION" "$main_names" "$main_funcs"
+
+    # Главный контроллер с обновленным заголовком
+    prime_dynamic_controller "PRIME MASTER EXECUTIVE v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
+
+menu_cyber_ops() {
+    print_header "CYBER OPERATIONS SECTOR"
+    local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
+    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "CYBER OPERATIONS" "$names" "$funcs"
+}
+
+
+menu_net_infra() {
+    print_header "NETWORK INFRASTRUCTURE"
+    local names="Device_Hack Mesh_Bridge Service_Hub Phantom_Engine"
+    local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "NETWORK & INFRA" "$names" "$funcs"
+}
+
+
 
 # --- Модули: DEVICE & NETWORK (FULL INFO v35.4) ---
 run_device_hack() {
