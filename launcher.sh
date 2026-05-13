@@ -2689,16 +2689,11 @@ run_dd_logic() {
 
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    # Короткие, емкие названия категорий
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB DATA_FORENSICS EXIT"
+    # Добавляем UPDATE в список
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB DATA_FORENSICS UPDATE EXIT"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab menu_forensics update_prime exit_script"
     
-    # Функции-хабы, которые открывают подменю
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab menu_forensics exit_script"
-
-    # Динамическая справка теперь работает только для категорий
     show_menu_info "$main_funcs"
-
-    # Главный контроллер с обновленным заголовком
     prime_dynamic_controller "PRIME MASTER EXECUTIVE v$CURRENT_VERSION" "$main_names" "$main_funcs"
 }
 
