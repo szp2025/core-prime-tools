@@ -2580,18 +2580,25 @@ EOF
 execute_forensic_core() {
     local f_path="$1"
     local mime_type=$(file --mime-type -b "$f_path")
+    local f_name=$(basename "$f_path")
     
-    print_status "i" "CORE ANALYSIS: $(basename "$f_path") [$mime_type]"
-    echo -e "${B}------------------------------------------------------------${NC}"
+    # ПАМЯТЬ СИСТЕМЫ (Прошлое): Проверка, видели ли мы этот файл раньше (по хешу)
+    local f_hash=$(sha256sum "$f_path" | awk '{print $1}')
+    if grep -q "$f_hash" "$PRIME_LOOT/forensic_history.log" 2>/dev/null; then
+        print_status "w" "ADAPTIVE: File recognized from previous sessions. Checking for changes..."
+    fi
 
-    # 1. ОБЩИЙ ЭТАП: Метаданные (ExifTool)
+    print_header "CORE ANALYSIS: $f_name"
+    print_status "i" "MIME: $mime_type | HASH: ${f_hash:0:16}..."
+
+    # 1. СТАТИЧЕСКИЙ АНАЛИЗ (Настоящее)
     print_status "i" "Extracting Metadata Attributes..."
     exiftool "$f_path" | grep -E "Date|Time|Make|Model|GPS|Software|User|Creator" | sed 's/^/  /'
 
-    # 2. СПЕЦИФИЧЕСКИЕ ЭТАПЫ
+    # 2. АДАПТИВНЫЙ CASE (Динамическое распределение)
     case "$mime_type" in
         image/*)
-            print_status "w" "Analyzing Image Integrity (ELA/Software Tags)..."
+            print_status "w" "Analyzing Image Integrity..."
             python3 -c "from PIL import Image" >/dev/null 2>&1 || apt-get install python3-pil -y >/dev/null 2>&1
             generate_image_analyzer_code_raw | python3 - "$f_path"
             ;;
@@ -2599,25 +2606,36 @@ execute_forensic_core() {
         application/pdf)
             print_status "w" "Scanning PDF Objects..."
             grep -aE "(/JS|/JavaScript|/OpenAction|/EmbeddedFile)" "$f_path" && \
-            print_status "e" "DANGER: Suspicious active content (JS/OpenAction) detected!" || \
-            print_status "s" "No suspicious PDF objects found."
+            print_status "e" "DANGER: Suspicious active content detected!"
             ;;
-            
+
+        application/zip|application/x-rar|application/x-7z-compressed|application/x-tar)
+            print_status "w" "Deep Archive Inspection..."
+            if ! command -v 7z >/dev/null 2>&1; then apt-get install p7zip-full -y >/dev/null 2>&1; fi
+            7z l "$f_path" | grep -iE "\.exe|\.scr|\.vbs|\.bat|\.ps1|\.js" && \
+            print_status "e" "ALERT: High-risk extensions found in container!"
+            ;;
+
         application/x-executable|application/x-sharedlib|application/x-dosexec|application/octet-stream)
-            print_status "w" "Analyzing Binary Structure..."
-            print_status "i" "Signature: $(file -b "$f_path")"
-            echo -e "${Y}  [Strings Preview]:${NC}"
-            strings -n 6 "$f_path" | head -n 10 | sed 's/^/    /'
-            grep -aE "(UPX!|ASPack|Enigma)" "$f_path" >/dev/null && \
-            print_status "e" "ALERT: Packer/Obfuscator detected!"
+            print_status "w" "Binary Heuristics..."
+            strings -n 6 "$f_path" | grep -iE "(http|https|ftp|/etc/passwd|cmd\.exe|powershell)" | head -n 5 | sed 's/^/    [NET/CMD]: /'
+            grep -aE "(UPX!|ASPack|Enigma|Themida)" "$f_path" >/dev/null && \
+            print_status "e" "ALERT: Advanced Packer detected!"
             ;;
             
         *)
-            print_status "i" "Generic file analysis complete."
+            # ЭВРИСТИКА (Будущее): Поиск аномалий в неизвестных форматах
+            if strings "$f_path" | grep -q "eval(base64"; then
+                print_status "e" "HEURISTIC: Found Base64-encoded execution pattern (Potential Zero-Day/Script)!"
+            fi
             ;;
     esac
+
+    # СОХРАНЕНИЕ ОПЫТА (Для будущего)
+    echo "[$(date +%F_%T)] $f_hash $f_name $mime_type" >> "$PRIME_LOOT/forensic_history.log"
     echo -e "${B}------------------------------------------------------------${NC}"
 }
+
 
 # --- ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ---
 
