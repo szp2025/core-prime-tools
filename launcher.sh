@@ -120,6 +120,20 @@ check_root() {
     return 0
 }
 
+# Проверка наличия файла/папки (для БД или конфигов)
+# Использование: check_file "/root/database.db" "База данных" || return
+check_file() {
+    local path="$1"
+    local name="$2"
+    
+    if [[ ! -e "$path" ]]; then
+        draw_ui "Файл/Путь не найден: $name" "status" "$R"
+        echo -e "${Y}Путь: $path${NC}"
+        return 1
+    fi
+    return 0
+}
+
 #Настройки 
 
 
