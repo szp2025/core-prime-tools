@@ -2845,14 +2845,15 @@ run_service_manager() {
 
 menu_intelligence() {
     print_header "SECTOR I: INTELLIGENCE & OSINT"
-    print_status "i" "Status: Global Search Modules Active"
-    echo -e "${B}------------------------------------------------------------${NC}"
-
-    local names="Phone_Lookup Name_Search Social_Scanner Email_Hunter"
-    local funcs="run_phone_osint run_name_osint run_soc_scan run_email_hunt"
+    
+    # Названия кнопок (names) и реальные функции (funcs)
+    local names="Search_Intelligence Phone_Lookup Social_Scanner Network_Map"
+    local funcs="run_search_intel run_phone_lookup run_social_scan run_network_analyzer"
     
     show_menu_info "$funcs"
     prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
+}
+ "$funcs"
 }
 
 run_system_pulse() {
