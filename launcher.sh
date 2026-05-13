@@ -561,10 +561,10 @@ EOF
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
     # Короткие, емкие названия категорий
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE EXIT"
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB EXIT"
     
     # Функции-хабы, которые открывают подменю
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core exit_script"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab exit_script"
 
     # Динамическая справка теперь работает только для категорий
     show_menu_info "$main_funcs"
@@ -592,6 +592,15 @@ menu_net_infra() {
     prime_dynamic_controller "NETWORK & INFRA" "$names" "$funcs"
 }
 
+
+menu_core_lab() {
+    print_header "SECTOR X: LOW-LEVEL CORE RESEARCH"
+    local names="Memory_Infiltrator Raw_Packet_Forge Wireless_Silent_Pulse Kernel_Audit"
+    local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
+}
 
 
 # --- Модули: DEVICE & NETWORK (FULL INFO v35.4) ---
