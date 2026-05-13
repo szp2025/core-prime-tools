@@ -661,6 +661,24 @@ run_servers() {
     prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
 }
 
+
+run_system_pulse() {
+    print_header "SECTOR Z: LIVE SYSTEM PULSE"
+    print_status "i" "Monitoring filesystem events and net-connections..."
+    
+    # Показываем активные сетевые соединения (куда лезет система)
+    echo -e "${Y}[NETWORK CONNECTIONS]:${NC}"
+    ss -tunp | grep -v "127.0.0.1" | head -n 10 | sed 's/^/  /'
+    
+    echo -e "${B}------------------------------------------------------------${NC}"
+    
+    # Живой мониторинг изменений файлов в /tmp и $PRIME_LOOT
+    print_status "w" "Watching for file activity (Press Ctrl+C to stop)..."
+    # Используем встроенный в ядро dnotify/inotify если есть, или просто мониторим через ls
+    watch -n 2 "ls -lt /tmp $PRIME_LOOT | head -n 15"
+}
+
+
 # Вспомогательные функции-мостики (для чистоты кода)
 pc_gen_payload() {
     print_header "PAYLOAD GENERATOR"
