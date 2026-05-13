@@ -1744,33 +1744,41 @@ local V_LIST=(
 run_view_loot() {
     print_header "DATA HARVESTER: LOOT VIEW"
 
-    # Массив путей к потенциальному луту
-    local loot_paths=(
-        "/root/prime_loot/critical_vulns.txt"
-        "/root/prime_loot/sql_success.txt"
-        "/root/prime_extracted_passwords.txt"
-    )
+    # 1. Динамическое определение базовой директории
+    # Если мы в Termux, используем $HOME, если в чистом Linux — /root
+    local base_loot="$HOME/prime_loot"
+    [[ -d "/root/prime_loot" ]] && base_loot="/root/prime_loot"
+    
+    # 2. Автоматический поиск всех .txt и .log файлов в директории лута
+    # Это лучше, чем жесткий массив путей, так как новые модули 
+    # смогут сами создавать файлы, и они сразу появятся здесь.
+    local found_files
+    found_files=$(find "$base_loot" -maxdepth 1 -type f -size +1c 2>/dev/null)
 
     local found_count=0
 
-    for file in "${loot_paths[@]}"; do
-        # Проверка: файл существует и не пуст (без явного if через &&)
-        [[ -s "$file" ]] && {
+    # 3. Цикл обработки найденных файлов
+    if [[ -n "$found_files" ]]; then
+        for file in $found_files; do
             ((found_count++))
-            print_status "s" "SOURCE: $file"
+            print_status "s" "SOURCE: $(basename "$file")"
             echo -e "${D}--------------------------------------------------${NC}"
             
-            # Табличное форматирование через column
-            # Если column не справляется, просто выводим содержимое
-            sed 's/|/ │ /g' "$file" | column -t -s '│' 2>/dev/null || cat "$file"
+            # Читаем последние 20 строк, чтобы не забивать экран
+            # Используем sed для имитации таблицы, если column нет
+            if command -v column >/dev/null 2>&1; then
+                sed 's/|/ │ /g' "$file" | tail -n 20 | column -t -s '│'
+            else
+                tail -n 20 "$file" | sed 's/|/ │ /g'
+            fi
             
             echo -e "${D}--------------------------------------------------${NC}\n"
-        }
-    done
+        done
+    fi
 
-    # Если ничего не найдено
+    # 4. Если ничего не найдено
     [[ $found_count -eq 0 ]] && {
-        print_status "e" "No harvested data found."
+        print_status "e" "No harvested data found in $base_loot"
         print_status "i" "Execute Scanner or Exploiter to collect intelligence."
     }
 
