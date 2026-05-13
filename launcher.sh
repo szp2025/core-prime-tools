@@ -604,8 +604,8 @@ menu_core_lab() {
 
 menu_forensics() {
     print_header "SECTOR F: DATA FORENSICS & RECOVERY"
-    local names="Metadata_Extractor Image_Tamper_Check PDF_Deep_Scan Binary_Analyzer Disk_Raw_Recovery Document_Sanitizer"
-    local funcs="run_metadata_exif run_image_analyzer run_pdf_scan run_bin_analyst run_raw_recovery run_doc_cleaner"
+    local names="AUTO_ANALYZE Disk_Raw_Recovery Document_Sanitizer"
+    local funcs="run_auto_forensics run_raw_recovery run_doc_cleaner"
     
     show_menu_info "$funcs"
     prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
@@ -2546,18 +2546,8 @@ run_kernel_check() {
 }
 
 
-run_metadata_exif() {
-    print_header "FORENSICS: METADATA EXTRACTION"
-    echo -en "${Y}Enter path to file: ${NC}"; read -r f_path
-    
-    if [[ ! -f "$f_path" ]]; then print_status "e" "File not found"; pause; return; fi
 
-    print_status "i" "Extracting hidden attributes..."
-    # Используем системный exiftool (стандарт Kali)
-    exiftool "$f_path" | grep -E "Date|Time|Make|Model|GPS|Software|User|Creator"
-    
-    pause
-}
+# --- ГЕНЕРАТОРЫ КОДА (Оставляем для работы Core) ---
 
 generate_image_analyzer_code_raw() {
     cat << 'EOF'
@@ -2575,9 +2565,7 @@ def analyze_image(path):
                 if "Software" in decoded or "Processing" in decoded:
                     print(f"[!] Warning: Possible Editor Detected: {value}")
         
-        # Проверка на ELA (Error Level Analysis) - упрощенная логика
         print("[*] Performing Error Level Analysis (ELA) simulation...")
-        # Если в файле есть блоки с разным качеством сжатия - это признак монтажа
         print("[s] Analysis complete: Check for inconsistent compression artifacts.")
     except Exception as e:
         print(f"[e] Error: {e}")
@@ -2587,66 +2575,77 @@ if __name__ == "__main__":
 EOF
 }
 
-run_image_analyzer() {
-    print_header "FORENSICS: IMAGE INTEGRITY"
-    echo -en "${Y}Path to image: ${NC}"; read -r img_path
-    check_step "cmd" "python3"
-    
-    # Установка подушки безопасности (Pillow) если нет
-    python3 -c "from PIL import Image" >/dev/null 2>&1 || apt-get install python3-pil -y
+# --- ЯДРО АНАЛИЗА ---
 
-    generate_image_analyzer_code_raw | python3 - "$img_path"
-    pause
+execute_forensic_core() {
+    local f_path="$1"
+    local mime_type=$(file --mime-type -b "$f_path")
+    
+    print_status "i" "CORE ANALYSIS: $(basename "$f_path") [$mime_type]"
+    echo -e "${B}------------------------------------------------------------${NC}"
+
+    # 1. ОБЩИЙ ЭТАП: Метаданные (ExifTool)
+    print_status "i" "Extracting Metadata Attributes..."
+    exiftool "$f_path" | grep -E "Date|Time|Make|Model|GPS|Software|User|Creator" | sed 's/^/  /'
+
+    # 2. СПЕЦИФИЧЕСКИЕ ЭТАПЫ
+    case "$mime_type" in
+        image/*)
+            print_status "w" "Analyzing Image Integrity (ELA/Software Tags)..."
+            python3 -c "from PIL import Image" >/dev/null 2>&1 || apt-get install python3-pil -y >/dev/null 2>&1
+            generate_image_analyzer_code_raw | python3 - "$f_path"
+            ;;
+            
+        application/pdf)
+            print_status "w" "Scanning PDF Objects..."
+            grep -aE "(/JS|/JavaScript|/OpenAction|/EmbeddedFile)" "$f_path" && \
+            print_status "e" "DANGER: Suspicious active content (JS/OpenAction) detected!" || \
+            print_status "s" "No suspicious PDF objects found."
+            ;;
+            
+        application/x-executable|application/x-sharedlib|application/x-dosexec|application/octet-stream)
+            print_status "w" "Analyzing Binary Structure..."
+            print_status "i" "Signature: $(file -b "$f_path")"
+            echo -e "${Y}  [Strings Preview]:${NC}"
+            strings -n 6 "$f_path" | head -n 10 | sed 's/^/    /'
+            grep -aE "(UPX!|ASPack|Enigma)" "$f_path" >/dev/null && \
+            print_status "e" "ALERT: Packer/Obfuscator detected!"
+            ;;
+            
+        *)
+            print_status "i" "Generic file analysis complete."
+            ;;
+    esac
+    echo -e "${B}------------------------------------------------------------${NC}"
 }
 
+# --- ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ---
 
+run_auto_forensics() {
+    print_header "FORENSICS: AUTOMATIC CORE ANALYZER"
+    echo -en "${Y}Path to file: ${NC}"; read -r f_path
 
-run_pdf_scan() {
-    print_header "FORENSICS: PDF MALWARE SCANNER"
-    echo -en "${Y}Path to PDF: ${NC}"; read -r pdf_path
-    
-    print_status "w" "Scanning for suspicious objects (Javascript, OpenAction, EmbeddedFiles)..."
-    
-    # Используем системную утилиту pdfid (часто есть в Kali) или парсим вручную
-    grep -aE "(/JS|/JavaScript|/OpenAction|/EmbeddedFile)" "$pdf_path" && \
-    print_status "e" "DANGER: Suspicious active content found in PDF!" || \
-    print_status "s" "No immediate active threats detected."
-    
+    if [[ ! -f "$f_path" ]]; then 
+        print_status "e" "File not found."; pause; return
+    fi
+
+    execute_forensic_core "$f_path"
     pause
 }
-
 
 run_doc_cleaner() {
     print_header "FORENSICS: DOCUMENT SANITIZER"
     echo -en "${Y}File to sanitize: ${NC}"; read -r f_path
     
+    if [[ ! -f "$f_path" ]]; then print_status "e" "File not found"; pause; return; fi
+
     print_status "i" "Stripping all metadata tags..."
     exiftool -all= "$f_path" -overwrite_original
-    
     print_status "s" "File is now 'Clean'. All signatures removed."
     pause
 }
 
 
-run_bin_analyst() {
-    print_header "FORENSICS: BINARY ANALYSIS"
-    echo -en "${Y}Path to binary (.exe/.bin/.elf): ${NC}"; read -r b_path
-    
-    if [[ ! -f "$b_path" ]]; then print_status "e" "File not found"; pause; return; fi
-
-    print_status "i" "Identifying file signature..."
-    file "$b_path"
-    
-    print_status "w" "Extracting readable strings (min length 6)..."
-    strings -n 6 "$b_path" | head -n 20
-    
-    print_status "i" "Checking for packers (UPX/etc)..."
-    grep -aE "(UPX!|ASPack|Enigma)" "$b_path" >/dev/null && \
-    print_status "w" "ALERT: Binary might be packed/obfuscated." || \
-    print_status "s" "No common packers detected."
-    
-    pause
-}
 
 
 # --- Вспомогательный селектор устройств ---
