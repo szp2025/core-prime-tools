@@ -134,6 +134,21 @@ check_file() {
     return 0
 }
 
+# Универсальная проверка переменной на пустоту
+# Использование: check_var "$t_ip" "Target IP" || return
+check_var() {
+    local value="$1"
+    local name="$2"
+    
+    if [[ -z "$value" ]]; then
+        draw_ui "ОШИБКА: Поле [$name] не заполнено!" "status" "$R"
+        return 1
+    fi
+    return 0
+}
+
+
+
 #Настройки 
 
 
@@ -234,9 +249,93 @@ ask_input() {
     echo "$result"
 }
 
+# Динамический пункт меню
+draw_item() {
+    local key="$1"
+    local title="$2"
+    local desc="$3"
+    
+    # 1. Динамический цвет ключа
+    local k_color=$G
+    case "${key,,}" in # Перевод в нижний регистр для проверки
+        "b"|"x"|"q"|"exit"|"back") k_color=$R ;;
+        "s"|"start"|"run")         k_color=$G ;;
+        "i"|"info")                k_color=$Y ;;
+        *)                         k_color=$G ;;
+    esac
+
+    # 2. Формирование строки
+    local output="  ${k_color}${key})${NC} [${B}${title}${NC}]"
+    
+    # 3. Динамическое добавление описания (если оно есть)
+    if [[ -n "$desc" ]]; then
+        output+=" - ${desc}"
+    fi
+
+    echo -e "$output"
+}
+
+# Универсальная функция ввода данных
+# Использование: target_ip=$(core_input "IP" "Введите адрес цели")
+core_input() {
+    local label="$1"
+    local hint="$2"
+    local var_value
+    
+    # Рисуем метку через draw_item, но без переноса строки для красоты
+    # Мы немного модифицируем логику, чтобы это выглядело как поле ввода
+    echo -ne "  ${G}${label})${NC} [${B}${hint}${NC}] ${Y}>> ${NC}" >&2
+    read -r var_value
+    echo "$var_value"
+}
 
 
 
+
+# Универсальная проверка данных (переменные, списки, вводы)
+# Использование: check_data "$var" "Target IP" || return 1
+check_data() {
+    local value="$1"
+    local label="$2"
+    
+    if [[ -z "$value" ]]; then
+        # Универсальное сообщение, подходящее и для переменных, и для списков
+        draw_ui "ОШИБКА: [$label] отсутствует или не заполнено" "status" "$R"
+        return 1
+    fi
+    return 0
+}
+
+
+# Проверка наличия данных в списке/выводе команды
+# Использование: check_list "$devices" "External Storage" || return 1
+check_list() {
+    local data="$1"
+    local name="$2"
+    
+    if [[ -z "$data" ]]; then
+        draw_ui "ОШИБКА: [$name] не обнаружены" "status" "$R"
+        return 1
+    fi
+    return 0
+}
+
+
+# Проверка вхождения числа в диапазон
+# Использование: check_range "$choice" 1 "$max" "Выбор устройства" || return 1
+check_range() {
+    local val="$1"
+    local min="$2"
+    local max="$3"
+    local name="$4"
+
+    if [[ "$val" =~ ^[0-9]+$ ]] && (( val >= min && val <= max )); then
+        return 0
+    else
+        draw_ui "ОШИБКА: [$name] вне диапазона ($min-$max)" "status" "$R"
+        return 1
+    fi
+}
 
 
 # --- Вспомогательные функции ---
@@ -2434,50 +2533,51 @@ run_upload_server() {
 
 
 # --- MODULE 98: MESH BRIDGE (ZERO-DEPENDENCY) ---
-
+#очищен Mesh.
 run_mesh_bridge() {
-    print_header "PRIME MESH: AD-HOC COMMUNICATIONS v1.0"
+    # 1. Заголовок и начальный статус через Core Engine
+    draw_ui "PRIME MESH: AD-HOC COMMUNICATIONS v1.0" "header"
+    draw_ui "Initializing Mesh Protocol..." "status"
     
-    print_status "i" "Initializing Mesh Protocol..."
+    # 2. Проверка зависимостей (универсально)
+    check_dep "termux-bluetooth-scan" "Требуется Termux:API для работы Bluetooth Mesh" || return
     
-    # Проверка доступности инструментов (термукс-апи для BT/WiFi)
-    if ! command -v termux-bluetooth-scan >/dev/null 2>&1; then
-        print_status "e" "Termux:API not detected. Mesh limited to local filesystem."
-    fi
+    # 3. Отрисовка меню через динамический draw_item
+    echo -e "\n${B}Выберите режим работы:${NC}"
+    draw_item "1" "Broadcaster" "Start Beacon"
+    draw_item "2" "Receiver"    "Listen for Signals"
+    draw_item "3" "Sync"        "Push Loot to Bridge"
+    draw_item "b" "Back"        "Вернуться в главное меню"
+    draw_ui "" "line"
+    
+    read -rp " Selection > " mesh_opt
 
-    echo -e "1) [Broadcaster] - Start Beacon"
-    echo -e "2) [Receiver]    - Listen for Signals"
-    echo -e "3) [Sync]        - Push Loot to Bridge"
-    echo -e "b) Back"
-    
-    read -rp "Selection > " mesh_opt
-
-    case $mesh_opt in
+    case "${mesh_opt,,}" in
         1)
-            print_status "s" "Beacon Active: Broadcasting PRIME_NODE..."
-            # Используем изменение имени Bluetooth устройства как маяк (Beacon)
-            # Это не требует сопряжения для передачи статуса
+            draw_ui "Beacon Active: Broadcasting PRIME_NODE..." "status" "$G"
+            # Маяк через смену имени Bluetooth устройства
             termux-bluetooth-set-name "PRIME_$(date +%H%M)_READY" 2>/dev/null
-            print_status "i" "Status encoded in Device Name."
+            draw_ui "Status encoded in Device Name." "status"
             ;;
         2)
-            print_status "i" "Scanning for nearby Prime Nodes..."
+            draw_ui "Scanning for nearby Prime Nodes..." "status" "$Y"
             # Поиск устройств с префиксом PRIME_
-            termux-bluetooth-scan 2>/dev/null | grep "PRIME_"
+            termux-bluetooth-scan 2>/dev/null | grep "PRIME_" || draw_ui "Узлы не найдены" "status" "$R"
             ;;
         3)
-            # Передача сигналов через общую директорию (если устройства связаны по SSH/SFTP)
-            if [[ -f "$PRIME_LOOT/bridge_signals.log" ]]; then
-                print_status "s" "Syncing bridge_signals.log to Mesh..."
-                # Здесь может быть команда rsync или scp на локальный IP второго устройства
-                print_status "y" "Loot Broadcasted via Local Mesh."
-            else
-                print_status "e" "No signals to sync."
+            # 4. Проверка файла через Core Engine
+            if check_file "$PRIME_LOOT/bridge_signals.log" "Лог сигналов Mesh"; then
+                draw_ui "Syncing bridge_signals.log to Mesh..." "status" "$G"
+                # Логика синхронизации
+                draw_ui "Loot Broadcasted via Local Mesh." "status" "$G"
             fi
             ;;
+        b) return ;;
         *) return ;;
     esac
-    pause
+
+    # 5. Универсальная пауза
+    core_pause
 }
 
 
@@ -2517,24 +2617,41 @@ EOF
 
 
 run_packet_forge() {
-    print_header "CORE_LAB: RAW PACKET FORGE"
+    # 1. Визуальный заголовок
+    draw_ui "CORE_LAB: RAW PACKET FORGE" "header"
     
-    # Проверка наличия scapy (библиотека Kali)
+    # 2. Проверка прав суперпользователя (без записи в лог на диск)
+    check_root || return
+    
+    # 3. Проверка зависимости Scapy
     if ! python3 -c "import scapy" >/dev/null 2>&1; then
-        print_status "w" "Scapy missing. Installing low-level network headers..."
+        draw_ui "Scapy missing. Installing headers..." "status" "$Y"
+        # Выполняем установку без лишнего мусора
         apt-get update && apt-get install python3-scapy -y
     fi
 
-    echo -en "${Y}Target IP: ${NC}"; read -r t_ip
-    echo -en "${Y}Target Port: ${NC}"; read -r t_port
+    draw_ui "Connection Parameters" "line"
+
+    # 4. Ввод данных через универсальный core_input
+    local t_ip=$(core_input "IP" "Target IP Address")
+    local t_port=$(core_input "PORT" "Target Port")
+
+    # 5. Валидация переменных (заменяем ручные if)
+    check_var "$t_ip" "IP Address" || { core_pause; return; }
+    check_var "$t_port" "Port" || { core_pause; return; }
+
+    # 6. Основной процесс
+    draw_ui "Forging polymorphic packet..." "status" "$B"
     
-    print_status "i" "Forging polymorphic packet structure..."
-    
-    # Запуск через наш стандартный механизм "в памяти"
+    # Передаем параметры в генератор кода
     generate_packet_forge_code_raw | python3 - "$t_ip" "$t_port"
+
+    draw_ui "Operation Completed" "status" "$G"
     
-    pause
+    # 7. Универсальная пауза
+    core_pause
 }
+
 
 
 
@@ -2592,16 +2709,36 @@ EOF
 
 
 run_mem_inject() {
-    print_header "CORE_LAB: MEMORY INFILTRATOR"
+    # 1. Заголовок через Core Engine
+    draw_ui "CORE_LAB: MEMORY INFILTRATOR" "header"
     
-    echo -en "${Y}Enter Target PID (e.g., of a browser or service): ${NC}"; read -r t_pid
-    echo -en "${Y}String to search in RAM (e.g., 'password'): ${NC}"; read -r t_search
+    # 2. Проверка прав (обязательно для доступа к памяти других процессов)
+    check_root || return
+
+    draw_ui "Target Identification" "line"
+
+    # 3. Ввод данных через универсальный core_input
+    # Больше никаких echo -en и ручных read
+    local t_pid=$(core_input "PID" "Target Process ID")
+    local t_search=$(core_input "STR" "String to search in RAM")
+
+    # 4. Валидация через check_var
+    # Если данные не введены, функция корректно прервется
+    check_var "$t_pid" "Target PID" || { core_pause; return; }
+    check_var "$t_search" "Search String" || { core_pause; return; }
+
+    # 5. Исполнение процесса
+    draw_ui "Engaging syscall ptrace_attach on PID $t_pid..." "status" "$W"
     
-    print_status "w" "Engaging syscall ptrace_attach on PID $t_pid..."
+    # Передаем параметры в генератор кода и запускаем в памяти
     generate_mem_inject_code_raw | python3 - "$t_pid" "$t_search"
+
+    draw_ui "Memory Scan Completed" "status" "$G"
     
-    pause
+    # 6. Универсальная пауза
+    core_pause
 }
+
 
 
 
@@ -2627,16 +2764,38 @@ EOF
 
 
 run_wifi_pulse() {
-    print_header "CORE_LAB: WIRELESS SILENT PULSE"
+    # 1. Заголовок в стиле Core Prime
+    draw_ui "CORE_LAB: WIRELESS SILENT PULSE" "header"
     
-    echo -en "${Y}Target Device MAC: ${NC}"; read -r t_mac
-    echo -en "${Y}Gateway (AP) MAC: ${NC}"; read -r g_mac
-    echo -en "${Y}Monitor Interface (e.g., wlan0mon): ${NC}"; read -r t_iface
+    # 2. Критические проверки (Root + Сетевой интерфейс)
+    check_root || return
+
+    draw_ui "Target Identification" "line"
+
+    # 3. Сбор параметров через универсальный ввод core_input
+    local t_mac=$(core_input "MAC" "Target Device MAC")
+    local g_mac=$(core_input "GW" "Gateway (AP) MAC")
+    local t_iface=$(core_input "IF" "Monitor Interface (e.g., wlan0mon)")
+
+    # 4. Валидация через check_var для каждой переменной
+    check_var "$t_mac" "Target MAC" || { core_pause; return; }
+    check_var "$g_mac" "Gateway MAC" || { core_pause; return; }
+    check_var "$t_iface" "Interface" || { core_pause; return; }
+
+    # 5. Проверка наличия интерфейса в системе через твою функцию check_component
+    # (Используем её для проверки пути в /sys/class/net/)
+    check_component "/sys/class/net/$t_iface" "Network Interface" || { core_pause; return; }
+
+    # 6. Запуск процесса инъекции
+    draw_ui "Broadcasting raw L2 deauth frames..." "status" "$B"
     
-    print_status "i" "Broadcasting raw L2 deauth frames..."
+    # Выполнение кода в памяти
     generate_wifi_pulse_code_raw | python3 - "$t_mac" "$g_mac" "$t_iface"
+
+    draw_ui "Pulse Attack Finished" "status" "$G"
     
-    pause
+    # 7. Универсальная пауза
+    core_pause
 }
 
 
@@ -2757,68 +2916,115 @@ execute_forensic_core() {
 # --- ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ---
 
 run_auto_forensics() {
-    print_header "FORENSICS: AUTOMATIC CORE ANALYZER"
-    echo -en "${Y}Path to file: ${NC}"; read -r f_path
+    # 1. Заголовок в едином стиле
+    draw_ui "FORENSICS: AUTOMATIC CORE ANALYZER" "header"
 
-    if [[ ! -f "$f_path" ]]; then 
-        print_status "e" "File not found."; pause; return
-    fi
+    # 2. Ввод пути через универсальный core_input
+    # Заменяем связку echo + read
+    local f_path=$(core_input "FILE" "Path to target file")
 
+    # 3. Валидация переменной (не пустой ли ввод)
+    check_var "$f_path" "File Path" || { core_pause; return; }
+
+    # 4. Проверка существования файла через твою функцию check_component
+    # Она выведет красивую ошибку, если файла нет, но не оставит логов на диске
+    check_component "$f_path" "Target for Analysis" || { core_pause; return; }
+
+    # 5. Информационный статус перед запуском
+    draw_ui "Initializing Deep Forensic Scan..." "status" "$B"
+    
+    # 6. Основной процесс
     execute_forensic_core "$f_path"
-    pause
+
+    draw_ui "Forensic Analysis Completed" "status" "$G"
+
+    # 7. Универсальная пауза
+    core_pause
 }
 
 run_doc_cleaner() {
-    print_header "FORENSICS: DOCUMENT SANITIZER"
-    echo -en "${Y}File to sanitize: ${NC}"; read -r f_path
-    
-    if [[ ! -f "$f_path" ]]; then print_status "e" "File not found"; pause; return; fi
+    # 1. Заголовок в едином стиле
+    draw_ui "FORENSICS: DOCUMENT SANITIZER" "header"
 
-    print_status "i" "Stripping all metadata tags..."
-    exiftool -all= "$f_path" -overwrite_original
-    print_status "s" "File is now 'Clean'. All signatures removed."
-    pause
+    # 2. Проверка зависимости (exiftool)
+    check_dep "exiftool" "Требуется пакет perl-image-exiftool для очистки метаданных" || { core_pause; return; }
+
+    # 3. Ввод пути через универсальный core_input
+    local f_path=$(core_input "FILE" "File to sanitize")
+
+    # 4. Валидация переменной
+    check_var "$f_path" "File Path" || { core_pause; return; }
+
+    # 5. Проверка существования файла через check_component
+    # Нам важно знать, что файл существует, прежде чем пускать exiftool
+    check_component "$f_path" "Target Document" || { core_pause; return; }
+
+    # 6. Основной процесс зачистки
+    draw_ui "Stripping all metadata tags..." "status" "$Y"
+    
+    # Выполнение команды. Мы используем -overwrite_original, чтобы не плодить 
+    # копии файлов с припиской _original (лишние следы)
+    if exiftool -all= "$f_path" -overwrite_original >/dev/null 2>&1; then
+        draw_ui "File is now 'Clean'. All signatures removed." "status" "$G"
+    else
+        draw_ui "Error during sanitization process" "status" "$R"
+    fi
+
+    # 7. Универсальная пауза
+    core_pause
 }
 
 
 
 
 # --- Вспомогательный селектор устройств ---
+/**
+ * Выбор целевого накопителя из списка доступных устройств.
+ * Использует универсальный валидатор check_data и check_range.
+ */
 select_target_storage() {
-    print_status "i" "Searching for connected mass storage devices..."
+    draw_ui "HARDWARE: STORAGE SELECTOR" "header"
+    draw_ui "Searching for connected mass storage devices..." "status" "$B"
     
-    # Выводим только диски, которые не являются системными (исключаем /, /boot и т.д.)
-    # Показываем: Имя, Размер, Модель, Серийник, Точку монтирования
+    # 1. Сбор данных (USB, SATA, NVME)
     local devices=$(lsblk -dno NAME,SIZE,MODEL,SERIAL,TRAN | grep -E "usb|sata|nvme")
     
-    if [[ -z "$devices" ]]; then
-        print_status "e" "No external storage detected."
-        return 1
-    fi
+    # 2. Валидация списка через универсальный check_data
+    check_data "$devices" "External Storage" || return 1
 
-    echo -e "\n${B}#  NAME  SIZE  MODEL / SERIAL${NC}"
-    echo -e "${B}------------------------------------------------------------${NC}"
+    draw_ui "Available External Media" "line"
     
     local i=1
     local dev_list=()
-    while read -r line; do
-        echo -e "${G}$i)${NC} /dev/$line"
-        dev_list+=("/dev/$(echo $line | awk '{print $1}')")
+    
+    # 3. Отрисовка доступных медиа-носителей
+    while read -r name size model serial tran; do
+        local desc="${model:-Unknown} [${serial:-No_Serial}] (${tran})"
+        draw_item "$i" "/dev/$name ($size)" "$desc"
+        dev_list+=("/dev/$name")
         ((i++))
     done <<< "$devices"
-    echo -e "${B}------------------------------------------------------------${NC}"
-
-    echo -en "${Y}Выберите номер карты памяти (1-$((${#dev_list[@]}))): ${NC}"; read -r choice
     
-    if [[ "$choice" -ge 1 && "$choice" -le "${#dev_list[@]}" ]]; then
-        TARGET_DEV="${dev_list[$((choice-1))]}"
-        print_status "s" "Selected: $TARGET_DEV"
-        return 0
-    else
-        print_status "e" "Invalid selection."
-        return 1
-    fi
+    draw_ui "" "line"
+
+    # 4. Получение выбора пользователя
+    local max_idx=${#dev_list[@]}
+    local choice=$(core_input "SEL" "Enter device number (1-$max_idx)")
+
+    # 5. Комплексная валидация (наличие данных + диапазон)
+    # Используем check_data вместо check_var
+    check_data "$choice" "User Selection" || { core_pause; return 1; }
+    check_range "$choice" 1 "$max_idx" "Device Index" || { core_pause; return 1; }
+
+    # 6. Установка глобальной переменной целевого устройства
+    TARGET_DEV="${dev_list[$((choice-1))]}"
+    draw_ui "Selected: $TARGET_DEV" "status" "$G"
+    
+    core_pause
+    return 0
 }
+
+
 
 # --- Обновленная основная функция ---
 run_raw_recovery() {
