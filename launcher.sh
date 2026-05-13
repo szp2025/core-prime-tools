@@ -156,7 +156,6 @@ show_progress() {
 
 
 
-
 # --- Универсальный динамический контроллер ---
 prime_dynamic_controller() {
     local title="$1"
