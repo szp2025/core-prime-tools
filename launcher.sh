@@ -2688,47 +2688,28 @@ run_dd_logic() {
 
 
 # --- ГЛАВНОЕ МЕНЮ ---
-run_main_menu() {
-    # Добавляем UPDATE в список
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB DATA_FORENSICS UPDATE EXIT"
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab menu_forensics update_prime exit_script"
-    
-    show_menu_info "$main_funcs"
-    prime_dynamic_controller "PRIME MASTER EXECUTIVE v$CURRENT_VERSION" "$main_names" "$main_funcs"
-}
-
-menu_cyber_ops() {
-    print_header "CYBER OPERATIONS SECTOR"
-    local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
-    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
+menu_intelligence() {
+    print_header "SECTOR I: INTELLIGENCE & OSINT"
+    local names="Smart_OSINT_Engine Phone_Lookup Social_Scanner Network_Intelligence"
+    local funcs="run_smart_osint_engine run_phone_lookup run_social_scan run_network_analyzer"
     
     show_menu_info "$funcs"
-    prime_dynamic_controller "CYBER OPERATIONS" "$names" "$funcs"
+    prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
 }
 
 
-menu_net_infra() {
-    print_header "NETWORK INFRASTRUCTURE"
-    local names="Device_Hack Mesh_Bridge Service_Hub Phantom_Engine"
-    local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
+menu_system_core() {
+    print_header "SYSTEM CORE: MAINTENANCE & INFO"
+    local names="System_Info Update_OS Update_Launcher Clean_Logs System_Pulse"
+    local funcs="run_system_info run_sys_update update_prime run_logs_cleaner run_system_pulse"
     
     show_menu_info "$funcs"
-    prime_dynamic_controller "NETWORK & INFRA" "$names" "$funcs"
-}
-
-
-menu_core_lab() {
-    print_header "SECTOR X: LOW-LEVEL CORE RESEARCH"
-    local names="Memory_Infiltrator Raw_Packet_Forge Wireless_Silent_Pulse Kernel_Audit"
-    local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
-    
-    show_menu_info "$funcs"
-    prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
+    prime_dynamic_controller "SYSTEM_CORE" "$names" "$funcs"
 }
 
 menu_forensics() {
     print_header "SECTOR F: DATA FORENSICS & RECOVERY"
-    local names="AUTO_ANALYZE Disk_Raw_Recovery Document_Sanitizer"
+    local names="ADAPTIVE_ANALYZE Disk_Raw_Recovery Document_Sanitizer"
     local funcs="run_auto_forensics run_raw_recovery run_doc_cleaner"
     
     show_menu_info "$funcs"
@@ -2736,11 +2717,18 @@ menu_forensics() {
 }
 
 
+menu_cyber_ops() {
+    print_header "CYBER OPERATIONS SECTOR"
+    local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
+    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "CYBER_OPS" "$names" "$funcs"
+}
+
+
 menu_crypto_lab() {
     print_header "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY"
-    print_status "i" "Engine: OpenSSL $(openssl version | awk '{print $2}')"
-    echo -e "${B}------------------------------------------------------------${NC}"
-
     local names="Hash_Analyzer File_Encryptor Stegano_Deep_Hide SSH_Key_Gen"
     local funcs="run_hash_analyzer run_file_cryptor run_stegano_lab run_ssh_keygen"
     
@@ -2748,125 +2736,32 @@ menu_crypto_lab() {
     prime_dynamic_controller "CRYPTO_LAB" "$names" "$funcs"
 }
 
-
-# --- Модули: DEVICE & NETWORK (FULL INFO v35.4) ---
-run_device_hack() {
-    print_header "DEVICE & NETWORK ANALYSIS"
-    
-    # Определяем функции и их отображаемые имена
-    local dh_funcs="run_network_analyzer scan_bluetooth_devices run_deep_audit"
-    local dh_names="Network_Intelligence Bluetooth_Scan Smart_Audit"
-    
-    # Динамический вывод справки из нашего общего словаря get_tool_info
-    show_menu_info "$dh_funcs"
-    
-    # Запуск контроллера
-    prime_dynamic_controller "DEVICE & NETWORK ANALYSIS" "$dh_names" "$dh_funcs"
-}
-
-
-# --- Модули: RECOVERY & PASSWORDS ---
-pc_password_recovery() {
-    print_header "PC TARGET CONTROL CENTER"
-    
-    local p_funcs="pc_gen_payload run_pc_recovery_ultimate run_forensic_scanner"
-    local p_names="Generate_Reverse_Shell Extract_Reset_Passwords Forensic_Auto_Defense"
-
-    # Динамический вывод справки
-    show_menu_info "$p_funcs"
-
-    prime_dynamic_controller "PC TARGET CONTROL" "$p_names" "$p_funcs"
-}
-
-
-# --- SECURITY & DATA HUB ---
-run_servers() {
-    print_header "SECURITY & DATA HUB"
-    
-    # Список имен для отображения в UI
-    local s_names="AV-Scanner Share-File Upload-Inbound"
-    
-    # Список соответствующих функций запуска
-    # Убедись, что эти функции (run_av_srv и т.д.) теперь просто 
-    # вызывают run_live_service с нужными параметрами.
-    local s_funcs="run_av_srv run_share_srv run_upload_srv"
-
-    # Динамическая справка подтягивает описание функций (если оно есть)
-    show_menu_info "$s_funcs"
-
-    # Запуск интерактивного контроллера
-    prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
-}
-
-# --- SECTOR: SYSTEM CORE (Управление состоянием) ---
-
-menu_system_core() {
-    print_header "SYSTEM CORE & MAINTENANCE"
-    
-    # Показываем краткую статистику системы перед выбором
-    local uptime_info=$(uptime -p)
-    local cpu_load=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')
-    print_status "i" "Status: $uptime_info | CPU Load: $cpu_load%"
-    echo -e "${B}------------------------------------------------------------${NC}"
-
-    local names="System_Update Logs_Cleaner Service_Manager System_Pulse"
-    local funcs="run_sys_update run_logs_cleaner run_service_manager run_system_pulse"
+menu_net_infra() {
+    print_header "NETWORK INFRASTRUCTURE"
+    local names="Device_Hack Mesh_Bridge Server_Control Phantom_Engine"
+    local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
     
     show_menu_info "$funcs"
-    prime_dynamic_controller "SYSTEM_CORE" "$names" "$funcs"
+    prime_dynamic_controller "NET_INFRA" "$names" "$funcs"
 }
 
-# --- Модули управления системой ---
-
-run_sys_update() {
-    print_header "SYSTEM UPDATE & UPGRADE"
-    print_status "w" "Starting standard Kali repositories sync..."
-    sudo apt-get update && sudo apt-get upgrade -y
-    pause
-}
-
-run_logs_cleaner() {
-    print_header "SYSTEM LOGS SANITIZER"
-    print_status "i" "Purging system logs and temp files..."
-    sudo rm -rf /var/log/*.log /tmp/* ~/.cache/*
-    print_status "s" "System is now clean and optimized."
-    pause
-}
-
-run_service_manager() {
-    print_header "CORE SERVICE MANAGER"
-    echo -e "${Y}Active critical services:${NC}"
-    systemctl list-units --type=service --state=running | grep -E "ssh|network|docker|postgresql" | sed 's/^/  /'
-    echo -en "\n${Y}Enter service name to RESTART (or 'q' to back): ${NC}"; read -r srv_name
-    [[ "$srv_name" != "q" ]] && sudo systemctl restart "$srv_name" && print_status "s" "Done."
-    pause
-}
-
-
-menu_intelligence() {
-    print_header "SECTOR I: INTELLIGENCE & OSINT"
-    
-    # Названия кнопок (names) и реальные функции (funcs)
-    local names="Search_Intelligence Phone_Lookup Social_Scanner Network_Map"
-    local funcs="run_search_intel run_phone_lookup run_social_scan run_network_analyzer"
+menu_core_lab() {
+    print_header "CORE RESEARCH LAB"
+    local names="Mem_Injection Packet_Forge WiFi_Pulse Kernel_Audit"
+    local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
     
     show_menu_info "$funcs"
-    prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
-}
- "$funcs"
+    prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
 }
 
-run_system_pulse() {
-    print_header "SECTOR Z: LIVE SYSTEM PULSE"
-    print_status "i" "Monitoring net-connections (Top 10)..."
-    ss -tunp | grep -v "127.0.0.1" | head -n 10 | sed 's/^/  /'
+run_main_menu() {
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA SYSTEM_CORE CORE_LAB DATA_FORENSICS EXIT"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_system_core menu_core_lab menu_forensics exit_script"
     
-    echo -e "${B}------------------------------------------------------------${NC}"
-    print_status "w" "Watching for file activity in /tmp and LOOT (Press Ctrl+C to stop)..."
-    # Динамический мониторинг
-    watch -n 2 "ls -lt /tmp $PRIME_LOOT | head -n 15"
+    show_menu_info "$main_funcs"
+    prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
 }
 
-#repair
+# --- ТОЧКА ЗАПУСКА ---
+clear
 run_main_menu
-
