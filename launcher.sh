@@ -1810,46 +1810,34 @@ local V_LIST=(
 }
 
 run_view_loot() {
-    print_header "DATA HARVESTER: LOOT VIEW"
+    print_header "DATA HARVESTER: INTELLIGENT LOOT VIEW"
 
-    # 1. Динамическое определение базовой директории
-    # Если мы в Termux, используем $HOME, если в чистом Linux — /root
-    local base_loot="$HOME/prime_loot"
-    [[ -d "/root/prime_loot" ]] && base_loot="/root/prime_loot"
-    
-    # 2. Автоматический поиск всех .txt и .log файлов в директории лута
-    # Это лучше, чем жесткий массив путей, так как новые модули 
-    # смогут сами создавать файлы, и они сразу появятся здесь.
-    local found_files
-    found_files=$(find "$base_loot" -maxdepth 1 -type f -size +1c 2>/dev/null)
-
+    local base_loot="$PRIME_LOOT"
+    local found_files=$(find "$base_loot" -maxdepth 1 -type f -size +1c 2>/dev/null)
     local found_count=0
 
-    # 3. Цикл обработки найденных файлов
     if [[ -n "$found_files" ]]; then
         for file in $found_files; do
             ((found_count++))
-            print_status "s" "SOURCE: $(basename "$file")"
+            print_status "s" "ANALYZING: $(basename "$file")"
             echo -e "${D}--------------------------------------------------${NC}"
             
-            # Читаем последние 20 строк, чтобы не забивать экран
-            # Используем sed для имитации таблицы, если column нет
-            if command -v column >/dev/null 2>&1; then
-                sed 's/|/ │ /g' "$file" | tail -n 20 | column -t -s '│'
-            else
-                tail -n 20 "$file" | sed 's/|/ │ /g'
-            fi
+            # Интеллектуальный парсинг контента:
+            # 1. Подсвечиваем IP-адреса (Cyan)
+            # 2. Подсвечиваем потенциальные пароли/ключи (Yellow)
+            # 3. Подсвечиваем успешные инъекции (Green)
             
-            echo -e "${D}--------------------------------------------------${NC}\n"
+            cat "$file" | tail -n 30 | sed \
+                -e "s/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}/\${C}&\${NC}/g" \
+                -e "s/Password[:=]\(.*\)/\${Y}&\${NC}/g" \
+                -e "s/Payload[:=]\(.*\)/\${G}&\${NC}/g" | \
+                if command -v column >/dev/null 2>&1; then column -t -s '│' 2>/dev/null || cat; else cat; fi
+            
+            echo -e "\n${D}--------------------------------------------------${NC}"
         done
     fi
 
-    # 4. Если ничего не найдено
-    [[ $found_count -eq 0 ]] && {
-        print_status "e" "No harvested data found in $base_loot"
-        print_status "i" "Execute Scanner or Exploiter to collect intelligence."
-    }
-
+    [[ $found_count -eq 0 ]] && print_status "e" "No data found in $base_loot"
     pause
 }
 
