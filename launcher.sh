@@ -112,6 +112,14 @@ safe_read() {
     [ -f "$1" ] && cat "$1" || log_msg "warn" "Файл $1 не найден"
 }
 
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        draw_ui "Эту операцию нужно запускать от ROOT (sudo)!" "status" "$R"
+        return 1
+    fi
+    return 0
+}
+
 #Настройки 
 
 
