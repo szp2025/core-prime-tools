@@ -78,7 +78,41 @@ check_status() {
     fi
 }
 
+/**
+ * Перезапуск конкретного модуля.
+ * @param {string} proc_name - Имя процесса для grep/pkill.
+ * @param {string} start_cmd - Команда запуска.
+ */
+restart_mod() {
+    local name="$1"
+    local cmd="$2"
+    
+    log_msg "info" "Перезапуск модуля $name..."
+    run_silent pkill -f "$name"
+    sleep 1
+    eval "$cmd &"
+    check_status "Модуль $name запущен" "Ошибка запуска $name"
+}
 
+/**
+ * Отрисовка стандартного подменю для модулей.
+ * @param {string} mod_name - Имя модуля для заголовка.
+ */
+draw_mod_menu() {
+    clear
+    draw_header "Управление: $1"
+    echo -e "${YELLOW}1)${NC} Запустить модуль"
+    echo -e "${YELLOW}2)${NC} Остановить модуль"
+    echo -e "${YELLOW}3)${NC} Проверить логи"
+    echo -e "${YELLOW}0)${NC} Назад"
+    spacer
+}
+
+safe_read() {
+    [ -f "$1" ] && cat "$1" || log_msg "warn" "Файл $1 не найден"
+}
+
+#Настройки 
 
 
 # Настройка DNS для локальных сервисов (например, scanclamavlocal)
