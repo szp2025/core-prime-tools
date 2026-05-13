@@ -2790,6 +2790,60 @@ run_servers() {
     prime_dynamic_controller "SECURITY & DATA HUB" "$s_names" "$s_funcs"
 }
 
+# --- SECTOR: SYSTEM CORE (Управление состоянием) ---
+
+menu_system_core() {
+    print_header "SYSTEM CORE & MAINTENANCE"
+    
+    # Показываем краткую статистику системы перед выбором
+    local uptime_info=$(uptime -p)
+    local cpu_load=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')
+    print_status "i" "Status: $uptime_info | CPU Load: $cpu_load%"
+    echo -e "${B}------------------------------------------------------------${NC}"
+
+    local names="System_Update Logs_Cleaner Service_Manager System_Pulse"
+    local funcs="run_sys_update run_logs_cleaner run_service_manager run_system_pulse"
+    
+    show_menu_info "$funcs"
+    prime_dynamic_controller "SYSTEM_CORE" "$names" "$funcs"
+}
+
+# --- Модули управления системой ---
+
+run_sys_update() {
+    print_header "SYSTEM UPDATE & UPGRADE"
+    print_status "w" "Starting standard Kali repositories sync..."
+    sudo apt-get update && sudo apt-get upgrade -y
+    pause
+}
+
+run_logs_cleaner() {
+    print_header "SYSTEM LOGS SANITIZER"
+    print_status "i" "Purging system logs and temp files..."
+    sudo rm -rf /var/log/*.log /tmp/* ~/.cache/*
+    print_status "s" "System is now clean and optimized."
+    pause
+}
+
+run_service_manager() {
+    print_header "CORE SERVICE MANAGER"
+    echo -e "${Y}Active critical services:${NC}"
+    systemctl list-units --type=service --state=running | grep -E "ssh|network|docker|postgresql" | sed 's/^/  /'
+    echo -en "\n${Y}Enter service name to RESTART (or 'q' to back): ${NC}"; read -r srv_name
+    [[ "$srv_name" != "q" ]] && sudo systemctl restart "$srv_name" && print_status "s" "Done."
+    pause
+}
+
+run_system_pulse() {
+    print_header "SECTOR Z: LIVE SYSTEM PULSE"
+    print_status "i" "Monitoring net-connections (Top 10)..."
+    ss -tunp | grep -v "127.0.0.1" | head -n 10 | sed 's/^/  /'
+    
+    echo -e "${B}------------------------------------------------------------${NC}"
+    print_status "w" "Watching for file activity in /tmp and LOOT (Press Ctrl+C to stop)..."
+    # Динамический мониторинг
+    watch -n 2 "ls -lt /tmp $PRIME_LOOT | head -n 15"
+}
 
 #repair
 run_main_menu
