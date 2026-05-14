@@ -2281,48 +2281,71 @@ EOF
 # --- PRIME IGNITION: RUN WITHOUT FILES ---
 
 run_live_service() {
+    # Слой 1: Заголовок через Голос [1]
     local service_type="$1" # av, share, upload
-    local port="$2"
+    local port="${2:-8080}"
     
-    print_header "PRIME LIVE NODE: ${service_type^^}_SERVICE"
+    core_engine_ui "PRIME LIVE NODE: ${service_type^^}_SERVICE"
     
-    # 1. Проверка портов и очистка
-    print_status "i" "Clearing port $port and prepping memory..."
+    # Слой 2: Санитар [8] — Очистка портов и подготовка памяти
+    core_engine_ui "i" "Clearing port $port and prepping memory..."
     fuser -k "$port/tcp" >/dev/null 2>&1
 
-    # 2. Определение генератора
+    # Слой 3: Мозг [5] — Проверка существования генератора
     local code_gen_func="generate_${service_type}_server_code_raw"
     
-    # 3. Запуск через пайп прямо в интерпретатор
-    print_status "w" "Igniting engine on port $port [MEMORY_ONLY_MODE]"
+    if ! command -v "$code_gen_func" >/dev/null; then
+        core_engine_ui "e" "Code generator for '$service_type' not found."
+        core_engine_wait
+        return
+    fi
     
+    # Слой 4: Глушитель [7] — Запуск через пайп прямо в интерпретатор (Без следов на диске)
+    core_engine_ui "w" "Igniting engine on port $port [MEMORY_ONLY_MODE]"
+    
+    # Исполнение в подпроцессе
     (
-        $code_gen_func | python3 - > /dev/null 2>&1 &
-    ) && {
+        "$code_gen_func" | python3 - > /dev/null 2>&1 &
+    )
+    
+    # Слой 5: Органы чувств [3] — Верификация запуска
+    sleep 2 # Время на инициализацию сокета
+    if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
-        print_status "s" "SERVICE ONLINE: http://$ip_addr:$port"
-        log_loot "service" "${service_type^^} started on port $port"
-    } || print_status "e" "Ignition failed."
+        core_engine_ui "s" "SERVICE ONLINE: http://$ip_addr:$port"
+        
+        # Интеграция в Сборщик трофеев [11]
+        core_engine_loot "service" "${service_type^^} node started on port $port"
+    else
+        core_engine_ui "e" "Ignition failed. Port remains dark."
+    fi
 
-    pause
+    core_engine_wait
 }
 
 
-run_av_server() {
-    print_header "PRIME SECURITY HUB: CLAMAV GATEWAY"
 
-    # 1. Проверка зависимостей (Python + ClamAV)
-    check_step "cmd" "python3" "Python3 missing." || { pause; return; }
+run_av_server() {
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PRIME SECURITY HUB: CLAMAV GATEWAY"
+
+    # Слой 2: Валидация фундамента через Мозг [5]
+    core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
     
-    # Для ClamAV оставляем авто-установку, так как это бинарная зависимость
+    # Проверка бинарной зависимости ClamAV через Санитара [8]
     if ! command -v clamscan >/dev/null 2>&1; then
-        print_status "w" "ClamAV not found. Attempting deployment..."
-        apt-get update && apt-get install clamav -y
+        core_engine_ui "w" "ClamAV not found. Attempting deployment..."
+        # Используем системный менеджер пакетов для развертывания
+        sudo apt-get update && sudo apt-get install -y clamav clamav-daemon
     fi
 
-    # 2. Запуск через "Живой движок" (без создания файлов)
-    # Передаем тип "av" и порт "5000"
+    # Слой 3: Запуск через «Живой движок» (Live Node)
+    # Используем созданный ранее run_live_service для полной стерильности
+    # Передаем тип "av" (аудио-визуальный/антивирусный контекст) и выделенный порт 5000
     run_live_service "av" "5000"
+
+    # Слой 4: Интеграция в Сборщик трофеев [11]
+    core_engine_loot "security" "ClamAV Gateway initiated on port 5000"
 }
 
 
@@ -2346,16 +2369,21 @@ run_share_server() {
 }
 
 run_upload_server() {
-    print_header "INBOUND DROP BOX: SECURE UPLINK"
+    # Слой 1: Визуализация через Голос [1]
+    core_engine_ui "INBOUND DROP BOX: SECURE UPLINK"
 
-    # 1. Проверка окружения
-    check_step "cmd" "python3" "Python3 missing." || { pause; return; }
+    # Слой 2: Валидация фундамента через Мозг [5]
+    # Проверка наличия Python3
+    core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
 
-    # 2. Запуск через универсальный "живой" движок
-    # Мы передаем идентификатор "upload" и порт 5001
+    # Слой 3: Динамический запуск через Live Node [22]
+    # Запуск сервера на порту 5001 в режиме MEMORY_ONLY
+    # Это гарантирует, что код сервера не записывается на диск
     run_live_service "upload" "5001"
-}
 
+    # Слой 4: Регистрация в Сборщике трофеев [11]
+    core_engine_loot "service" "Secure Uplink (Upload) initiated on port 5001"
+}
 
 # --- MODULE 98: MESH BRIDGE (ZERO-DEPENDENCY) ---
 #очищен Mesh.
