@@ -301,7 +301,7 @@ core_engine_info() {
     pgrep -f "share_server" >/dev/null && srv_status+="${G}[SH]${NC} "
     
     [[ -n "$srv_status" ]] && echo -e "${B}ACTIVE:${NC} ${srv_status}"
-    core_engine_wait # Визуальный барьер
+    #core_engine_wait # Визуальный барьер
 }
 
 # --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
