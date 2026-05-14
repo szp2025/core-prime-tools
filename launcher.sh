@@ -323,7 +323,7 @@ core_engine_progress() {
         (( percent > 85 )) && color="${G}"
         
         # Используем \r\e[K для очистки и возврата в одну строку
-        #printf "\r\e[K${NC}[i] %-15s ${color}[%s%s]${NC} %3d%% | RAM: %s" \
+        printf "\r\e[K${NC}[i] %-15s ${color}[%s%s]${NC} %3d%% | RAM: %s" \
             "$message" "${full_bar:0:i}" "${empty_bar:i:width}" "$percent" "$ram_info"
         
         sleep 0.05
