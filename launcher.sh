@@ -8,12 +8,49 @@ set +o history
 # 1. CORE ENGINE (Должны быть ПЕРВЫМИ)
 # ==========================================
 
+# Core Engine: Эвристическое удаление
+# Автоматически выбирает между -f и -rf, подавляя весь вывод
+core_engine_remove() {
+    # Эвристика: если объект — директория, используем -rf, иначе -f
+    for item in "$@"; do
+        if [ -d "$item" ]; then
+            rm -rf "$item" 2>/dev/null
+        else
+            rm -f "$item" 2>/dev/null
+        fi
+    done
+}
+
+
+# Core Engine: Динамический исполнитель
+# Сама решает: выводить результат или работать в режиме "стелс"
+core_engine_exec() {
+    local cmd="$1"
+    local mode="${2:-silent}" # По умолчанию — полная тишина
+
+    if [[ "$mode" == "silent" ]]; then
+        eval "$cmd" >/dev/null 2>&1
+    else
+        eval "$cmd"
+    fi
+}
+
+
+# Core Engine: Стерилизация окружения
+# Использует встроенную логику удаления для очистки следов сессии
+core_engine_clean_env() {
+    local cache_targets=(
+        "/root/.cache/zcompdump*"
+        "/root/.zcompdump*"
+        "${HOME}/.cache/zcompdump*"
+    )
+    
+    # Просто вызываем наш универсальный модуль
+    core_engine_remove "${cache_targets[@]}"
+}
+
+
 # --- Инициализация системы ---
-# Очистка кэша терминала для стабильной работы
-if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
-    rm -f /root/.cache/zcompdump* 2>/dev/null
-    rm -f /root/.zcompdump* 2>/dev/null
-fi
 
 CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 [ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
@@ -27,72 +64,73 @@ MOD_DIR="$BASE_DIR/modules"
 
 
 
-# Динамический пункт меню
-draw_item() {
+# Core Engine: Отрисовка элемента интерфейса
+# Автоматически подбирает цвет ключа и форматирует строку
+core_engine_item() {
     local key="$1"
     local title="$2"
-    local desc="$3"
-    
-    # 1. Динамический цвет ключа
+    local desc="${3:-}" # Эвристика: если описания нет, переменная просто пустая
+
+    # 1. Эвристика цвета: R для выхода/назад, Y для инфо, G для остального
+    # Используем регулярные выражения для мгновенного схлопывания case
     local k_color=$G
-    case "${key,,}" in # Перевод в нижний регистр для проверки
-        "b"|"x"|"q"|"exit"|"back") k_color=$R ;;
-        "s"|"start"|"run")         k_color=$G ;;
-        "i"|"info")                k_color=$Y ;;
-        *)                         k_color=$G ;;
-    esac
+    [[ "$key" =~ ^(b|x|q|exit|back)$ ]] && k_color=$R
+    [[ "$key" =~ ^(i|info)$ ]] && k_color=$Y
 
-    # 2. Формирование строки
-    local output="  ${k_color}${key})${NC} [${B}${title}${NC}]"
-    
-    # 3. Динамическое добавление описания (если оно есть)
-    if [[ -n "$desc" ]]; then
-        output+=" - ${desc}"
-    fi
-
-    echo -e "$output"
+    # 2. Формирование и вывод в одну строку для максимальной скорости
+    # Конструкция ${desc:+ - $desc} добавит дефис и описание только если desc не пуст
+    echo -e "  ${k_color}${key})${NC} [${B}${title}${NC}]${desc:+ - $desc}"
 }
 
-# Универсальная функция ввода данных
-# Использование: target_ip=$(core_input "IP" "Введите адрес цели")
-core_input() {
+
+# Core Engine: Универсальный захват данных
+# Автоматически форматирует приглашение и поддерживает скрытый ввод
+core_engine_input() {
     local label="$1"
     local hint="$2"
     local var_value
+    local cmd="read -r"
+
+    # 1. Эвристика цвета метки (синхронизация с core_engine_item)
+    local l_color=$G
+    [[ "$label" =~ ^(b|x|q|exit|back)$ ]] && l_color=$R
+    [[ "$label" =~ ^(i|info)$ ]] && l_color=$Y
+
+    # 2. Эвристика скрытого ввода (если в подсказке есть "pass" или "key")
+    [[ "${hint,,}" =~ (pass|key|secret) ]] && cmd="read -rs"
+
+    # 3. Отрисовка поля (направляем в stderr, чтобы не засорять результат функции)
+    echo -ne "  ${l_color}${label})${NC} [${B}${hint}${NC}] ${Y}>> ${NC}" >&2
     
-    # Рисуем метку через draw_item, но без переноса строки для красоты
-    # Мы немного модифицируем логику, чтобы это выглядело как поле ввода
-    echo -ne "  ${G}${label})${NC} [${B}${hint}${NC}] ${Y}>> ${NC}" >&2
-    read -r var_value
+    # 4. Исполнение захвата
+    $cmd var_value
+    
+    # 5. Возврат значения (и перенос строки для скрытого режима)
+    [[ "$cmd" == "read -rs" ]] && echo "" >&2
     echo "$var_value"
 }
 
-
-
-
-# Универсальная проверка данных (переменные, списки, вводы)
-# Использование: check_data "$var" "Target IP" || return 1
-check_data() {
-    local value="$1"
+# Core Engine: Эвристический контроль (Строки, Списки, Права, Файлы)
+core_engine_check() {
+    local val="$1"
     local label="$2"
-    
-    if [[ -z "$value" ]]; then
-        # Универсальное сообщение, подходящее и для переменных, и для списков
-        draw_ui "ОШИБКА: [$label] отсутствует или не заполнено" "status" "$R"
-        return 1
-    fi
-    return 0
-}
+    local type="${3:-auto}" # Режим: auto, file, dir, root
 
+    local failed=0
+    case "$type" in
+        "root") [[ $EUID -ne 0 ]] && failed=1 ;;
+        "file") [[ ! -f "$val" ]] && failed=1 ;;
+        "dir")  [[ ! -d "$val" ]] && failed=1 ;;
+        *)      # Режим auto: проверяет и пустые переменные, и пустые списки
+                [[ -z "${val// }" ]] && failed=1 ;;
+    esac
 
-# Проверка наличия данных в списке/выводе команды
-# Использование: check_list "$devices" "External Storage" || return 1
-check_list() {
-    local data="$1"
-    local name="$2"
-    
-    if [[ -z "$data" ]]; then
-        draw_ui "ОШИБКА: [$name] не обнаружены" "status" "$R"
+    if [[ $failed -eq 1 ]]; then
+        # Эвристический UI: сам выбирает формулировку
+        local suffix="не обнаружено"
+        [[ "$type" == "root" ]] && suffix="требуется доступ"
+        
+        core_engine_ui "![$label] $suffix"
         return 1
     fi
     return 0
