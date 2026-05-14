@@ -137,37 +137,57 @@ core_engine_check() {
 }
 
 
-# Проверка вхождения числа в диапазон
-# Использование: check_range "$choice" 1 "$max" "Выбор устройства" || return 1
-check_range() {
+# Core Engine: Валидатор числового диапазона
+# Проверяет ввод на целое число и вхождение в границы [min-max]
+core_engine_check_range() {
     local val="$1"
     local min="$2"
     local max="$3"
-    local name="$4"
+    local label="$4"
 
+    # Эвристическая проверка: является ли ввод числом и входит ли в диапазон
     if [[ "$val" =~ ^[0-9]+$ ]] && (( val >= min && val <= max )); then
         return 0
+    fi
+
+    # Если проверка провалена — мгновенный вывод через наше UI-ядро
+    core_engine_ui "![$label] вне диапазона ($min-$max)"
+    return 1
+}
+
+# Core Engine: Тихий запуск команд
+# Выполняет задачу без вывода, возвращая только статус завершения
+core_engine_run() {
+    # Используем "$@" для корректной передачи аргументов с пробелами
+    # Перенаправляем stdout и stderr в /dev/null
+    "$@" > /dev/null 2>&1
+    
+    # Возвращаем реальный код выхода команды для последующих проверок
+    return $?
+}
+
+# Core Engine: Гарантия наличия компонента в системе
+# Автоматически проверяет наличие команды и устанавливает пакет при отсутствии
+core_engine_ensure() {
+    local pkg="$1"
+
+    # 1. Эвристическая проверка: если команда уже есть, выходим мгновенно
+    command -v "$pkg" >/dev/null 2>&1 && return 0
+
+    # 2. Информирование через ядро
+    core_engine_ui "?Компонент [$pkg] не найден. Установка..."
+
+    # 3. Тихая установка через наш исполнитель
+    # Используем apt-get с флагами для автоматического подтверждения
+    if core_engine_run apt-get install -y "$pkg"; then
+        core_engine_ui "+[$pkg] успешно установлен"
+        return 0
     else
-        draw_ui "ОШИБКА: [$name] вне диапазона ($min-$max)" "status" "$R"
+        core_engine_ui "!Ошибка при установке [$pkg]"
         return 1
     fi
 }
 
-
-# 1. Тихий режим для команд
-run_silent() {
-    "$@" > /dev/null 2>&1
-}
-
-# 2. Быстрая проверка и установка пакетов
-# @param {string} package - Название пакета
-ensure_pkg() {
-    local pkg=$1
-    if ! command -v "$pkg" > /dev/null 2>&1; then
-        log_msg "info" "Установка $pkg..."
-        apt-get install -y "$pkg" > /dev/null 2>&1
-    fi
-}
 
 # 3. Пауза (Enter)
 wait_user() {
