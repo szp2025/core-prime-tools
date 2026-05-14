@@ -4,6 +4,10 @@ CURRENT_VERSION="35.4"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
+# ==========================================
+# 1. CORE ENGINE (Должны быть ПЕРВЫМИ)
+# ==========================================
+
 # --- Инициализация системы ---
 # Очистка кэша терминала для стабильной работы
 if [ -f "/root/.cache/zcompdump*" ] || [ -f "/root/.zcompdump*" ]; then
@@ -21,6 +25,95 @@ command -v curl eval $SILENT
 BASE_DIR="/root/core-prime-tools"
 MOD_DIR="$BASE_DIR/modules"
 
+
+
+# Динамический пункт меню
+draw_item() {
+    local key="$1"
+    local title="$2"
+    local desc="$3"
+    
+    # 1. Динамический цвет ключа
+    local k_color=$G
+    case "${key,,}" in # Перевод в нижний регистр для проверки
+        "b"|"x"|"q"|"exit"|"back") k_color=$R ;;
+        "s"|"start"|"run")         k_color=$G ;;
+        "i"|"info")                k_color=$Y ;;
+        *)                         k_color=$G ;;
+    esac
+
+    # 2. Формирование строки
+    local output="  ${k_color}${key})${NC} [${B}${title}${NC}]"
+    
+    # 3. Динамическое добавление описания (если оно есть)
+    if [[ -n "$desc" ]]; then
+        output+=" - ${desc}"
+    fi
+
+    echo -e "$output"
+}
+
+# Универсальная функция ввода данных
+# Использование: target_ip=$(core_input "IP" "Введите адрес цели")
+core_input() {
+    local label="$1"
+    local hint="$2"
+    local var_value
+    
+    # Рисуем метку через draw_item, но без переноса строки для красоты
+    # Мы немного модифицируем логику, чтобы это выглядело как поле ввода
+    echo -ne "  ${G}${label})${NC} [${B}${hint}${NC}] ${Y}>> ${NC}" >&2
+    read -r var_value
+    echo "$var_value"
+}
+
+
+
+
+# Универсальная проверка данных (переменные, списки, вводы)
+# Использование: check_data "$var" "Target IP" || return 1
+check_data() {
+    local value="$1"
+    local label="$2"
+    
+    if [[ -z "$value" ]]; then
+        # Универсальное сообщение, подходящее и для переменных, и для списков
+        draw_ui "ОШИБКА: [$label] отсутствует или не заполнено" "status" "$R"
+        return 1
+    fi
+    return 0
+}
+
+
+# Проверка наличия данных в списке/выводе команды
+# Использование: check_list "$devices" "External Storage" || return 1
+check_list() {
+    local data="$1"
+    local name="$2"
+    
+    if [[ -z "$data" ]]; then
+        draw_ui "ОШИБКА: [$name] не обнаружены" "status" "$R"
+        return 1
+    fi
+    return 0
+}
+
+
+# Проверка вхождения числа в диапазон
+# Использование: check_range "$choice" 1 "$max" "Выбор устройства" || return 1
+check_range() {
+    local val="$1"
+    local min="$2"
+    local max="$3"
+    local name="$4"
+
+    if [[ "$val" =~ ^[0-9]+$ ]] && (( val >= min && val <= max )); then
+        return 0
+    else
+        draw_ui "ОШИБКА: [$name] вне диапазона ($min-$max)" "status" "$R"
+        return 1
+    fi
+}
 
 
 # 1. Тихий режим для команд
@@ -216,94 +309,6 @@ ask_input() {
     echo -ne "${YELLOW}>>>> ${prompt_text}: ${NC}"
     read result
     echo "$result"
-}
-
-# Динамический пункт меню
-draw_item() {
-    local key="$1"
-    local title="$2"
-    local desc="$3"
-    
-    # 1. Динамический цвет ключа
-    local k_color=$G
-    case "${key,,}" in # Перевод в нижний регистр для проверки
-        "b"|"x"|"q"|"exit"|"back") k_color=$R ;;
-        "s"|"start"|"run")         k_color=$G ;;
-        "i"|"info")                k_color=$Y ;;
-        *)                         k_color=$G ;;
-    esac
-
-    # 2. Формирование строки
-    local output="  ${k_color}${key})${NC} [${B}${title}${NC}]"
-    
-    # 3. Динамическое добавление описания (если оно есть)
-    if [[ -n "$desc" ]]; then
-        output+=" - ${desc}"
-    fi
-
-    echo -e "$output"
-}
-
-# Универсальная функция ввода данных
-# Использование: target_ip=$(core_input "IP" "Введите адрес цели")
-core_input() {
-    local label="$1"
-    local hint="$2"
-    local var_value
-    
-    # Рисуем метку через draw_item, но без переноса строки для красоты
-    # Мы немного модифицируем логику, чтобы это выглядело как поле ввода
-    echo -ne "  ${G}${label})${NC} [${B}${hint}${NC}] ${Y}>> ${NC}" >&2
-    read -r var_value
-    echo "$var_value"
-}
-
-
-
-
-# Универсальная проверка данных (переменные, списки, вводы)
-# Использование: check_data "$var" "Target IP" || return 1
-check_data() {
-    local value="$1"
-    local label="$2"
-    
-    if [[ -z "$value" ]]; then
-        # Универсальное сообщение, подходящее и для переменных, и для списков
-        draw_ui "ОШИБКА: [$label] отсутствует или не заполнено" "status" "$R"
-        return 1
-    fi
-    return 0
-}
-
-
-# Проверка наличия данных в списке/выводе команды
-# Использование: check_list "$devices" "External Storage" || return 1
-check_list() {
-    local data="$1"
-    local name="$2"
-    
-    if [[ -z "$data" ]]; then
-        draw_ui "ОШИБКА: [$name] не обнаружены" "status" "$R"
-        return 1
-    fi
-    return 0
-}
-
-
-# Проверка вхождения числа в диапазон
-# Использование: check_range "$choice" 1 "$max" "Выбор устройства" || return 1
-check_range() {
-    local val="$1"
-    local min="$2"
-    local max="$3"
-    local name="$4"
-
-    if [[ "$val" =~ ^[0-9]+$ ]] && (( val >= min && val <= max )); then
-        return 0
-    else
-        draw_ui "ОШИБКА: [$name] вне диапазона ($min-$max)" "status" "$R"
-        return 1
-    fi
 }
 
 
@@ -708,6 +713,11 @@ show_menu_info() {
 }
 
 
+# ==========================================
+# 2. РАБОЧИЕ ШАБЛОНЫ 
+# ==========================================
+
+
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
 
 generate_core_form_template() {
@@ -827,6 +837,10 @@ EOF
 
 # --- Конец  Модулей ---
 
+
+# ==========================================
+# 2. РАБОЧИЕ ФУНКЦИИ (Используют ядро)
+# ==========================================
 
 
 run_system_pulse() {
@@ -3060,6 +3074,10 @@ run_dd_logic() {
 }
 
 
+
+# ==========================================
+# 3. ОСНОВНОЙ ЦИКЛ (CORE LOOP)
+# ==========================================
 # --- Точка входа ---
 
 
