@@ -21,7 +21,6 @@ core_engine_remove() {
     done
 }
 
-
 # Core Engine: Динамический исполнитель
 # Сама решает: выводить результат или работать в режиме "стелс"
 core_engine_exec() {
@@ -123,27 +122,7 @@ core_engine_run() {
     return $?
 }
 
-# Core Engine: Гарантия наличия компонента в системе
-# Автоматически проверяет наличие команды и устанавливает пакет при отсутствии
-core_engine_ensure() {
-    local pkg="$1"
 
-    # 1. Эвристическая проверка: если команда уже есть, выходим мгновенно
-    command -v "$pkg" >/dev/null 2>&1 && return 0
-
-    # 2. Информирование через ядро
-    core_engine_ui "?Компонент [$pkg] не найден. Установка..."
-
-    # 3. Тихая установка через наш исполнитель
-    # Используем apt-get с флагами для автоматического подтверждения
-    if core_engine_run apt-get install -y "$pkg"; then
-        core_engine_ui "+[$pkg] успешно установлен"
-        return 0
-    else
-        core_engine_ui "!Ошибка при установке [$pkg]"
-        return 1
-    fi
-}
 
 
 # Core Engine: Ожидание действия пользователя
@@ -212,6 +191,20 @@ core_engine_validator() {
             local err_msg="Требуются привилегии ROOT (sudo)"
             ;;
             
+        "pkg")
+            # Эвристика: если команда отсутствует, пробуем установить
+            if ! command -v "$target" >/dev/null 2>&1; then
+                core_engine_ui "?Компонент [$target] не найден. Установка..."
+                if core_engine_run apt-get install -y "$target"; then
+                    core_engine_ui "+[$target] установлен"
+                    return 0
+                else
+                    failed=1
+                    local err_msg="Не удалось установить пакет [$target]"
+                fi
+            fi
+            ;;
+
         "file"|"read")
             if [[ ! -f "$target" ]]; then
                 failed=1
@@ -223,7 +216,6 @@ core_engine_validator() {
             ;;
 
         "dir")
-            # Эвристика: если нет папки — создаем её тихо
             if [[ ! -d "$target" ]]; then
                 if core_engine_run mkdir -p "$target"; then
                     core_engine_ui "+Создана директория: $target"
