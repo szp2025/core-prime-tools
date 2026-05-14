@@ -110,50 +110,7 @@ core_engine_input() {
     echo "$var_value"
 }
 
-# Core Engine: Эвристический контроль (Строки, Списки, Права, Файлы)
-core_engine_check() {
-    local val="$1"
-    local label="$2"
-    local type="${3:-auto}" # Режим: auto, file, dir, root
 
-    local failed=0
-    case "$type" in
-        "root") [[ $EUID -ne 0 ]] && failed=1 ;;
-        "file") [[ ! -f "$val" ]] && failed=1 ;;
-        "dir")  [[ ! -d "$val" ]] && failed=1 ;;
-        *)      # Режим auto: проверяет и пустые переменные, и пустые списки
-                [[ -z "${val// }" ]] && failed=1 ;;
-    esac
-
-    if [[ $failed -eq 1 ]]; then
-        # Эвристический UI: сам выбирает формулировку
-        local suffix="не обнаружено"
-        [[ "$type" == "root" ]] && suffix="требуется доступ"
-        
-        core_engine_ui "![$label] $suffix"
-        return 1
-    fi
-    return 0
-}
-
-
-# Core Engine: Валидатор числового диапазона
-# Проверяет ввод на целое число и вхождение в границы [min-max]
-core_engine_check_range() {
-    local val="$1"
-    local min="$2"
-    local max="$3"
-    local label="$4"
-
-    # Эвристическая проверка: является ли ввод числом и входит ли в диапазон
-    if [[ "$val" =~ ^[0-9]+$ ]] && (( val >= min && val <= max )); then
-        return 0
-    fi
-
-    # Если проверка провалена — мгновенный вывод через наше UI-ядро
-    core_engine_ui "![$label] вне диапазона ($min-$max)"
-    return 1
-}
 
 # Core Engine: Тихий запуск команд
 # Выполняет задачу без вывода, возвращая только статус завершения
@@ -204,23 +161,6 @@ core_engine_wait() {
     read -r
 }
 
-# Core Engine: Гарантия существования директории
-# Автоматически создает дерево папок, если оно отсутствует
-core_engine_ensure_dir() {
-    local dir="$1"
-
-    # 1. Эвристика: если директория уже есть, выходим мгновенно
-    [[ -d "$dir" ]] && return 0
-
-    # 2. Тихий запуск создания дерева папок (mkdir -p)
-    if core_engine_run mkdir -p "$dir"; then
-        core_engine_ui "+Создана директория: $dir"
-        return 0
-    else
-        core_engine_ui "!Ошибка создания директории: $dir"
-        return 1
-    fi
-}
 
 # Core Engine: Универсальный диспетчер контроля и перезапуска
 # Объединяет проверку Exit Code и управление процессами в одном узле
@@ -266,6 +206,63 @@ core_engine_control() {
             fi
             ;;
     esac
+}
+
+
+core_engine_validator() {
+    local type="$1"
+    local target="$2"
+    local label="$3"
+    local extra="$4"
+    local failed=0
+
+    case "$type" in
+        "root")
+            [[ $EUID -ne 0 ]] && failed=1
+            local err_msg="Требуются привилегии ROOT (sudo)"
+            ;;
+            
+        "file"|"read")
+            if [[ ! -f "$target" ]]; then
+                failed=1
+                local err_msg="Файл [$target] не найден"
+            elif [[ "$type" == "read" ]]; then
+                cat "$target"
+                return 0
+            fi
+            ;;
+
+        "dir")
+            # Эвристика: если нет папки — создаем её тихо
+            if [[ ! -d "$target" ]]; then
+                if core_engine_run mkdir -p "$target"; then
+                    core_engine_ui "+Создана директория: $target"
+                    return 0
+                else
+                    failed=1
+                    local err_msg="Не удалось создать директорию [$target]"
+                fi
+            fi
+            ;;
+
+        "range")
+            if [[ ! "$target" =~ ^[0-9]+$ ]] || (( target < 1 || target > extra )); then
+                failed=1
+                local err_msg="Значение [$target] вне диапазона (1-$extra)"
+            fi
+            ;;
+
+        "list"|"empty")
+            [[ -z "${target// }" ]] && failed=1
+            local err_msg="Данные [$label] отсутствуют или пусты"
+            ;;
+    esac
+
+    if [[ $failed -eq 1 ]]; then
+        core_engine_ui "!ОШИБКА: $label -> $err_msg"
+        return 1
+    fi
+    return 0
 }
 
 
