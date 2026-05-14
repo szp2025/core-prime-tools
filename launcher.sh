@@ -2777,63 +2777,83 @@ EOF
 
 # --- ЯДРО АНАЛИЗА ---
 
-execute_forensic_core() {
+run_forensic_core() {
     local f_path="$1"
-    local mime_type=$(file --mime-type -b "$f_path")
-    local f_name=$(basename "$f_path")
     
-    # ПАМЯТЬ СИСТЕМЫ (Прошлое): Проверка, видели ли мы этот файл раньше (по хешу)
-    local f_hash=$(sha256sum "$f_path" | awk '{print $1}')
-    if grep -q "$f_hash" "$PRIME_LOOT/forensic_history.log" 2>/dev/null; then
-        print_status "w" "ADAPTIVE: File recognized from previous sessions. Checking for changes..."
+    # Слой 1: Органы чувств [3] — Определение природы файла
+    if [[ ! -f "$f_path" ]]; then
+        core_engine_ui "e" "Target file not found: $f_path"
+        return
     fi
 
-    print_header "CORE ANALYSIS: $f_name"
-    print_status "i" "MIME: $mime_type | HASH: ${f_hash:0:16}..."
+    local mime_type=$(file --mime-type -b "$f_path")
+    local f_name=$(basename "$f_path")
+    local f_hash=$(sha256sum "$f_path" | awk '{print $1}')
+    local history_log="${LOOT_DIR}/forensic_history.log"
+
+    # ПАМЯТЬ СИСТЕМЫ (Прошлое): Адаптивное узнавание
+    if grep -q "$f_hash" "$history_log" 2>/dev/null; then
+        core_engine_ui "w" "ADAPTIVE: File recognized from previous sessions. Checking for delta..."
+    fi
+
+    # Слой 2: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "CORE ANALYSIS: $f_name"
+    core_engine_ui "i" "MIME: $mime_type | HASH: ${f_hash:0:16}..."
 
     # 1. СТАТИЧЕСКИЙ АНАЛИЗ (Настоящее)
-    print_status "i" "Extracting Metadata Attributes..."
-    exiftool "$f_path" | grep -E "Date|Time|Make|Model|GPS|Software|User|Creator" | sed 's/^/  /'
+    core_engine_ui "i" "Extracting Metadata Attributes..."
+    # Используем exiftool для извлечения системных и GPS тегов
+    exiftool "$f_path" 2>/dev/null | grep -E "Date|Time|Make|Model|GPS|Software|User|Creator" | sed 's/^/  /'
 
     # 2. АДАПТИВНЫЙ CASE (Динамическое распределение)
     case "$mime_type" in
         image/*)
-            print_status "w" "Analyzing Image Integrity..."
-            python3 -c "from PIL import Image" >/dev/null 2>&1 || apt-get install python3-pil -y >/dev/null 2>&1
-            generate_image_analyzer_code_raw | python3 - "$f_path"
+            core_engine_ui "w" "Analyzing Image Integrity (ELA/Metadata)..."
+            # Проверка зависимости PIL через Мозг [5]
+            python3 -c "import PIL" &>/dev/null || core_engine_validator "pkg" "python3-pil" "PIL Library"
+            generate_image_analyzer_code_raw | python3 - "$f_path" 2>/dev/null
             ;;
             
         application/pdf)
-            print_status "w" "Scanning PDF Objects..."
+            core_engine_ui "w" "Scanning PDF Objects for Active Content..."
+            # Поиск JS-инъекций и OpenAction триггеров
             grep -aE "(/JS|/JavaScript|/OpenAction|/EmbeddedFile)" "$f_path" && \
-            print_status "e" "DANGER: Suspicious active content detected!"
+            core_engine_ui "e" "DANGER: Suspicious active content detected in PDF!"
             ;;
 
         application/zip|application/x-rar|application/x-7z-compressed|application/x-tar)
-            print_status "w" "Deep Archive Inspection..."
-            if ! command -v 7z >/dev/null 2>&1; then apt-get install p7zip-full -y >/dev/null 2>&1; fi
+            core_engine_ui "w" "Deep Archive Inspection (Container Analysis)..."
+            core_engine_validator "pkg" "p7zip-full" "7-Zip" || return
+            # Поиск исполняемых файлов внутри архива
             7z l "$f_path" | grep -iE "\.exe|\.scr|\.vbs|\.bat|\.ps1|\.js" && \
-            print_status "e" "ALERT: High-risk extensions found in container!"
+            core_engine_ui "!" "ALERT: High-risk extensions found in container!"
             ;;
 
         application/x-executable|application/x-sharedlib|application/x-dosexec|application/octet-stream)
-            print_status "w" "Binary Heuristics..."
+            core_engine_ui "w" "Binary Heuristics & Packer Detection..."
+            # Анализ строк на предмет сетевых команд
             strings -n 6 "$f_path" | grep -iE "(http|https|ftp|/etc/passwd|cmd\.exe|powershell)" | head -n 5 | sed 's/^/    [NET/CMD]: /'
+            # Обнаружение упаковщиков (UPX, Themida и др.)
             grep -aE "(UPX!|ASPack|Enigma|Themida)" "$f_path" >/dev/null && \
-            print_status "e" "ALERT: Advanced Packer detected!"
+            core_engine_ui "e" "ALERT: Advanced Binary Packer detected!"
             ;;
             
         *)
             # ЭВРИСТИКА (Будущее): Поиск аномалий в неизвестных форматах
             if strings "$f_path" | grep -q "eval(base64"; then
-                print_status "e" "HEURISTIC: Found Base64-encoded execution pattern (Potential Zero-Day/Script)!"
+                core_engine_ui "!" "HEURISTIC: Found Base64 execution pattern (Potential Zero-Day/Script)!"
             fi
             ;;
     esac
 
     # СОХРАНЕНИЕ ОПЫТА (Для будущего)
-    echo "[$(date +%F_%T)] $f_hash $f_name $mime_type" >> "$PRIME_LOOT/forensic_history.log"
-    echo -e "${B}------------------------------------------------------------${NC}"
+    echo "[$(date +%F_%T)] $f_hash $f_name $mime_type" >> "$history_log"
+    
+    # Слой 3: Регистрация в Сборщике трофеев [11]
+    core_engine_loot "forensics" "Analyzed: $f_name | Hash: $f_hash | MIME: $mime_type"
+    
+    core_engine_ui "s" "Forensic cycle complete."
+    core_engine_wait
 }
 
 
