@@ -3128,7 +3128,7 @@ menu_intelligence() {
 menu_system_core() {
     core_engine_ui "h" "SYSTEM CORE: MAINTENANCE & INFO"
     local names="System_Info Update_OS Update_Launcher Clean_Logs System_Pulse"
-    local funcs="run_system_info run_sys_update update_prime run_logs_cleaner run_system_pulse"
+    local funcs="run_system_info run_sys_update run_update_prime run_logs_cleaner run_system_pulse"
     prime_dynamic_controller "SYSTEM_CORE" "$names" "$funcs"
 }
 
