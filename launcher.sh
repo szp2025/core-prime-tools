@@ -342,7 +342,7 @@ prime_dynamic_controller() {
     local -a actions=($3)
     
     while true; do
-        clear # Чтобы не было каши на экране
+        clear # Очистка для предотвращения наслоения меню
         core_engine_info
         core_engine_ui "h" "$title"
         
@@ -359,17 +359,17 @@ prime_dynamic_controller() {
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
             local idx=$((choice-1))
-            # Прогресс теперь в одну строку
             core_engine_progress 1 "${labels[$idx]}"
-            # Выполнение
+            # Выполнение действия
             ${actions[$idx]}
-            # ВАЖНО: Если функция внутри себя не имеет паузы, меню вернется сразу
+            # УДАЛЕНО: core_engine_wait (пауза теперь зависит только от вызываемой функции)
         else
             core_engine_ui "e" "Invalid selection"
             sleep 1
         fi
     done
 }
+
 
 
 
