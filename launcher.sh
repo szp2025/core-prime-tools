@@ -325,35 +325,39 @@ core_engine_progress() {
     local message="${2:-SYNCHRONIZING}"
     local width=25
     
-    # Слой 1: Предварительный рендеринг шаблонов
+    # Подготовка баров (Zero-Loop Rendering)
     local full_bar=$(printf '█%.0s' $(seq 1 $width))
     local empty_bar=$(printf '░%.0s' $(seq 1 $width))
     
-    # Очистка RAM для вывода
-    local ram_info=$(free -m | awk '/Mem:/ { printf "%d/%dMB", $3, $2 }')
-
-    # Слой 2: Линейный рендеринг СТРОГО через printf \r
+    # Слой 1: Только один echo ПЕРЕД циклом (подготовка места)
+    # Мы не пишем ничего внутри цикла через echo
+    
     for ((i=1; i<=width; i++)); do
         local percent=$(( i * 100 / width ))
         
-        # Выбор цвета
+        # Цвет
         local color="${Y}"
         (( percent > 40 )) && color="${B}"
         (( percent > 85 )) && color="${G}"
         
-        # Слайсинг
+        # Слайсинг строк
         local bar_part="${full_bar:0:i}"
         local pad_part="${empty_bar:i:width}"
         
-        # \r возвращает курсор в начало, \e[K очищает строку справа
+        # Получаем RAM для каждой итерации
+        local ram_info=$(free -m | awk '/Mem:/ { printf "%d/%dMB", $3, $2 }')
+
+        # СТРОГО ОДНА СТРОКА: \r возвращает в начало, \e[K стирает старое
+        # ВАЖНО: printf должен быть единственным выводом в цикле
         printf "\r\e[K${NC}[i] Loading ${color}%-15s${NC} [%b%s%s${NC}] %3d%% | RAM: %s" \
             "$message" "$color" "$bar_part" "${NC}$pad_part" "$percent" "$ram_info"
 
+        # Задержка
         sleep 0.05
     done
     
-    # Финальный штрих: заменяем прогресс-бар на статус SUCCESS
-    echo -e "\r\e[K${G}[+] $message: SUCCESSFUL${NC}"
+    # Финальный перенос строки только ПОСЛЕ завершения цикла
+    printf "\n${G}[+] $message: SUCCESSFUL${NC}\n"
 }
 
 
