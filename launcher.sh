@@ -222,35 +222,50 @@ core_engine_ensure_dir() {
     fi
 }
 
-
-
-check_status() {
+# Core Engine: Универсальный диспетчер контроля и перезапуска
+# Объединяет проверку Exit Code и управление процессами в одном узле
+core_engine_control() {
+    # 1. Захват текущего статуса последней команды
     local status=$?
-    local success_msg="$1"
-    local error_msg="$2"
-    local fatal="${3:-0}"
-
-    if [ $status -eq 0 ]; then
-        log_msg "success" "$success_msg"
-    else
-        log_msg "error" "$error_msg"
-        if [ "$fatal" -eq 1 ]; then
-            log_msg "error" "Критический сбой. Работа остановлена."
-            exit 1
-        fi
-    fi
-}
-
-
-restart_mod() {
-    local name="$1"
-    local cmd="$2"
     
-    log_msg "info" "Перезапуск модуля $name..."
-    run_silent pkill -f "$name"
-    sleep 1
-    eval "$cmd &"
-    check_status "Модуль $name запущен" "Ошибка запуска $name"
+    # 2. Параметры
+    local mode="$1"      # Режим: "check" (проверка) или "restart" (перезапуск)
+    local label="$2"     # Имя модуля или описание действия
+    local extra_cmd="$3" # Команда запуска (только для режима restart)
+    local fatal="${4:-0}" # Флаг критической ошибки (1 - стоп)
+
+    case "$mode" in
+        "check")
+            # Логика простой проверки статуса выполнения
+            if [[ $status -eq 0 ]]; then
+                core_engine_ui "+$label: Успешно"
+                return 0
+            else
+                core_engine_ui "!$label: Ошибка"
+                [[ "$fatal" == "1" ]] && { core_engine_ui "!Критический сбой. Остановка."; exit 1; }
+                return 1
+            fi
+            ;;
+
+        "restart")
+            # Логика интеллектуального перезапуска модуля
+            core_engine_ui "?Инициализация перезапуска: [$label]..."
+            
+            # Эвристическая очистка: убиваем старые процессы молча
+            core_engine_run pkill -f "$label"
+            sleep 1
+            
+            # Динамический запуск в фоне
+            if [[ -n "$extra_cmd" ]]; then
+                eval "$extra_cmd &"
+                # Рекурсивный вызов себя для проверки результата запуска
+                core_engine_control "check" "Модуль [$label]" "" "$fatal"
+            else
+                core_engine_ui "!Ошибка: Не указана команда запуска для [$label]"
+                return 1
+            fi
+            ;;
+    esac
 }
 
 
