@@ -342,7 +342,7 @@ prime_dynamic_controller() {
     local -a actions=($3)
     
     while true; do
-        clear # Очистка для предотвращения наслоения меню
+        
         core_engine_info
         core_engine_ui "h" "$title"
         
