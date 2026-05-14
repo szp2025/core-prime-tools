@@ -321,43 +321,33 @@ core_engine_info() {
 # --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
 
 core_engine_progress() {
-    local duration="${1:-2}"
-    local message="${2:-SYNCHRONIZING}"
-    local width=25
+    local duration="${1:-1}"
+    local label="${2:-PROCESS}"
+    local width=20
     
-    # Подготовка баров (Zero-Loop Rendering)
-    local full_bar=$(printf '█%.0s' $(seq 1 $width))
-    local empty_bar=$(printf '░%.0s' $(seq 1 $width))
-    
-    # Слой 1: Только один echo ПЕРЕД циклом (подготовка места)
-    # Мы не пишем ничего внутри цикла через echo
+    # Слайсинг (Zero-Loop)
+    local full=$(printf '█%.0s' $(seq 1 $width))
+    local empty=$(printf '░%.0s' $(seq 1 $width))
     
     for ((i=1; i<=width; i++)); do
-        local percent=$(( i * 100 / width ))
+        local pc=$(( i * 100 / width ))
+        local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $3, $2}')
         
-        # Цвет
-        local color="${Y}"
-        (( percent > 40 )) && color="${B}"
-        (( percent > 85 )) && color="${G}"
+        # Выбираем цвет
+        local clr="${Y}"
+        (( pc > 50 )) && clr="${B}"
+        (( pc > 90 )) && clr="${G}"
         
-        # Слайсинг строк
-        local bar_part="${full_bar:0:i}"
-        local pad_part="${empty_bar:i:width}"
+        # \r - возврат, \e[K - очистка строки от мусора
+        printf "\r\e[K${NC}[i] %-15s ${clr}[%s%s]${NC} %3d%% | RAM: %s" \
+            "${label:0:15}" "${full:0:i}" "${empty:i:width}" "$pc" "$ram"
         
-        # Получаем RAM для каждой итерации
-        local ram_info=$(free -m | awk '/Mem:/ { printf "%d/%dMB", $3, $2 }')
-
-        # СТРОГО ОДНА СТРОКА: \r возвращает в начало, \e[K стирает старое
-        # ВАЖНО: printf должен быть единственным выводом в цикле
-        printf "\r\e[K${NC}[i] Loading ${color}%-15s${NC} [%b%s%s${NC}] %3d%% | RAM: %s" \
-            "$message" "$color" "$bar_part" "${NC}$pad_part" "$percent" "$ram_info"
-
-        # Задержка
-        sleep 0.05
+        # Рассчитываем задержку исходя из duration
+        sleep 0.04
     done
     
-    # Финальный перенос строки только ПОСЛЕ завершения цикла
-    printf "\n${G}[+] $message: SUCCESSFUL${NC}\n"
+    # Финальная строка (перезаписывает прогресс)
+    printf "\r\e[K${G}[+] %-15s COMPLETE | RAM: %s${NC}\n" "$label" "$ram"
 }
 
 
@@ -369,76 +359,38 @@ prime_dynamic_controller() {
     local -a actions=($3)
     
     while true; do
-        # Слой 1: Информация через узел [12]
+        clear # Очищаем экран для чистоты интерфейса
         core_engine_info
+        core_engine_ui "h" "$title"
         
-        # Слой 2: Заголовок через узел [1]
-        core_engine_ui "$title"
-        
-        # Слой 3: Отрисовка через Архитектора [2]
         for ((i=0; i<${#labels[@]}; i++)); do
-            # Используем core_engine_item для соблюдения стиля
-            core_engine_item "$((i+1))" "${labels[$i]//_/ }" "Execute linked action"
+            core_engine_item "$((i+1))" "${labels[$i]//_/ }" "Linked Action"
         done
         
         echo -e "\n${Y} B) BACK / EXIT${NC}"
-        echo -e "---------------------------------------"
+        core_engine_ui "line" ""
         
-        # Слой 4: Ввод через Органы чувств [3]
         local choice=$(core_engine_input "select" "Input")
         
-        # Слой 5: Валидация
         if [[ "$choice" == "b" || "$choice" == "B" ]]; then return 0; fi
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
             local idx=$((choice-1))
             
-            # Визуальный эффект перед запуском [13]
-            core_engine_progress 1 "Loading ${labels[$idx]}"
+            # Запуск прогресса (теперь строго в одну строку)
+            core_engine_progress 1 "${labels[$idx]}"
             
-            # Выполнение
+            # Выполнение функции
             ${actions[$idx]}
+            
+            # УБРАНО: core_engine_wait (теперь не нужно жать Enter после каждого клика)
         else
-            core_engine_ui "e" "Select 1-${#labels[@]} or B"
+            core_engine_ui "e" "Invalid selection"
             sleep 1
         fi
-        
-        # Визуальный барьер после выполнения [9]
-        core_engine_wait
     done
 }
 
-
-core_engine_loot() {
-    local module="${1:-unknown}"
-    local data="$2"
-    local loot_dir="${BASE_DIR:-./}/prime_loot"
-    local m_file="${loot_dir}/${module}_results.txt"
-    
-    # Слой 1: Инфраструктура через системный Глушитель
-    [[ -d "$loot_dir" ]] || core_engine_run "mkdir -p $loot_dir && chmod 700 $loot_dir"
-
-    # Слой 2: Экспресс-маркировка (без grep)
-    local sev="INFO"
-    [[ "$data" =~ (password|pwd|root|admin|vuln|critical|key|access) ]] && sev="CRITICAL"
-    [[ "$sev" == "INFO" && "$data" =~ (user|ip|domain|node) ]] && sev="TARGET"
-
-    # Слой 3: Запись через Атомарный поток
-    local entry="[$(date '+%H:%M:%S')] [$sev] -> $data"
-    echo "$entry" >> "$m_file"
-    
-    # Слой 4: Критический мост
-    if [[ "$sev" == "CRITICAL" ]]; then
-        echo "$entry" >> "${loot_dir}/master_intelligence.log"
-        core_engine_ui "!CRITICAL DATA SECURED"
-    fi
-
-    # Слой 5: Безопасная ротация (лимит 1000 строк)
-    local line_count=$(wc -l < "$m_file" 2>/dev/null || echo 0)
-    if (( line_count > 1000 )); then
-        sed -i '1,100d' "$m_file" # Удаляем первые 100 строк без создания tmp-файлов
-    fi
-}
 
 core_engine_mutate() {
     local input="$1"
