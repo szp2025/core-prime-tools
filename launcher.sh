@@ -304,34 +304,6 @@ spacer() {
     for ((i=0; i<count; i++)); do echo ""; done
 }
 
-
-
-log_msg() {
-    local type="$1"
-    local msg="$2"
-    case "$type" in
-        "info")    echo -e "${BLUE}[i]${NC} $msg" ;;
-        "success") echo -e "${GREEN}[+]${NC} $msg" ;;
-        "warn")    echo -e "${YELLOW}[!]${NC} $msg" ;;
-        "error")   echo -e "${RED}[X]${NC} $msg" ;;
-        *)         echo -e "$msg" ;;
-    esac
-}
-
-
-check_component() {
-    local path="$1"
-    local name="$2"
-    if [ -f "$path" ] || [ -d "$path" ]; then
-        log_msg "success" "Компонент $name обнаружен: $path"
-        return 0
-    else
-        log_msg "error" "Критическая ошибка: $name не найден по адресу $path"
-        return 1
-    fi
-}
-
-
 ask_input() {
     local prompt_text="$1"
     local result
