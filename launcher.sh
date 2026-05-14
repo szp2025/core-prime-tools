@@ -165,11 +165,7 @@ print_stats_line() {
 }
 
 
-/**
- * Функция для отрисовки стандартизированных заголовков меню.
- * @param {string} text - Текст заголовка.
- * @param {string} color - Переменная цвета (например, $BLUE).
- */
+
 draw_header() {
     local text="$1"
     local color="${2:-$BLUE}" # По умолчанию синий
@@ -180,21 +176,14 @@ draw_header() {
     fi
 }
 
-/**
- * Функция для создания пустых строк (отступов).
- * @param {int} count - Количество строк.
- */
+
 spacer() {
     local count="${1:-1}"
     for ((i=0; i<count; i++)); do echo ""; done
 }
 
 
-/**
- * Функция для вывода статусных сообщений.
- * @param {string} type - Тип сообщения: info, success, warn, error.
- * @param {string} message - Текст сообщения.
- */
+
 log_msg() {
     local type="$1"
     local msg="$2"
@@ -207,11 +196,7 @@ log_msg() {
     esac
 }
 
-/**
- * Проверка существования критически важного файла.
- * @param {string} path - Путь к файлу.
- * @param {string} module_name - Имя модуля для вывода в лог.
- */
+
 check_component() {
     local path="$1"
     local name="$2"
@@ -224,11 +209,7 @@ check_component() {
     fi
 }
 
-/**
- * Запрос ввода с проверкой.
- * @param {string} prompt_text - Сообщение для пользователя.
- * @param {string} var_name - Имя переменной, куда сохранить результат.
- */
+
 ask_input() {
     local prompt_text="$1"
     local result
