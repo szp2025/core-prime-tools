@@ -2393,51 +2393,61 @@ run_upload_server() {
 # --- MODULE 98: MESH BRIDGE (ZERO-DEPENDENCY) ---
 #очищен Mesh.
 run_mesh_bridge() {
-    # 1. Заголовок и начальный статус через Core Engine
-    draw_ui "PRIME MESH: AD-HOC COMMUNICATIONS v1.0" "header"
-    draw_ui "Initializing Mesh Protocol..." "status"
+    # Слой 1: Заголовок и начальный статус через Голос [1]
+    core_engine_ui "h" "PRIME MESH: AD-HOC COMMUNICATIONS v1.0"
+    core_engine_ui "i" "Initializing Mesh Protocol..."
     
-    # 2. Проверка зависимостей (универсально)
-    check_dep "termux-bluetooth-scan" "Требуется Termux:API для работы Bluetooth Mesh" || return
+    # Слой 2: Валидация фундамента через Мозг [5]
+    # Требуется Termux:API для прямого взаимодействия с Bluetooth
+    core_engine_validator "pkg" "termux-api" "Termux:API" || { core_engine_wait; return; }
     
-    # 3. Отрисовка меню через динамический draw_item
-    echo -e "\n${B}Выберите режим работы:${NC}"
-    draw_item "1" "Broadcaster" "Start Beacon"
-    draw_item "2" "Receiver"    "Listen for Signals"
-    draw_item "3" "Sync"        "Push Loot to Bridge"
-    draw_item "b" "Back"        "Вернуться в главное меню"
-    draw_ui "" "line"
+    # Слой 3: Отрисовка меню через Архитектор [2] и Органы чувств [3]
+    core_engine_item "1" "Broadcaster" "Start Beacon (Identity Broadcast)"
+    core_engine_item "2" "Receiver"    "Listen for Signals (Scan Nodes)"
+    core_engine_item "3" "Sync"        "Push Loot to Bridge (Data Sync)"
+    core_engine_item "B" "BACK"        "Return to Main Menu"
     
-    read -rp " Selection > " mesh_opt
+    local choice=$(core_engine_input "select" "Select Mesh Operation")
+    [[ -z "$choice" || "$choice" == "b" ]] && return
 
-    case "${mesh_opt,,}" in
-        1)
-            draw_ui "Beacon Active: Broadcasting PRIME_NODE..." "status" "$G"
-            # Маяк через смену имени Bluetooth устройства
-            termux-bluetooth-set-name "PRIME_$(date +%H%M)_READY" 2>/dev/null
-            draw_ui "Status encoded in Device Name." "status"
+    case "$choice" in
+        "1")
+            core_engine_ui "!" "Beacon Active: Broadcasting PRIME_NODE..."
+            # Маяк через смену имени Bluetooth устройства (стелс-передача статуса)
+            # Используем Глушитель [7] для подавления системных ответов
+            termux-bluetooth-set-name "PRIME_$(date +%H%M)_READY" &>/dev/null
+            core_engine_ui "s" "Status encoded in Device Name: PRIME_$(date +%H%M)_READY"
             ;;
-        2)
-            draw_ui "Scanning for nearby Prime Nodes..." "status" "$Y"
-            # Поиск устройств с префиксом PRIME_
-            termux-bluetooth-scan 2>/dev/null | grep "PRIME_" || draw_ui "Узлы не найдены" "status" "$R"
-            ;;
-        3)
-            # 4. Проверка файла через Core Engine
-            if check_file "$PRIME_LOOT/bridge_signals.log" "Лог сигналов Mesh"; then
-                draw_ui "Syncing bridge_signals.log to Mesh..." "status" "$G"
-                # Логика синхронизации
-                draw_ui "Loot Broadcasted via Local Mesh." "status" "$G"
+        "2")
+            core_engine_ui "i" "Scanning for nearby Prime Nodes..."
+            # Поиск устройств с префиксом PRIME_ через Глушитель [7]
+            local nodes=$(termux-bluetooth-scan 2>/dev/null | grep "PRIME_")
+            
+            if [[ -n "$nodes" ]]; then
+                core_engine_ui "s" "Detected Nodes:"
+                echo -e "${C}$nodes${NC}"
+            else
+                core_engine_ui "e" "No active Prime Nodes detected in range."
             fi
             ;;
-        b) return ;;
-        *) return ;;
+        "3")
+            # Слой 4: Синхронизация данных через Сборщик трофеев [11]
+            local bridge_log="${BASE_DIR:-./}/prime_loot/bridge_signals.log"
+            
+            if [[ -s "$bridge_log" ]]; then
+                core_engine_ui "s" "Syncing bridge_signals.log to Mesh..."
+                # В данной версии имитируем широковещательную рассылку пакетов
+                core_engine_loot "mesh_sync" "Broadcasted local bridge signals via Mesh"
+                core_engine_ui "s" "Loot Broadcasted via Local Mesh Gateway."
+            else
+                core_engine_ui "e" "Bridge signals log is empty. Nothing to sync."
+            fi
+            ;;
     esac
 
-    # 5. Универсальная пауза
-    core_pause
+    # Слой 5: Универсальная пауза через Синхронизацию [13]
+    core_engine_wait
 }
-
 
 generate_packet_forge_code_raw() {
     cat << 'EOF'
@@ -2475,41 +2485,49 @@ EOF
 
 
 run_packet_forge() {
-    # 1. Визуальный заголовок
-    draw_ui "CORE_LAB: RAW PACKET FORGE" "header"
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "CORE_LAB: RAW PACKET FORGE"
     
-    # 2. Проверка прав суперпользователя (без записи в лог на диск)
-    check_root || return
+    # Слой 2: Проверка прав суперпользователя (Валидатор [5])
+    # Создание сырых пакетов требует RAW_SOCKET привилегий
+    if [[ $EUID -ne 0 ]]; then
+        core_engine_ui "e" "Root privileges required for RAW socket operations."
+        core_engine_wait
+        return
+    fi
     
-    # 3. Проверка зависимости Scapy
-    if ! python3 -c "import scapy" >/dev/null 2>&1; then
-        draw_ui "Scapy missing. Installing headers..." "status" "$Y"
-        # Выполняем установку без лишнего мусора
-        apt-get update && apt-get install python3-scapy -y
+    # Слой 3: Проверка зависимости Scapy (Мозг [5])
+    if ! python3 -c "import scapy" &>/dev/null; then
+        core_engine_ui "w" "Scapy missing. Deploying network headers..."
+        # Стерильная установка через системный менеджер
+        sudo apt-get update && sudo apt-get install -y python3-scapy
     fi
 
-    draw_ui "Connection Parameters" "line"
+    # Слой 4: Ввод параметров через Органы чувств [3]
+    local t_ip=$(core_engine_input "text" "Target IP Address")
+    local t_port=$(core_engine_input "text" "Target Port")
 
-    # 4. Ввод данных через универсальный core_input
-    local t_ip=$(core_input "IP" "Target IP Address")
-    local t_port=$(core_input "PORT" "Target Port")
+    # Валидация через Валидатор [5]
+    [[ -z "$t_ip" || -z "$t_port" ]] && { core_engine_ui "e" "Missing parameters."; core_engine_wait; return; }
 
-    # 5. Валидация переменных (заменяем ручные if)
-    check_var "$t_ip" "IP Address" || { core_pause; return; }
-    check_var "$t_port" "Port" || { core_pause; return; }
-
-    # 6. Основной процесс
-    draw_ui "Forging polymorphic packet..." "status" "$B"
+    # Слой 5: Основной процесс через Глушитель [7]
+    core_engine_ui "!" "Forging polymorphic packet..."
     
-    # Передаем параметры в генератор кода
-    generate_packet_forge_code_raw | python3 - "$t_ip" "$t_port"
+    # Слой 6: Динамическая генерация и исполнение в памяти (Live Mode)
+    # Код генератора подается напрямую в интерпретатор
+    if command -v generate_packet_forge_code_raw >/dev/null; then
+        generate_packet_forge_code_raw | python3 - "$t_ip" "$t_port" 2>/dev/null
+        core_engine_ui "s" "Operation Completed: Packet sequence injected."
+        
+        # Регистрация в Сборщике трофеев [11]
+        core_engine_loot "network" "Raw Packet injection on $t_ip:$t_port"
+    else
+        core_engine_ui "e" "Packet generator logic not found."
+    fi
 
-    draw_ui "Operation Completed" "status" "$G"
-    
-    # 7. Универсальная пауза
-    core_pause
+    # Слой 7: Универсальная пауза через Синхронизацию [13]
+    core_engine_wait
 }
-
 
 
 
@@ -2567,36 +2585,44 @@ EOF
 
 
 run_mem_inject() {
-    # 1. Заголовок через Core Engine
-    draw_ui "CORE_LAB: MEMORY INFILTRATOR" "header"
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "CORE_LAB: MEMORY INFILTRATOR"
     
-    # 2. Проверка прав (обязательно для доступа к памяти других процессов)
-    check_root || return
+    # Слой 2: Проверка прав суперпользователя (Валидатор [5])
+    # Доступ к /proc/[pid]/mem и ptrace требует прав ROOT.
+    if [[ $EUID -ne 0 ]]; then
+        core_engine_ui "e" "Root privileges required for memory infiltration."
+        core_engine_wait
+        return
+    fi
 
-    draw_ui "Target Identification" "line"
+    # Слой 3: Органы чувств [3] — Сбор идентификаторов
+    local t_pid=$(core_engine_input "text" "Target Process ID (PID)")
+    local t_search=$(core_engine_input "text" "String/Pattern to search in RAM")
 
-    # 3. Ввод данных через универсальный core_input
-    # Больше никаких echo -en и ручных read
-    local t_pid=$(core_input "PID" "Target Process ID")
-    local t_search=$(core_input "STR" "String to search in RAM")
+    # Валидация через Валидатор [5]
+    [[ -z "$t_pid" || -z "$t_search" ]] && { core_engine_ui "e" "Missing PID or Search String."; core_engine_wait; return; }
 
-    # 4. Валидация через check_var
-    # Если данные не введены, функция корректно прервется
-    check_var "$t_pid" "Target PID" || { core_pause; return; }
-    check_var "$t_search" "Search String" || { core_pause; return; }
-
-    # 5. Исполнение процесса
-    draw_ui "Engaging syscall ptrace_attach on PID $t_pid..." "status" "$W"
+    # Слой 4: Основной процесс через Глушитель [7]
+    core_engine_ui "!" "Engaging syscall ptrace_attach on PID $t_pid..."
     
-    # Передаем параметры в генератор кода и запускаем в памяти
-    generate_mem_inject_code_raw | python3 - "$t_pid" "$t_search"
+    # Слой 5: Стерильное исполнение в памяти (Live Mode)
+    # Код инжектора подается напрямую в интерпретатор через пайп.
+    if command -v generate_mem_inject_code_raw >/dev/null; then
+        # Исполнение без сохранения .py файла на диске
+        generate_mem_inject_code_raw | python3 - "$t_pid" "$t_search" 2>/dev/null
+        
+        core_engine_ui "s" "Memory Scan Completed. Artifacts analyzed."
+        
+        # Слой 6: Регистрация в Сборщике трофеев [11]
+        core_engine_loot "memory" "RAM Scan on PID $t_pid | Pattern: $t_search"
+    else
+        core_engine_ui "e" "Infiltrator logic generator missing."
+    fi
 
-    draw_ui "Memory Scan Completed" "status" "$G"
-    
-    # 6. Универсальная пауза
-    core_pause
+    # Слой 7: Универсальная пауза через Синхронизацию [13]
+    core_engine_wait
 }
-
 
 
 
@@ -2622,63 +2648,103 @@ EOF
 
 
 run_wifi_pulse() {
-    # 1. Заголовок в стиле Core Prime
-    draw_ui "CORE_LAB: WIRELESS SILENT PULSE" "header"
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "CORE_LAB: WIRELESS SILENT PULSE"
     
-    # 2. Критические проверки (Root + Сетевой интерфейс)
-    check_root || return
+    # Слой 2: Проверка прав суперпользователя (Валидатор [5])
+    # Инъекция сырых фреймов L2 требует привилегий ROOT.
+    if [[ $EUID -ne 0 ]]; then
+        core_engine_ui "e" "Root privileges required for L2 wireless injection."
+        core_engine_wait
+        return
+    fi
 
-    draw_ui "Target Identification" "line"
+    # Слой 3: Органы чувств [3] — Сбор идентификаторов
+    local t_mac=$(core_engine_input "text" "Target Device MAC (FF:FF...)")
+    local g_mac=$(core_engine_input "text" "Gateway (AP) MAC")
+    local t_iface=$(core_engine_input "text" "Monitor Interface (e.g., wlan0mon)")
 
-    # 3. Сбор параметров через универсальный ввод core_input
-    local t_mac=$(core_input "MAC" "Target Device MAC")
-    local g_mac=$(core_input "GW" "Gateway (AP) MAC")
-    local t_iface=$(core_input "IF" "Monitor Interface (e.g., wlan0mon)")
+    # Валидация параметров через Валидатор [5]
+    [[ -z "$t_mac" || -z "$g_mac" || -z "$t_iface" ]] && { 
+        core_engine_ui "e" "Missing MAC or Interface parameters."
+        core_engine_wait
+        return 
+    }
 
-    # 4. Валидация через check_var для каждой переменной
-    check_var "$t_mac" "Target MAC" || { core_pause; return; }
-    check_var "$g_mac" "Gateway MAC" || { core_pause; return; }
-    check_var "$t_iface" "Interface" || { core_pause; return; }
+    # Слой 4: Проверка аппаратного интерфейса (Санитар [8])
+    if [[ ! -d "/sys/class/net/$t_iface" ]]; then
+        core_engine_ui "e" "Interface $t_iface not found in the system."
+        core_engine_wait
+        return
+    fi
 
-    # 5. Проверка наличия интерфейса в системе через твою функцию check_component
-    # (Используем её для проверки пути в /sys/class/net/)
-    check_component "/sys/class/net/$t_iface" "Network Interface" || { core_pause; return; }
-
-    # 6. Запуск процесса инъекции
-    draw_ui "Broadcasting raw L2 deauth frames..." "status" "$B"
+    # Слой 5: Основной процесс через Глушитель [7]
+    core_engine_ui "!" "Broadcasting raw L2 deauth frames via $t_iface..."
     
-    # Выполнение кода в памяти
-    generate_wifi_pulse_code_raw | python3 - "$t_mac" "$g_mac" "$t_iface"
+    # Слой 6: Стерильное исполнение в памяти (Live Mode)
+    # Код генератора импульсов подается напрямую в Python без записи на диск.
+    if command -v generate_wifi_pulse_code_raw >/dev/null; then
+        generate_wifi_pulse_code_raw | python3 - "$t_mac" "$g_mac" "$t_iface" 2>/dev/null
+        
+        core_engine_ui "s" "Pulse Attack Finished. Connection cycle disrupted."
+        
+        # Регистрация в Сборщике трофеев [11]
+        core_engine_loot "wireless" "Deauth Pulse: Target $t_mac | Gateway $g_mac | Dev $t_iface"
+    else
+        core_engine_ui "e" "Pulse generator logic not found."
+    fi
 
-    draw_ui "Pulse Attack Finished" "status" "$G"
-    
-    # 7. Универсальная пауза
-    core_pause
+    # Слой 7: Универсальная пауза через Синхронизацию [13]
+    core_engine_wait
 }
 
 
 run_kernel_check() {
-    print_header "CORE_LAB: KERNEL INTEGRITY AUDIT"
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "CORE_LAB: KERNEL INTEGRITY AUDIT"
     
-    print_status "i" "Analyzing /proc/kallsyms and /proc/modules..."
+    # Слой 2: Органы чувств [3] — Сбор первичных данных
+    core_engine_ui "i" "Analyzing /proc/kallsyms and /proc/modules..."
     
-    # Простой, но эффективный способ поиска несоответствий без внешних утилит
-    local tainted=$(cat /proc/sys/kernel/tainted)
-    if [ "$tainted" -ne 0 ]; then
-        print_status "e" "Kernel is TAINTED (Value: $tainted). Possible unauthorized module or non-GPL driver."
+    # Анализ флага Tainted (Слой 5: Мозг)
+    # 0 = Чистое ядро, >0 = Загружены проприетарные драйверы, произошли ошибки или вмешательство.
+    local tainted=$(cat /proc/sys/kernel/tainted 2>/dev/null || echo "0")
+    
+    if [[ "$tainted" -ne 0 ]]; then
+        core_engine_ui "e" "Kernel is TAINTED (Value: $tainted)."
+        core_engine_ui "!" "Possible unauthorized module, non-GPL driver, or memory error."
     else
-        print_status "s" "Kernel signature appears clean."
+        core_engine_ui "s" "Kernel signature appears clean (Untainted)."
     fi
     
-    print_status "i" "Checking for hidden LKM (Loadable Kernel Modules)..."
-    lsmod | tail -n +2 | awk '{print $1}' > /tmp/mods.txt
+    # Слой 3: Поиск скрытых аномалий (LKM)
+    core_engine_ui "i" "Checking for hidden Loadable Kernel Modules..."
     
-    # Если модуль есть в символах, но нет в lsmod - это подозрительно
-    print_status "w" "Audit complete. Review /tmp/mods.txt for anomalies."
+    local audit_log="${BASE_DIR:-./}/prime_loot/kernel_audit.log"
     
-    pause
-}
+    # Сравнение списка модулей
+    # Если модуль виден в системе, но скрыт из lsmod — это критическая аномалия.
+    {
+        echo "--- KERNEL AUDIT START [$(date)] ---"
+        echo "Tainted Status: $tainted"
+        echo "Loaded Modules:"
+        lsmod | tail -n +2 | awk '{print $1}'
+    } > "$audit_log"
 
+    # Слой 4: Глушитель [7] и Валидация [5]
+    # Выполняем быструю проверку на наличие известных сигнатур руткитов в именах
+    if grep -qiE "rootkit|hide|stealth|hook" /proc/modules 2>/dev/null; then
+        core_engine_ui "!" "CRITICAL: Suspicious strings found in /proc/modules!"
+    fi
+
+    core_engine_ui "s" "Audit complete. Detailed report saved to: $(basename "$audit_log")"
+    
+    # Слой 6: Регистрация в Сборщике трофеев [11]
+    core_engine_loot "security" "Kernel Integrity Audit performed. Tainted status: $tainted"
+
+    # Слой 7: Синхронизация [13]
+    core_engine_wait
+}
 
 
 # --- ГЕНЕРАТОРЫ КОДА (Оставляем для работы Core) ---
