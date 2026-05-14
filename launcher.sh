@@ -1949,67 +1949,69 @@ run_view_loot() {
 }
 
 run_iban_analyzer() {
-    clear
-    print_header "FINANCIAL INTELLIGENCE: OMNI-BANKER v2.2"
-    echo ""
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "FINANCIAL INTELLIGENCE: OMNI-BANKER v2.2"
 
-    # 1. Проверка фундамента
-    check_step "cmd" "python3" "Python3 required for Global Analysis." || { pause; return; }
+    # Слой 2: Валидация фундамента через Мозг [5]
+    core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
 
-    # 2. Вызов меню (Записывает цифру 1, 2 или 3 в CHOICE)
-    select_option "Select Operation Vector:" \
-        "SINGLE: Full IBAN & Holder Analysis" \
-        "PASSIVE: Structural Validation Only" \
-        "EXIT: Return to Main Menu"
+    # Слой 3: Органы чувств [3] — Выбор вектора
+    core_engine_item "1" "SINGLE" "Full IBAN & Holder Analysis"
+    core_engine_item "2" "PASSIVE" "Structural Validation Only"
+    core_engine_item "B" "BACK" "Return to Main Menu"
     
-    local btn="$CHOICE"
+    local choice=$(core_engine_input "select" "Select Operation Vector")
+    [[ -z "$choice" || "$choice" == "b" ]] && return
 
-    # Сразу отсекаем выход или пустой выбор
-    [[ -z "$btn" || "$btn" == "3" ]] && return
+    # Слой 4: Подготовка временного движка (Санитар [8])
+    local engine_path="/tmp/iban_engine_$(date +%s).py"
+    
+    # Генерация кода (внутренняя функция системы)
+    if command -v generate_iban_code >/dev/null; then
+        generate_iban_code "$engine_path" "2.2"
+    else
+        # Заглушка, если генератор еще не подточен
+        core_engine_ui "e" "IBAN Engine Generator not found."
+        return
+    fi
 
-    # 3. Подготовка временного движка
-    local engine_path="/tmp/iban_engine_$RANDOM.py"
-    generate_iban_code "$engine_path" "2.2"
-
-    # 4. Обработка логики через Case (Никаких if-then)
-    case "$btn" in
+    # Слой 5: Исполнение через Глушитель [7]
+    case "$choice" in
         "1")
-            print_input "Enter IBAN to validate" "FR76..."
-            read -r TARGET_IBAN
-            [[ -z "$TARGET_IBAN" ]] && { rm -f "$engine_path"; return; }
+            local target_iban=$(core_engine_input "text" "Enter IBAN to validate (e.g., FR76...)")
+            [[ -z "$target_iban" ]] && { core_engine_remove "$engine_path"; return; }
 
-            print_input "Enter Expected Holder Name (Optional)" "none"
-            read -r EXPECTED_NAME
+            local expected_name=$(core_engine_input "text" "Enter Expected Holder Name (Optional/none)")
             
-            print_status "i" "Executing Full Intelligence Cycle..."
-            echo ""
-            python3 "$engine_path" "$TARGET_IBAN" "${EXPECTED_NAME:-none}"
+            core_engine_ui "i" "Executing Full Intelligence Cycle..."
+            python3 "$engine_path" "$target_iban" "${expected_name:-none}"
             
-            log_loot "financial" "Full Scan: ${TARGET_IBAN:0:4}..."
+            # Сбор трофеев [11]
+            core_engine_loot "financial" "Full Scan: ${target_iban:0:4}****"
             ;;
 
         "2")
-            print_input "Enter IBAN for Structural Check" "DE..."
-            read -r TARGET_IBAN
-            [[ -z "$TARGET_IBAN" ]] && { rm -f "$engine_path"; return; }
+            local target_iban=$(core_engine_input "text" "Enter IBAN for Structural Check")
+            [[ -z "$target_iban" ]] && { core_engine_remove "$engine_path"; return; }
 
-            print_status "i" "Executing Passive Structural Validation..."
-            echo ""
-            # В пассивном режиме передаем "none" как имя
-            python3 "$engine_path" "$TARGET_IBAN" "none"
+            core_engine_ui "i" "Executing Passive Structural Validation..."
+            python3 "$engine_path" "$target_iban" "none"
             
-            log_loot "financial" "Passive Check: ${TARGET_IBAN:0:4}..."
+            core_engine_loot "financial" "Passive Check: ${target_iban:0:4}****"
             ;;
     esac
 
-    # 5. Финализация и Стерилизация
+    # Слой 6: Стерилизация и Финализация [8]
     local res_status=$?
-    rm -f "$engine_path"
+    core_engine_remove "$engine_path"
     
-    echo ""
-    [[ $res_status -eq 0 ]] && print_status "s" "Analysis complete. Trace purged." \
-                            || print_status "e" "Analysis interrupted."
-    pause
+    if [[ $res_status -eq 0 ]]; then
+        core_engine_ui "s" "Analysis complete. Trace purged."
+    else
+        core_engine_ui "e" "Analysis interrupted or invalid IBAN format."
+    fi
+
+    core_engine_wait
 }
 
 
