@@ -2350,38 +2350,43 @@ run_av_server() {
 
 
 run_share_server() {
-    print_header "SHARE SECTOR: SECURE FILE DISTRIBUTION"
+    # Слой 1: Визуализация через Голос [1]
+    core_engine_ui "SHARE SECTOR: SECURE FILE DISTRIBUTION"
 
-    local share_dir="/root/share"
+    local share_dir="${HOME}/prime_share"
     
-    # 1. Проверка и подготовка инфраструктуры
-    [[ -d "$share_dir" ]] || {
+    # Слой 2: Подготовка инфраструктуры через Санитара [8]
+    if [[ ! -d "$share_dir" ]]; then
         mkdir -p "$share_dir"
-        print_status "i" "Created transmission sector at $share_dir"
-    }
+        core_engine_ui "i" "Created transmission sector at $share_dir"
+    fi
 
-    # 2. Проверка окружения
-    check_step "cmd" "python3" "Python3 missing." || { pause; return; }
+    # Слой 3: Валидация фундамента через Мозг [5]
+    core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
 
-    # 3. Запуск через универсальный движок
-    # Тип "share", порт 5002
+    # Слой 4: Динамический запуск через Live Node [22]
+    # Используем тип "share" на порту 5002
     run_live_service "share" "5002"
+
+    # Слой 5: Регистрация в Сборщике трофеев [11]
+    core_engine_loot "service" "Share Sector (Uplink) active on port 5002"
 }
 
 run_upload_server() {
     # Слой 1: Визуализация через Голос [1]
-    core_engine_ui "INBOUND DROP BOX: SECURE UPLINK"
+    core_engine_ui "h" "INBOUND DROP BOX: SECURE UPLINK"
 
     # Слой 2: Валидация фундамента через Мозг [5]
-    # Проверка наличия Python3
+    # Проверка наличия интерпретатора Python3 для запуска сервера
     core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
 
     # Слой 3: Динамический запуск через Live Node [22]
-    # Запуск сервера на порту 5001 в режиме MEMORY_ONLY
-    # Это гарантирует, что код сервера не записывается на диск
+    # Запуск сервера на порту 5001 в режиме MEMORY_ONLY.
+    # Код сервера передается через пайп, исключая создание .py файлов на диске.
     run_live_service "upload" "5001"
 
     # Слой 4: Регистрация в Сборщике трофеев [11]
+    # Фиксация события запуска в системном логе
     core_engine_loot "service" "Secure Uplink (Upload) initiated on port 5001"
 }
 
