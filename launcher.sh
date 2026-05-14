@@ -306,30 +306,31 @@ core_engine_info() {
 
 # --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
 core_engine_progress() {
-    local duration="${1:-1}"
-    local label="${2:-LOADING}"
-    local width=20
+    local duration="${1:-2}"
+    local message="${2:-SYNCHRONIZING}"
+    local width=30
     
-    local full=$(printf '█%.0s' $(seq 1 $width))
-    local empty=$(printf '░%.0s' $(seq 1 $width))
+    local full_bar=$(printf '█%.0s' $(seq 1 $width))
+    local empty_bar=$(printf '░%.0s' $(seq 1 $width))
     
+    # УДАЛЕНО: echo внутри цикла (больше никакой лестницы)
     for ((i=1; i<=width; i++)); do
-        local pc=$(( i * 100 / width ))
-        local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $3, $2}')
+        local percent=$(( i * 100 / width ))
+        local ram_info=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $3, $2}')
         
-        local clr="${Y}"
-        (( pc > 50 )) && clr="${B}"
-        (( pc > 90 )) && clr="${G}"
+        local color="${Y}"
+        (( percent > 40 )) && color="${B}"
+        (( percent > 85 )) && color="${G}"
         
-        # \r\e[K — гарантия одной строки без мусора
-        printf "\r\e[K${NC}[i] %-15s ${clr}[%s%s]${NC} %3d%% | RAM: %s" \
-            "${label:0:15}" "${full:0:i}" "${empty:i:width}" "$pc" "$ram"
+        # Используем \r\e[K для очистки и возврата в одну строку
+        printf "\r\e[K${NC}[i] %-15s ${color}[%s%s]${NC} %3d%% | RAM: %s" \
+            "$message" "${full_bar:0:i}" "${empty_bar:i:width}" "$percent" "$ram_info"
         
-        sleep 0.04
+        sleep 0.05
     done
-    # Переход на новую строку только в конце
-    printf "\n${G}[+] %-15s SUCCESSFUL${NC}\n" "$label"
+    echo -e "\n${G}[+] $message: SUCCESSFUL${NC}"
 }
+
 
 
 
