@@ -274,16 +274,6 @@ core_engine_validator() {
 }
 
 
-draw_mod_menu() {
-    clear
-    draw_header "Управление: $1"
-    echo -e "${YELLOW}1)${NC} Запустить модуль"
-    echo -e "${YELLOW}2)${NC} Остановить модуль"
-    echo -e "${YELLOW}3)${NC} Проверить логи"
-    echo -e "${YELLOW}0)${NC} Назад"
-    spacer
-}
-
 
 #Настройки 
 
@@ -343,14 +333,6 @@ get_stats() {
     echo -e "${Y}NET: $net_status ${B}($net_type: $active_iface) ${Y}│ ACTIVE SRV: $active_srv"
     
     print_line
-}
-
-pause() { echo -e "\n${Y}Press Enter to return...${NC}"; read -r _; }
-
-exit_script() { 
-    echo -e "${R}Cleaning history and exiting...${NC}"
-    history -c
-    exit 0 
 }
 
 show_progress() {
@@ -452,28 +434,6 @@ prime_dynamic_controller() {
     done
 }
 
-print_header() {
-    local title="$1"
-    #clear
-    echo -e "${R}--------------------------------------------------${NC}"
-    # Центрируем текст: 46 символов свободного места в рамке
-    # Используем printf для выравнивания
-    printf "${R}|%*s%s%*s|${NC}\n" $(((48-${#title})/2)) "" "$title" $(((49-${#title})/2)) ""
-    echo -e "${R}--------------------------------------------------${NC}"
-}
-
-# Типы: i (info), s (success), e (error), w (warning)
-print_status() {
-    local type="$1"
-    local msg="$2"
-    case "$type" in
-        "i") echo -e "${B}[*] ${NC}$msg" ;;
-        "s") echo -e "${G}[+] ${NC}$msg" ;;
-        "e") echo -e "${R}[!] ${NC}$msg" ;;
-        "w") echo -e "${Y}[?] ${NC}$msg" ;;
-        *) echo -e "$msg" ;;
-    esac
-}
 
 log_loot() {
     local module="${1:-unknown}"
@@ -517,33 +477,8 @@ log_loot() {
     [[ "$severity" == "CRITICAL" ]] && echo -e "  ${R}[!] CRITICAL SECURED${NC}"
 }
 
-# Аргументы: $1 - тип проверки (cmd, file, port, dir), $2 - цель, $3 - текст ошибки
-check_step() {
-    local type="$1"
-    local target="$2"
-    local err_msg="$3"
-    local status=1
 
-    case "$type" in
-        "cmd") command -v "$target" >/dev/null 2>&1 && status=0 ;;
-        "file") [[ -f "$target" ]] && status=0 ;;
-        "dir")  [[ -d "$target" ]] && status=0 ;;
-        "port") timeout 1 bash -c "cat < /dev/tcp/${target/:/ }" 2>/dev/null && status=0 ;;
-    esac
 
-    if [[ $status -ne 0 ]]; then
-        print_status "e" "$err_msg"
-        return 1
-    fi
-    return 0
-}
-
-ask_confirm() {
-    local prompt="$1"
-    echo -en "${Y}$prompt (y/n): ${NC}"
-    read -r answer
-    [[ "$answer" == "y" ]]
-}
 
 
 
