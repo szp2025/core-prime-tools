@@ -2860,111 +2860,134 @@ run_forensic_core() {
 # --- ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ---
 
 run_auto_forensics() {
-    # 1. Заголовок в едином стиле
-    draw_ui "FORENSICS: AUTOMATIC CORE ANALYZER" "header"
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "FORENSICS: AUTOMATIC CORE ANALYZER"
 
-    # 2. Ввод пути через универсальный core_input
-    # Заменяем связку echo + read
-    local f_path=$(core_input "FILE" "Path to target file")
+    # Слой 2: Органы чувств [3] — Сбор данных
+    # Используем универсальный ввод Ядра
+    local f_path=$(core_engine_input "text" "Path to target file (e.g., /root/artifact.bin)")
 
-    # 3. Валидация переменной (не пустой ли ввод)
-    check_var "$f_path" "File Path" || { core_pause; return; }
+    # Слой 3: Валидация через Мозг [5] и Санитара [8]
+    # Проверка на пустой ввод
+    [[ -z "$f_path" ]] && { core_engine_ui "e" "Operation cancelled: Empty path."; core_engine_wait; return; }
 
-    # 4. Проверка существования файла через твою функцию check_component
-    # Она выведет красивую ошибку, если файла нет, но не оставит логов на диске
-    check_component "$f_path" "Target for Analysis" || { core_pause; return; }
+    # Проверка физического существования файла
+    if [[ ! -f "$f_path" ]]; then
+        core_engine_ui "e" "Target for Analysis not found: $f_path"
+        core_engine_wait
+        return
+    fi
 
-    # 5. Информационный статус перед запуском
-    draw_ui "Initializing Deep Forensic Scan..." "status" "$B"
+    # Слой 4: Информационный статус перед запуском
+    core_engine_ui "i" "Initializing Deep Forensic Scan..."
     
-    # 6. Основной процесс
-    execute_forensic_core "$f_path"
+    # Слой 5: Исполнение через основной Форензик-движок [24]
+    # Передаем управление модулю execute_forensic_core (run_forensic_core)
+    run_forensic_core "$f_path"
 
-    draw_ui "Forensic Analysis Completed" "status" "$G"
+    # Слой 6: Финализация и Сбор трофеев [11]
+    core_engine_ui "s" "Forensic Analysis Completed. Experience integrated."
+    
+    # Регистрация события в глобальном логе
+    core_engine_loot "forensics" "Auto-Scan initiated for: $(basename "$f_path")"
 
-    # 7. Универсальная пауза
-    core_pause
+    # Слой 7: Синхронизация [13]
+    core_engine_wait
 }
 
 run_doc_cleaner() {
-    # 1. Заголовок в едином стиле
-    draw_ui "FORENSICS: DOCUMENT SANITIZER" "header"
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "FORENSICS: DOCUMENT SANITIZER"
 
-    # 2. Проверка зависимости (exiftool)
-    check_dep "exiftool" "Требуется пакет perl-image-exiftool для очистки метаданных" || { core_pause; return; }
+    # Слой 2: Валидация фундамента через Мозг [5]
+    # Проверка наличия exiftool (основной движок очистки)
+    core_engine_validator "pkg" "exiftool" "ExifTool Engine" || { core_engine_wait; return; }
 
-    # 3. Ввод пути через универсальный core_input
-    local f_path=$(core_input "FILE" "File to sanitize")
+    # Слой 3: Органы чувств [3] — Сбор данных
+    local f_path=$(core_engine_input "text" "File to sanitize (e.g., /root/report.pdf)")
 
-    # 4. Валидация переменной
-    check_var "$f_path" "File Path" || { core_pause; return; }
-
-    # 5. Проверка существования файла через check_component
-    # Нам важно знать, что файл существует, прежде чем пускать exiftool
-    check_component "$f_path" "Target Document" || { core_pause; return; }
-
-    # 6. Основной процесс зачистки
-    draw_ui "Stripping all metadata tags..." "status" "$Y"
+    # Слой 4: Валидация параметров через Санитара [8]
+    [[ -z "$f_path" ]] && { core_engine_ui "e" "Operation cancelled: No path provided."; core_engine_wait; return; }
     
-    # Выполнение команды. Мы используем -overwrite_original, чтобы не плодить 
-    # копии файлов с припиской _original (лишние следы)
-    if exiftool -all= "$f_path" -overwrite_original >/dev/null 2>&1; then
-        draw_ui "File is now 'Clean'. All signatures removed." "status" "$G"
-    else
-        draw_ui "Error during sanitization process" "status" "$R"
+    if [[ ! -f "$f_path" ]]; then
+        core_engine_ui "e" "Target Document not found: $f_path"
+        core_engine_wait
+        return
     fi
 
-    # 7. Универсальная пауза
-    core_pause
+    # Слой 5: Основной процесс зачистки через Глушитель [7]
+    core_engine_ui "!" "Stripping all metadata tags..."
+    
+    # -all= : удаляет абсолютно все теги
+    # -overwrite_original : предотвращает создание резервных копий (Zero-Footprint)
+    if exiftool -all= "$f_path" -overwrite_original &>/dev/null; then
+        core_engine_ui "s" "File is now 'Clean'. All signatures and history removed."
+        
+        # Слой 6: Регистрация в Сборщике трофеев [11]
+        core_engine_loot "security" "Sanitized document: $(basename "$f_path")"
+    else
+        core_engine_ui "e" "Error during sanitization process. File may be locked."
+    fi
+
+    # Слой 7: Синхронизация [13]
+    core_engine_wait
 }
 
 
 
 
 # --- Вспомогательный селектор устройств ---
-/**
- * Выбор целевого накопителя из списка доступных устройств.
- * Использует универсальный валидатор check_data и check_range.
- */
-select_target_storage() {
-    draw_ui "HARDWARE: STORAGE SELECTOR" "header"
-    draw_ui "Searching for connected mass storage devices..." "status" "$B"
+
+run_storage_selector() {
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "HARDWARE: STORAGE SELECTOR"
+    core_engine_ui "i" "Searching for connected mass storage devices..."
     
-    # 1. Сбор данных (USB, SATA, NVME)
+    # Слой 2: Сбор данных через Санитара [8]
+    # lsblk используется для получения имен, размеров и моделей без монтирования
     local devices=$(lsblk -dno NAME,SIZE,MODEL,SERIAL,TRAN | grep -E "usb|sata|nvme")
     
-    # 2. Валидация списка через универсальный check_data
-    check_data "$devices" "External Storage" || return 1
+    # Слой 3: Валидация списка через Мозг [5]
+    if [[ -z "$devices" ]]; then
+        core_engine_ui "e" "No external storage media (USB/SATA/NVME) detected."
+        core_engine_wait
+        return 1
+    fi
 
-    draw_ui "Available External Media" "line"
+    # Слой 4: Отрисовка через Архитектор [2]
+    core_engine_ui "i" "Available External Media:"
     
     local i=1
     local dev_list=()
     
-    # 3. Отрисовка доступных медиа-носителей
+    # Парсинг вывода lsblk
     while read -r name size model serial tran; do
-        local desc="${model:-Unknown} [${serial:-No_Serial}] (${tran})"
-        draw_item "$i" "/dev/$name ($size)" "$desc"
+        local desc="${model:-Generic} [${serial:-ID_UNKNOWN}] (${tran^^})"
+        # Слой 3: Органы чувств — Формирование списка выбора
+        core_engine_item "$i" "/dev/$name ($size)" "$desc"
         dev_list+=("/dev/$name")
         ((i++))
     done <<< "$devices"
     
-    draw_ui "" "line"
-
-    # 4. Получение выбора пользователя
+    # Слой 5: Получение выбора через Органы чувств [3]
     local max_idx=${#dev_list[@]}
-    local choice=$(core_input "SEL" "Enter device number (1-$max_idx)")
+    local choice=$(core_engine_input "text" "Enter device number (1-$max_idx)")
 
-    # 5. Комплексная валидация (наличие данных + диапазон)
-    # Используем check_data вместо check_var
-    check_data "$choice" "User Selection" || { core_pause; return 1; }
-    check_range "$choice" 1 "$max_idx" "Device Index" || { core_pause; return 1; }
+    # Слой 6: Комплексная валидация (Валидатор [5])
+    if [[ -z "$choice" ]] || ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > max_idx )); then
+        core_engine_ui "e" "Invalid Selection. Index out of range."
+        core_engine_wait
+        return 1
+    fi
 
-    # 6. Установка глобальной переменной целевого устройства
+    # Слой 7: Установка глобального состояния и регистрация (Loot [11])
     TARGET_DEV="${dev_list[$((choice-1))]}"
-    draw_ui "Selected: $TARGET_DEV" "status" "$G"
+    core_engine_ui "s" "Target Device Locked: $TARGET_DEV"
     
-    core_pause
+    # Фиксация выбора в системном журнале
+    core_engine_loot "hardware" "Storage selected: $TARGET_DEV | Size: $(lsblk -dno SIZE "$TARGET_DEV")"
+    
+    core_engine_wait
     return 0
 }
 
@@ -2972,65 +2995,117 @@ select_target_storage() {
 
 # --- Обновленная основная функция ---
 run_raw_recovery() {
-    print_header "FORENSICS: AUTOMATIC STORAGE RECOVERY"
+    # Слой 1: Визуальный заголовок через Голос [1]
+    core_engine_ui "h" "FORENSICS: AUTOMATIC STORAGE RECOVERY"
     
-    # 1. Сначала выбираем карту памяти
-    if ! select_target_storage; then
-        pause; return
+    # Слой 2: Выбор цели через Hardware Selector [27]
+    # Если устройство не выбрано или процесс прерван, выходим
+    if ! run_storage_selector; then
+        return
     fi
     
-    # Теперь TARGET_DEV содержит путь, например /dev/sdb
+    # Наследуем глобальную переменную TARGET_DEV (напр. /dev/sdb)
     local dev_path="$TARGET_DEV"
-
-    # 2. Авто-диагностика аппаратной части (теперь прицельно по выбранному устройству)
     local dev_name=$(basename "$dev_path")
-    print_status "i" "Hardware Health Check for $dev_name..."
-    dmesg | grep -i "$dev_name" | tail -n 10 | sed 's/^/  /'
-    echo -e "${B}------------------------------------------------------------${NC}"
 
-    # 3. Меню выбора стратегии (используем те же функции, что и раньше)
+    # Слой 3: Авто-диагностика через Органы чувств [3] и Глушитель [7]
+    core_engine_ui "i" "Hardware Health Check for $dev_name..."
+    
+    # Анализируем кольцевой буфер ядра на предмет ошибок ввода-вывода (I/O errors)
+    # Это позволяет заранее понять, жив ли контроллер носителя
+    dmesg | grep -i "$dev_name" | tail -n 10 | sed 's/^/  /'
+    
+    # Слой 4: Динамическое распределение через Prime Controller [13]
+    # Определяем доступные векторы восстановления
     local options="PARTITION_FIX DEEP_CARVING IMAGE_DUMP BACK"
+    
+    # Привязываем векторы к логическим функциям Ядра
+    # Примечание: Функции *_logic должны быть определены в секции библиотек
     local opt_funcs="recover_partition_logic run_foremost_logic run_dd_logic run_main_menu"
     
-    prime_dynamic_controller "RECOVERY ENGINE [$dev_path]" "$options" "$opt_funcs"
+    core_engine_ui "!" "Initializing Recovery Engine on [$dev_path]"
+    
+    # Запуск динамического контроллера для управления процессом
+    if command -v prime_dynamic_controller >/dev/null; then
+        prime_dynamic_controller "RECOVERY ENGINE [$dev_path]" "$options" "$opt_funcs"
+    else
+        core_engine_ui "e" "Dynamic controller is missing. Falling back to manual mode."
+        # Резервный запуск простейшего восстановления
+        run_foremost_logic "$dev_path"
+    fi
+
+    # Слой 5: Регистрация в Сборщике трофеев [11]
+    core_engine_loot "forensics" "Recovery session started on device: $dev_path"
+    
+    # Слой 6: Синхронизация [13]
+    core_engine_wait
 }
 
 
 recover_partition_logic() {
-    # Параметр $dev_path передается неявно из родительской функции
-    check_step "pkg" "testdisk"
-    print_status "w" "Launching Partition Repair..."
-    print_status "i" "Instruction: [Analyze] -> [Quick Search] -> [Write]"
+    # Слой 1: Валидация фундамента через Мозг [5]
+    core_engine_validator "pkg" "testdisk" "TestDisk Recovery Tool" || return
+
+    core_engine_ui "!" "Launching Partition Repair Engine..."
+    core_engine_ui "i" "Instruction: [Analyze] -> [Quick Search] -> [Write] to fix tables."
+    
+    # Слой 2: Синхронизация [13] — пауза перед запуском интерактивной утилиты
     sleep 2
-    testdisk "$dev_path"
-    pause
+    
+    # Слой 3: Прямое взаимодействие с оборудованием
+    # Работает с TARGET_DEV, выбранным в run_storage_selector [27]
+    sudo testdisk "$dev_path"
+
+    core_engine_wait
 }
+
 
 run_foremost_logic() {
-    check_step "pkg" "foremost"
-    local rec_dir="$PRIME_LOOT/recovered_$(date +%s)"
+    # Слой 1: Валидация через Мозг [5]
+    core_engine_validator "pkg" "foremost" "Foremost Carving Tool" || return
+
+    # Слой 2: Подготовка стерильного сектора в LOOT [11]
+    local rec_dir="${LOOT_DIR}/recovered_$(date +%s)"
     mkdir -p "$rec_dir"
     
-    print_status "w" "Starting Deep Carving. No File System needed."
-    print_status "i" "Output directory: $rec_dir"
+    core_engine_ui "!" "Starting Deep Carving. RAW Sector Analysis initiated."
+    core_engine_ui "i" "Output directory: $rec_dir"
     
-    # Набор сигнатур: jpg, pdf, exe, zip, doc, png, mp4
-    foremost -v -t jpg,pdf,exe,zip,doc,png,mp4 -i "$dev_path" -o "$rec_dir"
+    # Слой 3: Процесс извлечения (Сигнатуры: изображения, документы, архивы, бинарники)
+    # Используем вербальный режим (-v) для мониторинга в реальном времени
+    sudo foremost -v -t jpg,pdf,exe,zip,doc,png,mp4 -i "$dev_path" -o "$rec_dir"
     
-    print_status "s" "Extraction complete. Data saved in Loot."
-    pause
+    # Слой 4: Регистрация результатов в Сборщике трофеев [11]
+    core_engine_loot "forensics" "Deep Carving complete for $dev_path. Results: $rec_dir"
+    
+    core_engine_ui "s" "Extraction complete. Data secured in Prime Loot."
+    core_engine_wait
 }
 
+
 run_dd_logic() {
-    local img_file="$PRIME_LOOT/disk_backup_$(date +%s).img"
-    print_status "w" "Creating binary image dump... DONT UNPLUG DEVICE!"
+    # Слой 1: Подготовка файла-образа
+    local img_file="${LOOT_DIR}/disk_backup_$(date +%s).img"
     
-    # Используем dd с индикатором прогресса
-    dd if="$dev_path" of="$img_file" bs=4M status=progress conv=noerror,sync
+    core_engine_ui "!" "Creating binary image dump... CRITICAL: DO NOT UNPLUG DEVICE!"
     
-    print_status "s" "Image secured: $img_file"
-    print_status "i" "You can now run Foremost on this .img file later."
-    pause
+    # Слой 2: Посекторное копирование через Глушитель [7]
+    # bs=4M для ускорения, conv=noerror,sync для пропуска битых секторов
+    # status=progress обеспечивает визуализацию процесса
+    sudo dd if="$dev_path" of="$img_file" bs=4M status=progress conv=noerror,sync
+    
+    # Слой 3: Валидация результата
+    if [[ -f "$img_file" ]]; then
+        core_engine_ui "s" "Image secured: $(basename "$img_file")"
+        core_engine_ui "i" "You can now run Foremost on this .img file for offline analysis."
+        
+        # Регистрация в Сборщике трофеев [11]
+        core_engine_loot "storage" "Image dump created: $img_file from $dev_path"
+    else
+        core_engine_ui "e" "Dump failed. Check target storage permissions."
+    fi
+    
+    core_engine_wait
 }
 
 
