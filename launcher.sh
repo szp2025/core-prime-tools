@@ -3117,8 +3117,9 @@ run_dd_logic() {
 
 
 # --- ГЛАВНОЕ МЕНЮ ---
+
 menu_intelligence() {
-    print_header "SECTOR I: INTELLIGENCE & OSINT"
+    core_engine_ui "h" "SECTOR I: INTELLIGENCE & OSINT"
     local names="Smart_OSINT_Engine Phone_Lookup Social_Scanner Network_Intelligence"
     local funcs="run_smart_osint_engine run_phone_lookup run_social_scan run_network_analyzer"
     
@@ -3126,9 +3127,8 @@ menu_intelligence() {
     prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
 }
 
-
 menu_system_core() {
-    print_header "SYSTEM CORE: MAINTENANCE & INFO"
+    core_engine_ui "h" "SYSTEM CORE: MAINTENANCE & INFO"
     local names="System_Info Update_OS Update_Launcher Clean_Logs System_Pulse"
     local funcs="run_system_info run_sys_update update_prime run_logs_cleaner run_system_pulse"
     
@@ -3137,7 +3137,7 @@ menu_system_core() {
 }
 
 menu_forensics() {
-    print_header "SECTOR F: DATA FORENSICS & RECOVERY"
+    core_engine_ui "h" "SECTOR F: DATA FORENSICS & RECOVERY"
     local names="ADAPTIVE_ANALYZE Disk_Raw_Recovery Document_Sanitizer"
     local funcs="run_auto_forensics run_raw_recovery run_doc_cleaner"
     
@@ -3145,9 +3145,8 @@ menu_forensics() {
     prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
 }
 
-
 menu_cyber_ops() {
-    print_header "CYBER OPERATIONS SECTOR"
+    core_engine_ui "h" "CYBER OPERATIONS SECTOR"
     local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
     local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
     
@@ -3155,9 +3154,8 @@ menu_cyber_ops() {
     prime_dynamic_controller "CYBER_OPS" "$names" "$funcs"
 }
 
-
 menu_crypto_lab() {
-    print_header "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY"
+    core_engine_ui "h" "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY"
     local names="Hash_Analyzer File_Encryptor Stegano_Deep_Hide SSH_Key_Gen"
     local funcs="run_hash_analyzer run_file_cryptor run_stegano_lab run_ssh_keygen"
     
@@ -3166,7 +3164,7 @@ menu_crypto_lab() {
 }
 
 menu_net_infra() {
-    print_header "NETWORK INFRASTRUCTURE"
+    core_engine_ui "h" "NETWORK INFRASTRUCTURE"
     local names="Device_Hack Mesh_Bridge Server_Control Phantom_Engine"
     local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
     
@@ -3175,7 +3173,7 @@ menu_net_infra() {
 }
 
 menu_core_lab() {
-    print_header "CORE RESEARCH LAB"
+    core_engine_ui "h" "CORE RESEARCH LAB"
     local names="Mem_Injection Packet_Forge WiFi_Pulse Kernel_Audit"
     local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
     
@@ -3190,6 +3188,7 @@ run_main_menu() {
     show_menu_info "$main_funcs"
     prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
 }
+
 
 # --- ТОЧКА ЗАПУСКА ---
 clear
