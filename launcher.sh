@@ -4,6 +4,17 @@ CURRENT_VERSION="35.4"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
+CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
+[ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
+
+SILENT="> /dev/null 2>&1"
+# Использование:
+command -v curl eval $SILENT
+
+BASE_DIR="/root/core-prime-tools"
+MOD_DIR="$BASE_DIR/modules"
+
+
 # ==========================================
 # 1. CORE ENGINE (Должны быть ПЕРВЫМИ)
 # ==========================================
@@ -77,18 +88,6 @@ core_engine_clean_env() {
 
 
 # --- Инициализация системы ---
-
-CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
-[ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
-
-SILENT="> /dev/null 2>&1"
-# Использование:
-command -v curl eval $SILENT
-
-BASE_DIR="/root/core-prime-tools"
-MOD_DIR="$BASE_DIR/modules"
-
-
 
 # Core Engine: Отрисовка элемента интерфейса
 # Автоматически подбирает цвет ключа и форматирует строку
@@ -300,45 +299,6 @@ address=/scanclamavlocal/$CURRENT_IP
 EOD
     service dnsmasq restart 2>/dev/null || (killall dnsmasq 2>/dev/null && dnsmasq -C /etc/dnsmasq.conf 2>/dev/null)
 fi
-
-print_line() {
-    echo -e "${D}--------------------------------------------------${NC}"
-}
-
-# Специализированный вывод системной строки
-print_stats_line() {
-    local label1="$1" value1="$2"
-    local label2="$3" value2="$4"
-    local label3="$5" value3="$6"
-    echo -e "${Y}$label1: ${G}$value1 ${Y}│ $label2: ${G}$value2 ${Y}│ $label3: ${G}$value3${NC}"
-}
-
-
-
-draw_header() {
-    local text="$1"
-    local color="${2:-$BLUE}" # По умолчанию синий
-    echo -e "${color}====================================================${NC}"
-    if [ ! -z "$text" ]; then
-        echo -e "${WHITE}  $text${NC}"
-        echo -e "${color}====================================================${NC}"
-    fi
-}
-
-
-spacer() {
-    local count="${1:-1}"
-    for ((i=0; i<count; i++)); do echo ""; done
-}
-
-ask_input() {
-    local prompt_text="$1"
-    local result
-    echo -ne "${YELLOW}>>>> ${prompt_text}: ${NC}"
-    read result
-    echo "$result"
-}
-
 
 # --- Вспомогательные функции ---
 get_stats() {
