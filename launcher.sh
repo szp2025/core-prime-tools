@@ -3116,75 +3116,73 @@ run_dd_logic() {
 # --- Точка входа ---
 
 
-# --- ГЛАВНОЕ МЕНЮ ---
-
-# --- ПОЛНЫЙ КОМПЛЕКТ МЕНЮ (СИНХРОНИЗИРОВАНО v13.8) ---
+# --- ГЛАВНОЕ МЕНЮ (ПОЛНЫЙ КОМПЛЕКТ v13.8) ---
 
 menu_intelligence() {
-    draw_ui "SECTOR I: INTELLIGENCE & OSINT" "header"
+    core_engine_ui "h" "SECTOR I: INTELLIGENCE & OSINT"
     local names="Smart_OSINT_Engine Phone_Lookup Social_Scanner Network_Intelligence"
     local funcs="run_smart_osint_engine run_phone_lookup run_social_scan run_network_analyzer"
     prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
 }
 
 menu_system_core() {
-    draw_ui "SYSTEM CORE: MAINTENANCE & INFO" "header"
+    core_engine_ui "h" "SYSTEM CORE: MAINTENANCE & INFO"
     local names="System_Info Update_OS Update_Launcher Clean_Logs System_Pulse"
     local funcs="run_system_info run_sys_update update_prime run_logs_cleaner run_system_pulse"
     prime_dynamic_controller "SYSTEM_CORE" "$names" "$funcs"
 }
 
 menu_forensics() {
-    draw_ui "SECTOR F: DATA FORENSICS & RECOVERY" "header"
+    core_engine_ui "h" "SECTOR F: DATA FORENSICS & RECOVERY"
     local names="ADAPTIVE_ANALYZE Disk_Raw_Recovery Document_Sanitizer Forensic_Loot"
     local funcs="run_auto_forensics run_raw_recovery run_doc_cleaner run_loot_viewer"
     prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
 }
 
 menu_cyber_ops() {
-    draw_ui "CYBER OPERATIONS SECTOR" "header"
+    core_engine_ui "h" "CYBER OPERATIONS SECTOR"
     local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
     local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
     prime_dynamic_controller "CYBER_OPS" "$names" "$funcs"
 }
 
 menu_crypto_lab() {
-    draw_ui "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY" "header"
+    core_engine_ui "h" "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY"
     local names="Hash_Analyzer File_Encryptor Stegano_Deep_Hide SSH_Key_Gen"
     local funcs="run_hash_analyzer run_file_cryptor run_stegano_lab run_ssh_keygen"
     prime_dynamic_controller "CRYPTO_LAB" "$names" "$funcs"
 }
 
 menu_net_infra() {
-    draw_ui "NETWORK INFRASTRUCTURE" "header"
+    core_engine_ui "h" "NETWORK INFRASTRUCTURE"
     local names="Device_Hack Mesh_Bridge Server_Control Phantom_Engine"
     local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
     prime_dynamic_controller "NET_INFRA" "$names" "$funcs"
 }
 
 menu_core_lab() {
-    draw_ui "CORE RESEARCH LAB" "header"
+    core_engine_ui "h" "CORE RESEARCH LAB"
     local names="Mem_Injection Packet_Forge WiFi_Pulse Kernel_Audit"
     local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
     prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
 }
 
 menu_financial_shield() {
-    draw_ui "FINANCIAL SHIELD: BANKING GAMBIT" "header"
+    core_engine_ui "h" "FINANCIAL SHIELD: BANKING GAMBIT"
     local names="IBAN_Validator Gambit_Strategy Transaction_Audit Secure_Wallet"
     local funcs="run_iban_analyzer run_gambit_info run_trans_audit run_wallet_manager"
     prime_dynamic_controller "FIN_SHIELD" "$names" "$funcs"
 }
 
 menu_deep_bridge() {
-    draw_ui "DEEP BRIDGE: DATA CORRELATION" "header"
+    core_engine_ui "h" "DEEP BRIDGE: DATA CORRELATION"
     local names="Artifact_Linker Loot_Collector Knowledge_Graph Session_Export"
     local funcs="run_artifact_linker run_loot_collector run_k_graph run_session_export"
     prime_dynamic_controller "DEEP_BRIDGE" "$names" "$funcs"
 }
 
 menu_stealth_comms() {
-    draw_ui "STEALTH COMMS: LIVE NODES" "header"
+    core_engine_ui "h" "STEALTH COMMS: LIVE NODES"
     local names="Live_Node_AV Shared_Node_Store Upload_Portal Node_Destroy"
     local funcs="run_live_node_av run_shared_store run_upload_portal run_node_clean"
     prime_dynamic_controller "STEALTH_COMMS" "$names" "$funcs"
