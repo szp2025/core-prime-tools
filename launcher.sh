@@ -435,150 +435,69 @@ prime_dynamic_controller() {
 }
 
 
-log_loot() {
+core_engine_loot() {
     local module="${1:-unknown}"
     local data="$2"
-    local loot_dir="/root/prime_loot"
-    local master_log="${loot_dir}/master_intelligence.log"
-    local module_file="${loot_dir}/${module}_results.txt"
+    local loot_dir="${BASE_DIR:-./}/prime_loot"
+    local m_file="${loot_dir}/${module}_results.txt"
+    
+    # Слой 1: Инфраструктура через системный Глушитель
+    [[ -d "$loot_dir" ]] || core_engine_run "mkdir -p $loot_dir && chmod 700 $loot_dir"
 
-    # --- СЛОЙ 1: БЕЗУСЛОВНАЯ ИНФРАСТРУКТУРА ---
-    # Создаем, если нет, и фиксируем права одной строкой
-    [[ -d "$loot_dir" ]] || (mkdir -p "$loot_dir" && chmod 700 "$loot_dir")
+    # Слой 2: Экспресс-маркировка (без grep)
+    local sev="INFO"
+    [[ "$data" =~ (password|pwd|root|admin|vuln|critical|key|access) ]] && sev="CRITICAL"
+    [[ "$sev" == "INFO" && "$data" =~ (user|ip|domain|node) ]] && sev="TARGET"
 
-    # --- СЛОЙ 2: ПОТОКОВАЯ МАРКИРОВКА (Severity) ---
-    # Используем grep как фильтр: если нашел — severity станет CRITICAL, иначе INFO
-    local severity="INFO"
-    echo "$data" | grep -qiE "password|pwd|root|admin|vuln|critical|key|access|granted" && severity="CRITICAL"
-    echo "$data" | grep -qiE "user|ip|domain|node" && [[ "$severity" == "INFO" ]] && severity="TARGET"
+    # Слой 3: Запись через Атомарный поток
+    local entry="[$(date '+%H:%M:%S')] [$sev] -> $data"
+    echo "$entry" >> "$m_file"
+    
+    # Слой 4: Критический мост
+    if [[ "$sev" == "CRITICAL" ]]; then
+        echo "$entry" >> "${loot_dir}/master_intelligence.log"
+        core_engine_ui "!CRITICAL DATA SECURED"
+    fi
 
-    # --- СЛОЙ 3: ФОРМИРОВАНИЕ ОТПЕЧАТКА ---
-    local entry="[$(date '+%Y-%m-%d %H:%M:%S')] [$severity] [$module] -> $data"
-
-    # --- СЛОЙ 4: АТОМАРНАЯ ЗАПИСЬ ---
-    # Пишем в файл модуля и сразу принуждаем к правам 600
-    echo "$entry" >> "$module_file" && chmod 600 "$module_file" 2>/dev/null
-
-    # Короткое замыкание для критических данных (заменяет IF)
-    [[ "$severity" == "CRITICAL" ]] && {
-        echo "$entry" >> "$master_log"
-        echo "SIGNAL_ID:$(date +%s) | DATA:$data" >> "${loot_dir}/bridge_signals.log"
-        chmod 600 "$master_log" "${loot_dir}/bridge_signals.log" 2>/dev/null
-    }
-
-    # --- СЛОЙ 5: МЕХАНИЧЕСКАЯ РОТАЦИЯ (No-IF) ---
-    # Используем арифметическое сравнение прямо в условии выполнения
-    (( $(stat -c%s "$module_file" 2>/dev/null || echo 0) > 1048576 )) && {
-        local tmp="${module_file}.tmp"
-        tail -n 100 "$module_file" > "$tmp" && mv "$tmp" "$module_file" && chmod 600 "$module_file"
-    }
-
-    # Финальный алерт через оператор &&
-    [[ "$severity" == "CRITICAL" ]] && echo -e "  ${R}[!] CRITICAL SECURED${NC}"
+    # Слой 5: Безопасная ротация (лимит 1000 строк)
+    local line_count=$(wc -l < "$m_file" 2>/dev/null || echo 0)
+    if (( line_count > 1000 )); then
+        sed -i '1,100d' "$m_file" # Удаляем первые 100 строк без создания tmp-файлов
+    fi
 }
 
-
-
-
-
-
-# Аргументы: $1 - текст вопроса, $2... - варианты (формат "описание:аргументы")
-select_option() {
-    local prompt="$1"; shift
-    local options=("$@")
-    local count=1
-    local total=${#options[@]}
-
-    echo -e "${W}[?] $prompt${NC}"
-
-    for ((i=0; i<total; i++)); do
-        local opt="${options[$i]}"
-        # Форматируем строку: номер и текст (ограничиваем длину для колонки)
-        local display_text="${G}$count)${NC} ${opt%%:*}"
-        
-        # Печатаем элемент с фиксированной шириной колонки (например, 25 символов)
-        printf " %-35b" "$display_text"
-
-        # Если индекс четный (вторая колонка) или это последний элемент — переходим на новую строку
-        if (( count % 2 == 0 )) || (( count == total )); then
-            echo ""
-        fi
-        ((count++))
-    done
-
-    echo -en "${Y}>> ${NC}"
-    read -r user_input
-    CHOICE="$user_input"
-}
-
-select_optionold() {
-    local prompt="$1"; shift
-    local options=("$@")
-    local count=1
-
-    echo -e "${W}[?] $prompt${NC}"
-    for opt in "${options[@]}"; do
-        echo -e " ${G}$count)${NC} ${opt%%:*}"
-        ((count++))
-    done
-
-    echo -en "${Y}>> ${NC}"
-    read -r user_input
-    # Передаем только цифру
-    CHOICE="$user_input"
-}
-
-
-
-# Для красивых запросов ввода
-print_input() {
-    local prompt="$1"
-    local default="$2"
-    echo -en "${Y}[?] $prompt ${W}(Default: $default)${Y}: ${NC}"
-}
-
-# Для вывода списков (ключи, файлы, пути)
-print_list() {
-    local title="$1"; shift
-    echo -e "${Y}--- $title ---${NC}"
-    for item in "$@"; do
-        echo -e "    ${G}>> ${W}$item${NC}"
-    done
-}
-
-smart_cat() {
-    local path="$1"
-    local content="$2"
-    echo "$content" > "$path"
-    chmod +x "$path"
-    print_status "i" "Engine component updated: $path"
-}
-
-
-# --- ENGINE: NEURAL OBSTRUCTION (Вставлять перед функцией run_sql_adaptive) ---
-mutate_case() {
+core_engine_mutate() {
     local input="$1"
+    local mode="${2:-full}"
     local output=""
-    for (( i=0; i<${#input}; i++ )); do
-        char="${input:$i:1}"
-        (( RANDOM % 2 )) && output+="${char^^}" || output+="${char,,}"
+    
+    for word in $input; do
+        local mutated_word=""
+        
+        # Neural Case Shuffle
+        for (( i=0; i<${#word}; i++ )); do
+            local char="${word:$i:1}"
+            (( RANDOM % 2 )) && mutated_word+="${char^^}" || mutated_word+="${char,,}"
+        done
+        
+        # Space Obstruction
+        local separator=" "
+        case "$mode" in
+            "sql")
+                local sql_vars=("/**/" "/**/--/**/" "+")
+                separator="${sql_vars[$(( RANDOM % ${#sql_vars[@]} ))]}" ;;
+            "web")
+                local web_vars=("%20" "%09" "%0a" "+")
+                separator="${web_vars[$(( RANDOM % ${#web_vars[@]} ))]}" ;;
+            "full")
+                local all_vars=("/**/" "%20" "+" "/**/--/**/")
+                separator="${all_vars[$(( RANDOM % ${#all_vars[@]} ))]}" ;;
+        esac
+        
+        output+="${mutated_word}${separator}"
     done
-    echo -n "$output"
-}
 
-mutate_space() {
-    local variants=("/**/" "+" "%20" "%09" "%0a" "/**/--/**/")
-    echo -n "${variants[$(( RANDOM % ${#variants[@]} ))]}"
-}
-
-# Адаптация под SQL-инъекции
-prime_obfuscate() {
-    local payload="$1"
-    local result=""
-    for word in $payload; do
-        result+="$(mutate_case "$word")$(mutate_space)"
-    done
-    echo -n "$result"
+    echo -n "${output%?}"
 }
 
 
@@ -620,19 +539,6 @@ get_tool_info() {
 
         *)                          echo "Описание функционала находится в стадии разработки..." ;;
     esac
-}
-
-
-show_menu_info() {
-    local funcs=$1
-    echo -e "${B}┌── INFO CENTER ──────────────────────────────────────────┐${NC}"
-    local i=1
-    for f in $funcs; do
-        local desc=$(get_tool_info "$f")
-        printf "${B}│${NC}  ${Y}%02d.${NC} %-50s ${B}│${NC}\n" "$i" "$desc"
-        ((i++))
-    done
-    echo -e "${B}└─────────────────────────────────────────────────────────┘${NC}"
 }
 
 
