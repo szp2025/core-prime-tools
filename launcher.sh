@@ -22,26 +22,12 @@ MOD_DIR="$BASE_DIR/modules"
 # Core Engine: Базовый UI-маркер
 # Эвристически определяет тип сообщения по первому символу (+, !, ?)
 core_engine_ui() {
-    local msg="$1"
-    
-    # Извлекаем первый символ для анализа
-    case "${msg:0:1}" in
-        "+") 
-            # Успех: Зеленый [+]
-            echo -e "  ${G}[+]${NC} ${msg:1}" 
-            ;;
-        "!") 
-            # Ошибка/Внимание: Красный [!]
-            echo -e "  ${R}[!]${NC} ${msg:1}" 
-            ;;
-        "?") 
-            # Процесс/Ожидание: Желтый [?]
-            echo -e "  ${Y}[?]${NC} ${msg:1}" 
-            ;;
-        *)   
-            # Инфо/Стандарт: Синий [i]
-            echo -e "  ${B}[i]${NC} $msg" 
-            ;;
+    case "$1" in
+        "h") echo -e "\n${B}>>> ${W}$2 ${B}<<<${NC}" ;;
+        "i") echo -e "${B}[i]${NC} $2" ;;
+        "s") echo -e "${G}[+]${NC} $2" ;;
+        "e") echo -e "${R}[-]${NC} $2" ;;
+        "line") echo -e "${B}---------------------------------------${NC}" ;;
     esac
 }
 
@@ -319,13 +305,11 @@ core_engine_info() {
 }
 
 # --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
-
 core_engine_progress() {
     local duration="${1:-1}"
-    local label="${2:-PROCESS}"
+    local label="${2:-LOADING}"
     local width=20
     
-    # Слайсинг (Zero-Loop)
     local full=$(printf '█%.0s' $(seq 1 $width))
     local empty=$(printf '░%.0s' $(seq 1 $width))
     
@@ -333,22 +317,20 @@ core_engine_progress() {
         local pc=$(( i * 100 / width ))
         local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $3, $2}')
         
-        # Выбираем цвет
         local clr="${Y}"
         (( pc > 50 )) && clr="${B}"
         (( pc > 90 )) && clr="${G}"
         
-        # \r - возврат, \e[K - очистка строки от мусора
+        # \r\e[K — гарантия одной строки без мусора
         printf "\r\e[K${NC}[i] %-15s ${clr}[%s%s]${NC} %3d%% | RAM: %s" \
             "${label:0:15}" "${full:0:i}" "${empty:i:width}" "$pc" "$ram"
         
-        # Рассчитываем задержку исходя из duration
         sleep 0.04
     done
-    
-    # Финальная строка (перезаписывает прогресс)
-    printf "\r\e[K${G}[+] %-15s COMPLETE | RAM: %s${NC}\n" "$label" "$ram"
+    # Переход на новую строку только в конце
+    printf "\n${G}[+] %-15s SUCCESSFUL${NC}\n" "$label"
 }
+
 
 
 
@@ -359,12 +341,12 @@ prime_dynamic_controller() {
     local -a actions=($3)
     
     while true; do
-        clear # Очищаем экран для чистоты интерфейса
+        clear # Чтобы не было каши на экране
         core_engine_info
         core_engine_ui "h" "$title"
         
         for ((i=0; i<${#labels[@]}; i++)); do
-            core_engine_item "$((i+1))" "${labels[$i]//_/ }" "Linked Action"
+            core_engine_item "$((i+1))" "${labels[$i]//_/ }" "Execute"
         done
         
         echo -e "\n${Y} B) BACK / EXIT${NC}"
@@ -376,20 +358,18 @@ prime_dynamic_controller() {
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
             local idx=$((choice-1))
-            
-            # Запуск прогресса (теперь строго в одну строку)
+            # Прогресс теперь в одну строку
             core_engine_progress 1 "${labels[$idx]}"
-            
-            # Выполнение функции
+            # Выполнение
             ${actions[$idx]}
-            
-            # УБРАНО: core_engine_wait (теперь не нужно жать Enter после каждого клика)
+            # ВАЖНО: Если функция внутри себя не имеет паузы, меню вернется сразу
         else
             core_engine_ui "e" "Invalid selection"
             sleep 1
         fi
     done
 }
+
 
 
 core_engine_mutate() {
