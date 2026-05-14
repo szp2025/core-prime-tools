@@ -258,46 +258,6 @@ draw_mod_menu() {
     spacer
 }
 
-safe_read() {
-    [ -f "$1" ] && cat "$1" || log_msg "warn" "Файл $1 не найден"
-}
-
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        draw_ui "Эту операцию нужно запускать от ROOT (sudo)!" "status" "$R"
-        return 1
-    fi
-    return 0
-}
-
-# Проверка наличия файла/папки (для БД или конфигов)
-# Использование: check_file "/root/database.db" "База данных" || return
-check_file() {
-    local path="$1"
-    local name="$2"
-    
-    if [[ ! -e "$path" ]]; then
-        draw_ui "Файл/Путь не найден: $name" "status" "$R"
-        echo -e "${Y}Путь: $path${NC}"
-        return 1
-    fi
-    return 0
-}
-
-# Универсальная проверка переменной на пустоту
-# Использование: check_var "$t_ip" "Target IP" || return
-check_var() {
-    local value="$1"
-    local name="$2"
-    
-    if [[ -z "$value" ]]; then
-        draw_ui "ОШИБКА: Поле [$name] не заполнено!" "status" "$R"
-        return 1
-    fi
-    return 0
-}
-
-
 
 #Настройки 
 
