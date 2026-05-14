@@ -999,55 +999,56 @@ run_ghost_commander() {
 
 
 # --- [ SYSTEM UPDATE ENGINE v35.4 ] ---
+/**
+ * Обновление ядра системы с защитой от повреждения синтаксиса.
+ * Базируется на стратегии защиты счета и минимизации следов.
+ */
 update_prime() {
-    print_header "SYSTEM UPDATE & SYNC"
+    draw_ui "SYSTEM UPDATE & SYNC" "header"
     
     local target_path="/root/launcher.sh"
     local repo_url="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
-    local alias_cmd="alias launcher='bash /root/launcher.sh'"
+    local tmp_path="${target_path}.tmp"
 
-    echo -e "${B}[*] Подключение к GitHub...${NC}"
-    show_progress 2 "FETCHING LATEST SOURCE"
+    draw_ui "Connecting to GitHub..." "status" "$B"
+    
+    # 1. Загрузка через core_execute (скрываем мусор curl)
+    core_execute "curl -s -L $repo_url -o $tmp_path" "Fetching Source"
+    
+    # 2. Проверка: скачался ли файл и не пуст ли он (вместо if [[ -s ]])
+    check_data "$(cat $tmp_path 2>/dev/null)" "Repository Source" || { rm -f "$tmp_path"; core_pause; return 1; }
 
-    # 1. Загрузка новой версии
-    if curl -s -L "$repo_url" -o "${target_path}.tmp"; then
-        if [[ -s "${target_path}.tmp" ]]; then
-            # Заменяем старый файл новым
-            mv "${target_path}.tmp" "$target_path"
-            
-            # 2. Установка прав (обязательно исполняемый)
-            chmod 755 "$target_path"
-            chown root:root "$target_path"
-
-            # 3. Проверка и фиксация Alias
-            # Проверяем, есть ли alias в .bashrc, если нет — добавляем
-            if ! grep -q "alias launcher=" ~/.bashrc; then
-                echo "$alias_cmd" >> ~/.bashrc
-                echo -e "${Y}[!] Alias 'launcher' был восстановлен в ~/.bashrc${NC}"
-            fi
-
-            # Дублируем в системный путь для мгновенного доступа
-            ln -sf "$target_path" /usr/local/bin/launcher
-            chmod +x /usr/local/bin/launcher
-
-            echo -e "------------------------------------------------"
-            echo -e "${G}[SUCCESS] Код обновлен, права установлены, alias активен!${NC}"
-            echo -e "${Y}[!] Перезапуск...${NC}"
-            sleep 1
-            
-            # 4. Мгновенный перезапуск
-            exec bash "$target_path"
-        else
-            echo -e "${R}[!] Ошибка: Файл пуст.${NC}"
-            rm -f "${target_path}.tmp"
-            pause
-        fi
-    else
-        echo -e "${R}[!] Ошибка: Нет связи с репозиторием.${NC}"
-        rm -f "${target_path}.tmp"
-        pause
+    # 3. КРИТИЧЕСКИЙ ФИЛЬТР: Проверка синтаксиса перед заменой (защита от ошибок на скрине 1778747449535.jpeg)
+    if ! bash -n "$tmp_path" 2>/dev/null; then
+        draw_ui "КРИТИЧЕСКАЯ ОШИБКА: Код в репозитории поврежден!" "status" "$R"
+        rm -f "$tmp_path"
+        core_pause
+        return 1
     fi
+
+    # 4. Применение обновления (атомарная операция)
+    mv "$tmp_path" "$target_path"
+    chmod 755 "$target_path"
+    chown root:root "$target_path"
+
+    # 5. Восстановление среды (Alias и Системный путь)
+    if ! grep -q "alias launcher=" ~/.bashrc; then
+        echo "alias launcher='bash $target_path'" >> ~/.bashrc
+        draw_ui "Alias 'launcher' restored in .bashrc" "status" "$Y"
+    fi
+    
+    ln -sf "$target_path" /usr/local/bin/launcher
+    chmod +x /usr/local/bin/launcher
+
+    draw_ui "Code updated, permissions set, alias active!" "status" "$G"
+    draw_ui "System rebooting in 1s..." "status" "$Y"
+    
+    sleep 1
+    
+    # 6. Мгновенный перезапуск без потери дескрипторов
+    exec bash "$target_path"
 }
+
 
 
 # --- ENGINE: DYNAMIC POLYMORPHISM (ZERO-FOOTPRINT) ---
