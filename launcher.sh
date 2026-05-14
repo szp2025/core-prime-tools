@@ -55,12 +55,7 @@ ensure_dir() {
 }
 
 
-/**
- * Проверка кода завершения последней команды.
- * @param {string} success_msg - Сообщение при успехе.
- * @param {string} error_msg - Сообщение при ошибке.
- * @param {boolean} fatal - Нужно ли остановить скрипт при ошибке (1 - да, 0 - нет).
- */
+
 check_status() {
     local status=$?
     local success_msg="$1"
@@ -78,11 +73,7 @@ check_status() {
     fi
 }
 
-/**
- * Перезапуск конкретного модуля.
- * @param {string} proc_name - Имя процесса для grep/pkill.
- * @param {string} start_cmd - Команда запуска.
- */
+
 restart_mod() {
     local name="$1"
     local cmd="$2"
@@ -94,10 +85,7 @@ restart_mod() {
     check_status "Модуль $name запущен" "Ошибка запуска $name"
 }
 
-/**
- * Отрисовка стандартного подменю для модулей.
- * @param {string} mod_name - Имя модуля для заголовка.
- */
+
 draw_mod_menu() {
     clear
     draw_header "Управление: $1"
