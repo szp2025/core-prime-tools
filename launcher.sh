@@ -162,51 +162,41 @@ core_engine_wait() {
 }
 
 
-# Core Engine: Универсальный диспетчер контроля и перезапуска
-# Объединяет проверку Exit Code и управление процессами в одном узле
 core_engine_control() {
-    # 1. Захват текущего статуса последней команды
     local status=$?
-    
-    # 2. Параметры
-    local mode="$1"      # Режим: "check" (проверка) или "restart" (перезапуск)
-    local label="$2"     # Имя модуля или описание действия
-    local extra_cmd="$3" # Команда запуска (только для режима restart)
-    local fatal="${4:-0}" # Флаг критической ошибки (1 - стоп)
+    local mode="$1"      
+    local label="$2"     
+    local cmd="$3" 
+    local fatal="${4:-0}"
 
     case "$mode" in
         "check")
-            # Логика простой проверки статуса выполнения
             if [[ $status -eq 0 ]]; then
                 core_engine_ui "+$label: Успешно"
                 return 0
-            else
-                core_engine_ui "!$label: Ошибка"
-                [[ "$fatal" == "1" ]] && { core_engine_ui "!Критический сбой. Остановка."; exit 1; }
-                return 1
             fi
+            core_engine_ui "!$label: Ошибка"
+            [[ "$fatal" == "1" ]] && { core_engine_ui "!Критический сбой. Остановка."; exit 1; }
+            return 1
             ;;
 
         "restart")
-            # Логика интеллектуального перезапуска модуля
-            core_engine_ui "?Инициализация перезапуска: [$label]..."
-            
-            # Эвристическая очистка: убиваем старые процессы молча
+            core_engine_ui "?Перезагрузка: [$label]..."
             core_engine_run pkill -f "$label"
             sleep 1
             
-            # Динамический запуск в фоне
-            if [[ -n "$extra_cmd" ]]; then
-                eval "$extra_cmd &"
-                # Рекурсивный вызов себя для проверки результата запуска
+            if [[ -n "$cmd" ]]; then
+                eval "$cmd &"
+                # Эвристический трюк: передаем статус выполнения eval следующему вызову
                 core_engine_control "check" "Модуль [$label]" "" "$fatal"
             else
-                core_engine_ui "!Ошибка: Не указана команда запуска для [$label]"
+                core_engine_ui "!Ошибка: Команда запуска [$label] пуста"
                 return 1
             fi
             ;;
     esac
 }
+
 
 
 core_engine_validator() {
