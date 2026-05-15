@@ -3456,6 +3456,188 @@ run_dd_logic() {
     core_engine_wait
 }
 
+# ==============================================================================
+# @description: Встроенный модуль OSINT для проверки занятости никнейма/email.
+# @param: $1 - Строка поиска (Никнейм или Email)
+# ==============================================================================
+run_osint_custom_socialscan() {
+    local target="$1"
+    if [[ -z "$target" ]]; then
+        core_engine_ui "e" "Параметр поиска пуст. Укажите никнейм или email."
+        return 1
+    fi
+
+    core_engine_ui "h" "NEXUS OSINT: INTERNAL SOCIALSCAN ENGINE"
+    core_engine_ui "i" "Сканирование идентификатора: $target"
+    echo "--------------------------------------------------"
+
+    # Определение типа входных данных (Email или Юзернейм)
+    local is_email=0
+    if [[ "$target" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        is_email=1
+        core_engine_ui "i" "Тип данных: Электронная почта"
+    else
+        core_engine_ui "i" "Тип данных: Никнейм / Юзернейм"
+    fi
+
+    # Массив проверяемых сервисов
+    # Структура: "Имя_Сервиса|URL_Шаблон|Тип_Проверки(status/string)|Ожидаемый_Индикатор"
+    local services=()
+    
+    if (( is_email == 0 )); then
+        # База проверок для Никнеймов
+        services=(
+            "GitHub|https://api.github.com/users/TARGET|status|200"
+            "Telegram|https://t.me/TARGET|string|<meta property=\"og:title\" content=\"Telegram: Contact"
+            "Reddit|https://www.reddit.com/user/TARGET/about.json|status|200"
+            "DockerHub|https://hub.docker.com/v2/users/TARGET/|status|200"
+            "Pinterest|https://www.pinterest.com/TARGET/|status|200"
+        )
+    else
+        # База проверок для Email
+        services=(
+            "WordPress_API|https://wordpress.org/wp-json/wp/v2/users/?search=TARGET|string|id"
+            "Archive_org|https://archive.org/services/account/v1/status?email=TARGET|string|true"
+        )
+    fi
+
+    local found_count=0
+
+    for service in "${services[@]}"; do
+        IFS='|' read -r name url type indicator <<< "$service"
+        local final_url="${url/TARGET/$target}"
+        
+        # Выполнение скрытого запроса с маскировкой под браузер
+        local response
+        if [[ "$type" == "status" ]]; then
+            local http_code
+            http_code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" --connect-timeout 5 "$final_url")
+            if [[ "$http_code" == "$indicator" ]]; then
+                core_engine_ui "s" "[+] $name: Профиль обнаружен (HTTP $http_code)"
+                echo "Artifact: $name|PROFILED|$final_url" >> ~/prime_loot/nexus_osint_scan.txt
+                ((found_count++))
+            else
+                core_engine_ui "i" "[-] $name: Нет совпадений"
+            fi
+        elif [[ "$type" == "string" ]]; then
+            response=$(curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 5 "$final_url")
+            if [[ "$name" == "Telegram" ]]; then
+                if [[ ! "$response" =~ $indicator ]]; then
+                    core_engine_ui "s" "[+] Telegram: Обнаружен активный публичный аккаунт"
+                    echo "Artifact: Telegram|USERNAME_EXISTS|$final_url" >> ~/prime_loot/nexus_osint_scan.txt
+                    ((found_count++))
+                else
+                    core_engine_ui "i" "[-] Telegram: Юзернейм свободен или скрыт"
+                fi
+            else
+                if [[ "$response" =~ $indicator ]]; then
+                    core_engine_ui "s" "[+] $name: Запись зафиксирована"
+                    echo "Artifact: $name|MATCH_FOUND|$final_url" >> ~/prime_loot/nexus_osint_scan.txt
+                    ((found_count++))
+                else
+                    core_engine_ui "i" "[-] $name: Чисто"
+                fi
+            fi
+        fi
+    done
+
+    echo "--------------------------------------------------"
+    core_engine_ui "s" "Сканирование завершено. Найдено артефактов: $found_count"
+    core_engine_wait
+}
+
+# ==============================================================================
+# @description: Встроенный модуль поиска компрометации учетных записей по базам утечек.
+# @param: $1 - Целевой Email или номер телефона
+# ==============================================================================
+run_osint_custom_leaks() {
+    local account="$1"
+    if [[ -z "$account" ]]; then
+        core_engine_ui "e" "Не указан объект для анализа утечек."
+        return 1
+    fi
+
+    core_engine_ui "h" "NEXUS OSINT: DATA BREACH ANALYZER"
+    core_engine_ui "i" "Запрос к распределенной матрице утечек для: $account"
+    echo "--------------------------------------------------"
+
+    if ! command -v jq &> /dev/null; then
+        core_engine_ui "w" "Утилита jq не найдена. Установка пакета..."
+        pkg install jq -y
+    fi
+
+    local api_url="https://api.proxynova.com/comb?query=${account}"
+    
+    core_engine_ui "i" "Отправка шифрованного поискового пакета..."
+    local raw_response
+    raw_response=$(curl -s -A "Mozilla/5.0 PrimeOSINT" --connect-timeout 8 "$api_url")
+
+    if [[ -z "$raw_response" ]]; then
+        core_engine_ui "e" "Сервер не ответил или таймаут соединения."
+        return 1
+    fi
+
+    local count
+    count=$(echo "$raw_response" | jq '.count' 2>/dev/null)
+
+    if [[ "$count" == "null" || -z "$count" || "$count" -eq 0 ]]; then
+        core_engine_ui "i" "[-] Запись в публичных компиляциях COMB / утечках не обнаружена."
+    else
+        core_engine_ui "s" "[!!!] ОБНАРУЖЕНО СОВПАДЕНИЙ В УТЕЧКАХ: $count"
+        
+        echo "$raw_response" | jq -r '.results[]' 2>/dev/null | while read -r line; do
+            core_engine_ui "w" " -> Скомпрометированный вектор: $line"
+            echo "Breach_Artifact: $line" >> ~/prime_loot/nexus_leaks_report.txt
+        done
+        
+        core_engine_ui "s" "Все артефакты экспортированы в ~/prime_loot/nexus_leaks_report.txt"
+    fi
+
+    echo "--------------------------------------------------"
+    core_engine_wait
+}
+
+# ==============================================================================
+# @description: Проверка привязки номера телефона к мессенджеру Telegram.
+# @param: $1 - Номер телефона в международном формате
+# ==============================================================================
+run_osint_custom_ignorant() {
+    local phone="$1"
+    phone="${phone//+/}"
+    phone="${phone// /}"
+    phone="${phone//-/}"
+
+    if [[ -z "$phone" || ! "$phone" =~ ^[0-9]+$ ]]; then
+        core_engine_ui "e" "Неверный формат номера телефона."
+        return 1
+    fi
+
+    core_engine_ui "h" "NEXUS OSINT: TELEGRAM INTERNAL RESOLVER"
+    core_engine_ui "i" "Анализ сигнатуры телефонного пула: +$phone"
+    echo "--------------------------------------------------"
+
+    local tg_url="https://t.me/+$phone"
+    local check_response
+    check_response=$(curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 5 "$tg_url")
+
+    if [[ "$check_response" =~ "tg://resolve?phone" || "$check_response" =~ "Послать сообщение" || "$check_response" =~ "Send Message" ]]; then
+        core_engine_ui "s" "[+] ВЕКТОР НАЙДЕН: Данный номер телефона привязан к Telegram аккаунту."
+        echo "Telegram_Artifact: +$phone|STATUS:ACTIVE_ACCOUNT" >> ~/prime_loot/nexus_telegram_resolved.txt
+        
+        local meta_name
+        meta_name=$(echo "$check_response" | grep -oE '<meta property="og:title" content="[^"]+"' | cut -d'"' -f4)
+        if [[ -n "$meta_name" && "$meta_name" != "Telegram" ]]; then
+            core_engine_ui "s" " -> Публичное имя в профиле: $meta_name"
+            echo "Telegram_Meta: +$phone|NAME:$meta_name" >> ~/prime_loot/nexus_telegram_resolved.txt
+        fi
+    else
+        core_engine_ui "i" "[-] Номер +$phone не зарегистрирован в мессенджере или полностью скрыт настройками приватности."
+    fi
+
+    echo "--------------------------------------------------"
+    core_engine_wait
+}
+
 
 
 # ==========================================
@@ -3468,8 +3650,8 @@ run_dd_logic() {
 
 menu_intelligence() {
     core_engine_ui "h" "SECTOR I: INTELLIGENCE & OSINT"
-    local names="Smart_OSINT_Engine Network_Intelligence"
-    local funcs="run_smart_osint_engine  run_network_analyzer"
+    local names="Smart_OSINT_Engine Network_Intelligence Nexus_SocialScan Nexus_Breach_Leaks Telegram_Resolver"
+    local funcs="run_smart_osint_engine  run_network_analyzer run_osint_custom_socialscan run_osint_custom_leaks run_osint_custom_ignorant"
     prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
 }
 
