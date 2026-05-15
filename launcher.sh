@@ -334,7 +334,7 @@ core_engine_info() {
 }
 
 # --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
-core_engine_progress() {
+core_engine_progressold() {
     local duration=$1
     local msg=$2
     # Ключевое здесь: printf "\r" возвращает каретку, а не переходит на новую строку.
@@ -345,6 +345,39 @@ core_engine_progress() {
     printf "\r\e[K${G}[+] $msg : SUCCESSFUL${NC}\n"
 }
 
+# --- CORE ENGINE: PROGRESS v13.8.2 (Fixed Width Edition) ---
+core_engine_progress() {
+    local duration="${1:-1}"
+    local msg="${2:-PROCESS}"
+    local width=15 # Уменьшил ширину, чтобы точно влезло на узкий экран Wiko
+    local steps=20
+
+    # Скрываем курсор, чтобы не дергался
+    printf "\e[?25l"
+
+    for ((i=1; i<=steps; i++)); do
+        local pc=$(( i * 100 / steps ))
+        
+        # Генерируем полоску без вложенных printf/seq
+        local fill=$(( i * width / steps ))
+        local empty=$(( width - fill ))
+        local p_bar=$(printf "%${fill}s" | tr ' ' '█')
+        local e_bar=$(printf "%${empty}s" | tr ' ' '░')
+
+        # ПРАВИЛО: \r (начало) -> \e[K (чистка) -> Текст
+        # Ограничиваем длину $msg до 12 символов (%-12.12s), чтобы не порвать строку
+        printf "\r\e[K${NC}[i] Loading %-12.12s ${B}[%s%s]${NC} %d%%" \
+            "$msg" "$p_bar" "$e_bar" "$pc"
+        
+        sleep $(echo "scale=2; $duration / $steps" | bc 2>/dev/null || echo "0.05")
+    done
+
+    # Завершаем: затираем прогресс и пишем финальный статус
+    printf "\r\e[K${G}[+] %-12.12s : SUCCESSFUL${NC}\n" "$msg"
+    
+    # Возвращаем курсор
+    printf "\e[?25h"
+}
 
 
 # --- Универсальный динамический контроллер ---
@@ -707,7 +740,7 @@ def scan():
     f.save(tmp_path)
     
     try:
-        cmd = [CLAM_PATH, '--no-summary', '--max-filesize=20M', tmp_path]
+        cmd = [CLAM_PATH, '--no-summary', tmp_path]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         scan_output = res.stdout if res.stdout else res.stderr
         if not scan_output and res.returncode == 0:
