@@ -2285,6 +2285,41 @@ run_prime_exploiter_v5() {
 }
 
 
+run_artifact_linker() {
+    core_engine_ui "h" "ARTIFACT LINKER: DATA CORRELATION"
+    
+    local report_file="$PRIME_LOOT/correlation_summary_$(date +%Y%m%d).md"
+    core_engine_ui "i" "Scanning prime_loot for connections..."
+
+    {
+        echo "# PRIME INTELLIGENCE SUMMARY - $(date)"
+        echo "---"
+        
+        # 1. Поиск совпадений по доменам
+        echo "## [TARGET CORRELATION]"
+        grep -rhE "[a-zA-Z0-9.-]+\.[a-z]{2,}" "$PRIME_LOOT" | sort -u | while read -r domain; do
+            local count=$(grep -rl "$domain" "$PRIME_LOOT" | wc -l)
+            if [ "$count" -gt 1 ]; then
+                echo "* **$domain**: Found in $count different log files."
+            fi
+        done
+
+        # 2. Поиск критических утечек из Deep Probe
+        echo -e "\n## [CRITICAL FINDINGS]"
+        grep -h "DB_LEAK" "$PRIME_LOOT"/*.log 2>/dev/null || echo "No DB leaks found."
+
+        # 3. Группировка найденных PHP скриптов
+        echo -e "\n## [SENSITIVE ENDPOINTS]"
+        ls "$PRIME_LOOT" | grep -E "probe_.*\.php" | sed 's/^/* /'
+        
+    } > "$report_file"
+
+    core_engine_ui "s" "Linker complete. Summary: $report_file"
+    cat "$report_file"
+    core_engine_wait
+}
+
+
 
 # --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
 # --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ГЛУБОКОГО АНАЛИЗА ---
