@@ -3639,7 +3639,7 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: Универсальный кросс-платформенный не детектируемый краулер.
+# @description: Универсальный кросс-платформенный не детектируемый краулер (Фикс curl)
 # ==============================================================================
 run_osint_omni_crawler() {
     core_engine_ui "h" "NEXUS CORE: OMNI STEALTH HEURISTIC CRAWLER"
@@ -3660,7 +3660,6 @@ run_osint_omni_crawler() {
     if [[ "$user_input" =~ "facebook.com/share/" || "$user_input" =~ "fb.watch" || "$user_input" =~ "vt.tiktok.com" || "$user_input" =~ "instagram.com/share" || "$user_input" =~ "t.co/" || "$user_input" =~ "youtu.be/" ]]; then
         core_engine_ui "i" "Обнаружен короткий редирект. Перехват конечной точки..."
         
-        # Получаем финальный URL после всех перенаправлений
         resolved_url=$(curl -s -I -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 6 "$user_input" | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
         
         if [[ -n "$resolved_url" ]]; then
@@ -3687,14 +3686,11 @@ run_osint_omni_crawler() {
         detected_platform="X_Twitter"
         target_user=$(echo "$user_input" | grep -oE "(x|twitter).com/[a-zA-Z0-9._]+" | cut -d'/' -f2)
     else
-        # Если передан чистый юзернейм
         target_user="${user_input//@/}"
         target_user="${target_user// /}"
-        # Отсекаем параметры tracking-линков (все после знака ?), если они остались
         target_user=$(echo "$target_user" | cut -d'?' -f1)
     fi
 
-    # Проверка на валидность изоляции
     if [[ -z "$target_user" || "$target_user" == "share" || "$target_user" == "p" ]]; then
         core_engine_ui "e" "Не удалось изолировать чистый идентификатор цели."
         core_engine_wait
@@ -3716,47 +3712,48 @@ run_osint_omni_crawler() {
     echo "==================================================================" >> "$loot_file"
 
     # --- БЛОК 3: УНИВЕРСАЛЬНАЯ ПОИСКОВАЯ МАТРИЦА ---
-    # Генерируем гибкие дорки в зависимости от того, по какой соцсети мы ведем поиск
     local dynamic_queries=()
     if [[ "$detected_platform" == "Facebook" ]]; then
         dynamic_queries=(
-            "site:facebook.com \"$target_user\" \"phone\" OR \"tel\""
+            "site:facebook.com \"$target_user\" \"phone\""
             "site:facebook.com \"$target_user\" \"@gmail.com\""
             "site:facebook.com \"via $target_user\""
         )
     else
-        # Кросс-платформенные дорки для поиска связок (например, когда инстаграм-ник упоминают в твиттере или пишут телефон в профиле)
         dynamic_queries=(
-            "\"$target_user\" \"phone\" OR \"tel\" OR \"WhatsApp\""
-            "\"$target_user\" \"@gmail.com\" OR \"@mail.ru\""
+            "\"$target_user\" \"phone\" OR \"WhatsApp\""
+            "\"$target_user\" \"@gmail.com\""
             "site:instagram.com/\"$target_user\""
             "site:x.com/\"$target_user\""
-            "site:linktr.ee/\"$target_user\""
         )
     fi
 
     local total_phones=0
     local total_emails=0
     local total_relations=0
-    local user_agents=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "Mozilla/5.0 (X11; Linux x86_64; rv:123.0)")
+    local user_agents=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
     for query in "${dynamic_queries[@]}"; do
         local rand_ua="${user_agents[$((RANDOM % ${#user_agents[@]}))]}"
-        local encoded_query
-        encoded_query=$(echo "$query" | curl -s -o /dev/null -w "%{url_effective}" --data-urlencode @- "" | cut -d'?' -f2)
         
-        local request_url="https://html.duckduckgo.com/html/?q=${encoded_query}"
+        # СТАБИЛЬНЫЙ ФИКС: Безопасное URL-кодирование без генерации пустых аргументов curl
+        local encoded_query
+        encoded_query=$(curl -s -A "$rand_ua" -o /dev/null -w "%{url_effective}" --data-urlencode "q=${query}" "https://html.duckduckgo.com/html/" | cut -d'?' -f2)
+        
+        local request_url="https://html.duckduckgo.com/html/?${encoded_query}"
         local raw_snippet_data
         raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 7 "$request_url")
 
-        if [[ -z "$raw_snippet_data" ]]; then continue; fi
+        if [[ -z "$raw_snippet_data" || "$raw_snippet_data" =~ "No results" ]]; then 
+            continue 
+        fi
 
         # Извлечение контактов (Телефоны)
         local extracted_phones
-        extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
+        extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
         if [[ -n "$extracted_phones" ]]; then
             while read -r phone; do
-                if [[ -n "$phone" && ! "$phone" =~ "00000" ]]; then
+                if [[ -n "$phone" && ! "$phone" =~ "0000" ]]; then
                     core_engine_ui "s" "[+] ОБНАРУЖЕН ТЕЛЕФОН: $phone"
                     echo "Extracted_Phone: $phone" >> "$loot_file"
                     ((total_phones++))
@@ -3786,20 +3783,19 @@ run_osint_omni_crawler() {
             done <<< "$extracted_profiles"
         fi
 
-        sleep $((1 + RANDOM % 2))
+        sleep 1
     done
 
     echo "--------------------------------------------------"
     if (( total_phones > 0 || total_emails > 0 || total_relations > 0 )); then
-        core_engine_ui "s" "Анализ завершен успешно! Найдено логов: $((total_phones + total_emails + total_relations))"
-        core_engine_ui "s" "Отчет сформирован: $loot_file"
+        core_engine_ui "s" "Анализ завершен! Сформировано логов: $((total_phones + total_emails + total_relations))"
+        core_engine_ui "s" "Отчет сохранен: $loot_file"
     else
         core_engine_ui "i" "Цифровых следов в открытых индексах не обнаружено."
     fi
 
     core_engine_wait
 }
-
 
 
 
