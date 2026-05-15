@@ -2350,6 +2350,39 @@ run_live_service() {
 }
 
 
+# --- STEALTH COMMS: NODE DESTROYER v1.0 ---
+run_node_clean() {
+    core_engine_ui "h" "NODE_DESTROY_SEQUENCE"
+    
+    # 1. Визуализация процесса аннигиляции
+    core_engine_ui "w" "Scanning for active Live Nodes..."
+    
+    # Ищем порты, которые мы обычно используем (5000, 5001, 5002)
+    local active_nodes=$(lsof -t -i:5000,5001,5002)
+    
+    if [[ -z "$active_nodes" ]]; then
+        core_engine_ui "i" "No active nodes detected in this sector."
+    else
+        core_engine_ui "w" "Active nodes found. Initiating purge..."
+        
+        # 2. Жёсткое удаление процессов
+        # Убиваем через fuser и pkill для верности
+        fuser -k -n tcp -9 5000 5001 5002 >/dev/null 2>&1
+        pkill -9 -f "python3" >/dev/null 2>&1
+        
+        core_engine_progress 1 "NODE_PURGE"
+        core_engine_ui "s" "All nodes have been terminated."
+    fi
+
+    # 3. Очистка цифрового мусора (логи и кеш)
+    core_engine_ui "i" "Wiping temporary traces..."
+    rm -f "$HOME/prime_node.log" "/tmp/prime_node.log"
+    
+    core_engine_ui "s" "Sector is now clean."
+    core_engine_wait
+}
+
+
 run_av_server() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "PRIME SECURITY HUB: CLAMAV GATEWAY"
