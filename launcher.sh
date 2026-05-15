@@ -356,7 +356,7 @@ prime_dynamic_controller() {
         
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]; then
             local idx=$((choice-1))
-            core_engine_progress 1 "${labels[$idx]}"
+            # core_engine_progress 1 "${labels[$idx]}"
             # Выполнение действия
             ${actions[$idx]}        
         else
