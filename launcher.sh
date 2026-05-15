@@ -335,28 +335,14 @@ core_engine_info() {
 
 # --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
 core_engine_progress() {
-    local duration="${1:-1}"
-    local message="${2:-PROCESS}"
-    local width=25
-    
-    local full=$(printf '█%.0s' $(seq 1 $width))
-    local empty=$(printf '░%.0s' $(seq 1 $width))
-    
-    for ((i=1; i<=width; i++)); do
-        local pc=$(( i * 100 / width ))
-        local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $3, $2}')
-        
-        local clr="${Y}"
-        (( pc > 50 )) && clr="${B}"
-        (( pc > 90 )) && clr="${G}"
-        
-        # СТРОГО ОДНА СТРОКА: \r возвращает назад, \e[K чистит мусор
-        printf "\r\e[K${NC}[i] Loading %-15s %b[%s%s]%b %3d%% | RAM: %s" \
-            "${message:0:15}" "$clr" "${full:0:i}" "${empty:i:width}" "${NC}" "$pc" "$ram"
-        
-        sleep 0.05
+    local duration=$1
+    local msg=$2
+    # Ключевое здесь: printf "\r" возвращает каретку, а не переходит на новую строку.
+    for i in {1..20}; do
+        printf "\r${NC}[i] Loading %-15s [%-20s] %d%%" "$msg" "$(printf '█%.0s' $(seq 1 $i))" "$((i*5))"
+        sleep 0.1
     done
-    printf "\r\e[K${G}[+] %-15s : SUCCESSFUL${NC}\n" "$message"
+    printf "\r\e[K${G}[+] $msg : SUCCESSFUL${NC}\n"
 }
 
 
@@ -2263,50 +2249,49 @@ run_iban_analyzer() {
 run_live_service() {
     local service_type="$1"
     local port="${2:-8080}"
-    
-    # Адаптация лог-файла под среду
     local log_file="$HOME/prime_node.log"
-    [[ ! -d "$HOME" ]] && log_file="/tmp/prime_node.log"
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
-    # --- 1. ПРОВЕРКА ЗАВИСИМОСТЕЙ ---
+    # --- 1. ЗАВИСИМОСТИ ---
     if ! command -v lsof >/dev/null 2>&1; then
         core_engine_ui "w" "Installing lsof..."
-        pkg install lsof -y >/dev/null 2>&1 || sudo apt-get install lsof -y >/dev/null 2>&1
+        pkg install lsof -y >/dev/null 2>&1
     fi
 
-    # --- 2. УНИВЕРСАЛЬНЫЙ САНИТАР (Root & Non-Root) ---
+    # --- 2. ГАРАНТИРОВАННАЯ ОЧИСТКА (Фикс Address already in use) ---
     core_engine_ui "i" "Clearing port $port and prepping memory..."
     
-    # Метод A: fuser (для Root/Linux)
+    # Пытаемся всеми способами прибить старый Flask
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
+    pkill -9 -f "python3" >/dev/null 2>&1 # Жестко, но для Termux надежно
     
-    # Метод B: lsof + kill (для Termux без Root)
     local pid=$(lsof -t -i:"$port")
     if [[ -n "$pid" ]]; then
         kill -9 $pid >/dev/null 2>&1
     fi
-    sleep 1 
-
-    # --- 3. ЗАПУСК ДВИЖКА ---
-    local code_gen_func="generate_${service_type}_server_code_raw"
     
+    # Даем Android время реально закрыть сокет
+    sleep 1.5 
+
+    # --- 3. ЗАПУСК (С проверкой генератора) ---
+    local code_gen_func="generate_${service_type}_server_code_raw"
     if ! command -v "$code_gen_func" >/dev/null; then
-        core_engine_ui "e" "Generator $code_gen_func not found."
+        core_engine_ui "e" "Generator $code_gen_func missing."
         core_engine_wait
         return
     fi
 
-    core_engine_ui "w" "Igniting engine on port $port [STEALTH_MODE]"
-    
-    # Запуск: Передаем переменные окружения (PRIME_LOOT/SHARE) в Python
+    core_engine_ui "w" "Igniting engine on port $port..."
     export PRIME_LOOT PRIME_SHARE
+    
+    # Запуск без следов на диске через пайп
     "$code_gen_func" | python3 - > "$log_file" 2>&1 &
     
+    # Тот самый фикс "лестницы" (убедись, что core_engine_progress обновлен)
     core_engine_progress 2 "SOCKET_STABILIZATION"
 
-    # --- 4. ГЛУБОКАЯ ДИАГНОСТИКА ---
+    # --- 4. ДИАГНОСТИКА ---
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1 2>/dev/null || echo "127.0.0.1")
         core_engine_ui "s" "SERVICE ONLINE: http://$ip_addr:$port"
@@ -2318,21 +2303,12 @@ run_live_service() {
         local blocker=$(lsof -i :"$port" | awk 'NR==2 {print $1" (PID: "$2")"}')
         
         if [[ -n "$blocker" ]]; then
-            core_engine_ui "e" "CONFLICT: Port $port is held by $blocker"
-            echo -e "${Y}[!] SUGGESTION:${NC} Restart Termux or run 'pkill python3'."
+            core_engine_ui "e" "CONFLICT: Port $port still held by $blocker"
+            echo -e "${Y}[!] SUGGESTION:${NC} Type 'pkill python3' manually."
         else
-            # Если порт пуст — смотрим логи
-            core_engine_ui "e" "PYTHON CRASH DETECTED. Execution log:"
+            core_engine_ui "e" "PYTHON CRASH DETECTED. Check logs:"
             core_engine_ui "line" ""
-            if [[ -f "$log_file" ]]; then
-                cat "$log_file"
-                # Если лог пустой, возможно не установлен Flask
-                if [[ ! -s "$log_file" ]]; then
-                    echo -e "${W}Log is empty. Possible missing dependency: ${B}Flask${NC}"
-                fi
-            else
-                echo -e "${R}Critical: Log file missing.${NC}"
-            fi
+            [[ -f "$log_file" ]] && cat "$log_file" || echo -e "${R}No log data.${NC}"
             core_engine_ui "line" ""
         fi
     fi
