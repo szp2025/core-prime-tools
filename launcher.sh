@@ -221,48 +221,55 @@ core_engine_control() {
 
 
 core_engine_validator() {
-    local type="$1"
-    local target="$2"
-    local label="$3"
-    local extra="$4"
+    local type="$1"    # Категория проверки
+    local target="$2"  # Объект (IP, файл, пакет)
+    local label="$3"   # Имя для вывода в лог
+    local extra="$4"   # Доп. параметр (например, макс. значение range)
     local failed=0
     local err_msg=""
 
     case "$type" in
+        # --- СИСТЕМНЫЙ СЛОЙ ---
         "root")
-            [[ $EUID -ne 0 ]] && { failed=1; err_msg="Требуются привилегии ROOT (sudo)"; }
+            [[ $EUID -ne 0 ]] && { failed=1; err_msg="Требуются права ROOT (sudo)"; }
             ;;
             
         "pkg")
             if ! command -v "$target" >/dev/null 2>&1; then
-                core_engine_ui "?Компонент [$target] не найден. Попытка авто-установки..."
+                core_engine_ui "?Компонент [$target] отсутствует. Установка..."
                 if core_engine_run apt-get install -y "$target"; then
-                    core_engine_ui "+[$target] успешно интегрирован"
+                    core_engine_ui "+[$target] успешно интегрирован в систему"
                     return 0
                 else
-                    failed=1; err_msg="Критический сбой: пакет [$target] недоступен в репозиториях"
-                fi
+                    failed=1; err_msg="Ошибка APT: не удалось установить [$target]"; fi
             fi
             ;;
 
+        # --- СЕТЕВОЙ СЛОЙ (НОВОЕ) ---
         "url"|"host")
-            # Валидация домена или IP (чтобы не запускать скан на пустые строки)
+            # Проверка синтаксиса домена/IP
             if [[ ! "$target" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,6}$ ]] && \
                [[ ! "$target" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-                failed=1; err_msg="Некорректный формат хоста/домена [$target]"
-            fi
+                failed=1; err_msg="Недопустимый формат цели: [$target]"; fi
             ;;
 
         "net_up")
-            # Проверка живой ли хост перед тем как тратить время на скан
-            if ! ping -c 1 -W 2 "$target" >/dev/null 2>&1; then
-                failed=1; err_msg="Цель [$target] не отвечает на ICMP (Offline/WAF)"
-            fi
+            # Эвристика: проверка доступности перед атакой/аудитом
+            if ! timeout 2 ping -c 1 "$target" >/dev/null 2>&1; then
+                failed=1; err_msg="Узел [$target] недоступен (Offline или ICMP Drop)"; fi
             ;;
 
+        "privacy")
+            # Проверка на "утечку" реального IP (если установлена переменная REAL_IP)
+            local current_ip=$(curl -s --connect-timeout 2 https://ifconfig.me)
+            if [[ -n "$REAL_IP" && "$current_ip" == "$REAL_IP" ]]; then
+                failed=1; err_msg="VPN/Proxy не активен! Обнаружен реальный IP [$current_ip]"; fi
+            ;;
+
+        # --- ФАЙЛОВЫЙ СЛОЙ ---
         "file"|"read")
             if [[ ! -f "$target" ]]; then
-                failed=1; err_msg="Файл [$target] отсутствует"
+                failed=1; err_msg="Файл [$target] не найден"; 
             elif [[ "$type" == "read" ]]; then
                 cat "$target"
                 return 0
@@ -272,38 +279,38 @@ core_engine_validator() {
         "dir")
             if [[ ! -d "$target" ]]; then
                 if core_engine_run mkdir -p "$target"; then
-                    core_engine_ui "+Системная директория готова: $target"
+                    core_engine_ui "+Директория создана: $target"
                     return 0
                 else
-                    failed=1; err_msg="Ошибка доступа к ФС: не удалось создать [$target]"
-                fi
+                    failed=1; err_msg="Ошибка ФС: нет прав на создание [$target]"; fi
             fi
             ;;
 
+        # --- ЛОГИЧЕСКИЙ СЛОЙ ---
         "range")
             if [[ ! "$target" =~ ^[0-9]+$ ]] || (( target < 1 || target > extra )); then
-                failed=1; err_msg="Значение [$target] вне допустимых границ (1-$extra)"
-            fi
-            ;;
-
-        "entropy")
-            # Проверка на "мусорный" ввод (защита от случайных нажатий)
-            if [[ ${#target} -lt 3 ]]; then
-                failed=1; err_msg="Слишком короткое значение для [$label]"
-            fi
+                failed=1; err_msg="Значение [$target] вне лимита (1-$extra)"; fi
             ;;
 
         "list"|"empty")
-            [[ -z "${target// }" ]] && { failed=1; err_msg="Поле [$label] не может быть пустым"; }
+            [[ -z "${target// }" ]] && { failed=1; err_msg="Поле [$label] пустое"; }
+            ;;
+            
+        "entropy")
+            # Защита от случайного ввода (менее 3 символов для хоста - подозрительно)
+            if [[ ${#target} -lt 3 ]]; then
+                failed=1; err_msg="Недостаточная длина данных для [$label]"; fi
             ;;
     esac
 
+    # Финализация
     if [[ $failed -eq 1 ]]; then
-        core_engine_ui "!КРИТИЧЕСКАЯ ОШИБКА: $label -> $err_msg"
+        core_engine_ui "!ОШИБКА ВАЛИДАЦИИ: $label -> $err_msg"
         return 1
     fi
     return 0
 }
+
 
 # --- CORE ENGINE: LOOT COLLECTOR v1.2 (Session Logger) ---
 core_engine_loot() {
@@ -366,18 +373,6 @@ core_engine_info() {
     
     [[ -n "$srv_status" ]] && echo -e "${B}ACTIVE:${NC} ${srv_status}"
     
-}
-
-# --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
-core_engine_progressold() {
-    local duration=$1
-    local msg=$2
-    # Ключевое здесь: printf "\r" возвращает каретку, а не переходит на новую строку.
-    for i in {1..20}; do
-        printf "\r${NC}[i] Loading %-15s [%-20s] %d%%" "$msg" "$(printf '█%.0s' $(seq 1 $i))" "$((i*5))"
-        sleep 0.1
-    done
-    printf "\r\e[K${G}[+] $msg : SUCCESSFUL${NC}\n"
 }
 
 # --- CORE ENGINE: PROGRESS v13.8.2 (Fixed Width Edition) ---
