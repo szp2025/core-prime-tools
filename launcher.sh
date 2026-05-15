@@ -3639,96 +3639,137 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: Пассивный тихий краулер для поиска связанных контактов Facebook.
+# @description: Эвристический не детектируемый краулер контактов и связей Facebook.
 # ==============================================================================
 run_osint_facebook_crawler() {
-    core_engine_ui "h" "NEXUS OSINT: STEALTH FACEBOOK CRAWLER"
+    core_engine_ui "h" "NEXUS CORE: STEALTH HEURISTIC FACEBOOK CRAWLER"
     echo -n " [?] Введите целевой Никнейм (Username) для анализа: "
     read -r target_user
 
-    # Валидация входных данных
     if [[ -z "$target_user" ]]; then
-        core_engine_ui "e" "Никнейм не указан. Отмена операции."
+        core_engine_ui "e" "Критерий поиска пуст. Отмена сессии."
         core_engine_wait
         return 1
     fi
 
-    # Очистка от возможных пробелов или символа @
+    # Стерилизация входных данных
     target_user="${target_user//@/}"
     target_user="${target_user// /}"
 
-    core_engine_ui "i" "Инициализация скрытой сессии краулинга для: $target_user"
+    core_engine_ui "i" "Инициализация эвристического анализа для вектора: $target_user"
     echo "--------------------------------------------------"
-    
-    # Создание директории для хранения лута
-    mkdir -p ~/prime_loot
-    local loot_file="~/prime_loot/fb_stealth_${target_user}.txt"
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Инициализация поиска для: $target_user" > "$loot_file"
 
-    # Массив поисковых дорков для сбора контактов
-    # Строится на основе анализа проиндексированных страниц Facebook
-    local dorks=(
-        "site:facebook.com/\"$target_user\" \"+33\""
-        "site:facebook.com/\"$target_user\" \"+7\""
-        "site:facebook.com/\"$target_user\" \"contact me\""
-        "site:facebook.com/\"$target_user\" \"phone\""
-        "site:facebook.com/\"$target_user\" \"@gmail.com\""
-        "site:facebook.com/marketplace \"$target_user\""
+    # Динамическое распределение путей сохранения лута
+    mkdir -p ~/prime_loot
+    local loot_file="$HOME/prime_loot/fb_heuristic_${target_user}.txt"
+    
+    echo "==================================================================" > "$loot_file"
+    echo " NEXUS SYSTEMS v14.0 - HEURISTIC CRAWLING REPORT" >> "$loot_file"
+    echo " TARGET PROFILE: $target_user" >> "$loot_file"
+    echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
+    echo "==================================================================" >> "$loot_file"
+
+    # Массив динамических поисковых запросов (Дорков) для извлечения графа связей и контактов
+    local dynamic_queries=(
+        "site:facebook.com \"$target_user\" \"phone\" OR \"tel\" OR \"contact\""
+        "site:facebook.com \"$target_user\" \"@gmail.com\" OR \"@mail\""
+        "site:facebook.com \"via $target_user\""
+        "site:facebook.com/permalink.php \"$target_user\""
+        "site:facebook.com/story.php \"$target_user\""
     )
 
-    core_engine_ui "i" "Фаза 1: Проверка существования базового профиля..."
-    local profile_url="https://www.facebook.com/$target_user"
-    local http_code
-    
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --connect-timeout 6 "$profile_url")
+    # Инициализация внутренних счетчиков
+    local total_phones=0
+    local total_emails=0
+    local total_relations=0
 
-    if [[ "$http_code" == "200" ]]; then
-        core_engine_ui "s" "[+] Публичный профиль обнаружен: $profile_url"
-        echo "Profile_Link: $profile_url" >> "$loot_file"
-    elif [[ "$http_code" == "404" ]]; then
-        core_engine_ui "w" "[-] Профиль с никнеймом $target_user напрямую не найден (или скрыт)."
-    else
-        core_engine_ui "i" "[!] Статус ответа профиля: HTTP $http_code"
-    fi
+    # Ротация User-Agent для исключения детектирования со стороны поисковых шлюзов
+    local user_agents=(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"
+    )
 
-    core_engine_ui "i" "Фаза 2: Скрытый пассивный поиск утечек и упоминаний номеров..."
-    
-    local found_contacts=0
-    for dork in "${dorks[@]}"; do
-        # Кодирование строки запроса для URL
-        local encoded_dork
-        encoded_dork=$(echo "$dork" | curl -s -o /dev/null -w "%{url_effective}" --data-urlencode @- "" | cut -d'?' -f2)
+    core_engine_ui "i" "Запуск пассивного сбора данных через распределенные шлюзы..."
+
+    for query in "${dynamic_queries[@]}"; do
+        # Выбор случайного идентификатора браузера
+        local rand_ua="${user_agents[$((RANDOM % ${#user_agents[@]}))]}"
         
-        local search_url="https://html.duckduckgo.com/html/?q=${encoded_dork}"
+        # Безопасное URL-кодирование поискового запроса
+        local encoded_query
+        encoded_query=$(echo "$query" | curl -s -o /dev/null -w "%{url_effective}" --data-urlencode @- "" | cut -d'?' -f2)
         
-        # Запрос через текстовую версию поисковика (без JS, чтобы не вызывать подозрительных логов)
-        local raw_html
-        raw_html=$(curl -s -A "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0" --connect-timeout 8 "$search_url")
+        # Текстовый асинхронный шлюз DuckDuckGo (без выполнения JS, защита от фингерпринтинга)
+        local request_url="https://html.duckduckgo.com/html/?q=${encoded_query}"
         
-        # Извлечение номеров телефонов по регулярным выражениям (международные форматы)
-        local phones
-        phones=$(echo "$raw_html" | grep -oE "\+[0-9]{11,12}|\+7[0-9]{10}|33[0-9]{9}" | sort -u)
-        
-        if [[ -n "$phones" ]]; then
-            while read -r phone; do
-                core_engine_ui "s" "[!!!] НАЙДЕН СВЯЗАННЫЙ ТЕЛЕФОН: $phone"
-                echo "Found_Phone: $phone (Источник: $dork)" >> "$loot_file"
-                ((found_contacts++))
-            done <<< "$phones"
+        local raw_snippet_data
+        raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 7 "$request_url")
+
+        if [[ -z "$raw_snippet_data" ]]; then
+            core_engine_ui "w" "[!] Ограничение ответа шлюза. Переход к следующему сектору."
+            continue
         fi
+
+        # --- ЭВРИСТИЧЕСКИЙ БЛОК 1: ИЗВЛЕЧЕНИЕ КОНТАКТНЫХ ДАННЫХ (ТЕЛЕФОНЫ) ---
+        # Извлекает международные форматы (+7, +33, +1, форматы с пробелами и дефисами)
+        local extracted_phones
+        extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
         
-        # Рандомная задержка (Таймаут тишины) для имитации поведения человека
-        sleep $((1 + RANDOM % 3))
+        if [[ -n "$extracted_phones" ]]; then
+            while read -r phone; do
+                # Исключаем системный мусор и дубликаты
+                if [[ -n "$phone" && ! "$phone" =~ "00000" ]]; then
+                    core_engine_ui "s" "[+] ОБНАРУЖЕН ТЕЛЕФОННЫЙ ВЕКТОР: $phone"
+                    echo "Extracted_Contact_Phone: $phone" >> "$loot_file"
+                    ((total_phones++))
+                fi
+            done <<< "$extracted_phones"
+        fi
+
+        # --- ЭВРИСТИЧЕСКИЙ БЛОК 2: ИЗВЛЕЧЕНИЕ ЭЛЕКТРОННЫХ ПОЧТ ---
+        local extracted_emails
+        extracted_emails=$(echo "$raw_snippet_data" | grep -oE "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}" | grep -vE "duckduckgo|bootstrap|github" | sort -u)
+        
+        if [[ -n "$extracted_emails" ]]; then
+            while read -r email; do
+                core_engine_ui "s" "[+] ОБНАРУЖЕН ЭЛЕКТРОННЫЙ АДРЕС: $email"
+                echo "Extracted_Contact_Email: $email" >> "$loot_file"
+                ((total_emails++))
+            done <<< "$extracted_emails"
+        fi
+
+        # --- ЭВРИСТИЧЕСКИЙ БЛОК 3: ИДЕНТИФИКАЦИЯ СВЯЗАННЫХ ИМЕН И НИКНЕЙМОВ ---
+        # Вычленяет ссылки на профили взаимодействующих лиц из структуры сниппетов
+        local extracted_profiles
+        extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "facebook.com/[a-zA-Z0-9.]+" | grep -vE "html|dt|r.txt|privacy|help|about|login|pages|sharer|groups|$target_user" | cut -d'/' -f2 | sort -u)
+
+        if [[ -n "$extracted_profiles" ]]; then
+            while read -r profile; do
+                if [[ -n "$profile" && ${#profile} -gt 3 ]]; then
+                    core_engine_ui "w" " -> Выявлена связь с аккаунтом: @$profile"
+                    echo "Linked_Social_Relation: https://www.facebook.com/$profile" >> "$loot_file"
+                    ((total_relations++))
+                fi
+            done <<< "$extracted_profiles"
+        fi
+
+        # Динамическая эвристическая задержка (Anti-Anti-Bot Delay)
+        sleep $((2 + RANDOM % 3))
     done
 
     echo "--------------------------------------------------"
-    if (( found_contacts > 0 )); then
-        core_engine_ui "s" "Сбор завершен. Успешно извлечено контактов: $found_contacts"
-        core_engine_ui "s" "Все артефакты сохранены в: $loot_file"
+    echo "==================================================================" >> "$loot_file"
+    echo " SUMMARY: Phones: $total_phones | Emails: $total_emails | Relations: $total_relations" >> "$loot_file"
+    echo "==================================================================" >> "$loot_file"
+
+    if (( total_phones > 0 || total_emails > 0 || total_relations > 0 )); then
+        core_engine_ui "s" "Краулинг завершен. Телефонов: $total_phones, Почт: $total_emails, Профилей связи: $total_relations"
+        core_engine_ui "s" "Сводный эвристический отчет сохранен: $loot_file"
     else
-        core_engine_ui "i" "Пассивный сбор завершен. Прямых открытых контактов не обнаружено."
+        core_engine_ui "i" "Анализ завершен. Прямых открытых связей в кэше поисковых систем не обнаружено."
     fi
-    
+
     core_engine_wait
 }
 
