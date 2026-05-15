@@ -2232,17 +2232,25 @@ run_iban_analyzer() {
 # --- PRIME IGNITION: RUN WITHOUT FILES ---
 
 run_live_service() {
-    # Слой 1: Заголовок через Голос [1]
     local service_type="$1" # av, share, upload
     local port="${2:-8080}"
     
-    core_engine_ui "PRIME LIVE NODE: ${service_type^^}_SERVICE"
+    # Слой 1: Заголовок (добавлен флаг "h")
+    core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}_SERVICE"
     
-    # Слой 2: Санитар [8] — Очистка портов и подготовка памяти
+    # Проверка зависимостей (lsof)
+    if ! command -v lsof >/dev/null 2>&1; then
+        core_engine_ui "w" "lsof missing. Deploying dependency..."
+        # Небольшой визуальный эффект, пока идет установка
+        ( pkg install lsof -y >/dev/null 2>&1 || sudo apt-get install lsof -y >/dev/null 2>&1 ) &
+        core_engine_progress 2 "INSTALLING_LSOF"
+    fi
+
+    # Слой 2: Санитар [8] — Очистка портов
     core_engine_ui "i" "Clearing port $port and prepping memory..."
     fuser -k "$port/tcp" >/dev/null 2>&1
 
-    # Слой 3: Мозг [5] — Проверка существования генератора
+    # Слой 3: Мозг [5] — Проверка генератора
     local code_gen_func="generate_${service_type}_server_code_raw"
     
     if ! command -v "$code_gen_func" >/dev/null; then
@@ -2251,21 +2259,20 @@ run_live_service() {
         return
     fi
     
-    # Слой 4: Глушитель [7] — Запуск через пайп прямо в интерпретатор (Без следов на диске)
-    core_engine_ui "w" "Igniting engine on port $port [MEMORY_ONLY_MODE]"
+    # Слой 4: Глушитель [7] — Запуск в MEMORY_ONLY_MODE
+    core_engine_ui "w" "Igniting engine on port $port [STEALTH_MODE]"
     
-    # Исполнение в подпроцессе
+    # Исполнение через пайп
     (
         "$code_gen_func" | python3 - > /dev/null 2>&1 &
     )
     
-    # Слой 5: Органы чувств [3] — Верификация запуска
-    sleep 2 # Время на инициализацию сокета
+    # Слой 5: Органы чувств [3] — Верификация
+    core_engine_progress 1 "SOCKET_INITIALIZATION"
+    
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
         core_engine_ui "s" "SERVICE ONLINE: http://$ip_addr:$port"
-        
-        # Интеграция в Сборщик трофеев [11]
         core_engine_loot "service" "${service_type^^} node started on port $port"
     else
         core_engine_ui "e" "Ignition failed. Port remains dark."
@@ -2273,7 +2280,6 @@ run_live_service() {
 
     core_engine_wait
 }
-
 
 
 run_av_server() {
