@@ -2286,36 +2286,55 @@ run_prime_exploiter_v5() {
 
 
 run_artifact_linker() {
-    core_engine_ui "h" "ARTIFACT LINKER: DATA CORRELATION"
+    core_engine_ui "h" "ARTIFACT LINKER: DEEP CORRELATION v2.0"
     
-    local report_file="$PRIME_LOOT/correlation_summary_$(date +%Y%m%d).md"
-    core_engine_ui "i" "Scanning prime_loot for connections..."
+    local report_file="$PRIME_LOOT/nexus_report_$(date +%Y%m%d_%H%M).md"
+    core_engine_ui "i" "Analyzing data bridges in prime_loot..."
+    core_engine_progress 2 "DATA_AGGREGATION"
 
     {
-        echo "# PRIME INTELLIGENCE SUMMARY - $(date)"
-        echo "---"
+        echo "# PRIME NEXUS INTELLIGENCE REPORT"
+        echo "Generated: $(date)"
+        echo "---------------------------------------"
         
-        # 1. Поиск совпадений по доменам
-        echo "## [TARGET CORRELATION]"
-        grep -rhE "[a-zA-Z0-9.-]+\.[a-z]{2,}" "$PRIME_LOOT" | sort -u | while read -r domain; do
-            local count=$(grep -rl "$domain" "$PRIME_LOOT" | wc -l)
-            if [ "$count" -gt 1 ]; then
-                echo "* **$domain**: Found in $count different log files."
+        # 1. СВЯЗЬ ЦЕЛЕЙ (Domain & IP Correlation)
+        echo -e "\n## [1] TARGET INTERSECTIONS"
+        # Собираем все домены и IP, исключая локальный мусор
+        local targets=$(grep -rhE "([a-zA-Z0-9.-]+\.[a-z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})" "$PRIME_LOOT" | sort -u | grep -vE "^(127\.|0\.|192\.168\.|172\.|10\.)")
+        
+        for t in $targets; do
+            local occurrence=$(grep -rl "$t" "$PRIME_LOOT" | wc -l)
+            if [ "$occurrence" -gt 1 ]; then
+                echo -e "\n[!] MATCH: **$t**"
+                echo "    Found in $occurrence sources:"
+                grep -rl "$t" "$PRIME_LOOT" | sed "s|$PRIME_LOOT/|    -> |"
             fi
         done
 
-        # 2. Поиск критических утечек из Deep Probe
-        echo -e "\n## [CRITICAL FINDINGS]"
-        grep -h "DB_LEAK" "$PRIME_LOOT"/*.log 2>/dev/null || echo "No DB leaks found."
+        # 2. АНАЛИЗ КРИТИЧЕСКИХ НАХОДОК (Vulnerability Map)
+        echo -e "\n## [2] CRITICAL FINDINGS (Deep Probe & Audit)"
+        # Ищем метки, которые ставит наш Omega Auditor и Deep Probe
+        grep -hE "CRITICAL|DB_LEAK|RCE_RISK|EXPOSED" "$PRIME_LOOT"/*.log 2>/dev/null | sort -u | sed 's/^/* /'
 
-        # 3. Группировка найденных PHP скриптов
-        echo -e "\n## [SENSITIVE ENDPOINTS]"
-        ls "$PRIME_LOOT" | grep -E "probe_.*\.php" | sed 's/^/* /'
+        # 3. КАРТА СКРИПТОВ ПО ДОМЕНАМ (Sensitive Endpoints)
+        echo -e "\n## [3] EXPOSED INFRASTRUCTURE"
+        ls "$PRIME_LOOT" | grep "probe_" | sed -E 's/probe_(.*)_[0-9]+\.php/\1/' | sort -u | while read -r domain; do
+            echo "* Target Domain: $domain"
+            ls "$PRIME_LOOT" | grep "probe_$domain" | sed 's/^/  - /'
+        done
         
     } > "$report_file"
 
-    core_engine_ui "s" "Linker complete. Summary: $report_file"
-    cat "$report_file"
+    core_engine_ui "s" "Linker complete. Nexus file created."
+    core_engine_ui "i" "Path: $report_file"
+    
+    # Моментальный вывод самого важного в терминал
+    core_engine_ui "line"
+    echo -e "${Y}>>> TOP CRITICAL CORRELATIONS <<<${NC}"
+    # Выводим только строки с совпадениями и алертами
+    grep -E "\[!\]|CRITICAL|DB_LEAK|RCE_RISK" "$report_file" | head -n 20 || echo "No critical intersections found yet."
+    core_engine_ui "line"
+    
     core_engine_wait
 }
 
@@ -3519,6 +3538,17 @@ menu_stealth_comms() {
     local funcs="run_av_server run_share_server run_upload_server run_node_clean"    
     # 4. Запуск через контроллер
     prime_dynamic_controller "STEALTH_COMMS" "$names" "$funcs"
+}
+
+menu_nexus_correlation() {
+    core_engine_ui "h" "SECTOR N: NEXUS ANALYSIS & CORRELATION"
+    
+    # Имена для отображения
+    local names="Artifact_Linker Loot_Collector Knowledge_Graph Session_Export"
+    # Функции (убедись, что run_artifact_linker v2.0 уже в коде)
+    local funcs="run_artifact_linker run_loot_collector run_k_graph run_session_export"
+    
+    prime_dynamic_controller "NEXUS_CORRELATION" "$names" "$funcs"
 }
 
 
