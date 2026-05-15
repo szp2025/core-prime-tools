@@ -2232,55 +2232,47 @@ run_iban_analyzer() {
 # --- PRIME IGNITION: RUN WITHOUT FILES ---
 
 run_live_service() {
-    local service_type="$1" # av, share, upload
+    local service_type="$1"
     local port="${2:-8080}"
     
-    # Слой 1: Заголовок (добавлен флаг "h")
-    core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}_SERVICE"
-    
-    # Проверка зависимостей (lsof)
+    core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
+
+    # --- ПРОВЕРКА ЗАВИСИМОСТЕЙ ---
     if ! command -v lsof >/dev/null 2>&1; then
-        core_engine_ui "w" "lsof missing. Deploying dependency..."
-        # Небольшой визуальный эффект, пока идет установка
-        ( pkg install lsof -y >/dev/null 2>&1 || sudo apt-get install lsof -y >/dev/null 2>&1 ) &
-        core_engine_progress 2 "INSTALLING_LSOF"
+        core_engine_ui "w" "Installing lsof..."
+        pkg install lsof -y >/dev/null 2>&1
     fi
 
-    # Слой 2: Санитар [8] — Очистка портов
-    core_engine_ui "i" "Clearing port $port and prepping memory..."
+    # Проверка Flask (Критично для твоих генераторов)
+    if ! python3 -c "import flask" >/dev/null 2>&1; then
+        core_engine_ui "w" "Flask missing. Deploying Python Environment..."
+        pip install flask >/dev/null 2>&1
+    fi
+
+    # --- ОЧИСТКА ПОРТА ---
+    core_engine_ui "i" "Clearing port $port..."
     fuser -k "$port/tcp" >/dev/null 2>&1
 
-    # Слой 3: Мозг [5] — Проверка генератора
+    # --- ЗАПУСК ---
     local code_gen_func="generate_${service_type}_server_code_raw"
+    core_engine_ui "w" "Igniting engine on port $port..."
     
-    if ! command -v "$code_gen_func" >/dev/null; then
-        core_engine_ui "e" "Code generator for '$service_type' not found."
-        core_engine_wait
-        return
-    fi
+    # Запускаем и ловим ошибки в файл, чтобы не гадать
+    "$code_gen_func" | python3 - > /tmp/prime_node.log 2>&1 &
     
-    # Слой 4: Глушитель [7] — Запуск в MEMORY_ONLY_MODE
-    core_engine_ui "w" "Igniting engine on port $port [STEALTH_MODE]"
-    
-    # Исполнение через пайп
-    (
-        "$code_gen_func" | python3 - > /dev/null 2>&1 &
-    )
-    
-    # Слой 5: Органы чувств [3] — Верификация
-    core_engine_progress 1 "SOCKET_INITIALIZATION"
+    core_engine_progress 3 "STABILIZING_SOCKET"
     
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
         core_engine_ui "s" "SERVICE ONLINE: http://$ip_addr:$port"
-        core_engine_loot "service" "${service_type^^} node started on port $port"
     else
         core_engine_ui "e" "Ignition failed. Port remains dark."
+        echo -e "${R}LOG ERROR:${NC}"
+        cat /tmp/prime_node.log
     fi
 
     core_engine_wait
 }
-
 
 run_av_server() {
     # Слой 1: Заголовок через Голос [1]
