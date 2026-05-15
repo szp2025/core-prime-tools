@@ -307,62 +307,28 @@ core_engine_info() {
 # --- CORE ENGINE: PROGRESS v13.8 (Zero-Loop Rendering) ---
 core_engine_progress() {
     local duration="${1:-1}"
-    local message="${2:-SYNCHRONIZING}"
+    local message="${2:-PROCESS}"
+    local width=25
     
-    # 1. Калибровка экрана (без лишних echo)
-    local col=$(tput cols 2>/dev/null || echo 60)
-    local width=$(( col - 45 )) # Увеличили запас под RAM и текст
-    [[ $width -lt 20 ]] && width=20
+    local full=$(printf '█%.0s' $(seq 1 $width))
+    local empty=$(printf '░%.0s' $(seq 1 $width))
     
-    # Расчет задержки
-    local delay=$(echo "scale=4; $duration / $width" | bc -l 2>/dev/null || echo "0.05")
-
-    # Твоя палитра
-    local c_low='\033[38;5;220m'  # Yellow
-    local c_mid='\033[38;5;39m'   # Cyan
-    local c_high='\033[38;5;82m'  # Green
-    local c_head='\033[1;37m'     # White Head
-    local c_dim='\033[38;5;240m'  # Gray Shade
-
-    # Слой 1: Подготовка шаблонов (Zero-Loop вместо вложенных циклов j)
-    local full_block=$(printf '█%.0s' $(seq 1 $width))
-    local empty_block=$(printf '░%.0s' $(seq 1 $width))
-
-    # 2. Основной цикл рендеринга (СТРОГО ОДНА СТРОКА)
     for ((i=1; i<=width; i++)); do
-        local percent=$(( i * 100 / width ))
-        local ram_info=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $3, $2}')
+        local pc=$(( i * 100 / width ))
+        local ram=$(free -m | awk '/Mem:/ {printf "%d/%dMB", $3, $2}')
         
-        # Выбор цвета
-        local current_color="$c_low"
-        [[ $percent -gt 40 ]] && current_color="$c_mid"
-        [[ $percent -gt 85 ]] && current_color="$c_high"
+        local clr="${Y}"
+        (( pc > 50 )) && clr="${B}"
+        (( pc > 90 )) && clr="${G}"
         
-        # Слайсинг строк (быстрее в 100 раз, чем цикл j)
-        local bar="${full_block:0:i-1}"
-        local pad="${empty_block:i:width}"
+        # СТРОГО ОДНА СТРОКА: \r возвращает назад, \e[K чистит мусор
+        printf "\r\e[K${NC}[i] Loading %-15s %b[%s%s]%b %3d%% | RAM: %s" \
+            "${message:0:15}" "$clr" "${full:0:i}" "${empty:i:width}" "${NC}" "$pc" "$ram"
         
-        # Добавляем твою "голову" ❯
-        local head=""
-        if [[ $i -lt $width ]]; then
-            head="${c_head}❯${NC}"
-        else
-            head="${current_color}█${NC}"
-        fi
-
-        # ВЫВОД: \r возвращает в начало, \e[K стирает старое.
-        # Совмещаем заголовок, бар и RAM в одну линию.
-        printf "\r\e[K${c_dim}Status:${NC} ${Y}[%b%s%b%b${Y}] %3d%% ${NC}| ${c_mid}RAM: %s${NC} | %-12s" \
-            "$current_color" "$bar" "$head" "$c_dim$pad" "$percent" "$ram_info" "${message:0:12}"
-
-        sleep $delay
+        sleep 0.05
     done
-    
-    # 3. Финализация (заменяем бар на успех)
-    printf "\r\e[K${G}✔️  %-15s : CORE LOOP SECURED | RAM: %s${NC}\n" "${message:0:15}" "$ram_info"
+    printf "\r\e[K${G}[+] %-15s : SUCCESSFUL${NC}\n" "$message"
 }
-
-
 
 
 
