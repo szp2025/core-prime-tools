@@ -2237,43 +2237,56 @@ run_live_service() {
     
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
-    # --- ПРОВЕРКА ЗАВИСИМОСТЕЙ ---
+    # --- 1. ПРОВЕРКА ЗАВИСИМОСТЕЙ ---
     if ! command -v lsof >/dev/null 2>&1; then
         core_engine_ui "w" "Installing lsof..."
         pkg install lsof -y >/dev/null 2>&1
     fi
 
-    # Проверка Flask (Критично для твоих генераторов)
-    if ! python3 -c "import flask" >/dev/null 2>&1; then
-        core_engine_ui "w" "Flask missing. Deploying Python Environment..."
-        pip install flask >/dev/null 2>&1
-    fi
+    # --- 2. САНИТАР (ЖЕСТКАЯ ОЧИСТКА) ---
+    core_engine_ui "i" "Clearing port $port and prepping memory..."
+    # Убиваем процессы максимально жестко через SIGKILL (-9)
+    fuser -k -n tcp -9 "$port" >/dev/null 2>&1
+    sleep 1 # Даем ядру время освободить сокет
 
-    # --- ОЧИСТКА ПОРТА ---
-    core_engine_ui "i" "Clearing port $port..."
-    fuser -k "$port/tcp" >/dev/null 2>&1
-
-    # --- ЗАПУСК ---
+    # --- 3. ЗАПУСК ДВИЖКА ---
     local code_gen_func="generate_${service_type}_server_code_raw"
     core_engine_ui "w" "Igniting engine on port $port..."
     
-    # Запускаем и ловим ошибки в файл, чтобы не гадать
+    # Запуск с перенаправлением ошибок в лог
     "$code_gen_func" | python3 - > /tmp/prime_node.log 2>&1 &
     
-    core_engine_progress 3 "STABILIZING_SOCKET"
-    
+    core_engine_progress 2 "SOCKET_STABILIZATION"
+
+    # --- 4. ГЛУБОКАЯ ДИАГНОСТИКА ---
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
         core_engine_ui "s" "SERVICE ONLINE: http://$ip_addr:$port"
+        core_engine_loot "service" "${service_type^^} node started on port $port"
     else
-        core_engine_ui "e" "Ignition failed. Port remains dark."
-        echo -e "${R}LOG ERROR:${NC}"
-        cat /tmp/prime_node.log
+        core_engine_ui "e" "IGNITION FAILED: Port $port remains dark."
+        
+        # Выясняем, кто мешает
+        local blocker=$(lsof -i :"$port" | awk 'NR==2 {print $1" (PID: "$2")"}')
+        
+        if [[ -n "$blocker" ]]; then
+            core_engine_ui "e" "CONFLICT: Port $port is held by $blocker"
+            echo -e "${Y}[!] SUGGESTION:${NC} Run 'fuser -k -n tcp $port' manually."
+        else
+            # Если порт пуст, значит упал сам Python
+            core_engine_ui "e" "PYTHON CRASH DETECTED. Check logs below:"
+            core_engine_ui "line" ""
+            if [[ -f /tmp/prime_node.log ]]; then
+                cat /tmp/prime_node.log
+            else
+                echo -e "${R}Critical: Log file missing.${NC}"
+            fi
+            core_engine_ui "line" ""
+        fi
     fi
 
     core_engine_wait
 }
-
 run_av_server() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "PRIME SECURITY HUB: CLAMAV GATEWAY"
