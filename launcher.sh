@@ -2220,21 +2220,21 @@ run_prime_exploiter_v5() {
 
 # --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
 run_prime_auditor_v2() {
-    core_engine_ui "h" "OMEGA AUDITOR v3.1 (Zero-Trace / DB Logic)"
+    core_engine_ui "h" "OMEGA AUDITOR v3.2 (Smart Validation / Zero-Trace)"
 
     local host=$(core_engine_input "text" "Enter Host (domain.com)")
     [[ -z "$host" ]] && return
 
     local audit_log="$PRIME_LOOT/ghost_audit_$(date +%s).log"
     local ua_list=(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
     )
     local vuln_links=""
 
-    core_engine_ui "i" "Initializing Ghost Protocol. Scanning for DB Logic Leaks..."
+    core_engine_ui "i" "Mode: Smart Ghost. Filtering hosting false-positives..."
 
-    # --- СЛОЙ 1: ДИНАМИЧЕСКИЙ МАППИНГ И АНАЛИЗ ЛОГИКИ ---
+    # --- СЛОЙ 1: МАППИНГ ---
     local map_ua="${ua_list[$RANDOM % 2]}"
     local discovered_php=$(curl -s -k -L -A "$map_ua" "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.php' | sort -u | head -n 15)
     [[ -z "$discovered_php" ]] && discovered_php=("index.php" "db.php" "config.php")
@@ -2244,28 +2244,31 @@ run_prime_auditor_v2() {
     for file_path in $discovered_php; do
         local current_ua="${ua_list[$RANDOM % 2]}"
         
-        # 1. Проверка на Broken Access (доступ к классам без сессии)
+        # 1. Проверка на доступ к исполняемым файлам (Session Bypass)
         local status=$(curl -Is -k -L -w "%{http_code}" -A "$current_ua" \
             -e "https://www.google.com/search?q=$host" \
-            -H "Connection: close" --connect-timeout 4 "https://$host/$file_path")
+            --connect-timeout 4 "https://$host/$file_path")
 
         if [[ "$status" == "200" ]]; then
-            local logic_body=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$file_path")
-            if echo "$logic_body" | grep -qiE "class |function |public function"; then
+            local logic_body=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$file_path" | head -c 1000)
+            # Если файл отдает контент и это не страница ошибки хостинга
+            if echo "$logic_body" | grep -qiE "class |function |public function" && ! echo "$logic_body" | grep -qiE "InfinityFree|403 Forbidden|Suspended"; then
                 echo -e "${R}[CRITICAL] LOGIC EXPOSED:${NC} /$file_path"
                 vuln_links+="${R}[LOGIC_GATE]${NC} https://$host/$file_path\n"
             fi
         fi
 
-        # 2. Глубокий анализ Теневых Копий (Поиск mysqli и дыр)
+        # 2. Глубокий анализ Теневых Копий (Валидация реальности файла)
         for ext in "${shadow_ext[@]}"; do
             local shadow_target="${file_path}${ext}"
-            local shadow_content=$(curl -s -k -L -A "$current_ua" --max-time 4 "https://$host/$shadow_target")
+            # Сканируем начало файла для проверки подлинности
+            local shadow_content=$(curl -s -k -L -A "$current_ua" --max-time 4 "https://$host/$shadow_target" | head -c 2000)
             
-            if [[ -n "$shadow_content" && ! "$shadow_content" == *"404"* ]]; then
-                echo -e "${Y}[!] SOURCE LEAK FOUND:${NC} /$shadow_target"
+            # ВАЛИДАЦИЯ: файл не пустой, не 404 и НЕ содержит мусор от хостинга
+            if [[ -n "$shadow_content" ]] && ! echo "$shadow_content" | grep -qiE "404 Not Found|InfinityFree|403 Forbidden|Suspended|<html>"; then
                 
-                # --- Анализ критических моментов БД ---
+                echo -e "${G}[REAL HIT]${NC} /$shadow_target"
+                
                 local db_info=""
                 if echo "$shadow_content" | grep -q "mysqli_"; then
                     db_info=" (Uses MySQLi)"
@@ -2273,7 +2276,7 @@ run_prime_auditor_v2() {
                     db_info=" (WARNING: Deprecated mysql_ detected!)"
                 fi
 
-                if echo "$shadow_content" | grep -qE "DB_PASSWORD|password|'root'"; then
+                if echo "$shadow_content" | grep -qE "DB_PASSWORD|password|'root'|DB_USER"; then
                     db_info+=" [!!! CREDENTIALS FOUND !!!]"
                 fi
 
@@ -2281,34 +2284,32 @@ run_prime_auditor_v2() {
                 echo "[SOURCE_LEAK] $shadow_target $db_info" >> "$audit_log"
             fi
         done
-
-        sleep $(( (RANDOM % 2) + 1 )) # Jitter
+        sleep $(( (RANDOM % 2) + 1 ))
     done
 
-    # --- СЛОЙ 2: ПРЯМЫЕ УТЕЧКИ ОКРУЖЕНИЯ ---
+    # --- СЛОЙ 2: АРТЕФАКТЫ ОКРУЖЕНИЯ (С валидацией) ---
     local db_env=(".env" "backup.sql" "config.php.bak" ".git/config")
     for art in "${db_env[@]}"; do
-        local art_status=$(curl -Is -k -o /dev/null -w "%{http_code}" -A "${ua_list[0]}" "https://$host/$art")
-        if [[ "$art_status" == "200" ]]; then
-            echo -e "${R}[!] DB ARTIFACT:${NC} /$art"
+        local art_data=$(curl -s -k -L -A "${ua_list[0]}" --max-time 3 "https://$host/$art" | head -c 500)
+        if [[ -n "$art_data" ]] && ! echo "$art_data" | grep -qiE "InfinityFree|403 Forbidden|<html>"; then
+            echo -e "${R}[!] REAL DB ARTIFACT:${NC} /$art"
             vuln_links+="${R}[DB_FILE]${NC} https://$host/$art\n"
         fi
     done
 
-    # --- ИТОГОВЫЙ СИНТЕЗ ---
+    # --- ИТОГ ---
     core_engine_ui "line"
-    echo -e "${Y}>>> OMEGA V3.1: FINAL REPORT <<<${NC}"
+    echo -e "${Y}>>> OMEGA V3.2: CLEAN REPORT (No Hosting Trash) <<<${NC}"
     if [[ -n "$vuln_links" ]]; then
         echo -e "$vuln_links"
     else
-        echo -e "${G}Audit finished. No leaks detected with current entropy.${NC}"
+        echo -e "${G}Audit finished. No real leaks detected (False-positives filtered).${NC}"
     fi
     core_engine_ui "line"
 
-    core_engine_loot "audit" "Ghost audit for $host finished. Log: $audit_log"
+    core_engine_loot "audit" "Clean Ghost audit for $host finished."
     core_engine_wait
 }
-
 
 
 run_view_loot() {
