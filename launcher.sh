@@ -2220,7 +2220,7 @@ run_prime_exploiter_v5() {
 
 # --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
 run_prime_auditor_v2() {
-    core_engine_ui "h" "OMEGA AUDITOR v3.2 (Smart Validation / Zero-Trace)"
+    core_engine_ui "h" "OMEGA AUDITOR v3.4 (Multi-Lang Spider / Heuristic)"
 
     local host=$(core_engine_input "text" "Enter Host (domain.com)")
     [[ -z "$host" ]] && return
@@ -2232,82 +2232,97 @@ run_prime_auditor_v2() {
     )
     local vuln_links=""
 
-    core_engine_ui "i" "Mode: Smart Ghost. Filtering hosting false-positives..."
+    core_engine_ui "i" "Protocol: Spider engaged. Scanning PHP, HTML, Python..."
 
-    # --- СЛОЙ 1: МАППИНГ ---
+    # --- СЛОЙ 1: ГЛУБОКИЙ МАППИНГ (SPIDER MODE) ---
     local map_ua="${ua_list[$RANDOM % 2]}"
-    local discovered_php=$(curl -s -k -L -A "$map_ua" "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.php' | sort -u | head -n 15)
-    [[ -z "$discovered_php" ]] && discovered_php=("index.php" "db.php" "config.php")
+    # Собираем всё: .php, .html, .py
+    local raw_map=$(curl -s -k -L -A "$map_ua" "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|html|py)' | sort -u)
+    
+    # Рекурсия: заходим в найденные страницы для поиска скрытых ссылок
+    local extended_map="$raw_map"
+    for link in $(echo "$raw_map" | head -n 5); do
+        local sub=$(curl -s -k -L -A "$map_ua" --max-time 3 "https://$host/$link" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|html|py)' | sort -u)
+        extended_map=$(echo -e "$extended_map\n$sub" | sort -u)
+    done
 
-    local shadow_ext=(".bak" ".old" ".save" ".php~" ".txt" ".swp")
+    local discovered_files=$(echo "$extended_map" | sort -u | head -n 40)
+    [[ -z "$discovered_files" ]] && discovered_files=("index.php" "index.html" "api.py")
 
-    for file_path in $discovered_php; do
+    local shadow_ext=(".bak" ".old" ".save" ".txt" ".swp" ".zip" "~")
+
+    for file_path in $discovered_files; do
         local current_ua="${ua_list[$RANDOM % 2]}"
         
-        # 1. Проверка на доступ к исполняемым файлам (Session Bypass)
+        # 1. Анализ доступа и Session Bypass (Heuristics)
         local status=$(curl -Is -k -L -w "%{http_code}" -A "$current_ua" \
             -e "https://www.google.com/search?q=$host" \
             --connect-timeout 4 "https://$host/$file_path")
 
         if [[ "$status" == "200" ]]; then
-            local logic_body=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$file_path" | head -c 1000)
-            # Если файл отдает контент и это не страница ошибки хостинга
-            if echo "$logic_body" | grep -qiE "class |function |public function" && ! echo "$logic_body" | grep -qiE "InfinityFree|403 Forbidden|Suspended"; then
-                echo -e "${R}[CRITICAL] LOGIC EXPOSED:${NC} /$file_path"
-                vuln_links+="${R}[LOGIC_GATE]${NC} https://$host/$file_path\n"
+            local body=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$file_path" | head -c 2000)
+            
+            if ! echo "$body" | grep -qiE "InfinityFree|403 Forbidden|Suspended|<html>"; then
+                
+                # Детекция открытой логики (PHP/Python)
+                if echo "$body" | grep -qiE "class |def |function |import |public function|<?php"; then
+                    echo -e "${R}[CRITICAL] SOURCE/LOGIC EXPOSED:${NC} /$file_path"
+                    vuln_links+="${R}[LOGIC_GATE]${NC} https://$host/$file_path\n"
+                
+                # Детекция обхода сессии в админках
+                elif echo "$body" | grep -qiE "logout|dashboard|settings|admin|profile|edit|user_id"; then
+                    echo -e "${Y}[BYPASS] SESSION RISK:${NC} /$file_path (Private UI exposed!)"
+                    vuln_links+="${Y}[SESSION_BYPASS]${NC} https://$host/$file_path\n"
+                fi
             fi
         fi
 
-        # 2. Глубокий анализ Теневых Копий (Валидация реальности файла)
+        # 2. Теневые копии (Deep Shadow Scan)
         for ext in "${shadow_ext[@]}"; do
             local shadow_target="${file_path}${ext}"
-            # Сканируем начало файла для проверки подлинности
             local shadow_content=$(curl -s -k -L -A "$current_ua" --max-time 4 "https://$host/$shadow_target" | head -c 2000)
             
-            # ВАЛИДАЦИЯ: файл не пустой, не 404 и НЕ содержит мусор от хостинга
-            if [[ -n "$shadow_content" ]] && ! echo "$shadow_content" | grep -qiE "404 Not Found|InfinityFree|403 Forbidden|Suspended|<html>"; then
-                
+            if [[ -n "$shadow_content" ]] && ! echo "$shadow_content" | grep -qiE "404 Not Found|InfinityFree|403 Forbidden|<html>"; then
                 echo -e "${G}[REAL HIT]${NC} /$shadow_target"
                 
-                local db_info=""
-                if echo "$shadow_content" | grep -q "mysqli_"; then
-                    db_info=" (Uses MySQLi)"
-                elif echo "$shadow_content" | grep -q "mysql_query"; then
-                    db_info=" (WARNING: Deprecated mysql_ detected!)"
+                local info=""
+                # Анализ Python-специфичных утечек
+                [[ "$shadow_content" == *"import "* ]] && info=" (Python Source)"
+                [[ "$shadow_content" == *"mysqli_"* ]] && info=" (PHP MySQLi)"
+                
+                # Поиск секретов
+                if echo "$shadow_content" | grep -qE "DB_PASSWORD|password|'root'|SECRET_KEY|API_KEY|token"; then
+                    info+=" [!!! CREDENTIALS FOUND !!!]"
                 fi
 
-                if echo "$shadow_content" | grep -qE "DB_PASSWORD|password|'root'|DB_USER"; then
-                    db_info+=" [!!! CREDENTIALS FOUND !!!]"
-                fi
-
-                vuln_links+="${Y}[SOURCE_LEAK]${NC} https://$host/$shadow_target $db_info\n"
-                echo "[SOURCE_LEAK] $shadow_target $db_info" >> "$audit_log"
+                vuln_links+="${Y}[SOURCE_LEAK]${NC} https://$host/$shadow_target $info\n"
+                echo "[SOURCE_LEAK] $shadow_target $info" >> "$audit_log"
             fi
         done
         sleep $(( (RANDOM % 2) + 1 ))
     done
 
-    # --- СЛОЙ 2: АРТЕФАКТЫ ОКРУЖЕНИЯ (С валидацией) ---
-    local db_env=(".env" "backup.sql" "config.php.bak" ".git/config")
+    # --- СЛОЙ 2: АРТЕФАКТЫ ОКРУЖЕНИЯ ---
+    local db_env=(".env" "backup.sql" "config.php.bak" ".git/config" "requirements.txt" "app.py.old")
     for art in "${db_env[@]}"; do
-        local art_data=$(curl -s -k -L -A "${ua_list[0]}" --max-time 3 "https://$host/$art" | head -c 500)
-        if [[ -n "$art_data" ]] && ! echo "$art_data" | grep -qiE "InfinityFree|403 Forbidden|<html>"; then
-            echo -e "${R}[!] REAL DB ARTIFACT:${NC} /$art"
+        local art_data=$(curl -s -k -L -A "${ua_list[0]}" --max-time 3 "https://$host/$art" | head -c 1000)
+        if [[ -n "$art_data" ]] && ! echo "$art_data" | grep -qiE "InfinityFree|403 Forbidden|<html>|404 Not Found"; then
+            echo -e "${R}[!] DEEP ARTIFACT:${NC} /$art"
             vuln_links+="${R}[DB_FILE]${NC} https://$host/$art\n"
         fi
     done
 
     # --- ИТОГ ---
     core_engine_ui "line"
-    echo -e "${Y}>>> OMEGA V3.2: CLEAN REPORT (No Hosting Trash) <<<${NC}"
+    echo -e "${Y}>>> OMEGA V3.4: SPIDER SENSE REPORT <<<${NC}"
     if [[ -n "$vuln_links" ]]; then
         echo -e "$vuln_links"
     else
-        echo -e "${G}Audit finished. No real leaks detected (False-positives filtered).${NC}"
+        echo -e "${G}Audit finished. No leaks detected in PHP/HTML/Python stack.${NC}"
     fi
     core_engine_ui "line"
 
-    core_engine_loot "audit" "Clean Ghost audit for $host finished."
+    core_engine_loot "audit" "Deep spider audit for $host finished."
     core_engine_wait
 }
 
