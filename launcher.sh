@@ -2218,6 +2218,99 @@ run_prime_exploiter_v5() {
 
 
 
+# --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
+run_prime_auditor_v2() {
+    core_engine_ui "h" "OMEGA AUDITOR v3.1 (Zero-Trace / DB Logic)"
+
+    local host=$(core_engine_input "text" "Enter Host (domain.com)")
+    [[ -z "$host" ]] && return
+
+    local audit_log="$PRIME_LOOT/ghost_audit_$(date +%s).log"
+    local ua_list=(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+    )
+    local vuln_links=""
+
+    core_engine_ui "i" "Initializing Ghost Protocol. Scanning for DB Logic Leaks..."
+
+    # --- СЛОЙ 1: ДИНАМИЧЕСКИЙ МАППИНГ И АНАЛИЗ ЛОГИКИ ---
+    local map_ua="${ua_list[$RANDOM % 2]}"
+    local discovered_php=$(curl -s -k -L -A "$map_ua" "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.php' | sort -u | head -n 15)
+    [[ -z "$discovered_php" ]] && discovered_php=("index.php" "db.php" "config.php")
+
+    local shadow_ext=(".bak" ".old" ".save" ".php~" ".txt" ".swp")
+
+    for file_path in $discovered_php; do
+        local current_ua="${ua_list[$RANDOM % 2]}"
+        
+        # 1. Проверка на Broken Access (доступ к классам без сессии)
+        local status=$(curl -Is -k -L -w "%{http_code}" -A "$current_ua" \
+            -e "https://www.google.com/search?q=$host" \
+            -H "Connection: close" --connect-timeout 4 "https://$host/$file_path")
+
+        if [[ "$status" == "200" ]]; then
+            local logic_body=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$file_path")
+            if echo "$logic_body" | grep -qiE "class |function |public function"; then
+                echo -e "${R}[CRITICAL] LOGIC EXPOSED:${NC} /$file_path"
+                vuln_links+="${R}[LOGIC_GATE]${NC} https://$host/$file_path\n"
+            fi
+        fi
+
+        # 2. Глубокий анализ Теневых Копий (Поиск mysqli и дыр)
+        for ext in "${shadow_ext[@]}"; do
+            local shadow_target="${file_path}${ext}"
+            local shadow_content=$(curl -s -k -L -A "$current_ua" --max-time 4 "https://$host/$shadow_target")
+            
+            if [[ -n "$shadow_content" && ! "$shadow_content" == *"404"* ]]; then
+                echo -e "${Y}[!] SOURCE LEAK FOUND:${NC} /$shadow_target"
+                
+                # --- Анализ критических моментов БД ---
+                local db_info=""
+                if echo "$shadow_content" | grep -q "mysqli_"; then
+                    db_info=" (Uses MySQLi)"
+                elif echo "$shadow_content" | grep -q "mysql_query"; then
+                    db_info=" (WARNING: Deprecated mysql_ detected!)"
+                fi
+
+                if echo "$shadow_content" | grep -qE "DB_PASSWORD|password|'root'"; then
+                    db_info+=" [!!! CREDENTIALS FOUND !!!]"
+                fi
+
+                vuln_links+="${Y}[SOURCE_LEAK]${NC} https://$host/$shadow_target $db_info\n"
+                echo "[SOURCE_LEAK] $shadow_target $db_info" >> "$audit_log"
+            fi
+        done
+
+        sleep $(( (RANDOM % 2) + 1 )) # Jitter
+    done
+
+    # --- СЛОЙ 2: ПРЯМЫЕ УТЕЧКИ ОКРУЖЕНИЯ ---
+    local db_env=(".env" "backup.sql" "config.php.bak" ".git/config")
+    for art in "${db_env[@]}"; do
+        local art_status=$(curl -Is -k -o /dev/null -w "%{http_code}" -A "${ua_list[0]}" "https://$host/$art")
+        if [[ "$art_status" == "200" ]]; then
+            echo -e "${R}[!] DB ARTIFACT:${NC} /$art"
+            vuln_links+="${R}[DB_FILE]${NC} https://$host/$art\n"
+        fi
+    done
+
+    # --- ИТОГОВЫЙ СИНТЕЗ ---
+    core_engine_ui "line"
+    echo -e "${Y}>>> OMEGA V3.1: FINAL REPORT <<<${NC}"
+    if [[ -n "$vuln_links" ]]; then
+        echo -e "$vuln_links"
+    else
+        echo -e "${G}Audit finished. No leaks detected with current entropy.${NC}"
+    fi
+    core_engine_ui "line"
+
+    core_engine_loot "audit" "Ghost audit for $host finished. Log: $audit_log"
+    core_engine_wait
+}
+
+
+
 run_view_loot() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "DATA HARVESTER: INTELLIGENT LOOT VIEW"
