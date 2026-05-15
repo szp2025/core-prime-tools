@@ -3346,8 +3346,8 @@ menu_forensics() {
 
 menu_cyber_ops() {
     core_engine_ui "h" "CYBER OPERATIONS SECTOR"
-    local names="Ghost_Commander PC_Control Ultimate_Exploit Polymorph_Gen"
-    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 generate_poly_payload"
+    local names="Ghost_Commander PC_Control Ultimate_Exploit Omega_Auditor Polymorph_Gen"
+    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 run_prime_auditor_v2 generate_poly_payload"
     prime_dynamic_controller "CYBER_OPS" "$names" "$funcs"
 }
 
