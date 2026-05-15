@@ -2668,41 +2668,6 @@ run_mesh_bridge() {
     core_engine_wait
 }
 
-generate_packet_forge_code_raw() {
-    cat << 'EOF'
-import sys
-from scapy.all import IP, TCP, send
-import random
-
-def forge_stealth_packet(target_ip, target_port):
-    # Создаем IP-слой со случайным ID для обхода простых фильтров
-    ip_layer = IP(dst=target_ip, id=random.randint(1000, 9000))
-    
-    # Создаем TCP-слой с флагом "S" (SYN) и нестандартным Window Size
-    # Это имитирует специфический стек ОС для обхода пассивных систем защиты
-    tcp_layer = TCP(sport=random.randint(1024, 65535), 
-                    dport=int(target_port), 
-                    flags="S", 
-                    window=random.choice([1024, 2048, 4096, 8192]))
-    
-    packet = ip_layer / tcp_layer
-    
-    try:
-        send(packet, verbose=False)
-        print(f"[SUCCESS] Stealth SYN packet injected to {target_ip}:{target_port}")
-    except Exception as e:
-        print(f"[ERROR] Injection failed: {e}")
-
-if __name__ == "__main__":
-    if len(sys.argv) > 2:
-        forge_stealth_packet(sys.argv[1], sys.argv[2])
-    else:
-        print("Usage: python3 - <target_ip> <target_port>")
-EOF
-}
-
-
-
 run_packet_forge() {
     # Слой 1: Визуальный заголовок через Голос [1]
     core_engine_ui "h" "CORE_LAB: RAW PACKET FORGE"
@@ -2747,8 +2712,6 @@ run_packet_forge() {
     # Слой 7: Универсальная пауза через Синхронизацию [13]
     core_engine_wait
 }
-
-
 
 
 generate_mem_inject_code_raw() {
@@ -2800,6 +2763,41 @@ if __name__ == "__main__":
         read_process_memory(int(sys.argv[1]), sys.argv[2])
 EOF
 }
+
+
+generate_packet_forge_code_raw() {
+    cat << 'EOF'
+import sys
+from scapy.all import IP, TCP, send
+import random
+
+def forge_stealth_packet(target_ip, target_port):
+    # Создаем IP-слой со случайным ID для обхода простых фильтров
+    ip_layer = IP(dst=target_ip, id=random.randint(1000, 9000))
+    
+    # Создаем TCP-слой с флагом "S" (SYN) и нестандартным Window Size
+    # Это имитирует специфический стек ОС для обхода пассивных систем защиты
+    tcp_layer = TCP(sport=random.randint(1024, 65535), 
+                    dport=int(target_port), 
+                    flags="S", 
+                    window=random.choice([1024, 2048, 4096, 8192]))
+    
+    packet = ip_layer / tcp_layer
+    
+    try:
+        send(packet, verbose=False)
+        print(f"[SUCCESS] Stealth SYN packet injected to {target_ip}:{target_port}")
+    except Exception as e:
+        print(f"[ERROR] Injection failed: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        forge_stealth_packet(sys.argv[1], sys.argv[2])
+    else:
+        print("Usage: python3 - <target_ip> <target_port>")
+EOF
+}
+
 
 
 
@@ -3413,8 +3411,8 @@ menu_stealth_comms() {
 
 
 run_main_menu() {
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS SYSTEM_CORE CORE_LAB DATA_FORENSICS DEEP_BRIDGE EXIT"
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_system_core menu_core_lab menu_forensics menu_deep_bridge exit_script"
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS SYSTEM_CORE CORE_LAB DATA_FORENSICS DEEP_BRIDGE PASSWORD EXIT"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_system_core menu_core_lab menu_forensics menu_deep_bridge run_pass_lab exit_script"
     
     prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
 }
