@@ -2230,100 +2230,97 @@ run_prime_exploiter_v5() {
 
 # --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
 run_prime_auditor_v2() {
-    core_engine_ui "h" "OMEGA AUDITOR v3.6 (Security Insight / Ghost)"
+    local host="$1"
+    core_engine_ui "h" "OMEGA AUDITOR v5.0 (Smart Hybrid / Parallel)"
 
-    local host=$(core_engine_input "text" "Enter Host (domain.com)")
+    # 1. ПОЛУЧЕНИЕ ЦЕЛИ
+    if [[ -z "$host" ]]; then
+        host=$(core_engine_input "text" "Enter Target (Domain or IP)")
+    fi
     [[ -z "$host" ]] && return
 
-    local audit_log="$PRIME_LOOT/absolute_audit_$(date +%s).log"
-    local ua_list=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0.0.0" "Mozilla/5.0 (iPhone; OS 17_5) Safari/604.1")
+    # 2. ЭВРИСТИКА БЕЗОПАСНОСТИ (Умное определение режима)
+    # Проверяем, является ли хост локальным
+    if [[ "$host" =~ ^(127\.|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|localhost) ]]; then
+        core_engine_ui "i" "Local target detected. Skipping Anonymity Check."
+    else
+        # Для внешних целей включаем Sentinel Mode
+        core_engine_validator "privacy" "" "Security Shield" || return
+    fi
+
+    # 3. ВАЛИДАЦИЯ ДОСТУПНОСТИ
+    core_engine_validator "url" "$host" "Syntax" || return
+    core_engine_validator "net_up" "$host" "Availability" || return
+
+    # 4. ПАРАЛЛЕЛЬНЫЙ ДВИЖОК (Тот же мощный v4.0)
+    local audit_log="$PRIME_LOOT/smart_audit_$(date +%s).log"
+    local tmp_pipe="/tmp/prime_pipe_$$"
     local vuln_links=""
+    touch "$tmp_pipe"
 
-    core_engine_ui "i" "Engaging Absolute Vision + Security Probe..."
+    core_engine_ui "i" "Deploying Parallel Engines on: $host"
 
-    # --- СЛОЙ 1: ГЛУБОКИЙ КРАУЛИНГ ---
-    local map_ua="${ua_list[$RANDOM % 2]}"
-    local raw_map=$(curl -s -k -L -A "$map_ua" "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|pdf|docx|xlsx|txt|zip|rar|sql|env|log)' | sort -u)
-    
-    # --- СЛОЙ 2: SMART FUZZING & SECURITY FILES ---
-    local target_dirs=("" "uploads" "backup" "docs" "files" "temp" "admin" "db" ".git")
-    local file_masks=("config" "backup" "data" "db" "users" "report" "salary" "test" "old" "dump")
-    local extensions=("php.bak" "sql" "zip" "rar" "pdf" "xlsx" "env")
-    
-    # Специфические файлы безопасности
-    local sec_files=(".htaccess" ".htpasswd" "robots.txt" "phpinfo.php" ".user.ini")
-
-    core_engine_ui "i" "Probing hidden layers and security configurations..."
-
-    local scan_queue=$(echo -e "$raw_map")
-    
-    # Добавляем комбинации масок
-    for dir in "${target_dirs[@]}"; do
-        # Проверка на Directory Listing (запрос к самой папке)
-        [[ -n "$dir" ]] && scan_queue+="\n${dir}/"
-        
-        for mask in "${file_masks[@]}"; do
-            for ext in "${extensions[@]}"; do
-                scan_queue+="\n${dir}${dir:+/}${mask}.${ext}"
-            done
+    ( # Поток А: Краулинг
+        local discovered=$(curl -s -k -L --max-time 5 "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|pdf|docx|xlsx|zip|sql|env|htaccess)' | sort -u)
+        for t in $discovered; do
+            echo "HIT|$t" >> "$tmp_pipe"
         done
-        # Добавляем sec_files в каждую директорию
-        for sec in "${sec_files[@]}"; do
-            scan_queue+="\n${dir}${dir:+/}${sec}"
+    ) &
+
+    ( # Поток Б: Скрытые файлы
+        local fuzz=(".env" ".htaccess" "backup.sql" "config.php.bak" ".git/config" "phpinfo.php")
+        for f in "${fuzz[@]}"; do
+            local res=$(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 3 "https://$host/$f")
+            [[ "$res" == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
         done
-    done
+    ) &
 
-    local unique_queue=$(echo -e "$scan_queue" | sort -u)
-
-    for target in $unique_queue; do
-        local current_ua="${ua_list[$RANDOM % 2]}"
-        local status=$(curl -Is -k -L -w "%{http_code}" -A "$current_ua" --connect-timeout 3 "https://$host/$target")
-
-        if [[ "$status" == "200" ]]; then
-            local body_sample=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$target" | head -c 1200)
-            
-            if ! echo "$body_sample" | grep -qiE "InfinityFree|403 Forbidden|<html>|Suspended"; then
-                
-                # КАТЕГОРИЗАЦИЯ
-                if [[ "$target" == *".htaccess"* ]]; then
-                    echo -e "${R}[CRITICAL] SERVER CONFIG EXPOSED:${NC} /$target"
-                    vuln_links+="${R}[HTACCESS]${NC} https://$host/$target\n"
-                
-                elif echo "$body_sample" | grep -qiE "Index of /|NameLast modifiedSize"; then
-                    echo -e "${R}[VULN] DIRECTORY LISTING:${NC} /$target"
-                    vuln_links+="${R}[DIR_LIST]${NC} https://$host/$target\n"
-
-                elif echo "$target" | grep -qiE "\.(sql|env|zip|rar|php\.bak)$"; then
-                    echo -e "${R}[ARTIFACT]${NC} /$target"
-                    vuln_links+="${R}[DB/BACKUP]${NC} https://$host/$target\n"
-                
-                elif echo "$target" | grep -qiE "\.(pdf|docx|xlsx)$"; then
-                    echo -e "${G}[DOC]${NC} /$target"
-                    vuln_links+="${G}[DOC]${NC} https://$host/$target\n"
-                
-                elif echo "$target" | grep -q "\.php"; then
-                    if echo "$body_sample" | grep -qiE "class |function |logout|admin|settings"; then
-                        echo -e "${Y}[LOGIC]${NC} /$target"
-                        vuln_links+="${Y}[LOGIC]${NC} https://$host/$target\n"
-                    fi
-                fi
-                echo "[HIT] $target" >> "$audit_log"
+    wait
+    
+    # 5. ИНТЕЛЛЕКТУАЛЬНЫЙ ЛУТИНГ (Auto-Loot)
+    while IFS='|' read -r type target; do
+        local sample=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 1000)
+        if ! echo "$sample" | grep -qiE "<html>|403 Forbidden|InfinityFree"; then
+            if echo "$target" | grep -qiE "\.(env|sql|bak|htaccess)"; then
+                core_engine_loot "CRITICAL" "Exposed: $target on $host"
+                vuln_links+="${R}[CRITICAL]${NC} $target\n"
+            else
+                vuln_links+="${G}[FILE]${NC} $target\n"
             fi
         fi
-    done
+    done < <(sort -u "$tmp_pipe")
 
-    # --- ИТОГ ---
+    rm -f "$tmp_pipe"
+
+    # ИТОГ
     core_engine_ui "line"
-    echo -e "${Y}>>> OMEGA V3.6: SECURITY INSIGHT REPORT <<<${NC}"
-    if [[ -n "$vuln_links" ]]; then
-        echo -e "$vuln_links" | sort -u
-    else
-        echo -e "${G}No exposed configs or leaks detected.${NC}"
-    fi
+    echo -e "${Y}>>> AUDIT REPORT: $host <<<${NC}"
+    echo -e "${vuln_links:-No leaks found.}"
     core_engine_ui "line"
-    core_engine_loot "audit" "Security audit for $host finished."
     core_engine_wait
 }
+
+run_omni_scan() {
+    core_engine_ui "h" "OMNI-SCAN ENGINE v1.0 (Autonomous Orchestrator)"
+
+    # Слой 1: Безопасность
+    core_engine_validator "privacy" "" "Anonymity Check" || return
+
+    # Слой 2: Ввод
+    local target_host=$(core_engine_input "text" "Enter Target Host")
+    [[ -z "$target_host" ]] && return
+
+    # Слой 3: Предварительная проверка
+    core_engine_validator "url" "$target_host" "Syntax Check" || return
+    core_engine_validator "net_up" "$target_host" "Availability Check" || return
+
+    core_engine_ui "i" "All checks passed. Deploying Parallel Auditor..."
+    
+    # ПЕРЕДАЧА ХОСТА В АУДИТОР
+    run_prime_auditor_v2 "$target_host"
+}
+
+
 
 run_view_loot() {
     # Слой 1: Заголовок через Голос [1]
@@ -3359,7 +3356,7 @@ menu_forensics() {
 menu_cyber_ops() {
     core_engine_ui "h" "CYBER OPERATIONS SECTOR"
     local names="Ghost_Commander PC_Control Ultimate_Exploit Omega_Auditor Polymorph_Gen"
-    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5 run_prime_auditor_v2 generate_poly_payload"
+    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5  run_prime_auditor_v2 generate_poly_payload"
     prime_dynamic_controller "CYBER_OPS" "$names" "$funcs"
 }
 
