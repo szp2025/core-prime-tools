@@ -3638,6 +3638,100 @@ run_osint_custom_ignorant() {
     core_engine_wait
 }
 
+# ==============================================================================
+# @description: Пассивный тихий краулер для поиска связанных контактов Facebook.
+# ==============================================================================
+run_osint_facebook_crawler() {
+    core_engine_ui "h" "NEXUS OSINT: STEALTH FACEBOOK CRAWLER"
+    echo -n " [?] Введите целевой Никнейм (Username) для анализа: "
+    read -r target_user
+
+    # Валидация входных данных
+    if [[ -z "$target_user" ]]; then
+        core_engine_ui "e" "Никнейм не указан. Отмена операции."
+        core_engine_wait
+        return 1
+    fi
+
+    # Очистка от возможных пробелов или символа @
+    target_user="${target_user//@/}"
+    target_user="${target_user// /}"
+
+    core_engine_ui "i" "Инициализация скрытой сессии краулинга для: $target_user"
+    echo "--------------------------------------------------"
+    
+    # Создание директории для хранения лута
+    mkdir -p ~/prime_loot
+    local loot_file="~/prime_loot/fb_stealth_${target_user}.txt"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Инициализация поиска для: $target_user" > "$loot_file"
+
+    # Массив поисковых дорков для сбора контактов
+    # Строится на основе анализа проиндексированных страниц Facebook
+    local dorks=(
+        "site:facebook.com/\"$target_user\" \"+33\""
+        "site:facebook.com/\"$target_user\" \"+7\""
+        "site:facebook.com/\"$target_user\" \"contact me\""
+        "site:facebook.com/\"$target_user\" \"phone\""
+        "site:facebook.com/\"$target_user\" \"@gmail.com\""
+        "site:facebook.com/marketplace \"$target_user\""
+    )
+
+    core_engine_ui "i" "Фаза 1: Проверка существования базового профиля..."
+    local profile_url="https://www.facebook.com/$target_user"
+    local http_code
+    
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --connect-timeout 6 "$profile_url")
+
+    if [[ "$http_code" == "200" ]]; then
+        core_engine_ui "s" "[+] Публичный профиль обнаружен: $profile_url"
+        echo "Profile_Link: $profile_url" >> "$loot_file"
+    elif [[ "$http_code" == "404" ]]; then
+        core_engine_ui "w" "[-] Профиль с никнеймом $target_user напрямую не найден (или скрыт)."
+    else
+        core_engine_ui "i" "[!] Статус ответа профиля: HTTP $http_code"
+    fi
+
+    core_engine_ui "i" "Фаза 2: Скрытый пассивный поиск утечек и упоминаний номеров..."
+    
+    local found_contacts=0
+    for dork in "${dorks[@]}"; do
+        # Кодирование строки запроса для URL
+        local encoded_dork
+        encoded_dork=$(echo "$dork" | curl -s -o /dev/null -w "%{url_effective}" --data-urlencode @- "" | cut -d'?' -f2)
+        
+        local search_url="https://html.duckduckgo.com/html/?q=${encoded_dork}"
+        
+        # Запрос через текстовую версию поисковика (без JS, чтобы не вызывать подозрительных логов)
+        local raw_html
+        raw_html=$(curl -s -A "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0" --connect-timeout 8 "$search_url")
+        
+        # Извлечение номеров телефонов по регулярным выражениям (международные форматы)
+        local phones
+        phones=$(echo "$raw_html" | grep -oE "\+[0-9]{11,12}|\+7[0-9]{10}|33[0-9]{9}" | sort -u)
+        
+        if [[ -n "$phones" ]]; then
+            while read -r phone; do
+                core_engine_ui "s" "[!!!] НАЙДЕН СВЯЗАННЫЙ ТЕЛЕФОН: $phone"
+                echo "Found_Phone: $phone (Источник: $dork)" >> "$loot_file"
+                ((found_contacts++))
+            done <<< "$phones"
+        fi
+        
+        # Рандомная задержка (Таймаут тишины) для имитации поведения человека
+        sleep $((1 + RANDOM % 3))
+    done
+
+    echo "--------------------------------------------------"
+    if (( found_contacts > 0 )); then
+        core_engine_ui "s" "Сбор завершен. Успешно извлечено контактов: $found_contacts"
+        core_engine_ui "s" "Все артефакты сохранены в: $loot_file"
+    else
+        core_engine_ui "i" "Пассивный сбор завершен. Прямых открытых контактов не обнаружено."
+    fi
+    
+    core_engine_wait
+}
+
 
 
 # ==========================================
@@ -3650,8 +3744,8 @@ run_osint_custom_ignorant() {
 
 menu_intelligence() {
     core_engine_ui "h" "SECTOR I: INTELLIGENCE & OSINT"
-    local names="Smart_OSINT_Engine Network_Intelligence Nexus_SocialScan Nexus_Breach_Leaks Telegram_Resolver"
-    local funcs="run_smart_osint_engine  run_network_analyzer run_osint_custom_socialscan run_osint_custom_leaks run_osint_custom_ignorant"
+    local names="Smart_OSINT_Engine Network_Intelligence Nexus_SocialScan Nexus_Breach_Leaks Telegram_Resolver Facebook_Stealth"
+    local funcs="run_smart_osint_engine  run_network_analyzer run_osint_custom_socialscan run_osint_custom_leaks run_osint_custom_ignorant run_osint_facebook_crawler"
     prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
 }
 
