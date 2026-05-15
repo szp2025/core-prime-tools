@@ -2209,7 +2209,6 @@ run_pass_lab() {
 }
 
 
-
 run_prime_exploiter_v5() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "PRIME HEURISTIC VULN-SCANNER v7.0"
@@ -2288,9 +2287,35 @@ run_prime_exploiter_v5() {
 
 
 # --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
+# --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ГЛУБОКОГО АНАЛИЗА ---
+run_deep_file_probe() {
+    local host="$1"
+    local target_file="$2"
+    [[ -z "$host" || -z "$target_file" ]] && return
+
+    core_engine_ui "i" "Deep Probing: $target_file..."
+    
+    # Загружаем заголовок файла (первые 2кб достаточно для анализа логики)
+    local sample=$(curl -s -k -L --max-time 5 "https://$host/$target_file" | head -c 2048)
+    local leaks=""
+
+    # Эвристика: поиск паттернов уязвимостей
+    echo "$sample" | grep -qiE "mysqli_connect|PDO\(|db_password|db_user|root" && leaks+="${R}[!] DB_LEAK: Connection string detected${NC}\n"
+    echo "$sample" | grep -qiE "POST\[|GET\[|REQUEST\[" && leaks+="${Y}[*] LOGIC: Entry point for data detected${NC}\n"
+    echo "$sample" | grep -qiE "exec\(|system\(|passthru\(" && leaks+="${R}[!] RCE_RISK: System command execution${NC}\n"
+    echo "$sample" | grep -qiE "fopen\(|file_get_contents\(" && leaks+="${B}[i] LFI_RISK: File operations detected${NC}\n"
+
+    if [[ -n "$leaks" ]]; then
+        echo -e "      |--- ANALYSIS:\n$(echo -e "$leaks" | sed 's/^/      | /')"
+        # Сохраняем "грязный" файл в лут для ручного разбора
+        echo "$sample" > "$PRIME_LOOT/probe_${target_file//\//_}_$(date +%s).php"
+    fi
+}
+
+# --- ОСНОВНОЙ АУДИТОР ---
 run_prime_auditor_v2() {
     local host="$1"
-    core_engine_ui "h" "OMEGA AUDITOR v5.0 (Smart Hybrid / Parallel)"
+    core_engine_ui "h" "OMEGA AUDITOR v5.1 (Deep Probe / Parallel)"
 
     # 1. ПОЛУЧЕНИЕ ЦЕЛИ
     if [[ -z "$host" ]]; then
@@ -2298,36 +2323,31 @@ run_prime_auditor_v2() {
     fi
     [[ -z "$host" ]] && return
 
-    # 2. ЭВРИСТИКА БЕЗОПАСНОСТИ (Умное определение режима)
-    # Проверяем, является ли хост локальным
+    # 2. ЭВРИСТИКА БЕЗОПАСНОСТИ
     if [[ "$host" =~ ^(127\.|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|localhost) ]]; then
         core_engine_ui "i" "Local target detected. Skipping Anonymity Check."
     else
-        # Для внешних целей включаем Sentinel Mode
         core_engine_validator "privacy" "" "Security Shield" || return
     fi
 
-    # 3. ВАЛИДАЦИЯ ДОСТУПНОСТИ
+    # 3. ВАЛИДАЦИЯ
     core_engine_validator "url" "$host" "Syntax" || return
     core_engine_validator "net_up" "$host" "Availability" || return
 
-    # 4. ПАРАЛЛЕЛЬНЫЙ ДВИЖОК (Тот же мощный v4.0)
-    local audit_log="$PRIME_LOOT/smart_audit_$(date +%s).log"
+    # 4. ПАРАЛЛЕЛЬНЫЙ ДВИЖОК
     local tmp_pipe="/tmp/prime_pipe_$$"
     local vuln_links=""
     touch "$tmp_pipe"
 
     core_engine_ui "i" "Deploying Parallel Engines on: $host"
 
-    ( # Поток А: Краулинг
+    ( # Поток А: Краулинг контента
         local discovered=$(curl -s -k -L --max-time 5 "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|pdf|docx|xlsx|zip|sql|env|htaccess)' | sort -u)
-        for t in $discovered; do
-            echo "HIT|$t" >> "$tmp_pipe"
-        done
+        for t in $discovered; do echo "HIT|$t" >> "$tmp_pipe"; done
     ) &
 
-    ( # Поток Б: Скрытые файлы
-        local fuzz=(".env" ".htaccess" "backup.sql" "config.php.bak" ".git/config" "phpinfo.php")
+    ( # Поток Б: Скрытые директории/файлы
+        local fuzz=(".env" ".htaccess" "backup.sql" "config.php.bak" ".git/config" "phpinfo.php" "wp-config.php" "config.php")
         for f in "${fuzz[@]}"; do
             local res=$(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 3 "https://$host/$f")
             [[ "$res" == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
@@ -2336,25 +2356,32 @@ run_prime_auditor_v2() {
 
     wait
     
-    # 5. ИНТЕЛЛЕКТУАЛЬНЫЙ ЛУТИНГ (Auto-Loot)
+    # 5. ИНТЕЛЛЕКТУАЛЬНЫЙ ЛУТИНГ + DEEP PROBE
+    core_engine_ui "line"
+    echo -e "${Y}>>> AUDIT REPORT: $host <<<${NC}"
+
     while IFS='|' read -r type target; do
-        local sample=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 1000)
-        if ! echo "$sample" | grep -qiE "<html>|403 Forbidden|InfinityFree"; then
+        # Быстрая проверка на мусор хостинга
+        local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
+        if ! echo "$head_check" | grep -qiE "<html>|403 Forbidden|InfinityFree|Not Found"; then
+            
+            # Классификация
             if echo "$target" | grep -qiE "\.(env|sql|bak|htaccess)"; then
                 core_engine_loot "CRITICAL" "Exposed: $target on $host"
-                vuln_links+="${R}[CRITICAL]${NC} $target\n"
+                echo -e "${R}[CRITICAL]${NC} $target"
             else
-                vuln_links+="${G}[FILE]${NC} $target\n"
+                echo -e "${G}[FILE]${NC} $target"
+            fi
+
+            # --- ЭВРИСТИЧЕСКИЙ ВЫЗОВ DEEP PROBE ---
+            # Если файл PHP и имеет подозрительное имя — вскрываем немедленно
+            if echo "$target" | grep -qiE "\.php$" && echo "$target" | grep -qiE "log|pass|recup|config|admin|db|setup"; then
+                run_deep_file_probe "$host" "$target"
             fi
         fi
     done < <(sort -u "$tmp_pipe")
 
     rm -f "$tmp_pipe"
-
-    # ИТОГ
-    core_engine_ui "line"
-    echo -e "${Y}>>> AUDIT REPORT: $host <<<${NC}"
-    echo -e "${vuln_links:-No leaks found.}"
     core_engine_ui "line"
     core_engine_wait
 }
