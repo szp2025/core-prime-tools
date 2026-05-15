@@ -3071,8 +3071,8 @@ run_dd_logic() {
 
 menu_intelligence() {
     core_engine_ui "h" "SECTOR I: INTELLIGENCE & OSINT"
-    local names="Smart_OSINT_Engine Phone_Lookup Social_Scanner Network_Intelligence"
-    local funcs="run_smart_osint_engine run_phone_lookup run_social_scan run_network_analyzer"
+    local names="Smart_OSINT_Engine Network_Intelligence"
+    local funcs="run_smart_osint_engine  run_network_analyzer"
     prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
 }
 
@@ -3134,14 +3134,11 @@ menu_deep_bridge() {
 
 menu_stealth_comms() {
     # 1. Запуск прогресс-бара для красоты перехода
-    core_engine_progress 1 "STEALTH_COMMS"
-    
+    core_engine_progress 1 "STEALTH_COMMS"    
     # 2. Имена для отображения в меню (красивые)
-    local names="Live_Node_AV Shared_Node_Store Upload_Portal Node_Destroy"
-    
+    local names="Live_Node_AV Shared_Node_Store Upload_Portal Node_Destroy"    
     # 3. РЕАЛЬНЫЕ имена функций из твоего кода (исправлено)
-    local funcs="run_av_server run_share_server run_upload_server run_node_clean"
-    
+    local funcs="run_av_server run_share_server run_upload_server run_node_clean"    
     # 4. Запуск через контроллер
     prime_dynamic_controller "STEALTH_COMMS" "$names" "$funcs"
 }
