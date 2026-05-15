@@ -3639,11 +3639,11 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: Эвристический не детектируемый краулер с функцией раскрытия коротких ссылок share/.
+# @description: Универсальный кросс-платформенный не детектируемый краулер.
 # ==============================================================================
-run_osint_facebook_crawler() {
-    core_engine_ui "h" "NEXUS CORE: STEALTH HEURISTIC FACEBOOK CRAWLER"
-    echo -n " [?] Введите Никнейм или ссылку (например, facebook.com/share/...): "
+run_osint_omni_crawler() {
+    core_engine_ui "h" "NEXUS CORE: OMNI STEALTH HEURISTIC CRAWLER"
+    echo -n " [?] Введите Никнейм или любую ссылку (FB, Insta, TikTok, X, YT): "
     read -r user_input
 
     if [[ -z "$user_input" ]]; then
@@ -3653,78 +3653,92 @@ run_osint_facebook_crawler() {
     fi
 
     local target_user=""
+    local detected_platform="Generic_OSINT"
+    local resolved_url=""
 
-    # --- БЛОК ИНТЕЛЛЕКТУАЛЬНОГО РАЗВЕРТЫВАНИЯ ССЫЛОК (URL RESOLVER) ---
-    if [[ "$user_input" =~ "facebook.com/share/" || "$user_input" =~ "fb.watch" ]]; then
-        core_engine_ui "i" "Обнаружена короткая ссылка. Запуск тихого перехвата редиректа..."
+    # --- БЛОК 1: УНИВЕРСАЛЬНЫЙ RESOLVER И ОПРЕДЕЛЕНИЕ ПЛАТФОРМЫ ---
+    if [[ "$user_input" =~ "facebook.com/share/" || "$user_input" =~ "fb.watch" || "$user_input" =~ "vt.tiktok.com" || "$user_input" =~ "instagram.com/share" || "$user_input" =~ "t.co/" || "$user_input" =~ "youtu.be/" ]]; then
+        core_engine_ui "i" "Обнаружен короткий редирект. Перехват конечной точки..."
         
-        # Отправляем HEAD-запрос для получения заголовков ответа без скачивания тела страницы
-        local resolved_url
+        # Получаем финальный URL после всех перенаправлений
         resolved_url=$(curl -s -I -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 6 "$user_input" | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
         
         if [[ -n "$resolved_url" ]]; then
-            core_engine_ui "s" "[+] Ссылка успешно раскрыта: $resolved_url"
-            
-            # Эвристическое извлечение никнейма или ID из раскрытого URL
-            if [[ "$resolved_url" =~ facebook.com/profile.php\?id=([0-9]+) ]]; then
-                target_user="${BASH_REMATCH[1]}"
-            else
-                target_user=$(echo "$resolved_url" | grep -oE "facebook.com/[a-zA-Z0-9.]+" | cut -d'/' -f2)
-            fi
-        fi
-    else
-        # Если введен обычный никнейм или стандартная ссылка
-        target_user="${user_input//@/}"
-        target_user="${target_user// /}"
-        if [[ "$target_user" =~ facebook.com/([a-zA-Z0-9.]+) ]]; then
-            target_user="${BASH_REMATCH[1]}"
+            user_input="$resolved_url"
+            core_engine_ui "s" "[+] Ссылка успешно раскрыта"
         fi
     fi
 
-    # Финальная проверка: удалось ли вычленить идентификатор
-    if [[ -z "$target_user" || "$target_user" == "share" ]]; then
-        core_engine_ui "e" "Не удалось извлечь валидный идентификатор профиля из ввода."
+    # --- БЛОК 2: ЭВРИСТИЧЕСКАЯ ФИЛЬТРАЦИЯ И ВЫДЕЛЕНИЕ НИКНЕЙМА ---
+    if [[ "$user_input" =~ facebook.com/ ]]; then
+        detected_platform="Facebook"
+        if [[ "$user_input" =~ profile.php\?id=([0-9]+) ]]; then
+            target_user="${BASH_REMATCH[1]}"
+        else
+            target_user=$(echo "$user_input" | grep -oE "facebook.com/[a-zA-Z0-9.]+" | cut -d'/' -f2)
+        fi
+    elif [[ "$user_input" =~ instagram.com/ ]]; then
+        detected_platform="Instagram"
+        target_user=$(echo "$user_input" | grep -oE "instagram.com/[a-zA-Z0-9._]+" | cut -d'/' -f2)
+    elif [[ "$user_input" =~ tiktok.com/ ]]; then
+        detected_platform="TikTok"
+        target_user=$(echo "$user_input" | grep -oE "tiktok.com/@[a-zA-Z0-9._]+" | cut -d'/' -f2 | tr -d '@')
+    elif [[ "$user_input" =~ x.com/ || "$user_input" =~ twitter.com/ ]]; then
+        detected_platform="X_Twitter"
+        target_user=$(echo "$user_input" | grep -oE "(x|twitter).com/[a-zA-Z0-9._]+" | cut -d'/' -f2)
+    else
+        # Если передан чистый юзернейм
+        target_user="${user_input//@/}"
+        target_user="${target_user// /}"
+        # Отсекаем параметры tracking-линков (все после знака ?), если они остались
+        target_user=$(echo "$target_user" | cut -d'?' -f1)
+    fi
+
+    # Проверка на валидность изоляции
+    if [[ -z "$target_user" || "$target_user" == "share" || "$target_user" == "p" ]]; then
+        core_engine_ui "e" "Не удалось изолировать чистый идентификатор цели."
         core_engine_wait
         return 1
     fi
 
-    core_engine_ui "s" "[+] Идентификатор цели успешно изолирован: $target_user"
-    core_engine_ui "i" "Инициализация эвристического анализа для вектора: $target_user"
+    core_engine_ui "s" "[+] Матрица: $detected_platform | Идентификатор: $target_user"
+    core_engine_ui "i" "Запуск пассивного перекрестного доркинга..."
     echo "--------------------------------------------------"
 
-    # Динамическое распределение путей сохранения лута
     mkdir -p ~/prime_loot
-    local loot_file="$HOME/prime_loot/fb_heuristic_${target_user}.txt"
+    local loot_file="$HOME/prime_loot/omni_heuristic_${target_user}.txt"
     
     echo "==================================================================" > "$loot_file"
-    echo " NEXUS SYSTEMS v14.0 - HEURISTIC CRAWLING REPORT" >> "$loot_file"
-    echo " TARGET PROFILE: $target_user" >> "$loot_file"
-    if [[ -n "$resolved_url" ]]; then
-        echo " SOURCE SHARE URL: $user_input" >> "$loot_file"
-        echo " RESOLVED URL: $resolved_url" >> "$loot_file"
-    fi
+    echo " NEXUS SYSTEMS v14.0 - MULTI-PLATFORM HEURISTIC REPORT" >> "$loot_file"
+    echo " DETECTED PLATFORM: $detected_platform" >> "$loot_file"
+    echo " ISOLATED TARGET: $target_user" >> "$loot_file"
     echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
     echo "==================================================================" >> "$loot_file"
 
-    # Массив динамических поисковых запросов (Дорков)
-    local dynamic_queries=(
-        "site:facebook.com \"$target_user\" \"phone\" OR \"tel\" OR \"contact\""
-        "site:facebook.com \"$target_user\" \"@gmail.com\" OR \"@mail\""
-        "site:facebook.com \"via $target_user\""
-        "site:facebook.com/permalink.php \"$target_user\""
-        "site:facebook.com/story.php \"$target_user\""
-    )
+    # --- БЛОК 3: УНИВЕРСАЛЬНАЯ ПОИСКОВАЯ МАТРИЦА ---
+    # Генерируем гибкие дорки в зависимости от того, по какой соцсети мы ведем поиск
+    local dynamic_queries=()
+    if [[ "$detected_platform" == "Facebook" ]]; then
+        dynamic_queries=(
+            "site:facebook.com \"$target_user\" \"phone\" OR \"tel\""
+            "site:facebook.com \"$target_user\" \"@gmail.com\""
+            "site:facebook.com \"via $target_user\""
+        )
+    else
+        # Кросс-платформенные дорки для поиска связок (например, когда инстаграм-ник упоминают в твиттере или пишут телефон в профиле)
+        dynamic_queries=(
+            "\"$target_user\" \"phone\" OR \"tel\" OR \"WhatsApp\""
+            "\"$target_user\" \"@gmail.com\" OR \"@mail.ru\""
+            "site:instagram.com/\"$target_user\""
+            "site:x.com/\"$target_user\""
+            "site:linktr.ee/\"$target_user\""
+        )
+    fi
 
     local total_phones=0
     local total_emails=0
     local total_relations=0
-
-    local user_agents=(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"
-    )
-
-    core_engine_ui "i" "Запуск пассивного сбора данных через распределенные шлюзы..."
+    local user_agents=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "Mozilla/5.0 (X11; Linux x86_64; rv:123.0)")
 
     for query in "${dynamic_queries[@]}"; do
         local rand_ua="${user_agents[$((RANDOM % ${#user_agents[@]}))]}"
@@ -3735,67 +3749,57 @@ run_osint_facebook_crawler() {
         local raw_snippet_data
         raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 7 "$request_url")
 
-        if [[ -z "$raw_snippet_data" ]]; then
-            continue
-        fi
+        if [[ -z "$raw_snippet_data" ]]; then continue; fi
 
-        # --- ЭВРИСТИЧЕСКИЙ БЛОК 1: ИЗВЛЕЧЕНИЕ ТЕЛЕФОНОВ ---
+        # Извлечение контактов (Телефоны)
         local extracted_phones
         extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
-        
         if [[ -n "$extracted_phones" ]]; then
             while read -r phone; do
                 if [[ -n "$phone" && ! "$phone" =~ "00000" ]]; then
-                    core_engine_ui "s" "[+] ОБНАРУЖЕН ТЕЛЕФОННЫЙ ВЕКТОР: $phone"
-                    echo "Extracted_Contact_Phone: $phone" >> "$loot_file"
+                    core_engine_ui "s" "[+] ОБНАРУЖЕН ТЕЛЕФОН: $phone"
+                    echo "Extracted_Phone: $phone" >> "$loot_file"
                     ((total_phones++))
                 fi
             done <<< "$extracted_phones"
         fi
 
-        # --- ЭВРИСТИЧЕСКИЙ БЛОК 2: ИЗВЛЕЧЕНИЕ ПОЧТ ---
+        # Извлечение контактов (Почты)
         local extracted_emails
-        extracted_emails=$(echo "$raw_snippet_data" | grep -oE "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}" | grep -vE "duckduckgo|bootstrap|github" | sort -u)
-        
+        extracted_emails=$(echo "$raw_snippet_data" | grep -oE "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}" | grep -vE "duckduckgo|bootstrap" | sort -u)
         if [[ -n "$extracted_emails" ]]; then
             while read -r email; do
-                core_engine_ui "s" "[+] ОБНАРУЖЕН ЭЛЕКТРОННЫЙ АДРЕС: $email"
-                echo "Extracted_Contact_Email: $email" >> "$loot_file"
+                core_engine_ui "s" "[+] ОБНАРУЖЕН EMAIL: $email"
+                echo "Extracted_Email: $email" >> "$loot_file"
                 ((total_emails++))
             done <<< "$extracted_emails"
         fi
 
-        # --- ЭВРИСТИЧЕСКИЙ БЛОК 3: СВЯЗАННЫЕ ИМЕНА И НИКНЕЙМОВ ---
+        # Извлечение кросс-ссылок (Связи с другими аккаунтами)
         local extracted_profiles
-        extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "facebook.com/[a-zA-Z0-9.]+" | grep -vE "html|dt|r.txt|privacy|help|about|login|pages|sharer|groups|$target_user" | cut -d'/' -f2 | sort -u)
-
+        extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "(facebook|instagram|x|twitter|tiktok).com/[a-zA-Z0-9._]+" | grep -vE "html|privacy|help|login|$target_user" | sort -u)
         if [[ -n "$extracted_profiles" ]]; then
             while read -r profile; do
-                if [[ -n "$profile" && ${#profile} -gt 3 ]]; then
-                    core_engine_ui "w" " -> Выявлена связь с аккаунтом: @$profile"
-                    echo "Linked_Social_Relation: https://www.facebook.com/$profile" >> "$loot_file"
-                    ((total_relations++))
-                fi
+                core_engine_ui "w" " -> Связанный профиль в сети: https://$profile"
+                echo "Cross_Platform_Relation: https://$profile" >> "$loot_file"
+                ((total_relations++))
             done <<< "$extracted_profiles"
         fi
 
-        sleep $((2 + RANDOM % 2))
+        sleep $((1 + RANDOM % 2))
     done
 
     echo "--------------------------------------------------"
-    echo "==================================================================" >> "$loot_file"
-    echo " SUMMARY: Phones: $total_phones | Emails: $total_emails | Relations: $total_relations" >> "$loot_file"
-    echo "==================================================================" >> "$loot_file"
-
     if (( total_phones > 0 || total_emails > 0 || total_relations > 0 )); then
-        core_engine_ui "s" "Краулинг завершен. Телефонов: $total_phones, Почт: $total_emails, Сформировано связей: $total_relations"
-        core_engine_ui "s" "Эвристический отчет сохранен: $loot_file"
+        core_engine_ui "s" "Анализ завершен успешно! Найдено логов: $((total_phones + total_emails + total_relations))"
+        core_engine_ui "s" "Отчет сформирован: $loot_file"
     else
-        core_engine_ui "i" "Анализ завершен. Прямых связей в кэше поисковых систем не обнаружено."
+        core_engine_ui "i" "Цифровых следов в открытых индексах не обнаружено."
     fi
 
     core_engine_wait
 }
+
 
 
 
@@ -3810,8 +3814,8 @@ run_osint_facebook_crawler() {
 
 menu_intelligence() {
     core_engine_ui "h" "SECTOR I: INTELLIGENCE & OSINT"
-    local names="Smart_OSINT_Engine Network_Intelligence Nexus_SocialScan Nexus_Breach_Leaks Telegram_Resolver Facebook_Stealth"
-    local funcs="run_smart_osint_engine  run_network_analyzer run_osint_custom_socialscan run_osint_custom_leaks run_osint_custom_ignorant run_osint_facebook_crawler"
+    local names="Smart_OSINT_Engine Network_Intelligence Nexus_SocialScan Nexus_Breach_Leaks Telegram_Resolver Omni_Stealth_Crawler"
+    local funcs="run_smart_osint_engine  run_network_analyzer run_osint_custom_socialscan run_osint_custom_leaks run_osint_custom_ignorant run_osint_omni_crawler"
     prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
 }
 
