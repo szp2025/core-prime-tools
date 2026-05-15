@@ -3553,8 +3553,9 @@ menu_nexus_correlation() {
 
 
 run_main_menu() {
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS SYSTEM_CORE CORE_LAB DATA_FORENSICS DEEP_BRIDGE PASSWORD EXIT"
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_system_core menu_core_lab menu_forensics menu_deep_bridge run_pass_lab exit_script"
+    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS 
+NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS DEEP_BRIDGE PASSWORD EXIT"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics menu_deep_bridge run_pass_lab exit_script"
     
     prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
 }
