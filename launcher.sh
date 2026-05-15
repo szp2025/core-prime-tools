@@ -2220,112 +2220,100 @@ run_prime_exploiter_v5() {
 
 # --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
 run_prime_auditor_v2() {
-    core_engine_ui "h" "OMEGA AUDITOR v3.4 (Multi-Lang Spider / Heuristic)"
+    core_engine_ui "h" "OMEGA AUDITOR v3.6 (Security Insight / Ghost)"
 
     local host=$(core_engine_input "text" "Enter Host (domain.com)")
     [[ -z "$host" ]] && return
 
-    local audit_log="$PRIME_LOOT/ghost_audit_$(date +%s).log"
-    local ua_list=(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
-    )
+    local audit_log="$PRIME_LOOT/absolute_audit_$(date +%s).log"
+    local ua_list=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0.0.0" "Mozilla/5.0 (iPhone; OS 17_5) Safari/604.1")
     local vuln_links=""
 
-    core_engine_ui "i" "Protocol: Spider engaged. Scanning PHP, HTML, Python..."
+    core_engine_ui "i" "Engaging Absolute Vision + Security Probe..."
 
-    # --- СЛОЙ 1: ГЛУБОКИЙ МАППИНГ (SPIDER MODE) ---
+    # --- СЛОЙ 1: ГЛУБОКИЙ КРАУЛИНГ ---
     local map_ua="${ua_list[$RANDOM % 2]}"
-    # Собираем всё: .php, .html, .py
-    local raw_map=$(curl -s -k -L -A "$map_ua" "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|html|py)' | sort -u)
+    local raw_map=$(curl -s -k -L -A "$map_ua" "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|pdf|docx|xlsx|txt|zip|rar|sql|env|log)' | sort -u)
     
-    # Рекурсия: заходим в найденные страницы для поиска скрытых ссылок
-    local extended_map="$raw_map"
-    for link in $(echo "$raw_map" | head -n 5); do
-        local sub=$(curl -s -k -L -A "$map_ua" --max-time 3 "https://$host/$link" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|html|py)' | sort -u)
-        extended_map=$(echo -e "$extended_map\n$sub" | sort -u)
+    # --- СЛОЙ 2: SMART FUZZING & SECURITY FILES ---
+    local target_dirs=("" "uploads" "backup" "docs" "files" "temp" "admin" "db" ".git")
+    local file_masks=("config" "backup" "data" "db" "users" "report" "salary" "test" "old" "dump")
+    local extensions=("php.bak" "sql" "zip" "rar" "pdf" "xlsx" "env")
+    
+    # Специфические файлы безопасности
+    local sec_files=(".htaccess" ".htpasswd" "robots.txt" "phpinfo.php" ".user.ini")
+
+    core_engine_ui "i" "Probing hidden layers and security configurations..."
+
+    local scan_queue=$(echo -e "$raw_map")
+    
+    # Добавляем комбинации масок
+    for dir in "${target_dirs[@]}"; do
+        # Проверка на Directory Listing (запрос к самой папке)
+        [[ -n "$dir" ]] && scan_queue+="\n${dir}/"
+        
+        for mask in "${file_masks[@]}"; do
+            for ext in "${extensions[@]}"; do
+                scan_queue+="\n${dir}${dir:+/}${mask}.${ext}"
+            done
+        done
+        # Добавляем sec_files в каждую директорию
+        for sec in "${sec_files[@]}"; do
+            scan_queue+="\n${dir}${dir:+/}${sec}"
+        done
     done
 
-    local discovered_files=$(echo "$extended_map" | sort -u | head -n 40)
-    [[ -z "$discovered_files" ]] && discovered_files=("index.php" "index.html" "api.py")
+    local unique_queue=$(echo -e "$scan_queue" | sort -u)
 
-    local shadow_ext=(".bak" ".old" ".save" ".txt" ".swp" ".zip" "~")
-
-    for file_path in $discovered_files; do
+    for target in $unique_queue; do
         local current_ua="${ua_list[$RANDOM % 2]}"
-        
-        # 1. Анализ доступа и Session Bypass (Heuristics)
-        local status=$(curl -Is -k -L -w "%{http_code}" -A "$current_ua" \
-            -e "https://www.google.com/search?q=$host" \
-            --connect-timeout 4 "https://$host/$file_path")
+        local status=$(curl -Is -k -L -w "%{http_code}" -A "$current_ua" --connect-timeout 3 "https://$host/$target")
 
         if [[ "$status" == "200" ]]; then
-            local body=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$file_path" | head -c 2000)
+            local body_sample=$(curl -s -k -L -A "$current_ua" --max-time 3 "https://$host/$target" | head -c 1200)
             
-            if ! echo "$body" | grep -qiE "InfinityFree|403 Forbidden|Suspended|<html>"; then
+            if ! echo "$body_sample" | grep -qiE "InfinityFree|403 Forbidden|<html>|Suspended"; then
                 
-                # Детекция открытой логики (PHP/Python)
-                if echo "$body" | grep -qiE "class |def |function |import |public function|<?php"; then
-                    echo -e "${R}[CRITICAL] SOURCE/LOGIC EXPOSED:${NC} /$file_path"
-                    vuln_links+="${R}[LOGIC_GATE]${NC} https://$host/$file_path\n"
+                # КАТЕГОРИЗАЦИЯ
+                if [[ "$target" == *".htaccess"* ]]; then
+                    echo -e "${R}[CRITICAL] SERVER CONFIG EXPOSED:${NC} /$target"
+                    vuln_links+="${R}[HTACCESS]${NC} https://$host/$target\n"
                 
-                # Детекция обхода сессии в админках
-                elif echo "$body" | grep -qiE "logout|dashboard|settings|admin|profile|edit|user_id"; then
-                    echo -e "${Y}[BYPASS] SESSION RISK:${NC} /$file_path (Private UI exposed!)"
-                    vuln_links+="${Y}[SESSION_BYPASS]${NC} https://$host/$file_path\n"
+                elif echo "$body_sample" | grep -qiE "Index of /|NameLast modifiedSize"; then
+                    echo -e "${R}[VULN] DIRECTORY LISTING:${NC} /$target"
+                    vuln_links+="${R}[DIR_LIST]${NC} https://$host/$target\n"
+
+                elif echo "$target" | grep -qiE "\.(sql|env|zip|rar|php\.bak)$"; then
+                    echo -e "${R}[ARTIFACT]${NC} /$target"
+                    vuln_links+="${R}[DB/BACKUP]${NC} https://$host/$target\n"
+                
+                elif echo "$target" | grep -qiE "\.(pdf|docx|xlsx)$"; then
+                    echo -e "${G}[DOC]${NC} /$target"
+                    vuln_links+="${G}[DOC]${NC} https://$host/$target\n"
+                
+                elif echo "$target" | grep -q "\.php"; then
+                    if echo "$body_sample" | grep -qiE "class |function |logout|admin|settings"; then
+                        echo -e "${Y}[LOGIC]${NC} /$target"
+                        vuln_links+="${Y}[LOGIC]${NC} https://$host/$target\n"
+                    fi
                 fi
+                echo "[HIT] $target" >> "$audit_log"
             fi
-        fi
-
-        # 2. Теневые копии (Deep Shadow Scan)
-        for ext in "${shadow_ext[@]}"; do
-            local shadow_target="${file_path}${ext}"
-            local shadow_content=$(curl -s -k -L -A "$current_ua" --max-time 4 "https://$host/$shadow_target" | head -c 2000)
-            
-            if [[ -n "$shadow_content" ]] && ! echo "$shadow_content" | grep -qiE "404 Not Found|InfinityFree|403 Forbidden|<html>"; then
-                echo -e "${G}[REAL HIT]${NC} /$shadow_target"
-                
-                local info=""
-                # Анализ Python-специфичных утечек
-                [[ "$shadow_content" == *"import "* ]] && info=" (Python Source)"
-                [[ "$shadow_content" == *"mysqli_"* ]] && info=" (PHP MySQLi)"
-                
-                # Поиск секретов
-                if echo "$shadow_content" | grep -qE "DB_PASSWORD|password|'root'|SECRET_KEY|API_KEY|token"; then
-                    info+=" [!!! CREDENTIALS FOUND !!!]"
-                fi
-
-                vuln_links+="${Y}[SOURCE_LEAK]${NC} https://$host/$shadow_target $info\n"
-                echo "[SOURCE_LEAK] $shadow_target $info" >> "$audit_log"
-            fi
-        done
-        sleep $(( (RANDOM % 2) + 1 ))
-    done
-
-    # --- СЛОЙ 2: АРТЕФАКТЫ ОКРУЖЕНИЯ ---
-    local db_env=(".env" "backup.sql" "config.php.bak" ".git/config" "requirements.txt" "app.py.old")
-    for art in "${db_env[@]}"; do
-        local art_data=$(curl -s -k -L -A "${ua_list[0]}" --max-time 3 "https://$host/$art" | head -c 1000)
-        if [[ -n "$art_data" ]] && ! echo "$art_data" | grep -qiE "InfinityFree|403 Forbidden|<html>|404 Not Found"; then
-            echo -e "${R}[!] DEEP ARTIFACT:${NC} /$art"
-            vuln_links+="${R}[DB_FILE]${NC} https://$host/$art\n"
         fi
     done
 
     # --- ИТОГ ---
     core_engine_ui "line"
-    echo -e "${Y}>>> OMEGA V3.4: SPIDER SENSE REPORT <<<${NC}"
+    echo -e "${Y}>>> OMEGA V3.6: SECURITY INSIGHT REPORT <<<${NC}"
     if [[ -n "$vuln_links" ]]; then
-        echo -e "$vuln_links"
+        echo -e "$vuln_links" | sort -u
     else
-        echo -e "${G}Audit finished. No leaks detected in PHP/HTML/Python stack.${NC}"
+        echo -e "${G}No exposed configs or leaks detected.${NC}"
     fi
     core_engine_ui "line"
-
-    core_engine_loot "audit" "Deep spider audit for $host finished."
+    core_engine_loot "audit" "Security audit for $host finished."
     core_engine_wait
 }
-
 
 run_view_loot() {
     # Слой 1: Заголовок через Голос [1]
