@@ -336,16 +336,75 @@ core_engine_loot() {
 
 
 # Настройка DNS для локальных сервисов (например, scanclamavlocal)
-if command -v dnsmasq >/dev/null 2>&1; then
-    cat << EOD > /etc/dnsmasq.conf
+core_network_dns_sync() {
+    core_engine_ui "i" "Syncing Network DNS Layer..."
+
+    # Проверка зависимостей
+    if ! command -v dnsmasq >/dev/null 2>&1; then
+        core_engine_ui "!" "dnsmasq не найден. DNS-адаптация пропущена."
+        return 1
+    fi
+
+    # 1. ЭВРИСТИКА: Поиск лучшего активного IP
+    # Берем IP самого активного интерфейса (исключая docker и loopback)
+    local active_ip=$(ip -4 addr show | grep -vE '127.0.0.1|docker' | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
+    
+    # Если IP не найден, откатываемся на localhost
+    [[ -z "$active_ip" ]] && active_ip="127.0.0.1"
+
+    # 2. АДАПТИВНОСТЬ: Сбор имен для регистрации
+    # Мы можем регистрировать не только статику, но и имя хоста машины
+    local hostname=$(hostname)
+    local dns_conf="/etc/dnsmasq.conf"
+    
+    core_engine_ui "i" "Binding DNS to IP: $active_ip"
+
+    # 3. ГЕНЕРАЦИЯ (Smart Config)
+    # Используем временный файл, чтобы не убить рабочий конфиг раньше времени
+    local tmp_dns=$(mktemp)
+    
+    cat << EOD > "$tmp_dns"
+# --- Core Prime DNS Configuration ---
 domain-needed
 bogus-priv
 interface=lo
 interface=wlan0
-address=/scanclamavlocal/$CURRENT_IP
+interface=eth0
+bind-dynamic
+local-ttl=60
+cache-size=1500
+
+# Динамические локальные домены
+address=/scanclamavlocal/$active_ip
+address=/$hostname.local/$active_ip
+address=/prime.portal/$active_ip
+address=/audit.local/$active_ip
+
+# Ускорение для upstream (используем Cloudflare как резерв)
+server=1.1.1.1
+server=8.8.8.8
 EOD
-    service dnsmasq restart 2>/dev/null || (killall dnsmasq 2>/dev/null && dnsmasq -C /etc/dnsmasq.conf 2>/dev/null)
-fi
+
+    # 4. ВАЛИДАЦИЯ И ПРИМЕНЕНИЕ
+    if dnsmasq --test -C "$tmp_dns" >/dev/null 2>&1; then
+        cp "$tmp_dns" "$dns_conf"
+        
+        # Умный перезапуск
+        if service dnsmasq restart 2>/dev/null; then
+            core_engine_ui "+" "DNS Sync Complete: http://$hostname.local"
+        else
+            killall dnsmasq 2>/dev/null
+            dnsmasq -C "$dns_conf" && core_engine_ui "+" "DNS Engine Restarted (Manual)"
+        fi
+    else
+        core_engine_ui "!" "Критическая ошибка в конфигурации DNS. Откат."
+        rm -f "$tmp_dns"
+        return 1
+    fi
+
+    rm -f "$tmp_dns"
+    return 0
+}
 
 core_engine_info() {
     # Слой 1: Метрики без AWK (используем встроенные средства и быстрый cut)
@@ -2441,67 +2500,61 @@ run_live_service() {
     local service_type="$1"
     local port="${2:-8080}"
     local log_file="$HOME/prime_node.log"
+    local cert_file="$HOME/prime_node.pem"
+    local protocol="http"
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
-    # --- 1. ЗАВИСИМОСТИ ---
-    if ! command -v lsof >/dev/null 2>&1; then
-        core_engine_ui "w" "Installing lsof..."
-        pkg install lsof -y >/dev/null 2>&1
+    # --- 1. АДАПТИВНЫЙ DNS & IP ---
+    # Вызываем синхронизацию (она сама найдет лучший IP и обновит dnsmasq)
+    core_network_dns_sync || core_engine_ui "w" "DNS Sync bypassed, using raw IP."
+    
+    # Эвристика имени: выбираем домен на основе типа сервиса
+    local service_name="prime.portal"
+    [[ "$service_type" == "av" ]] && service_name="scanclamavlocal"
+
+    # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
+    if command -v openssl >/dev/null 2>&1; then
+        if [[ ! -f "$cert_file" ]]; then
+            core_engine_ui "i" "Generating ephemeral SSL for $service_name..."
+            openssl req -x509 -newkey rsa:2048 -keyout "$cert_file" -out "$cert_file" -days 1 -nodes -subj "/CN=$service_name" >/dev/null 2>&1
+        fi
+        [[ -f "$cert_file" ]] && protocol="https" && export PRIME_CERT="$cert_file"
     fi
 
-    # --- 2. ГАРАНТИРОВАННАЯ ОЧИСТКА (Фикс Address already in use) ---
-    core_engine_ui "i" "Clearing port $port and prepping memory..."
-    
-    # Пытаемся всеми способами прибить старый Flask
+    # --- 3. ГАРАНТИРОВАННАЯ ОЧИСТКА ---
+    core_engine_ui "i" "Sanitizing port $port..."
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
-    pkill -9 -f "python3" >/dev/null 2>&1 # Жестко, но для Termux надежно
-    
-    local pid=$(lsof -t -i:"$port")
-    if [[ -n "$pid" ]]; then
-        kill -9 $pid >/dev/null 2>&1
-    fi
-    
-    # Даем Android время реально закрыть сокет
-    sleep 1.5 
+    pkill -9 -f "python3" >/dev/null 2>&1
+    sleep 1.2
 
-    # --- 3. ЗАПУСК (С проверкой генератора) ---
+    # --- 4. SMART IGNITION (Запуск через пайп) ---
     local code_gen_func="generate_${service_type}_server_code_raw"
     if ! command -v "$code_gen_func" >/dev/null; then
-        core_engine_ui "e" "Generator $code_gen_func missing."
-        core_engine_wait
-        return
+        core_engine_ui "e" "Fatal: $code_gen_func not found."
+        core_engine_wait; return
     fi
 
-    core_engine_ui "w" "Igniting engine on port $port..."
+    core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
     export PRIME_LOOT PRIME_SHARE
     
-    # Запуск без следов на диске через пайп
+    # Адаптивный запуск: Python подхватит PRIME_CERT, если он экспортирован
     "$code_gen_func" | python3 - > "$log_file" 2>&1 &
     
-    # Тот самый фикс "лестницы" (убедись, что core_engine_progress обновлен)
-    core_engine_progress 2 "SOCKET_STABILIZATION"
+    core_engine_progress 2 "NODE_STABILIZATION"
 
-    # --- 4. ДИАГНОСТИКА ---
+    # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
-        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1 2>/dev/null || echo "127.0.0.1")
-        core_engine_ui "s" "SERVICE ONLINE: http://$ip_addr:$port"
-        core_engine_loot "service" "${service_type^^} node started on port $port"
+        local final_url="$protocol://$service_name:$port"
+        core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
+        
+        # Авто-регистрация в луте
+        core_engine_loot "node_startup" "Service ${service_type} deployed at $final_url"
     else
-        core_engine_ui "e" "IGNITION FAILED: Port $port remains dark."
-        
-        # Проверка блокировщика
-        local blocker=$(lsof -i :"$port" | awk 'NR==2 {print $1" (PID: "$2")"}')
-        
-        if [[ -n "$blocker" ]]; then
-            core_engine_ui "e" "CONFLICT: Port $port still held by $blocker"
-            echo -e "${Y}[!] SUGGESTION:${NC} Type 'pkill python3' manually."
-        else
-            core_engine_ui "e" "PYTHON CRASH DETECTED. Check logs:"
-            core_engine_ui "line" ""
-            [[ -f "$log_file" ]] && cat "$log_file" || echo -e "${R}No log data.${NC}"
-            core_engine_ui "line" ""
-        fi
+        core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
+        core_engine_ui "line"
+        [[ -f "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty."
+        core_engine_ui "line"
     fi
 
     core_engine_wait
@@ -3341,8 +3394,8 @@ menu_intelligence() {
 
 menu_system_core() {
     core_engine_ui "h" "SYSTEM CORE: MAINTENANCE & INFO"
-    local names="System_Info Update_OS Update_Launcher Clean_Logs System_Pulse"
-    local funcs="run_system_info run_sys_update run_update_prime run_logs_cleaner run_system_pulse"
+    local names="System_Info Sync_DNS Update_OS Update_Launcher Clean_Logs System_Pulse"
+    local funcs="run_system_info core_network_dns_sync run_sys_update run_update_prime run_logs_cleaner run_system_pulse"
     prime_dynamic_controller "SYSTEM_CORE" "$names" "$funcs"
 }
 
