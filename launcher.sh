@@ -392,8 +392,7 @@ prime_dynamic_controller() {
             local idx=$((choice-1))
             core_engine_progress 1 "${labels[$idx]}"
             # Выполнение действия
-            ${actions[$idx]}
-            # УДАЛЕНО: core_engine_wait (пауза теперь зависит только от вызываемой функции)
+            ${actions[$idx]}        
         else
             core_engine_ui "e" "Invalid selection"
             sleep 1
