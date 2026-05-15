@@ -226,31 +226,43 @@ core_engine_validator() {
     local label="$3"
     local extra="$4"
     local failed=0
+    local err_msg=""
 
     case "$type" in
         "root")
-            [[ $EUID -ne 0 ]] && failed=1
-            local err_msg="Требуются привилегии ROOT (sudo)"
+            [[ $EUID -ne 0 ]] && { failed=1; err_msg="Требуются привилегии ROOT (sudo)"; }
             ;;
             
         "pkg")
-            # Эвристика: если команда отсутствует, пробуем установить
             if ! command -v "$target" >/dev/null 2>&1; then
-                core_engine_ui "?Компонент [$target] не найден. Установка..."
+                core_engine_ui "?Компонент [$target] не найден. Попытка авто-установки..."
                 if core_engine_run apt-get install -y "$target"; then
-                    core_engine_ui "+[$target] установлен"
+                    core_engine_ui "+[$target] успешно интегрирован"
                     return 0
                 else
-                    failed=1
-                    local err_msg="Не удалось установить пакет [$target]"
+                    failed=1; err_msg="Критический сбой: пакет [$target] недоступен в репозиториях"
                 fi
+            fi
+            ;;
+
+        "url"|"host")
+            # Валидация домена или IP (чтобы не запускать скан на пустые строки)
+            if [[ ! "$target" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,6}$ ]] && \
+               [[ ! "$target" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+                failed=1; err_msg="Некорректный формат хоста/домена [$target]"
+            fi
+            ;;
+
+        "net_up")
+            # Проверка живой ли хост перед тем как тратить время на скан
+            if ! ping -c 1 -W 2 "$target" >/dev/null 2>&1; then
+                failed=1; err_msg="Цель [$target] не отвечает на ICMP (Offline/WAF)"
             fi
             ;;
 
         "file"|"read")
             if [[ ! -f "$target" ]]; then
-                failed=1
-                local err_msg="Файл [$target] не найден"
+                failed=1; err_msg="Файл [$target] отсутствует"
             elif [[ "$type" == "read" ]]; then
                 cat "$target"
                 return 0
@@ -260,35 +272,38 @@ core_engine_validator() {
         "dir")
             if [[ ! -d "$target" ]]; then
                 if core_engine_run mkdir -p "$target"; then
-                    core_engine_ui "+Создана директория: $target"
+                    core_engine_ui "+Системная директория готова: $target"
                     return 0
                 else
-                    failed=1
-                    local err_msg="Не удалось создать директорию [$target]"
+                    failed=1; err_msg="Ошибка доступа к ФС: не удалось создать [$target]"
                 fi
             fi
             ;;
 
         "range")
             if [[ ! "$target" =~ ^[0-9]+$ ]] || (( target < 1 || target > extra )); then
-                failed=1
-                local err_msg="Значение [$target] вне диапазона (1-$extra)"
+                failed=1; err_msg="Значение [$target] вне допустимых границ (1-$extra)"
+            fi
+            ;;
+
+        "entropy")
+            # Проверка на "мусорный" ввод (защита от случайных нажатий)
+            if [[ ${#target} -lt 3 ]]; then
+                failed=1; err_msg="Слишком короткое значение для [$label]"
             fi
             ;;
 
         "list"|"empty")
-            [[ -z "${target// }" ]] && failed=1
-            local err_msg="Данные [$label] отсутствуют или пусты"
+            [[ -z "${target// }" ]] && { failed=1; err_msg="Поле [$label] не может быть пустым"; }
             ;;
     esac
 
     if [[ $failed -eq 1 ]]; then
-        core_engine_ui "!ОШИБКА: $label -> $err_msg"
+        core_engine_ui "!КРИТИЧЕСКАЯ ОШИБКА: $label -> $err_msg"
         return 1
     fi
     return 0
 }
-
 
 # --- CORE ENGINE: LOOT COLLECTOR v1.2 (Session Logger) ---
 core_engine_loot() {
