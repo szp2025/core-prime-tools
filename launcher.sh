@@ -182,6 +182,7 @@ core_engine_wait() {
 }
 
 
+
 core_engine_control() {
     local status=$?
     local mode="$1"      
@@ -288,6 +289,25 @@ core_engine_validator() {
     return 0
 }
 
+
+# --- CORE ENGINE: LOOT COLLECTOR v1.2 (Session Logger) ---
+core_engine_loot() {
+    local category="${1:-SYSTEM}" # Категория: service, scan, exploit
+    local message="$2"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    local loot_file="$PRIME_LOOT/session_loot.log"
+
+    # Создаем папку, если её нет (универсально для Root/Non-Root)
+    mkdir -p "$PRIME_LOOT" 2>/dev/null
+
+    # Форматируем запись для файла
+    echo "[$timestamp] [$category] $message" >> "$loot_file"
+
+    # Если это запуск сервиса, дублируем в UI для красоты
+    if [[ "$category" == "service" ]]; then
+        core_engine_ui "i" "Event logged to loot sector."
+    fi
+}
 
 
 #Настройки 
@@ -449,6 +469,47 @@ core_engine_mutate() {
     done
 
     echo -n "${output%?}"
+}
+
+
+# --- INTELLIGENCE: DEEP RECON v1.4 ---
+core_intelligence_gather() {
+    local r_target="$1"
+    core_engine_ui "i" "Deep scanning: $r_target"
+
+    # 1. WHOIS Данные (Регистратор и Владелец)
+    local whois_info=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Admin City:|Country:|Expires:" | head -n 6)
+    [[ -z "$whois_info" ]] && whois_info="WHOIS: Data Protected"
+
+    # 2. HTTP HEADERS (Версия PHP, Server, OS)
+    # --connect-timeout 5 чтобы не зависнуть на мертвом хосте
+    local headers=$(curl -Is --connect-timeout 5 "http://$r_target" 2>/dev/null)
+    
+    # Извлекаем версию PHP (X-Powered-By)
+    local php_ver=$(echo "$headers" | grep -i "X-Powered-By:" | awk '{print $2}' | tr -d '\r')
+    [[ -z "$php_ver" ]] && php_ver="PHP: Hidden/Unknown"
+
+    # Извлекаем ПО сервера (Apache, Nginx, и их версии)
+    local srv_ver=$(echo "$headers" | grep -i "Server:" | cut -d' ' -f2- | tr -d '\r')
+    [[ -z "$srv_ver" ]] && srv_ver="Server: Undetected"
+
+    # 3. IP RESOLUTION
+    local target_ip=$(dig +short "$r_target" | tail -n1)
+    [[ -z "$target_ip" ]] && target_ip=$(host "$r_target" | awk '/has address/ { print $4 }' | head -n1)
+
+    # ВЫВОД В UI
+    core_engine_ui "line"
+    echo -e "${G}>>> TARGET ARCHITECTURE <<<${NC}"
+    echo -e "${B}IP ADDR:${NC} $target_ip"
+    echo -e "${B}ENGINE:${NC}  $srv_ver"
+    echo -e "${B}RUNTIME:${NC} $php_ver"
+    core_engine_ui "line"
+    echo -e "${G}>>> REGISTRY DATA <<<${NC}"
+    echo "$whois_info"
+    core_engine_ui "line"
+
+    # Сохраняем в лог (Loot)
+    core_engine_loot "intelligence" "Recon finished for $r_target. IP: $target_ip, PHP: $php_ver"
 }
 
 
@@ -1230,82 +1291,77 @@ generate_poly_payload() {
 
 
 run_system_info() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "PRIME INTELLIGENCE & RECON v2.1"
+    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v2.5"
 
-    # Слой 2: Выбор цели через Архитектора [2] и Органы чувств [3]
-    core_engine_item "1" "LOCAL" "Internal Node & USB Status"
-    core_engine_item "2" "REMOTE" "External Server/Site Recon"
+    core_engine_item "1" "LOCAL" "System, USB, Cron & Webhooks"
+    core_engine_item "2" "REMOTE" "Deep Recon & Webhook Discovery"
     core_engine_item "B" "BACK" "Return to Main Menu"
     
-    local choice=$(core_engine_input "select" "Select Intelligence Target")
+    local choice=$(core_engine_input "select" "Target Type")
     [[ -z "$choice" || "$choice" == "b" ]] && return
 
     case "$choice" in
         "1") # --- LOCAL ---
-            core_engine_ui "Gathering Local Intelligence..."
+            core_engine_ui "i" "Analyzing Local Services..."
             
-            # Используем Мозг [5] для проверки инструментов
-            local kernel=$(uname -rs)
-            local uptime=$(uptime -p)
-            # Берем IP из готового узла Метрик [12] или напрямую
-            local internal_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo "N/A")
+            # Проверка локальных слушателей (кто может принимать вебхуки)
+            local listeners=$(lsof -nP -iTCP -sTCP:LISTEN | grep -E "python|node|php" || echo "No local web-listeners active.")
             
-            local usb_devices
-            if core_engine_validator "pkg" "usbutils" "lsusb" 2>/dev/null; then
-                usb_devices=$(lsusb)
-            else
-                usb_devices=$(find /sys/bus/usb/devices/ -maxdepth 2 -name "product" -exec cat {} + 2>/dev/null | sed 's/^/Device: /')
-            fi
-            [[ -z "$usb_devices" ]] && usb_devices="No active USB connections detected."
-
-            echo -e "\n${Y}--- LOCAL NODE REPORT ---${NC}"
-            echo -e "${B}System Core:${NC}\n  Kernel: $kernel\n  Uptime: $uptime\n  Priv IP: $internal_ip"
-            echo -e "${B}USB Bus Scan:${NC}\n$usb_devices"
+            echo -e "\n${Y}--- LOCAL EVENT LISTENERS ---${NC}"
+            echo -e "${W}$listeners${NC}"
             ;;
 
         "2") # --- REMOTE ---
-            # Проверка зависимостей через Мозг [5]
-            core_engine_validator "pkg" "curl" "curl" || { core_engine_wait; return; }
+            core_engine_validator "pkg" "curl" "curl" || return
             
-            local r_target=$(core_engine_input "text" "Enter Target Domain or IP (e.g., google.com)")
+            local r_target=$(core_engine_input "text" "Enter Target (domain.com)")
             [[ -z "$r_target" ]] && return
 
-            core_engine_ui "w" "Executing Deep Reconnaissance..."
+            core_engine_ui "w" "Executing Multi-Vector Reconnaissance..."
+            core_engine_progress 2 "SCANNING_RESOURCES"
+
+            # 1. Сбор базовых данных
+            local headers=$(curl -Is --connect-timeout 5 -L "$r_target" 2>/dev/null)
+            local php_ver=$(echo "$headers" | grep -Ei "X-Powered-By" | cut -d' ' -f2- | tr -d '\r')
             
-            # 1. Заголовки (Глушитель [7] для тишины)
-            local raw_headers=$(curl -Is --connect-timeout 5 "$r_target" 2>/dev/null)
+            # 2. ПОИСК WEBHOOKS & API (Fuzzing)
+            core_engine_ui "i" "Probing for Webhook & API endpoints..."
+            local webhook_hits=""
+            # Список эндпоинтов, которые часто остаются открытыми
+            local hooks=("webhook" "webhooks" "api/v1" "api/v2" "hooks" "tg-hook.php" "stripe-webhook" "git-hook")
             
-            # 2. Поиск стека (Server, PHP, Frameworks)
-            local server_stack=$(echo "$raw_headers" | grep -Ei "Server|X-Powered-By|Via|X-AspNet-Version" || echo "Server Info: Hidden/Hardened")
+            for hook in "${hooks[@]}"; do
+                local code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout 2 "http://$r_target/$hook")
+                if [[ "$code" == "200" || "$code" == "405" || "$code" == "401" ]]; then
+                    # 405 (Method Not Allowed) часто означает, что хук ждет POST запрос — это "живая" цель!
+                    webhook_hits+="${G}[!] DETECTED:${NC} /$hook (Status: $code)\n"
+                fi
+            done
             
-            # 3. Технологические улики (Нейро-мутация [4] не нужна, работаем через grep)
-            local tech_hints=""
-            [[ "$raw_headers" == *"PHPSESSID"* ]] && tech_hints+="[!] PHP Session Detected (PHPSESSID)\n"
-            [[ "$raw_headers" == *"Laravel"* ]] && tech_hints+="[!] Framework: Laravel Detected\n"
-            # Быстрая проверка на WP без повторного тяжелого запроса, если возможно
-            if echo "$raw_headers" | grep -qi "wp-content"; then
-                tech_hints+="[!] CMS: WordPress Detected\n"
+            # 3. WHOIS & IP
+            local target_ip=$(host "$r_target" 2>/dev/null | awk '/has address/ {print $4}' | head -n1)
+
+            # --- ВЫВОД ---
+            echo -e "\n${Y}--- REMOTE INTELLIGENCE REPORT ---${NC}"
+            echo -e "${B}Target IP:${NC} $target_ip"
+            echo -e "${B}Runtime:${NC}   ${G}${php_ver:-Unknown}${NC}"
+            
+            echo -e "\n${B}Webhook & API Surface:${NC}"
+            if [[ -n "$webhook_hits" ]]; then
+                echo -e "$webhook_hits"
+                echo -e "${Y}[*] Analysis:${NC} Active listeners found. Possible third-party integration detected."
+            else
+                echo -e "${R}No common webhook endpoints detected.${NC}"
             fi
             
-            # 4. DNS & WHOIS (через Глушитель)
-            local ip_map=$(host "$r_target" 2>/dev/null | head -n 3 || echo "DNS Lookup: Failed")
-            local owner=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Country:|Expires:" | head -n 5 || echo "WHOIS: Protected/Unavailable")
-
-            echo -e "\n${Y}--- REMOTE TARGET REPORT: $r_target ---${NC}"
-            echo -e "${B}Network Mapping:${NC}\n$ip_map"
-            echo -e "${B}Server Stack:${NC}\n$server_stack"
-            [[ -n "$tech_hints" ]] && echo -e "${B}Technology Hints:${NC}\n$(echo -e "$tech_hints")"
-            echo -e "${B}Intelligence Context:${NC}\n$owner"
-
-            # Сбор трофеев [11]
-            core_engine_loot "recon" "Deep Recon executed: $r_target"
+            core_engine_loot "recon" "Webhook scan for $r_target finished."
             ;;
     esac
 
     core_engine_ui "+" "Diagnostic complete."
     core_engine_wait
 }
+
 
 
 # --- Анализ Bluetooth устройств ---
@@ -1357,8 +1413,6 @@ run_bluetooth_scan() {
     
     core_engine_wait
 }
-
-
 
 
 # --- Глубокий аудит системы ---
