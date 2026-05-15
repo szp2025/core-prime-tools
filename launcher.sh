@@ -11,8 +11,37 @@ SILENT="> /dev/null 2>&1"
 # Использование:
 command -v curl eval $SILENT
 
-BASE_DIR="/root/core-prime-tools"
+# --- CORE PATH INITIALIZATION ---
+# Сначала определяем, где мы находимся
+if [[ -n "$TERMUX_VERSION" ]]; then
+    # Среда: Termux (Android)
+    BASE_DIR="$HOME/core-prime-tools"
+    PRIME_LOOT="$HOME/prime_loot"
+    PRIME_SHARE="$HOME/prime_share"
+    # Расширяем PATH для бинарников Termux
+    PATH="$PATH:/data/data/com.termux/files/usr/bin"
+else
+    # Среда: Стандартный Linux
+    # Проверяем, есть ли права root, чтобы решить, куда писать
+    if [[ $EUID -eq 0 ]]; then
+        BASE_DIR="/root/core-prime-tools"
+        PRIME_LOOT="/root/prime_loot"
+        PRIME_SHARE="/root/prime_share"
+    else
+        BASE_DIR="$HOME/core-prime-tools"
+        PRIME_LOOT="$HOME/prime_loot"
+        PRIME_SHARE="$HOME/prime_share"
+    fi
+fi
+
+# Вторичные директории
 MOD_DIR="$BASE_DIR/modules"
+
+# Создание инфраструктуры (без ошибок доступа)
+mkdir -p "$BASE_DIR" "$MOD_DIR" "$PRIME_LOOT" "$PRIME_SHARE" 2>/dev/null
+
+export BASE_DIR MOD_DIR PRIME_LOOT PRIME_SHARE
+
 
 
 # ==========================================
@@ -2235,49 +2264,72 @@ run_live_service() {
     local service_type="$1"
     local port="${2:-8080}"
     
+    # Адаптация лог-файла под среду
+    local log_file="$HOME/prime_node.log"
+    [[ ! -d "$HOME" ]] && log_file="/tmp/prime_node.log"
+
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
     # --- 1. ПРОВЕРКА ЗАВИСИМОСТЕЙ ---
     if ! command -v lsof >/dev/null 2>&1; then
         core_engine_ui "w" "Installing lsof..."
-        pkg install lsof -y >/dev/null 2>&1
+        pkg install lsof -y >/dev/null 2>&1 || sudo apt-get install lsof -y >/dev/null 2>&1
     fi
 
-    # --- 2. САНИТАР (ЖЕСТКАЯ ОЧИСТКА) ---
+    # --- 2. УНИВЕРСАЛЬНЫЙ САНИТАР (Root & Non-Root) ---
     core_engine_ui "i" "Clearing port $port and prepping memory..."
-    # Убиваем процессы максимально жестко через SIGKILL (-9)
+    
+    # Метод A: fuser (для Root/Linux)
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
-    sleep 1 # Даем ядру время освободить сокет
+    
+    # Метод B: lsof + kill (для Termux без Root)
+    local pid=$(lsof -t -i:"$port")
+    if [[ -n "$pid" ]]; then
+        kill -9 $pid >/dev/null 2>&1
+    fi
+    sleep 1 
 
     # --- 3. ЗАПУСК ДВИЖКА ---
     local code_gen_func="generate_${service_type}_server_code_raw"
-    core_engine_ui "w" "Igniting engine on port $port..."
     
-    # Запуск с перенаправлением ошибок в лог
-    "$code_gen_func" | python3 - > /tmp/prime_node.log 2>&1 &
+    if ! command -v "$code_gen_func" >/dev/null; then
+        core_engine_ui "e" "Generator $code_gen_func not found."
+        core_engine_wait
+        return
+    fi
+
+    core_engine_ui "w" "Igniting engine on port $port [STEALTH_MODE]"
+    
+    # Запуск: Передаем переменные окружения (PRIME_LOOT/SHARE) в Python
+    export PRIME_LOOT PRIME_SHARE
+    "$code_gen_func" | python3 - > "$log_file" 2>&1 &
     
     core_engine_progress 2 "SOCKET_STABILIZATION"
 
     # --- 4. ГЛУБОКАЯ ДИАГНОСТИКА ---
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
-        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
+        local ip_addr=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1 2>/dev/null || echo "127.0.0.1")
         core_engine_ui "s" "SERVICE ONLINE: http://$ip_addr:$port"
         core_engine_loot "service" "${service_type^^} node started on port $port"
     else
         core_engine_ui "e" "IGNITION FAILED: Port $port remains dark."
         
-        # Выясняем, кто мешает
+        # Проверка блокировщика
         local blocker=$(lsof -i :"$port" | awk 'NR==2 {print $1" (PID: "$2")"}')
         
         if [[ -n "$blocker" ]]; then
             core_engine_ui "e" "CONFLICT: Port $port is held by $blocker"
-            echo -e "${Y}[!] SUGGESTION:${NC} Run 'fuser -k -n tcp $port' manually."
+            echo -e "${Y}[!] SUGGESTION:${NC} Restart Termux or run 'pkill python3'."
         else
-            # Если порт пуст, значит упал сам Python
-            core_engine_ui "e" "PYTHON CRASH DETECTED. Check logs below:"
+            # Если порт пуст — смотрим логи
+            core_engine_ui "e" "PYTHON CRASH DETECTED. Execution log:"
             core_engine_ui "line" ""
-            if [[ -f /tmp/prime_node.log ]]; then
-                cat /tmp/prime_node.log
+            if [[ -f "$log_file" ]]; then
+                cat "$log_file"
+                # Если лог пустой, возможно не установлен Flask
+                if [[ ! -s "$log_file" ]]; then
+                    echo -e "${W}Log is empty. Possible missing dependency: ${B}Flask${NC}"
+                fi
             else
                 echo -e "${R}Critical: Log file missing.${NC}"
             fi
@@ -2287,6 +2339,8 @@ run_live_service() {
 
     core_engine_wait
 }
+
+
 run_av_server() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "PRIME SECURITY HUB: CLAMAV GATEWAY"
