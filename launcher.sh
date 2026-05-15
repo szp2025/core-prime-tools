@@ -3639,23 +3639,56 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: Эвристический не детектируемый краулер контактов и связей Facebook.
+# @description: Эвристический не детектируемый краулер с функцией раскрытия коротких ссылок share/.
 # ==============================================================================
 run_osint_facebook_crawler() {
     core_engine_ui "h" "NEXUS CORE: STEALTH HEURISTIC FACEBOOK CRAWLER"
-    echo -n " [?] Введите целевой Никнейм (Username) для анализа: "
-    read -r target_user
+    echo -n " [?] Введите Никнейм или ссылку (например, facebook.com/share/...): "
+    read -r user_input
 
-    if [[ -z "$target_user" ]]; then
+    if [[ -z "$user_input" ]]; then
         core_engine_ui "e" "Критерий поиска пуст. Отмена сессии."
         core_engine_wait
         return 1
     fi
 
-    # Стерилизация входных данных
-    target_user="${target_user//@/}"
-    target_user="${target_user// /}"
+    local target_user=""
 
+    # --- БЛОК ИНТЕЛЛЕКТУАЛЬНОГО РАЗВЕРТЫВАНИЯ ССЫЛОК (URL RESOLVER) ---
+    if [[ "$user_input" =~ "facebook.com/share/" || "$user_input" =~ "fb.watch" ]]; then
+        core_engine_ui "i" "Обнаружена короткая ссылка. Запуск тихого перехвата редиректа..."
+        
+        # Отправляем HEAD-запрос для получения заголовков ответа без скачивания тела страницы
+        local resolved_url
+        resolved_url=$(curl -s -I -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 6 "$user_input" | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
+        
+        if [[ -n "$resolved_url" ]]; then
+            core_engine_ui "s" "[+] Ссылка успешно раскрыта: $resolved_url"
+            
+            # Эвристическое извлечение никнейма или ID из раскрытого URL
+            if [[ "$resolved_url" =~ facebook.com/profile.php\?id=([0-9]+) ]]; then
+                target_user="${BASH_REMATCH[1]}"
+            else
+                target_user=$(echo "$resolved_url" | grep -oE "facebook.com/[a-zA-Z0-9.]+" | cut -d'/' -f2)
+            fi
+        fi
+    else
+        # Если введен обычный никнейм или стандартная ссылка
+        target_user="${user_input//@/}"
+        target_user="${target_user// /}"
+        if [[ "$target_user" =~ facebook.com/([a-zA-Z0-9.]+) ]]; then
+            target_user="${BASH_REMATCH[1]}"
+        fi
+    fi
+
+    # Финальная проверка: удалось ли вычленить идентификатор
+    if [[ -z "$target_user" || "$target_user" == "share" ]]; then
+        core_engine_ui "e" "Не удалось извлечь валидный идентификатор профиля из ввода."
+        core_engine_wait
+        return 1
+    fi
+
+    core_engine_ui "s" "[+] Идентификатор цели успешно изолирован: $target_user"
     core_engine_ui "i" "Инициализация эвристического анализа для вектора: $target_user"
     echo "--------------------------------------------------"
 
@@ -3666,10 +3699,14 @@ run_osint_facebook_crawler() {
     echo "==================================================================" > "$loot_file"
     echo " NEXUS SYSTEMS v14.0 - HEURISTIC CRAWLING REPORT" >> "$loot_file"
     echo " TARGET PROFILE: $target_user" >> "$loot_file"
+    if [[ -n "$resolved_url" ]]; then
+        echo " SOURCE SHARE URL: $user_input" >> "$loot_file"
+        echo " RESOLVED URL: $resolved_url" >> "$loot_file"
+    fi
     echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
     echo "==================================================================" >> "$loot_file"
 
-    # Массив динамических поисковых запросов (Дорков) для извлечения графа связей и контактов
+    # Массив динамических поисковых запросов (Дорков)
     local dynamic_queries=(
         "site:facebook.com \"$target_user\" \"phone\" OR \"tel\" OR \"contact\""
         "site:facebook.com \"$target_user\" \"@gmail.com\" OR \"@mail\""
@@ -3678,47 +3715,36 @@ run_osint_facebook_crawler() {
         "site:facebook.com/story.php \"$target_user\""
     )
 
-    # Инициализация внутренних счетчиков
     local total_phones=0
     local total_emails=0
     local total_relations=0
 
-    # Ротация User-Agent для исключения детектирования со стороны поисковых шлюзов
     local user_agents=(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
         "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0"
     )
 
     core_engine_ui "i" "Запуск пассивного сбора данных через распределенные шлюзы..."
 
     for query in "${dynamic_queries[@]}"; do
-        # Выбор случайного идентификатора браузера
         local rand_ua="${user_agents[$((RANDOM % ${#user_agents[@]}))]}"
-        
-        # Безопасное URL-кодирование поискового запроса
         local encoded_query
         encoded_query=$(echo "$query" | curl -s -o /dev/null -w "%{url_effective}" --data-urlencode @- "" | cut -d'?' -f2)
         
-        # Текстовый асинхронный шлюз DuckDuckGo (без выполнения JS, защита от фингерпринтинга)
         local request_url="https://html.duckduckgo.com/html/?q=${encoded_query}"
-        
         local raw_snippet_data
         raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 7 "$request_url")
 
         if [[ -z "$raw_snippet_data" ]]; then
-            core_engine_ui "w" "[!] Ограничение ответа шлюза. Переход к следующему сектору."
             continue
         fi
 
-        # --- ЭВРИСТИЧЕСКИЙ БЛОК 1: ИЗВЛЕЧЕНИЕ КОНТАКТНЫХ ДАННЫХ (ТЕЛЕФОНЫ) ---
-        # Извлекает международные форматы (+7, +33, +1, форматы с пробелами и дефисами)
+        # --- ЭВРИСТИЧЕСКИЙ БЛОК 1: ИЗВЛЕЧЕНИЕ ТЕЛЕФОНОВ ---
         local extracted_phones
         extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
         
         if [[ -n "$extracted_phones" ]]; then
             while read -r phone; do
-                # Исключаем системный мусор и дубликаты
                 if [[ -n "$phone" && ! "$phone" =~ "00000" ]]; then
                     core_engine_ui "s" "[+] ОБНАРУЖЕН ТЕЛЕФОННЫЙ ВЕКТОР: $phone"
                     echo "Extracted_Contact_Phone: $phone" >> "$loot_file"
@@ -3727,7 +3753,7 @@ run_osint_facebook_crawler() {
             done <<< "$extracted_phones"
         fi
 
-        # --- ЭВРИСТИЧЕСКИЙ БЛОК 2: ИЗВЛЕЧЕНИЕ ЭЛЕКТРОННЫХ ПОЧТ ---
+        # --- ЭВРИСТИЧЕСКИЙ БЛОК 2: ИЗВЛЕЧЕНИЕ ПОЧТ ---
         local extracted_emails
         extracted_emails=$(echo "$raw_snippet_data" | grep -oE "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}" | grep -vE "duckduckgo|bootstrap|github" | sort -u)
         
@@ -3739,8 +3765,7 @@ run_osint_facebook_crawler() {
             done <<< "$extracted_emails"
         fi
 
-        # --- ЭВРИСТИЧЕСКИЙ БЛОК 3: ИДЕНТИФИКАЦИЯ СВЯЗАННЫХ ИМЕН И НИКНЕЙМОВ ---
-        # Вычленяет ссылки на профили взаимодействующих лиц из структуры сниппетов
+        # --- ЭВРИСТИЧЕСКИЙ БЛОК 3: СВЯЗАННЫЕ ИМЕНА И НИКНЕЙМОВ ---
         local extracted_profiles
         extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "facebook.com/[a-zA-Z0-9.]+" | grep -vE "html|dt|r.txt|privacy|help|about|login|pages|sharer|groups|$target_user" | cut -d'/' -f2 | sort -u)
 
@@ -3754,8 +3779,7 @@ run_osint_facebook_crawler() {
             done <<< "$extracted_profiles"
         fi
 
-        # Динамическая эвристическая задержка (Anti-Anti-Bot Delay)
-        sleep $((2 + RANDOM % 3))
+        sleep $((2 + RANDOM % 2))
     done
 
     echo "--------------------------------------------------"
@@ -3764,14 +3788,15 @@ run_osint_facebook_crawler() {
     echo "==================================================================" >> "$loot_file"
 
     if (( total_phones > 0 || total_emails > 0 || total_relations > 0 )); then
-        core_engine_ui "s" "Краулинг завершен. Телефонов: $total_phones, Почт: $total_emails, Профилей связи: $total_relations"
-        core_engine_ui "s" "Сводный эвристический отчет сохранен: $loot_file"
+        core_engine_ui "s" "Краулинг завершен. Телефонов: $total_phones, Почт: $total_emails, Сформировано связей: $total_relations"
+        core_engine_ui "s" "Эвристический отчет сохранен: $loot_file"
     else
-        core_engine_ui "i" "Анализ завершен. Прямых открытых связей в кэше поисковых систем не обнаружено."
+        core_engine_ui "i" "Анализ завершен. Прямых связей в кэше поисковых систем не обнаружено."
     fi
 
     core_engine_wait
 }
+
 
 
 
