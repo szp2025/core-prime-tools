@@ -3951,12 +3951,6 @@ menu_financial_shield() {
     prime_dynamic_controller "FIN_SHIELD" "$names" "$funcs"
 }
 
-menu_deep_bridge() {
-    core_engine_ui "h" "DEEP BRIDGE: DATA CORRELATION"
-    local names="Artifact_Linker Loot_Collector Knowledge_Graph Session_Export"
-    local funcs="run_artifact_linker run_loot_collector run_k_graph run_session_export"
-    prime_dynamic_controller "DEEP_BRIDGE" "$names" "$funcs"
-}
 
 menu_stealth_comms() {
     # 1. Запуск прогресс-бара для красоты перехода
@@ -3973,18 +3967,16 @@ menu_nexus_correlation() {
     core_engine_ui "h" "SECTOR N: NEXUS ANALYSIS & CORRELATION"
     
     # Имена для отображения
-    local names="Artifact_Linker"
+    local names="Full_Pipeline"
 local funcs="run_nexus_full_pipeline"    
-
-    
     prime_dynamic_controller "NEXUS_CORRELATION" "$names" "$funcs"
 }
 
 
 run_main_menu() {
     local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS 
-NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS DEEP_BRIDGE PASSWORD EXIT"
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics menu_deep_bridge run_pass_lab exit_script"
+NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS PASSWORD EXIT"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics run_pass_lab exit_script"
     
     prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
 }
