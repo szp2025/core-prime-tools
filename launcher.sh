@@ -3639,7 +3639,7 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: Универсальный кросс-платформенный не детектируемый краулер (Фикс curl)
+# @description: Универсальный кросс-платформенный не детектируемый краулер v14.2
 # ==============================================================================
 run_osint_omni_crawler() {
     core_engine_ui "h" "NEXUS CORE: OMNI STEALTH HEURISTIC CRAWLER"
@@ -3705,50 +3705,41 @@ run_osint_omni_crawler() {
     local loot_file="$HOME/prime_loot/omni_heuristic_${target_user}.txt"
     
     echo "==================================================================" > "$loot_file"
-    echo " NEXUS SYSTEMS v14.0 - MULTI-PLATFORM HEURISTIC REPORT" >> "$loot_file"
+    echo " NEXUS SYSTEMS v14.2 - MULTI-PLATFORM HEURISTIC REPORT" >> "$loot_file"
     echo " DETECTED PLATFORM: $detected_platform" >> "$loot_file"
     echo " ISOLATED TARGET: $target_user" >> "$loot_file"
     echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
     echo "==================================================================" >> "$loot_file"
 
-    # --- БЛОК 3: УНИВЕРСАЛЬНАЯ ПОИСКОВАЯ МАТРИЦА ---
-    local dynamic_queries=()
-    if [[ "$detected_platform" == "Facebook" ]]; then
-        dynamic_queries=(
-            "site:facebook.com \"$target_user\" \"phone\""
-            "site:facebook.com \"$target_user\" \"@gmail.com\""
-            "site:facebook.com \"via $target_user\""
-        )
-    else
-        dynamic_queries=(
-            "\"$target_user\" \"phone\" OR \"WhatsApp\""
-            "\"$target_user\" \"@gmail.com\""
-            "site:instagram.com/\"$target_user\""
-            "site:x.com/\"$target_user\""
-        )
-    fi
+    # --- БЛОК 3: УНИВЕРСАЛЬНАЯ КАСКАДНАЯ МАТРИЦА ЗАПРОСОВ ---
+    # Смягчаем синтаксис: убираем лишние кавычки, чтобы DDG HTML выдавал больше результатов
+    local dynamic_queries=(
+        "$target_user facebook"
+        "$target_user contact phone"
+        "$target_user gmail.com"
+        "site:facebook.com $target_user"
+    )
 
     local total_phones=0
     local total_emails=0
     local total_relations=0
-    local user_agents=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    local user_agents=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
     for query in "${dynamic_queries[@]}"; do
         local rand_ua="${user_agents[$((RANDOM % ${#user_agents[@]}))]}"
         
-        # СТАБИЛЬНЫЙ ФИКС: Безопасное URL-кодирование без генерации пустых аргументов curl
         local encoded_query
         encoded_query=$(curl -s -A "$rand_ua" -o /dev/null -w "%{url_effective}" --data-urlencode "q=${query}" "https://html.duckduckgo.com/html/" | cut -d'?' -f2)
         
         local request_url="https://html.duckduckgo.com/html/?${encoded_query}"
         local raw_snippet_data
-        raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 7 "$request_url")
+        raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 8 "$request_url")
 
         if [[ -z "$raw_snippet_data" || "$raw_snippet_data" =~ "No results" ]]; then 
             continue 
         fi
 
-        # Извлечение контактов (Телефоны)
+        # Извлечение контактов (Телефоны - международные маски)
         local extracted_phones
         extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
         if [[ -n "$extracted_phones" ]]; then
@@ -3772,7 +3763,7 @@ run_osint_omni_crawler() {
             done <<< "$extracted_emails"
         fi
 
-        # Извлечение кросс-ссылок (Связи с другими аккаунтами)
+        # Извлечение кросс-ссылок (Связанные профили)
         local extracted_profiles
         extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "(facebook|instagram|x|twitter|tiktok).com/[a-zA-Z0-9._]+" | grep -vE "html|privacy|help|login|$target_user" | sort -u)
         if [[ -n "$extracted_profiles" ]]; then
@@ -3783,15 +3774,16 @@ run_osint_omni_crawler() {
             done <<< "$extracted_profiles"
         fi
 
+        # Тайм-аут защиты шлюза
         sleep 1
     done
 
     echo "--------------------------------------------------"
     if (( total_phones > 0 || total_emails > 0 || total_relations > 0 )); then
-        core_engine_ui "s" "Анализ завершен! Сформировано логов: $((total_phones + total_emails + total_relations))"
+        core_engine_ui "s" "Анализ завершен успешно! Сформировано логов: $((total_phones + total_emails + total_relations))"
         core_engine_ui "s" "Отчет сохранен: $loot_file"
     else
-        core_engine_ui "i" "Цифровых следов в открытых индексах не обнаружено."
+        core_engine_ui "i" "Открытых цифровых следов данного идентификатора в пассивном индексе не обнаружено."
     fi
 
     core_engine_wait
