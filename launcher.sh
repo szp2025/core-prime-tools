@@ -3457,12 +3457,12 @@ run_dd_logic() {
 }
 
 # ==============================================================================
-# @description: Исправленный модуль Nexus SocialScan (Поиск никнейма на платформах)
+# @description: Нативный автономный модуль Nexus SocialScan (Поиск никнейма)
 # ==============================================================================
 run_osint_custom_socialscan() {
     core_engine_ui "h" "NEXUS CORE: MULTI-PLATFORM SOCIALSCAN"
     
-    # Сброс и очистка буфера ввода stdin
+    # Сброс буфера ввода stdin
     tcflush xtcin 2>/dev/null || true
     
     local default_target=""
@@ -3471,7 +3471,7 @@ run_osint_custom_socialscan() {
         core_engine_ui "i" "Обнаружена активная цель в текущей сессии: $default_target"
     fi
 
-    echo -n " [?] Укажите Никнейм или Email для сканирования сетей [По умолчанию: $default_target]: "
+    echo -n " [?] Укажите Никнейм для сканирования сетей [По умолчанию: $default_target]: "
     read -r scan_target < /dev/tty
 
     if [[ -z "$scan_target" && -n "$default_target" ]]; then
@@ -3479,94 +3479,148 @@ run_osint_custom_socialscan() {
     fi
 
     if [[ -z "$scan_target" ]]; then
-        core_engine_ui "e" "[-] Параметр поиска пуст. Укажите никнейм или email."
+        core_engine_ui "e" "[-] Параметр поиска пуст. Укажите никнейм."
         core_engine_wait
         return 1
     fi
 
-    # Очистка спецсимволов для чистого кросс-платформенного сканирования
+    # Очистка от мусора
     scan_target="${scan_target//@/}"
     scan_target=$(echo "$scan_target" | cut -d'?' -f1 | tr -d '[:space:]')
 
-    core_engine_ui "i" "Активация socialscan_env для идентификатора: $scan_target"
+    core_engine_ui "i" "Запуск нативного сканирования для идентификатора: $scan_target"
     echo "--------------------------------------------------"
 
-    if [[ ! -d "core-prime-tools/modules/socialscan_env" ]]; then
-        core_engine_ui "e" "Модуль socialscan_env не обнаружен в целевой директории."
-        core_engine_wait
-        return 1
-    fi
-
-    core_engine_ui "i" "Проверка регистрации аккаунта на 120+ независимых платформах..."
-    # Пример нативной интеграции с утилитой socialscan (если развернута внутри env)
-    # source core-prime-tools/modules/socialscan_env/bin/activate 2>/dev/null
-    # socialscan "$scan_target" --json ~/prime_loot/socialscan_${scan_target}.json
+    mkdir -p ~/prime_loot
+    local loot_file="$HOME/prime_loot/socialscan_${scan_target}.txt"
     
-    sleep 2
-    core_engine_ui "s" "Кросс-платформенный скан завершен успешно."
+    echo "==================================================================" > "$loot_file"
+    echo " NEXUS SOCIALSCAN REPORT FOR: $scan_target" >> "$loot_file"
+    echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
+    echo "==================================================================" >> "$loot_file"
+
+    # Список проверяемых URL-шаблонов
+    local platforms=(
+        "Telegram|https://t.me/"
+        "Instagram|https://www.instagram.com/"
+        "TikTok|https://www.tiktok.com/@"
+        "X-Twitter|https://x.com/"
+        "GitHub|https://github.com/"
+        "Pinterest|https://www.pinterest.com/"
+        "YouTube|https://www.youtube.com/@"
+        "Reddit|https://www.reddit.com/user/"
+    )
+
+    local found_count=0
+    local user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+    for platform in "${platforms[@]}"; do
+        local name="${platform%%|*}"
+        local base_url="${platform#*|}"
+        local full_url="${base_url}${scan_target}"
+        
+        # Проверяем доступность аккаунта по HTTP-коду (быстрый HEAD-запрос)
+        local http_code
+        http_code=$(curl -s -o /dev/null -I -L -A "$user_agent" --connect-timeout 5 -w "%{http_code}" "$full_url")
+        
+        if [[ "$http_code" == "200" ]]; then
+            core_engine_ui "s" "[+] НАЙДЕН АККАУНТ ($name): $full_url"
+            echo "Found_Platform: $name -> $full_url" >> "$loot_file"
+            ((found_count++))
+        elif [[ "$http_code" == "404" ]]; then
+            echo " [.] $name: Профиль отсутствует (404)"
+        else
+            echo " [-] $name: Ограничено защитой площадки (HTTP $http_code)"
+        fi
+        
+        sleep 0.5
+    done
+
+    echo "--------------------------------------------------"
+    if (( found_count > 0 )); then
+        core_engine_ui "s" "Сканирование завершено. Найдено совпадений: $found_count"
+        core_engine_ui "s" "Результаты сохранены: $loot_file"
+    else
+        core_engine_ui "i" "Никнейм полностью свободен на основных платформах."
+    fi
+    
     core_engine_wait
 }
 
+
 # ==============================================================================
-# @description: Исправленный эвристический модуль анализа утечек (Nexus Breach Leaks)
+# @description: Нативный автономный модуль Nexus Breach Leaks (Локальный поиск)
 # ==============================================================================
 run_osint_custom_leaks() {
-    core_engine_ui "h" "NEXUS CORE: BREACH LEAKS SCANNER"
+    core_engine_ui "h" "NEXUS CORE: LOCAL BREACH LEAKS SCANNER"
     
-    # Сброс и очистка буфера ввода stdin для предотвращения авто-пропуска
+    # Сброс буфера ввода stdin
     tcflush xtcin 2>/dev/null || true
     
     local default_target=""
-    # Эвристическая зацепка: проверяем, есть ли уже лог от краулера, чтобы подставить цель
     if [[ -n "$target_user" ]]; then
         default_target="$target_user"
         core_engine_ui "i" "Обнаружена активная цель в текущей сессии: $default_target"
     fi
 
-    echo -n " [?] Введите Email, Телефон или Никнейм для проверки утечек [По умолчанию: $default_target]: "
-    # Читаем ввод с явным указанием терминального устройства для изоляции от буфера меню
+    echo -n " [?] Введите Email, Телефон или Никнейм для поиска по базам [По умолчанию: $default_target]: "
     read -r leak_target < /dev/tty
 
-    # Если пользователь просто нажал Enter, но есть цель по умолчанию — берем её
     if [[ -z "$leak_target" && -n "$default_target" ]]; then
         leak_target="$default_target"
     fi
 
     if [[ -z "$leak_target" ]]; then
-        core_engine_ui "e" "[-] Ошибка: Не указан объект для анализа утечек."
+        core_engine_ui "e" "[-] Ошибка: Не указан объект для локального анализа."
         core_engine_wait
         return 1
     fi
 
-    core_engine_ui "i" "Запуск анализа баз данных для вектора: $leak_target"
+    local clean_target
+    clean_target=$(echo "$leak_target" | tr -d '[:space:]')
+
+    core_engine_ui "i" "Запуск высокоскоростного сигнатурного поиска по локальным хранилищам..."
     echo "--------------------------------------------------"
 
-    # Проверка архитектурного окружения модуля
-    if [[ ! -d "core-prime-tools/modules/leaks_env" ]]; then
-        core_engine_ui "w" "[!] Окружение leaks_env перемещено или отсутствует в модулях."
-        # Эвристический поиск дубликата в корне
-        if [[ -d "leaks_env" ]]; then
-            core_engine_ui "i" "Обнаружен корневой сектор leaks_env. Локализация..."
-            mv leaks_env core-prime-tools/modules/
-        else
-            core_engine_ui "e" "Критическая ошибка: leaks_env не найден."
-            core_engine_wait
-            return 1
+    # Директории, где скрипт будет искать текстовые дампы (.txt, .log, .csv)
+    local search_dirs=("$HOME/arsenal_loot" "$HOME/prime_loot" "$HOME/reports")
+    local match_count=0
+
+    # Создаем или очищаем файл системного отчета о совпадениях
+    local leak_report="$HOME/prime_loot/local_leaks_matches_${clean_target}.txt"
+    echo "=== NEXUS LOCAL BREACH SEARCH REPORT FOR: $clean_target ===" > "$leak_report"
+    echo "DATE: $(date +'%Y-%m-%d %H:%M:%S')" >> "$leak_report"
+    echo "--------------------------------------------------" >> "$leak_report"
+
+    for dir in "${search_dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+            core_engine_ui "i" "Анализ сектора: $dir..."
+            
+            # Ищем совпадения без учета регистра во всех текстовых файлах директории
+            # Отсекаем сам файл отчета, чтобы не искать внутри себя
+            local results
+            results=$(grep -rih "$clean_target" "$dir" 2>/dev/null | grep -v "LOCAL BREACH SEARCH REPORT" | head -n 50)
+            
+            if [[ -n "$results" ]]; then
+                while read -r line; do
+                    if [[ -n "$line" ]]; then
+                        core_engine_ui "s" "[!] НАЙДЕНО СОВПАДЕНИЕ В БАЗЕ: $line"
+                        echo "$line" >> "$leak_report"
+                        ((match_count++))
+                    fi
+                done <<< "$results"
+            fi
         fi
+    done
+
+    echo "--------------------------------------------------"
+    if (( match_count > 0 )); then
+        core_engine_ui "s" "Поиск завершен. Обнаружено строк в дампах: $match_count"
+        core_engine_ui "s" "Все найденные строки логов выгружены в: $leak_report"
+    else
+        core_engine_ui "i" "В локальных базах данных `~/arsenal_loot` совпадений с вектором не найдено."
     fi
 
-    # Имитация выполнения или запуск твоего python-скрипта внутри окружения
-    # Стерилизуем параметры для передачи в локальный обработчик
-    local clean_param
-    clean_param=$(echo "$leak_target" | tr -d '[:space:]')
-    
-    core_engine_ui "i" "Сканирование сигнатур утечек по локальным индексам..."
-    sleep 1.5
-    
-    # ЗДЕСЬ подставь реальную команду вызова твоего скрипта, если она используется, например:
-    # python3 core-prime-tools/modules/leaks_env/search.py "$clean_param"
-    
-    core_engine_ui "i" "Поиск завершен. Синхронизация с prime_loot..."
     core_engine_wait
 }
 
