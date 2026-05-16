@@ -2286,34 +2286,43 @@ run_prime_exploiter_v5() {
 
 
 # ==============================================================================
-# @description: Модуль 1 - Исправленный Artifact Linker без ошибок синтаксиса grep
+# @description: Единый конвейер автоматической корреляции, сборки и экспорта
 # ==============================================================================
-run_artifact_linker() {
-    core_engine_ui "h" "ARTIFACT LINKER: DEEP CORRELATION v2.2"
-    core_engine_ui "i" "Синхронизация и анализ перекрестных связей в prime_loot..."
+run_nexus_full_pipeline() {
+    core_engine_ui "h" "NEXUS CORRELATION: FULL PIPELINE AUTOMATION"
     
-    local target_report=""
-    mkdir -p ~/prime_loot
-    
-    # Автоматически подтягиваем активную цель текущей сессии
+    # 1. Захват и верификация цели
     local current_target="${target_user:-"general_target"}"
+    core_engine_ui "i" "Инициализация сквозного анализа для объекта: [$current_target]"
+    echo "------------------------------------------------------------------"
+
     local timestamp
     timestamp=$(date +'%Y%m%d_%H%M')
-    target_report="$HOME/prime_loot/nexus_report_${current_target}_${timestamp}.md"
+    
+    # Пути для сохранения артефактов
+    local prime_loot_dir="$HOME/prime_loot"
+    local archive_dir="$prime_loot_dir/archives"
+    local target_report="$prime_loot_dir/nexus_report_${current_target}_${timestamp}.md"
+    local archive_file="$archive_dir/loot_${current_target}_${timestamp}.tar.gz"
+    local export_path="/sdcard/Download"
 
+    mkdir -p "$prime_loot_dir" "$archive_dir"
+
+    # ==========================================
+    # ЭТАП 1: ARTIFACT LINKER (Глубокая линковка)
+    # ==========================================
+    core_engine_ui "i" "[Этап 1/4] Сшивание логов и построение паспорта объекта..."
+    
     echo "==================================================================" > "$target_report"
     echo "  NEXUS INTEGRATED INTELLIGENCE REPORT: $current_target" >> "$target_report"
     echo "  GENERATED: $(date +'%Y-%m-%d %H:%M:%S')" >> "$target_report"
     echo "==================================================================" >> "$target_report"
 
-    # Безопасный сбор данных: считываем файлы, содержащие имя цели
-    if ls "$HOME/prime_loot"/*"${current_target}"* 1>/dev/null 2>&1; then
-        find "$HOME/prime_loot" -type f -name "*${current_target}*" | while read -r file; do
-            # Защита от зацикливания (не читаем генерируемый отчет)
-            if [[ "$file" != *"/nexus_report_"* ]]; then
+    if ls "$prime_loot_dir"/*"${current_target}"* 1>/dev/null 2>&1; then
+        find "$prime_loot_dir" -type f -name "*${current_target}*" | while read -r file; do
+            if [[ "$file" != *"/nexus_report_"* && "$file" != *"/archives/"* ]]; then
                 echo -e "\n### АНАЛИЗ ИСТОЧНИКА: $(basename "$file")" >> "$target_report"
                 echo "--------------------------------------------------" >> "$target_report"
-                
                 while read -r line; do
                     if [[ -n "$line" ]]; then
                         echo "  * $line" >> "$target_report"
@@ -2321,126 +2330,74 @@ run_artifact_linker() {
                 done < "$file"
             fi
         done
-        core_engine_ui "s" "[+] База знаний успешно сформирована"
+        core_engine_ui "s" "[+] Сводный цифровой профиль успешно сгенерирован."
     else
+        core_engine_ui "w" "[!] Первичные логи отсутствуют. Создан пустой бланк отчета."
         echo "[-] Локальные сырые логи для построения профиля отсутствуют." >> "$target_report"
     fi
 
-    echo -e "\n[+] Корреляция завершена. Сводный паспорт объекта создан."
-    core_engine_ui "i" "Путь к файлу: $target_report"
-    echo "--------------------------------------------------"
-    core_engine_ui "h" "КРИТИЧЕСКИЕ ВЫЯВЛЕННЫЕ СВЯЗИ"
-
-    # Исправленный grep: используем флаг -F (фиксированная строка) или экранируем дефис
-    # Это полностью убирает ошибки "invalid option -- '>'"
-    if [[ -f "$target_report" ]]; then
-        grep -F "->" "$target_report" 2>/dev/null | head -n 30 | while read -r match_line; do
-            local clean_display
-            clean_display=$(echo "$match_line" | tr -d '*#')
-            echo " [!] СВЯЗЬ: $clean_display"
-        done
-        
-        # Дополнительно выводим найденные платформы для наглядности
-        grep -E "(Found_Platform|Extracted_)" "$target_report" 2>/dev/null | head -n 30 | while read -r match_line; do
-            local clean_display
-            clean_display=$(echo "$match_line" | tr -d '*#')
-            echo " [!] МАТРИЦА: $clean_display"
-        done
-    fi
-    echo "--------------------------------------------------"
-    core_engine_wait
-}
-
-# ==============================================================================
-# @description: Модуль 2 - Сборщик находок Loot Collector (Пункт 2 меню)
-# ==============================================================================
-run_loot_collector() {
-    core_engine_ui "h" "NEXUS CORRELATION: LOOT COLLECTOR"
+    # ==========================================
+    # ЭТАП 2: KNOWLEDGE GRAPH (Топология связей)
+    # ==========================================
+    echo "------------------------------------------------------------------"
+    core_engine_ui "i" "[Этап 2/4] Визуализация семантической карты..."
     
-    local current_target="${target_user:-"general"}"
-    core_engine_ui "i" "Упаковка и архивация собранных артефактов для: $current_target"
-    echo "--------------------------------------------------"
-    
-    local archive_dir="$HOME/prime_loot/archives"
-    mkdir -p "$archive_dir"
-    local archive_file="$archive_dir/loot_${current_target}_$(date +'%Y%m%d').tar.gz"
-    
-    if ls "$HOME/prime_loot"/*"${current_target}"* 1>/dev/null 2>&1; then
-        # Архивируем все файлы цели, исключая директорию с архивами
-        (cd "$HOME/prime_loot" && tar -czf "$archive_file" --exclude='archives' *"${current_target}"* 2>/dev/null)
-        core_engine_ui "s" "[+] Все локальные логи упакованы в защищенный архив:"
-        echo "    $archive_file"
-    else
-        core_engine_ui "w" "[!] Файлы для архивации не найдены. Запустите модули разведки."
-    fi
-    
-    core_engine_wait
-}
-
-# ==============================================================================
-# @description: Модуль 3 - Визуализатор Knowledge Graph (Пункт 3 меню)
-# ==============================================================================
-run_k_graph() {
-    core_engine_ui "h" "NEXUS CORRELATION: KNOWLEDGE GRAPH v1.1"
-    
-    local current_target="${target_user:-"unknown"}"
-    core_engine_ui "i" "Построение семантического графа связей для сущности: $current_target"
-    echo "--------------------------------------------------"
-    
-    # Интеллектуальный вывод структуры связей на основе логов
-    echo "  [ ТОПОЛОГИЯ ЦИФРОВОГО СЛЕДА ОБЪЕКТА ]"
+    echo "  [ ТОПОЛОГИЯ ЦИФРОВОГО СЛЕДА ОБЪЕКТА: $current_target ]"
     echo "                      "
     echo "       [Instagram] <--- (Профиль) ---+ "
     echo "                                      | "
-    echo "       [TikTok]    <--- (Медиа) -----+---> [ ИДЕНТИФИКАТОР: $current_target ]"
+    echo "       [TikTok]    <--- (Медиа) -----+---> [ $current_target ]"
     echo "                                      | "
     echo "       [Telegram]  <--- (Связь) -----+ "
     echo "                                      | "
     echo "       [Reddit]    <--- (Форумы) ----+ "
     echo "                      "
-    echo "--------------------------------------------------"
-    
-    # Динамическая проверка наличия локальных логов утечек
-    if ls "$HOME/prime_loot"/local_leaks_matches_"${current_target}"* 1>/dev/null 2>&1; then
-        core_engine_ui "s" "[+] Корреляция: Обнаружены пересечения с локальными базами дампов!"
-    else
-        core_engine_ui "i" "Связи с тяжелыми дампами утечек на данный момент не зафиксированы."
-    fi
-    
-    core_engine_wait
-}
 
-# ==============================================================================
-# @description: Модуль 4 - Экспорт сессии Session Export (Пункт 4 меню)
-# ==============================================================================
-run_session_export() {
-    core_engine_ui "h" "NEXUS CORRELATION: SESSION EXPORT"
-    
-    # Очищаем буфер терминала перед чтением ввода
-    tcflush xtcin 2>/dev/null || true
-    
-    core_engine_ui "i" "Экспорт собранных матриц и паспортов отчетов..."
-    echo -n " [?] Укажите путь для выгрузки отчетов [По умолчанию: /sdcard/Download]: "
-    read -r export_path < /dev/tty
-    
-    if [[ -z "$export_path" ]]; then
-        export_path="/sdcard/Download"
+    # Вывод критических зацепок на экран (Безопасный grep фиксированных строк)
+    if [[ -f "$target_report" ]]; then
+        grep -F "->" "$target_report" 2>/dev/null | head -n 10 | while read -r match_line; do
+            local clean_display
+            clean_display=$(echo "$match_line" | tr -d '*#')
+            echo "     [!] ВЫЯВЛЕНА СВЯЗЬ: $clean_display"
+        done
     fi
+
+    # ==========================================
+    # ЭТАП 3: LOOT COLLECTOR (Архивация)
+    # ==========================================
+    echo "------------------------------------------------------------------"
+    core_engine_ui "i" "[Этап 3/4] Компрессия данных в защищенный архив..."
     
-    echo "--------------------------------------------------"
+    if ls "$prime_loot_dir"/*"${current_target}"* 1>/dev/null 2>&1; then
+        (cd "$prime_loot_dir" && tar -czf "$archive_file" --exclude='archives' *"${current_target}"* 2>/dev/null)
+        core_engine_ui "s" "[+] Все файлы упакованы в: $(basename "$archive_file")"
+    else
+        core_engine_ui "w" "[!] Нет файлов для компрессии."
+    fi
+
+    # ==========================================
+    # ЭТАП 4: SESSION EXPORT (Выгрузка на накопитель)
+    # ==========================================
+    echo "------------------------------------------------------------------"
+    core_engine_ui "i" "[Этап 4/4] Автоматический экспорт на внешний накопитель..."
+    
     if [[ -d "$export_path" ]]; then
-        if cp "$HOME/prime_loot"/*.* "$export_path/" 2>/dev/null; then
-            core_engine_ui "s" "[+] Экспорт завершен! Все файлы скопированы в: $export_path"
+        if cp "$target_report" "$export_path/" 2>/dev/null && cp "$archive_file" "$export_path/" 2>/dev/null; then
+            core_engine_ui "s" "[УСПЕХ] Все отчеты и архивы скопированы в: $export_path/"
         else
-            # Резервный экспорт в корень домашней директории Termux при нехватке прав к sdcard
-            mkdir -p "$HOME/nexus_export"
-            cp "$HOME/prime_loot"/*.* "$HOME/nexus_export/" 2>/dev/null
-            core_engine_ui "w" "[!] Ограничение доступа к памяти. Данные сохранены в: $HOME/nexus_export"
+            # Если нет прав доступа к sdcard памяти смартфона
+            local backup_export="$HOME/nexus_export"
+            mkdir -p "$backup_export"
+            cp "$target_report" "$backup_export/" 2>/dev/null
+            cp "$archive_file" "$backup_export/" 2>/dev/null
+            core_engine_ui "w" "[!] Ограничение прав Termux. Файлы выгружены локально: $backup_export/"
         fi
     else
-        core_engine_ui "e" "[-] Ошибка: Указанный путь экспорта не существует."
+        core_engine_ui "e" "[-] Внешний каталог $export_path не найден. Результаты сохранены в $prime_loot_dir"
     fi
-    
+
+    echo "------------------------------------------------------------------"
+    core_engine_ui "s" "Конвейер полностью завершен! Сессия зафиксирована."
     core_engine_wait
 }
 
@@ -4016,9 +3973,9 @@ menu_nexus_correlation() {
     core_engine_ui "h" "SECTOR N: NEXUS ANALYSIS & CORRELATION"
     
     # Имена для отображения
-    local names="Artifact_Linker Loot_Collector Knowledge_Graph Session_Export"
-    # Функции (убедись, что run_artifact_linker v2.0 уже в коде)
-    local funcs="run_artifact_linker run_loot_collector run_k_graph run_session_export"
+    local names="Artifact_Linker"
+local funcs="run_nexus_full_pipeline"    
+
     
     prime_dynamic_controller "NEXUS_CORRELATION" "$names" "$funcs"
 }
