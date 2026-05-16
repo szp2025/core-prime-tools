@@ -3639,10 +3639,10 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: Универсальный кросс-платформенный не детектируемый краулер v14.2
+# @description: Универсальный краулер v14.3 с глубоким поисковым шлюзом Google
 # ==============================================================================
 run_osint_omni_crawler() {
-    core_engine_ui "h" "NEXUS CORE: OMNI STEALTH HEURISTIC CRAWLER"
+    core_engine_ui "h" "NEXUS CORE: OMNI STEALTH HEURISTIC CRAWLER v14.3"
     echo -n " [?] Введите Никнейм или любую ссылку (FB, Insta, TikTok, X, YT): "
     read -r user_input
 
@@ -3656,19 +3656,17 @@ run_osint_omni_crawler() {
     local detected_platform="Generic_OSINT"
     local resolved_url=""
 
-    # --- БЛОК 1: УНИВЕРСАЛЬНЫЙ RESOLVER И ОПРЕДЕЛЕНИЕ ПЛАТФОРМЫ ---
+    # --- БЛОК 1: УНИВЕРСАЛЬНЫЙ RESOLVER ---
     if [[ "$user_input" =~ "facebook.com/share/" || "$user_input" =~ "fb.watch" || "$user_input" =~ "vt.tiktok.com" || "$user_input" =~ "instagram.com/share" || "$user_input" =~ "t.co/" || "$user_input" =~ "youtu.be/" ]]; then
         core_engine_ui "i" "Обнаружен короткий редирект. Перехват конечной точки..."
-        
         resolved_url=$(curl -s -I -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 6 "$user_input" | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
-        
         if [[ -n "$resolved_url" ]]; then
             user_input="$resolved_url"
             core_engine_ui "s" "[+] Ссылка успешно раскрыта"
         fi
     fi
 
-    # --- БЛОК 2: ЭВРИСТИЧЕСКАЯ ФИЛЬТРАЦИЯ И ВЫДЕЛЕНИЕ НИКНЕЙМА ---
+    # --- БЛОК 2: ИДЕНТИФИКАЦИЯ МАТРИЦЫ ---
     if [[ "$user_input" =~ facebook.com/ ]]; then
         detected_platform="Facebook"
         if [[ "$user_input" =~ profile.php\?id=([0-9]+) ]]; then
@@ -3698,96 +3696,103 @@ run_osint_omni_crawler() {
     fi
 
     core_engine_ui "s" "[+] Матрица: $detected_platform | Идентификатор: $target_user"
-    core_engine_ui "i" "Запуск пассивного перекрестного доркинга..."
+    core_engine_ui "i" "Запуск глубокого пассивного сканирования глобального индекса..."
     echo "--------------------------------------------------"
 
     mkdir -p ~/prime_loot
     local loot_file="$HOME/prime_loot/omni_heuristic_${target_user}.txt"
     
     echo "==================================================================" > "$loot_file"
-    echo " NEXUS SYSTEMS v14.2 - MULTI-PLATFORM HEURISTIC REPORT" >> "$loot_file"
-    echo " DETECTED PLATFORM: $detected_platform" >> "$loot_file"
-    echo " ISOLATED TARGET: $target_user" >> "$loot_file"
+    echo " NEXUS SYSTEMS v14.3 - GLOBAL INDEX OSINT REPORT" >> "$loot_file"
+    echo " TARGET: $target_user ($detected_platform)" >> "$loot_file"
     echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
     echo "==================================================================" >> "$loot_file"
 
-    # --- БЛОК 3: УНИВЕРСАЛЬНАЯ КАСКАДНАЯ МАТРИЦА ЗАПРОСОВ ---
-    # Смягчаем синтаксис: убираем лишние кавычки, чтобы DDG HTML выдавал больше результатов
-    local dynamic_queries=(
-        "$target_user facebook"
-        "$target_user contact phone"
-        "$target_user gmail.com"
-        "site:facebook.com $target_user"
+    # Набор семантических векторов для глобального текстового шлюза
+    local query_vectors=(
+        "${target_user}+phone"
+        "${target_user}+contact"
+        "${target_user}+gmail"
+        "site:facebook.com+${target_user}"
     )
 
     local total_phones=0
     local total_emails=0
     local total_relations=0
-    local user_agents=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
+    # Ротация продвинутых User-Agent для пробития защиты поисковых систем
+    local user_agents=(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Android 13; Mobile; rv:109.0) Gecko/114.0 Firefox/114.0"
+    )
 
-    for query in "${dynamic_queries[@]}"; do
+    for vector in "${query_vectors[@]}"; do
         local rand_ua="${user_agents[$((RANDOM % ${#user_agents[@]}))]}"
         
-        local encoded_query
-        encoded_query=$(curl -s -A "$rand_ua" -o /dev/null -w "%{url_effective}" --data-urlencode "q=${query}" "https://html.duckduckgo.com/html/" | cut -d'?' -f2)
-        
-        local request_url="https://html.duckduckgo.com/html/?${encoded_query}"
+        # Используем текстовое зеркало Google (без скриптов, чистое извлечение сырых данных)
+        local request_url="https://www.google.com/search?q=${vector}&num=30&gbv=1-A"
         local raw_snippet_data
         raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 8 "$request_url")
 
-        if [[ -z "$raw_snippet_data" || "$raw_snippet_data" =~ "No results" ]]; then 
-            continue 
+        if [[ -z "$raw_snippet_data" || "$raw_snippet_data" =~ "detected unusual traffic" ]]; then
+            # Если основной шлюз выдал капчу, плавно откатываемся на резервный текстовый шлюз
+            request_url="https://html.duckduckgo.com/html/?q=${vector//+/ }"
+            raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 8 "$request_url")
         fi
 
-        # Извлечение контактов (Телефоны - международные маски)
+        if [[ -z "$raw_snippet_data" ]]; then continue; fi
+
+        # --- ПАРСИНГ АРТЕФАКТОВ ---
+        # 1. Извлечение мобильных номеров (поддержка пробелов, скобок и международных кодов)
         local extracted_phones
-        extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
+        extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?\(?[0-9]{2,4}\)?[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
         if [[ -n "$extracted_phones" ]]; then
             while read -r phone; do
-                if [[ -n "$phone" && ! "$phone" =~ "0000" ]]; then
-                    core_engine_ui "s" "[+] ОБНАРУЖЕН ТЕЛЕФОН: $phone"
+                if [[ -n "$phone" && ! "$phone" =~ "0000" && ${#phone} -gt 7 ]]; then
+                    core_engine_ui "s" "[+] НАЙДЕН ТЕЛЕФОН: $phone"
                     echo "Extracted_Phone: $phone" >> "$loot_file"
                     ((total_phones++))
                 fi
             done <<< "$extracted_phones"
         fi
 
-        # Извлечение контактов (Почты)
+        # 2. Извлечение электронных адресов
         local extracted_emails
-        extracted_emails=$(echo "$raw_snippet_data" | grep -oE "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}" | grep -vE "duckduckgo|bootstrap" | sort -u)
+        extracted_emails=$(echo "$raw_snippet_data" | grep -oE "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}" | grep -vE "google|duckduckgo|w3.org" | sort -u)
         if [[ -n "$extracted_emails" ]]; then
             while read -r email; do
-                core_engine_ui "s" "[+] ОБНАРУЖЕН EMAIL: $email"
+                core_engine_ui "s" "[+] НАЙДЕН EMAIL: $email"
                 echo "Extracted_Email: $email" >> "$loot_file"
                 ((total_emails++))
             done <<< "$extracted_emails"
         fi
 
-        # Извлечение кросс-ссылок (Связанные профили)
+        # 3. Извлечение перекрестных связей
         local extracted_profiles
-        extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "(facebook|instagram|x|twitter|tiktok).com/[a-zA-Z0-9._]+" | grep -vE "html|privacy|help|login|$target_user" | sort -u)
+        extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "(facebook|instagram|x|twitter|tiktok).com/[a-zA-Z0-9._]+" | grep -vE "search|html|privacy|help|login|accounts|$target_user" | sort -u)
         if [[ -n "$extracted_profiles" ]]; then
             while read -r profile; do
-                core_engine_ui "w" " -> Связанный профиль в сети: https://$profile"
+                core_engine_ui "w" " -> Выявлена связь: https://$profile"
                 echo "Cross_Platform_Relation: https://$profile" >> "$loot_file"
                 ((total_relations++))
             done <<< "$extracted_profiles"
         fi
 
-        # Тайм-аут защиты шлюза
-        sleep 1
+        # Асинхронная задержка для сохранения полной тишины
+        sleep $((2 + RANDOM % 3))
     done
 
     echo "--------------------------------------------------"
     if (( total_phones > 0 || total_emails > 0 || total_relations > 0 )); then
-        core_engine_ui "s" "Анализ завершен успешно! Сформировано логов: $((total_phones + total_emails + total_relations))"
-        core_engine_ui "s" "Отчет сохранен: $loot_file"
+        core_engine_ui "s" "Глубокий анализ завершен! Сформировано зацепок: $((total_phones + total_emails + total_relations))"
+        core_engine_ui "s" "Все артефакты экспортированы в лут-файл: $loot_file"
     else
-        core_engine_ui "i" "Открытых цифровых следов данного идентификатора в пассивном индексе не обнаружено."
+        core_engine_ui "i" "Прямых открытых привязок в глобальном поисковом индексе на данный момент нет."
     fi
 
     core_engine_wait
 }
+
 
 
 
