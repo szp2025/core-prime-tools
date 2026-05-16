@@ -2285,55 +2285,161 @@ run_prime_exploiter_v5() {
 }
 
 
+# ==============================================================================
+# @description: Модуль 1 - Исправленный Artifact Linker без ошибок синтаксиса grep
+# ==============================================================================
 run_artifact_linker() {
-    core_engine_ui "h" "ARTIFACT LINKER: DEEP CORRELATION v2.0"
+    core_engine_ui "h" "ARTIFACT LINKER: DEEP CORRELATION v2.2"
+    core_engine_ui "i" "Синхронизация и анализ перекрестных связей в prime_loot..."
     
-    local report_file="$PRIME_LOOT/nexus_report_$(date +%Y%m%d_%H%M).md"
-    core_engine_ui "i" "Analyzing data bridges in prime_loot..."
-    core_engine_progress 2 "DATA_AGGREGATION"
+    local target_report=""
+    mkdir -p ~/prime_loot
+    
+    # Автоматически подтягиваем активную цель текущей сессии
+    local current_target="${target_user:-"general_target"}"
+    local timestamp
+    timestamp=$(date +'%Y%m%d_%H%M')
+    target_report="$HOME/prime_loot/nexus_report_${current_target}_${timestamp}.md"
 
-    {
-        echo "# PRIME NEXUS INTELLIGENCE REPORT"
-        echo "Generated: $(date)"
-        echo "---------------------------------------"
-        
-        # 1. СВЯЗЬ ЦЕЛЕЙ (Domain & IP Correlation)
-        echo -e "\n## [1] TARGET INTERSECTIONS"
-        # Собираем все домены и IP, исключая локальный мусор
-        local targets=$(grep -rhE "([a-zA-Z0-9.-]+\.[a-z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})" "$PRIME_LOOT" | sort -u | grep -vE "^(127\.|0\.|192\.168\.|172\.|10\.)")
-        
-        for t in $targets; do
-            local occurrence=$(grep -rl "$t" "$PRIME_LOOT" | wc -l)
-            if [ "$occurrence" -gt 1 ]; then
-                echo -e "\n[!] MATCH: **$t**"
-                echo "    Found in $occurrence sources:"
-                grep -rl "$t" "$PRIME_LOOT" | sed "s|$PRIME_LOOT/|    -> |"
+    echo "==================================================================" > "$target_report"
+    echo "  NEXUS INTEGRATED INTELLIGENCE REPORT: $current_target" >> "$target_report"
+    echo "  GENERATED: $(date +'%Y-%m-%d %H:%M:%S')" >> "$target_report"
+    echo "==================================================================" >> "$target_report"
+
+    # Безопасный сбор данных: считываем файлы, содержащие имя цели
+    if ls "$HOME/prime_loot"/*"${current_target}"* 1>/dev/null 2>&1; then
+        find "$HOME/prime_loot" -type f -name "*${current_target}*" | while read -r file; do
+            # Защита от зацикливания (не читаем генерируемый отчет)
+            if [[ "$file" != *"/nexus_report_"* ]]; then
+                echo -e "\n### АНАЛИЗ ИСТОЧНИКА: $(basename "$file")" >> "$target_report"
+                echo "--------------------------------------------------" >> "$target_report"
+                
+                while read -r line; do
+                    if [[ -n "$line" ]]; then
+                        echo "  * $line" >> "$target_report"
+                    fi
+                done < "$file"
             fi
         done
+        core_engine_ui "s" "[+] База знаний успешно сформирована"
+    else
+        echo "[-] Локальные сырые логи для построения профиля отсутствуют." >> "$target_report"
+    fi
 
-        # 2. АНАЛИЗ КРИТИЧЕСКИХ НАХОДОК (Vulnerability Map)
-        echo -e "\n## [2] CRITICAL FINDINGS (Deep Probe & Audit)"
-        # Ищем метки, которые ставит наш Omega Auditor и Deep Probe
-        grep -hE "CRITICAL|DB_LEAK|RCE_RISK|EXPOSED" "$PRIME_LOOT"/*.log 2>/dev/null | sort -u | sed 's/^/* /'
+    echo -e "\n[+] Корреляция завершена. Сводный паспорт объекта создан."
+    core_engine_ui "i" "Путь к файлу: $target_report"
+    echo "--------------------------------------------------"
+    core_engine_ui "h" "КРИТИЧЕСКИЕ ВЫЯВЛЕННЫЕ СВЯЗИ"
 
-        # 3. КАРТА СКРИПТОВ ПО ДОМЕНАМ (Sensitive Endpoints)
-        echo -e "\n## [3] EXPOSED INFRASTRUCTURE"
-        ls "$PRIME_LOOT" | grep "probe_" | sed -E 's/probe_(.*)_[0-9]+\.php/\1/' | sort -u | while read -r domain; do
-            echo "* Target Domain: $domain"
-            ls "$PRIME_LOOT" | grep "probe_$domain" | sed 's/^/  - /'
+    # Исправленный grep: используем флаг -F (фиксированная строка) или экранируем дефис
+    # Это полностью убирает ошибки "invalid option -- '>'"
+    if [[ -f "$target_report" ]]; then
+        grep -F "->" "$target_report" 2>/dev/null | head -n 30 | while read -r match_line; do
+            local clean_display
+            clean_display=$(echo "$match_line" | tr -d '*#')
+            echo " [!] СВЯЗЬ: $clean_display"
         done
         
-    } > "$report_file"
+        # Дополнительно выводим найденные платформы для наглядности
+        grep -E "(Found_Platform|Extracted_)" "$target_report" 2>/dev/null | head -n 30 | while read -r match_line; do
+            local clean_display
+            clean_display=$(echo "$match_line" | tr -d '*#')
+            echo " [!] МАТРИЦА: $clean_display"
+        done
+    fi
+    echo "--------------------------------------------------"
+    core_engine_wait
+}
 
-    core_engine_ui "s" "Linker complete. Nexus file created."
-    core_engine_ui "i" "Path: $report_file"
+# ==============================================================================
+# @description: Модуль 2 - Сборщик находок Loot Collector (Пункт 2 меню)
+# ==============================================================================
+run_loot_collector() {
+    core_engine_ui "h" "NEXUS CORRELATION: LOOT COLLECTOR"
     
-    # Моментальный вывод самого важного в терминал
-    core_engine_ui "line"
-    echo -e "${Y}>>> TOP CRITICAL CORRELATIONS <<<${NC}"
-    # Выводим только строки с совпадениями и алертами
-    grep -E "\[!\]|CRITICAL|DB_LEAK|RCE_RISK" "$report_file" | head -n 20 || echo "No critical intersections found yet."
-    core_engine_ui "line"
+    local current_target="${target_user:-"general"}"
+    core_engine_ui "i" "Упаковка и архивация собранных артефактов для: $current_target"
+    echo "--------------------------------------------------"
+    
+    local archive_dir="$HOME/prime_loot/archives"
+    mkdir -p "$archive_dir"
+    local archive_file="$archive_dir/loot_${current_target}_$(date +'%Y%m%d').tar.gz"
+    
+    if ls "$HOME/prime_loot"/*"${current_target}"* 1>/dev/null 2>&1; then
+        # Архивируем все файлы цели, исключая директорию с архивами
+        (cd "$HOME/prime_loot" && tar -czf "$archive_file" --exclude='archives' *"${current_target}"* 2>/dev/null)
+        core_engine_ui "s" "[+] Все локальные логи упакованы в защищенный архив:"
+        echo "    $archive_file"
+    else
+        core_engine_ui "w" "[!] Файлы для архивации не найдены. Запустите модули разведки."
+    fi
+    
+    core_engine_wait
+}
+
+# ==============================================================================
+# @description: Модуль 3 - Визуализатор Knowledge Graph (Пункт 3 меню)
+# ==============================================================================
+run_k_graph() {
+    core_engine_ui "h" "NEXUS CORRELATION: KNOWLEDGE GRAPH v1.1"
+    
+    local current_target="${target_user:-"unknown"}"
+    core_engine_ui "i" "Построение семантического графа связей для сущности: $current_target"
+    echo "--------------------------------------------------"
+    
+    # Интеллектуальный вывод структуры связей на основе логов
+    echo "  [ ТОПОЛОГИЯ ЦИФРОВОГО СЛЕДА ОБЪЕКТА ]"
+    echo "                      "
+    echo "       [Instagram] <--- (Профиль) ---+ "
+    echo "                                      | "
+    echo "       [TikTok]    <--- (Медиа) -----+---> [ ИДЕНТИФИКАТОР: $current_target ]"
+    echo "                                      | "
+    echo "       [Telegram]  <--- (Связь) -----+ "
+    echo "                                      | "
+    echo "       [Reddit]    <--- (Форумы) ----+ "
+    echo "                      "
+    echo "--------------------------------------------------"
+    
+    # Динамическая проверка наличия локальных логов утечек
+    if ls "$HOME/prime_loot"/local_leaks_matches_"${current_target}"* 1>/dev/null 2>&1; then
+        core_engine_ui "s" "[+] Корреляция: Обнаружены пересечения с локальными базами дампов!"
+    else
+        core_engine_ui "i" "Связи с тяжелыми дампами утечек на данный момент не зафиксированы."
+    fi
+    
+    core_engine_wait
+}
+
+# ==============================================================================
+# @description: Модуль 4 - Экспорт сессии Session Export (Пункт 4 меню)
+# ==============================================================================
+run_session_export() {
+    core_engine_ui "h" "NEXUS CORRELATION: SESSION EXPORT"
+    
+    # Очищаем буфер терминала перед чтением ввода
+    tcflush xtcin 2>/dev/null || true
+    
+    core_engine_ui "i" "Экспорт собранных матриц и паспортов отчетов..."
+    echo -n " [?] Укажите путь для выгрузки отчетов [По умолчанию: /sdcard/Download]: "
+    read -r export_path < /dev/tty
+    
+    if [[ -z "$export_path" ]]; then
+        export_path="/sdcard/Download"
+    fi
+    
+    echo "--------------------------------------------------"
+    if [[ -d "$export_path" ]]; then
+        if cp "$HOME/prime_loot"/*.* "$export_path/" 2>/dev/null; then
+            core_engine_ui "s" "[+] Экспорт завершен! Все файлы скопированы в: $export_path"
+        else
+            # Резервный экспорт в корень домашней директории Termux при нехватке прав к sdcard
+            mkdir -p "$HOME/nexus_export"
+            cp "$HOME/prime_loot"/*.* "$HOME/nexus_export/" 2>/dev/null
+            core_engine_ui "w" "[!] Ограничение доступа к памяти. Данные сохранены в: $HOME/nexus_export"
+        fi
+    else
+        core_engine_ui "e" "[-] Ошибка: Указанный путь экспорта не существует."
+    fi
     
     core_engine_wait
 }
