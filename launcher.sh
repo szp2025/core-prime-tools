@@ -348,6 +348,25 @@ GLOBAL_SIG_WEB_STRUCTURE="php|db|sql|id=|query=|select|insert|update"
 # Сигналы выявления критических аномалий и уязвимостей в финальных отчетах
 GLOBAL_SIG_VULN_ALERTS="critical|vulnerable|payload|exploit|dbms|open|cve-|injection|bypass"
 
+# --- Сигнатуры для сбора информации и разведки вебхуков (Recon & Webhook Signatures) ---
+# Паттерн для фильтрации активных веб-интерпретаторов и служб в системе
+GLOBAL_SIG_WEB_RUNTIMES="python|node|php|go|ruby|java|nginx|apache"
+
+# Базовый словарь эндпоинтов для поиска открытых вебхуков и API (Webhook Fuzzing Dict)
+GLOBAL_WEBHOOK_WORDLIST=(
+    "webhook"
+    "webhooks"
+    "api/v1"
+    "api/v2"
+    "hooks"
+    "tg-hook.php"
+    "stripe-webhook"
+    "git-hook"
+    "slack-hook"
+    "api/webhooks"
+    "v1/webhooks"
+)
+
 # ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
 # ==============================================================================
@@ -1811,75 +1830,96 @@ generate_poly_payload() {
 }
 
 
+# ==============================================================================
+# @description: Модуль сбора системной информации и разведки вебхуков (RECON v2.6)
+# ==============================================================================
 run_system_info() {
-    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v2.5"
+    clear
+    # Слой 1: Заголовок через компоненты интерфейса Ядра
+    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v2.6"
 
+    # Слой 2: Построение интерактивного меню выбора вектора разведки
     core_engine_item "1" "LOCAL" "System, USB, Cron & Webhooks"
     core_engine_item "2" "REMOTE" "Deep Recon & Webhook Discovery"
     core_engine_item "B" "BACK" "Return to Main Menu"
+    core_engine_ui "line" ""
     
     local choice=$(core_engine_input "select" "Target Type")
-    [[ -z "$choice" || "$choice" == "b" ]] && return
+    [[ -z "$choice" || "$choice" == "b" || "$choice" == "B" ]] && return
 
     case "$choice" in
-        "1") # --- LOCAL ---
-            core_engine_ui "i" "Analyzing Local Services..."
+        "1") # --- ВЕКТОР 1: LOCAL (Анализ локального хоста) ---
+            clear
+            core_engine_ui "h" "RECON: LOCAL SERVICE INTELLIGENCE"
+            core_engine_ui "i" "Analyzing Local Services & Active Runtimes..."
             
-            # Проверка локальных слушателей (кто может принимать вебхуки)
-            local listeners=$(lsof -nP -iTCP -sTCP:LISTEN | grep -E "python|node|php" || echo "No local web-listeners active.")
+            # Проверка локальных слушателей с использованием глобальной сигнатуры сред исполнения
+            local listeners=$(lsof -nP -iTCP -sTCP:LISTEN | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No local web-listeners active.")
             
             echo -e "\n${Y}--- LOCAL EVENT LISTENERS ---${NC}"
             echo -e "${W}$listeners${NC}"
             ;;
 
-        "2") # --- REMOTE ---
+        "2") # --- ВЕКТОР 2: REMOTE (Внешняя разведка инфраструктуры) ---
+            clear
+            core_engine_ui "h" "RECON: REMOTE INFRASTRUCTURE SURFACE"
+            
+            # Проверка базовых зависимостей ядра перед сетевым сканированием
             core_engine_validator "pkg" "curl" "curl" || return
             
             local r_target=$(core_engine_input "text" "Enter Target (domain.com)")
             [[ -z "$r_target" ]] && return
 
-            core_engine_ui "w" "Executing Multi-Vector Reconnaissance..."
+            core_engine_ui "w" "Executing Multi-Vector Reconnaissance on $r_target..."
             core_engine_progress 2 "SCANNING_RESOURCES"
+            sleep 1
 
-            # 1. Сбор базовых данных
-            local headers=$(curl -Is --connect-timeout 5 -L "$r_target" 2>/dev/null)
+            # 1. Пассивный сбор HTTP-заголовков с использованием глобального User-Agent
+            local headers=$(curl -Is --connect-timeout 5 -L -A "$GLOBAL_NETWORK_UA" "$target" 2>/dev/null)
             local php_ver=$(echo "$headers" | grep -Ei "X-Powered-By" | cut -d' ' -f2- | tr -d '\r')
             
-            # 2. ПОИСК WEBHOOKS & API (Fuzzing)
+            # 2. АКТИВНЫЙ ФАЗЗИНГ WEBHOOKS & API (Перебор глобального словаря ядра)
+            core_engine_ui "line" ""
             core_engine_ui "i" "Probing for Webhook & API endpoints..."
-            local webhook_hits=""
-            # Список эндпоинтов, которые часто остаются открытыми
-            local hooks=("webhook" "webhooks" "api/v1" "api/v2" "hooks" "tg-hook.php" "stripe-webhook" "git-hook")
             
-            for hook in "${hooks[@]}"; do
-                local code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout 2 "http://$r_target/$hook")
-                if [[ "$code" == "200" || "$code" == "405" || "$code" == "401" ]]; then
-                    # 405 (Method Not Allowed) часто означает, что хук ждет POST запрос — это "живая" цель!
+            local webhook_hits=""
+            for hook in "${GLOBAL_WEBHOOK_WORDLIST[@]}"; do
+                echo -ne " [.] Тестирование точки: /$hook\r"
+                
+                # Запрос к эндпоинту
+                local code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout 3 -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook")
+                
+                # 405 (Method Not Allowed), 401 (Unauthorized) или 200/403 означают, что эндпоинт существует!
+                if [[ "$code" == "200" || "$code" == "405" || "$code" == "401" || "$code" == "403" ]]; then
                     webhook_hits+="${G}[!] DETECTED:${NC} /$hook (Status: $code)\n"
                 fi
             done
+            # Очищаем строку прогресса в терминале
+            echo -ne "                                                                          \r"
             
-            # 3. WHOIS & IP
+            # 3. WHOIS & Нахождение IP-адреса целевого хоста
             local target_ip=$(host "$r_target" 2>/dev/null | awk '/has address/ {print $4}' | head -n1)
 
-            # --- ВЫВОД ---
-            echo -e "\n${Y}--- REMOTE INTELLIGENCE REPORT ---${NC}"
-            echo -e "${B}Target IP:${NC} $target_ip"
-            echo -e "${B}Runtime:${NC}   ${G}${php_ver:-Unknown}${NC}"
+            # --- ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТЕЗ И ВЫВОД ОТЧЕТА ---
+            core_engine_ui "line" ""
+            echo -e "${Y}--- REMOTE INTELLIGENCE REPORT ---${NC}"
+            echo -e "${B}Target IP:${NC} ${W}${target_ip:-Unknown}${NC}"
+            echo -e "${B}Runtime:${NC}   ${G}${php_ver:-Unknown / Hidden}${NC}"
+            core_engine_ui "line" ""
             
-            echo -e "\n${B}Webhook & API Surface:${NC}"
+            echo -e "${B}Webhook & API Surface:${NC}"
             if [[ -n "$webhook_hits" ]]; then
                 echo -e "$webhook_hits"
-                echo -e "${Y}[*] Analysis:${NC} Active listeners found. Possible third-party integration detected."
+                core_engine_ui "w" "Анализ: Обнаружены активные слушатели. Зафиксирована интеграция со сторонними сервисами."
+                core_engine_loot "recon" "Для цели $r_target обнаружены активные API эндпоинты."
             else
-                echo -e "${R}No common webhook endpoints detected.${NC}"
+                core_engine_ui "e" "Распространенных эндпоинтов вебхуков не обнаружено."
             fi
-            
-            core_engine_loot "recon" "Webhook scan for $r_target finished."
             ;;
     esac
 
-    core_engine_ui "+" "Diagnostic complete."
+    core_engine_ui "line" ""
+    core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
 
