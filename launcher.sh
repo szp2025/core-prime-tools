@@ -44,6 +44,129 @@ export BASE_DIR MOD_DIR PRIME_LOOT PRIME_SHARE
 
 
 
+# ==============================================================================
+# 1. ГЛОБАЛЬНАЯ МАТРИЦА ПЛАТФОРМ ДЛЯ КРОСС-СПРАВОК (GLOBAL OSINT SITES)
+# ==============================================================================
+GLOBAL_OSINT_SITES=(
+    # Основные социальные сети и мессенджеры
+    "https://t.me/|Telegram"
+    "https://instagram.com/|Instagram"
+    "https://twitter.com/|Twitter"
+    "https://vk.com/|VK"
+    "https://ok.ru/|Odnoklassniki"
+    "https://www.facebook.com/|Facebook"
+    "https://www.tiktok.com/@|TikTok"
+    
+    # Профессиональные, ИТ-платформы и репозитории
+    "https://github.com/|GitHub"
+    "https://gitlab.com/|GitLab"
+    "https://bitbucket.org/|BitBucket"
+    "https://www.linkedin.com/in/|LinkedIn"
+    "https://habr.com/ru/users/|Habr"
+    "https://stackoverflow.com/users/|StackOverflow"
+    
+    # Блоги, форумы и контент-платформы
+    "https://www.reddit.com/user/|Reddit"
+    "https://medium.com/@|Medium"
+    "https://pikabu.ru/@|Pikabu"
+    "https://livejournal.com/~|LiveJournal"
+    "https://pbase.com/|PBase"
+    "https://vc.ru/u/|VCRu"
+    
+    # Видео, стриминг и музыкальные сервисы
+    "https://www.youtube.com/@|YouTube"
+    "https://www.twitch.tv/|Twitch"
+    "https://vimeo.com/|Vimeo"
+    "https://soundcloud.com/|SoundCloud"
+    "https://open.spotify.com/user/|Spotify"
+    "https://www.dailymotion.com/|Dailymotion"
+    
+    # Дизайн, фото, портфолио и хобби
+    "https://www.pinterest.com/|Pinterest"
+    "https://www.behance.net/|Behance"
+    "https://www.deviantart.com/|DeviantArt"
+    "https://www.flickr.com/people/|Flickr"
+    "https://www.artstation.com/|ArtStation"
+    "https://unsplash.com/@|Unsplash"
+    
+    # Игровые платформы и сообщества
+    "https://steamcommunity.com/id/|Steam"
+    "https://www.chess.com/member/|Chess.com"
+    "https://psnprofiles.com/|PSNProfiles"
+    "https://xboxgamertag.com/search/|XboxGamertags"
+    
+    # Фриланс, коммерция и прочие сервисы
+    "https://www.fl.ru/users/|FL.ru"
+    "https://www.freelancer.com/u/|Freelancer"
+    "https://www.patreon.com/|Patreon"
+    "https://archive.org/details/@|Archive.org"
+)
+
+# ==============================================================================
+# 2. МАТРИЦА ПОЧТОВЫХ ПРОВАЙДЕРОВ ДЛЯ ВАЛИДАЦИИ И ДОРКИНГА (EMAIL DOMAINS)
+# ==============================================================================
+GLOBAL_EMAIL_DOMAINS=(
+    "gmail.com|Google Mail"
+    "yahoo.com|Yahoo Mail"
+    "outlook.com|Microsoft Outlook"
+    "hotmail.com|Hotmail"
+    "icloud.com|Apple iCloud"
+    "mail.ru|Mail.ru Group"
+    "yandex.ru|Yandex Mail"
+    "rambler.ru|Rambler Mail"
+    "proton.me|ProtonMail Encrypted"
+    "protonmail.com|ProtonMail Legacy"
+    "tutanota.com|Tutanota Secure"
+    "gmx.de|GMX Mail"
+    "zoho.com|Zoho Mail"
+    "aoi.com|AOL Mail"
+)
+
+# ==============================================================================
+# 3. МЕЖДУНАРОДНЫЕ ТЕЛЕФОННЫЕ КОДЫ ДЛЯ АНАЛИЗА ГЕОЛОКАЦИИ (TELEPHONY CODES)
+# ==============================================================================
+GLOBAL_PHONE_CODES=(
+    "+7|Россия / Казахстан"
+    "+33|Франция"
+    "+1|США / Канада"
+    "+44|Великобритания"
+    "+49|Германия"
+    "+380|Украина"
+    "+375|Беларусь"
+    "+48|Польша"
+    "+34|Испания"
+    "+39|Италия"
+    "+41|Швейцария"
+    "+90|Турция"
+    "+971|ОАЭ"
+    "+81|Япония"
+    "+86|Китай"
+)
+
+# ==============================================================================
+# 4. КРИПТОГРАФИЧЕСКИЕ СИГНАТУРЫ ДЛЯ БЛОКЧЕЙН-ТРЕКИНГА (CRYPTO SIGNATURES)
+# ==============================================================================
+GLOBAL_CRYPTO_TYPES=(
+    "^(0x)[0-9a-fA-F]{40}$|Ethereum (ETH) / ERC-20 Wallet"
+    "^(1|3)[a-km-zA-HJ-NP-Z1-9]{26,33}$|Bitcoin (BTC) Legacy/P2SH"
+    "^(bc1)[a-zA-Z0-9]{25,39}$|Bitcoin (BTC) Bech32 Native SegWit"
+    "^(T)[a-zA-Z0-9]{33}$|TRON (TRX) / TRC-20 Wallet"
+    "^(4)[0-9a-zA-Z]{94}$|Monero (XMR) Anonymous Wallet"
+    "^(r)[0-9a-zA-Z]{24,34}$|Ripple (XRP) Ledger Address"
+    "^(D)[a-km-zA-HJ-NP-Z1-9]{33}$|Dogecoin (DOGE) Address"
+)
+
+# ==============================================================================
+# СИСТЕМНЫЕ СИГНАТУРЫ И СЕТЕВЫЕ НАСТРОЙКИ (GLOBAL SIGNATURES & NETWORK)
+# ==============================================================================
+# Регулярные выражения для валидации входных векторов
+GLOBAL_REGEX_EMAIL="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
+GLOBAL_REGEX_PHONE="^\+?[0-9]{10,15}$"
+
+# Эмуляция легитимного окружения для обхода базовых блокировок (User-Agent)
+GLOBAL_NETWORK_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+
 # ==========================================
 # 1. CORE ENGINE (Должны быть ПЕРВЫМИ)
 # ==========================================
@@ -1859,68 +1982,71 @@ suggest_action() {
     fi
 }
 
+# ==============================================================================
+# @description: Высокоскоростной движок OSINT с глобальными сигнатурами
+# ==============================================================================
 run_smart_osint_engine() {
     clear
-    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v13.8"
+    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v14.0"
 
     # Ввод через стандартный input Ядра
     local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, or Email)")
     [[ -z "$INPUT" ]] && return
 
     local raw_log="/tmp/prime_recon_$RANDOM.log"
-    local UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     
     # Используем новый однострочный прогресс
     core_engine_progress 2 "OSINT_SCAN_INIT"
 
-    # --- 1. ОПРЕДЕЛЕНИЕ ТИПА ЦЕЛИ ---
-    local is_email="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
-    local is_phone="^\+?[0-9]{10,15}$"
-
-    # --- 2. SOCIAL SCAN ---
-    if [[ ! "$INPUT" =~ $is_email && ! "$INPUT" =~ $is_phone ]]; then
+    # --- 1. SOCIAL SCAN (Проверка: если ввод НЕ email и НЕ телефон) ---
+    if [[ ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL && ! "$INPUT" =~ $GLOBAL_REGEX_PHONE ]]; then
         core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
-        local sites=(
-            "https://github.com/|GitHub"
-            "https://twitter.com/|Twitter"
-            "https://instagram.com/|Instagram"
-            "https://vk.com/|VK"
-            "https://t.me/|Telegram"
-            "https://ok.ru/|Odnoklassniki"
-            "https://www.pinterest.com/|Pinterest"
-            "https://www.reddit.com/user/|Reddit"
-        )
+        
+        local sites=("${GLOBAL_OSINT_SITES[@]}")
+        local total_sites=${#sites[@]}
+        local current_index=0
 
         for entry in "${sites[@]}"; do
+            ((current_index++))
             local url="${entry%%|*}"
-            local name="${entry##*|}"
-            local status=$(curl -s -o /dev/null -L -w "%{http_code}" -A "$UA" "${url}${INPUT}" --connect-timeout 5)
+            local name="${entry#*|}"
+            
+            local progress
+            progress=$(printf "[%02d/%02d]" "$current_index" "$total_sites")
+
+            # Запрос утилитой curl с использованием глобального User-Agent
+            local status
+            status=$(curl -s -o /dev/null -L -w "%{http_code}" -A "$GLOBAL_NETWORK_UA" "${url}${INPUT}" --connect-timeout 5)
+            
             if [ "$status" == "200" ]; then
                 echo "[+] FOUND on $name: ${url}${INPUT}" >> "$raw_log"
-                core_engine_ui "s" "Match confirmed: $name"
+                core_engine_ui "s" "$progress Match confirmed: $name"
+            else
+                echo -ne " [.] Проверка: $progress $name...\r"
             fi
         done
+        echo -ne "                                                       \r"
     fi
 
-    # --- 3. PHONE INTEL ---
-    if [[ "$INPUT" =~ $is_phone ]]; then
+    # --- 2. PHONE INTEL ---
+    if [[ "$INPUT" =~ $GLOBAL_REGEX_PHONE ]]; then
         core_engine_ui "i" "Deep-Querying Global Phone Databases..."
-        curl -s "https://htmlweb.ru/geo/api.php?json&telcod=${INPUT}" >> "$raw_log" 2>/dev/null
+        curl -s -A "$GLOBAL_NETWORK_UA" "https://htmlweb.ru/geo/api.php?json&telcod=${INPUT}" >> "$raw_log" 2>/dev/null
         local phone_info=$(grep -oE '"name":"[^"]+"|"oper":"[^"]+"' "$raw_log" | sed 's/"//g')
         [[ -n "$phone_info" ]] && core_engine_ui "s" "Operator Data: $phone_info"
     fi
 
-    # --- 4. DATA BREACH ANALYZER ---
-    if [[ "$INPUT" =~ $is_email ]]; then
+    # --- 3. DATA BREACH ANALYZER ---
+    if [[ "$INPUT" =~ $GLOBAL_REGEX_EMAIL ]]; then
         core_engine_ui "i" "Cross-referencing Leak Databases..."
-        curl -s "https://api.proxynova.com/comb?query=${INPUT}" >> "$raw_log" 2>/dev/null
+        curl -s -A "$GLOBAL_NETWORK_UA" "https://api.proxynova.com/comb?query=${INPUT}" >> "$raw_log" 2>/dev/null
         if grep -q "results" "$raw_log"; then
             core_engine_ui "w" "Breach Detected: Target found in global COMB leak."
             echo "[!] WARNING: Data leak detected for $INPUT" >> "$raw_log"
         fi
     fi
 
-    # --- 5. ГЕНЕРАЦИЯ ФИНАЛЬНОГО ДОСЬЕ ---
+    # --- 4. ГЕНЕРАЦИЯ ФИНАЛЬНОГО ДОСЬЕ ---
     core_engine_ui "line" ""
     core_engine_ui "s" "INTELLIGENCE DOSSIER GENERATED"
     core_engine_ui "line" ""
@@ -1936,15 +2062,12 @@ run_smart_osint_engine() {
         echo -e "${R}No data collected.${NC}"
     fi
     
-    # Логирование через новый движок
     core_engine_loot "osint" "Dossier for $INPUT created. Hits: $hits"
     rm -f "$raw_log"
     core_engine_ui "line" ""
 
-    # Заменяем старую pause на новый wait
     core_engine_wait
 }
-
 
 
 run_pc_recovery_ultimate() {
