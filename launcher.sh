@@ -184,17 +184,22 @@ GLOBAL_BANK_MATRIX=(
 
 
 # ==============================================================================
-# 4. КРИПТОГРАФИЧЕСКИЕ СИГНАТУРЫ ДЛЯ БЛОКЧЕЙН-ТРЕКИНГА (CRYPTO SIGNATURES)
+# 4. КРИПТОГРАФИЧЕСКИЕ СИГНАТУРЫ ДЛЯ БЛОКЧЕЙН-ТРЕКИНГА (ULTIMATE CRYPTO CORE)
 # ==============================================================================
 GLOBAL_CRYPTO_TYPES=(
-    "^(0x)[0-9a-fA-F]{40}$|Ethereum (ETH) / ERC-20 Wallet"
-    "^(1|3)[a-km-zA-HJ-NP-Z1-9]{26,33}$|Bitcoin (BTC) Legacy/P2SH"
-    "^(bc1)[a-zA-Z0-9]{25,39}$|Bitcoin (BTC) Bech32 Native SegWit"
-    "^(T)[a-zA-Z0-9]{33}$|TRON (TRX) / TRC-20 Wallet"
-    "^(4)[0-9a-zA-Z]{94}$|Monero (XMR) Anonymous Wallet"
-    "^(r)[0-9a-zA-Z]{24,34}$|Ripple (XRP) Ledger Address"
-    "^(D)[a-km-zA-HJ-NP-Z1-9]{33}$|Dogecoin (DOGE) Address"
+    "\b0x[0-9a-fA-F]{40}\b|Ethereum (ETH) / Binance Smart Chain (BSC) / Polygon / ERC-20"
+    "\b[13][a-km-zA-HJ-NP-Z1-9]{26,33}\b|Bitcoin (BTC) Legacy / P2SH Address"
+    "\bbc1[a-zA-Z0-9]{25,39}\b|Bitcoin (BTC) Native SegWit (Bech32)"
+    "\bbc1[pP][a-zA-Z0-9]{58}\b|Bitcoin (BTC) Taproot / Schnorr Signatures (Bech32m)"
+    "\bT[a-zA-Z0-9]{33}\b|TRON (TRX) / Tether USD (USDT-TRC20)"
+    "\b4[0-9a-zA-Z]{94}\b|Monero (XMR) Stealth Cryptonote Wallet"
+    "\b[49][1-9A-HJ-NP-Za-km-z]{94,105}\b|Monero (XMR) Integrated Wallet Address"
+    "\br[0-9a-zA-Z]{24,34}\b|Ripple (XRP) Ledger Address"
+    "\bD[a-km-zA-HJ-NP-Z1-9]{33}\b|Dogecoin (DOGE) Address"
+    "\b[L3][a-km-zA-HJ-NP-Z1-9]{26,33}\b|Litecoin (LTC) Legacy / Script Address"
+    "\bltc1[a-zA-Z0-9]{25,43}\b|Litecoin (LTC) Native SegWit Address"
 )
+
 
 # --- Сектор 7: Верификация международных банковских реквизитов (IBAN / RIB / SWIFT Intel) ---
 GLOBAL_API_FINANCE_NODES=(
@@ -293,8 +298,11 @@ GLOBAL_NETWORK_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, li
 # ==============================================================================
 # МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
 # ==============================================================================
-# Регулярное выражение для поиска расширений файлов в веб-документах
-GLOBAL_REGEX_WEB_EXTENSIONS='[a-zA-Z0-9_\/\.-]+\.(php|pdf|docx|xlsx|zip|sql|env|htaccess|bak|log|conf|ini)'
+# ==============================================================================
+# @description: Ультимативный паттерн поиска веб-документов и системных секретов
+# ==============================================================================
+GLOBAL_REGEX_WEB_EXTENSIONS='\b[a-zA-Z0-9_\/\.-]+\.(php|php[0-9]|aspx?|jspx?|pdf|docx?|xlsx?|zip|gz|tar\.gz|tgz|rar|sql|db|sqlite|env|htaccess|htpasswd|bak|old|swp|log|conf|ini|json|ya?ml|git|key|pem|crt)\b'
+
 
 # Базовый словарь фаззинга чувствительных точек и бэкапов (Web Fuzzing Dict)
 GLOBAL_FUZZ_WORDLIST=(
