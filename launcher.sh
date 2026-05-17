@@ -993,42 +993,80 @@ EOF
 
 
 # --- py functions ---
-# Функция-генератор контента для IBAN (ПОЛНАЯ ВЕРСИЯ v1.7)
+# ==============================================================================
+# @description: Функция-генератор контента для IBAN/RIB (ИНТЕГРИРОВАННАЯ v1.8)
+# ==============================================================================
 generate_iban_code() {
     local target_file="$1"
     local v_num="$2"
-    local code
 
-    # Захватываем код Python. Используем 'EOF' в кавычках для защиты символов $ и скобок.
-    code=$(cat << 'EOF'
+    # --- Подготовка динамических данных из глобальных матриц ядра ---
+    local python_sources=""
+    local entry
+
+    # 1. Формируем список источников для Python на основе GLOBAL_API_FINANCE_NODES
+    for entry in "${GLOBAL_API_FINANCE_NODES[@]}"; do
+        local url="${entry%%|*}"
+        # Пропускаем СНГ-специфичные API БИК, так как они требуют другой логики парсинга JSON
+        if [[ "$url" == *"bik-info"* || "$url" == *"gasi.gov.ru"* ]]; then
+            continue
+        fi
+        python_sources+="    \"$url\",\n"
+    done
+    # Удаляем последний перенос строки для чистоты синтаксиса
+    python_sources=$(echo -e "$python_sources" | sed '$d')
+
+    # 2. Формируем локальный словарь банков для Python из GLOBAL_BANK_MATRIX
+    local python_bank_dict=""
+    for entry in "${GLOBAL_BANK_MATRIX[@]}"; do
+        local code="${entry%%|*}"
+        local tail="${entry#*|}"
+        local name="${tail%%|*}"
+        python_bank_dict+="    \"$code\": \"$name\",\n"
+    done
+    python_bank_dict=$(echo -e "$python_bank_dict" | sed '$d')
+
+    # --- Генерация контента файла через защищенный стрим ---
+    local code
+    code=$(cat << EOF
 import sys, re, json, time
 from urllib.request import Request, urlopen
 
-# Список доверенных зеркал и API для отказоустойчивости
+# Динамически импортированные зеркала верификации из GLOBAL_API_FINANCE_NODES
 SOURCES = [
-    "https://api.ibanlist.com/v1/validate/",
-    "https://openiban.com/validate/",
-    "https://api.iban-check.com/v1/verify/"
+$python_sources
 ]
 
+# Локальный справочник идентификаторов из GLOBAL_BANK_MATRIX
+LOCAL_BANKS = {
+$python_bank_dict
+}
+
 def get_bank_data(iban):
-    """Опрашивает источники по цепочке (Failover System)"""
+    """Опрашивает источники по цепочке (Failover System с глобальным UA)"""
+    # Используем сетевой User-Agent, заданный на глобальном уровне лаунчера
+    ua_string = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    
     for base_url in SOURCES:
         try:
-            url = f"{base_url}{iban}"
-            req = Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0'})
+            # Формируем корректный URL в зависимости от структуры эндпоинта
+            if base_url.endswith("="):
+                url = f"{base_url}{iban}"
+            else:
+                url = f"{base_url}{iban}"
+                
+            req = Request(url, headers={'User-Agent': ua_string})
             with urlopen(req, timeout=4) as response:
                 return json.loads(response.read().decode())
         except:
-            continue # Если один сайт упал, переходим к следующему
+            continue
     return None
 
 def get_country_format(iban):
     """Математический разбор структуры по стандартам ISO"""
     country = iban[:2]
-    # Словарь специфик (можно расширять до бесконечности)
     formats = {
-        'FR': {'name': 'France', 'len': 27, 'parse': lambda i: f"Bank: {i[4:9]}, Branch: {i[9:14]}, Acc: {i[14:25]}, Key: {i[25:27]}"},
+        'FR': {'name': 'France', 'len': 27, 'parse': lambda i: f"Bank: {i[4:9]} (RIB), Branch: {i[9:14]}, Acc: {i[14:25]}, Key: {i[25:27]}"},
         'DE': {'name': 'Germany', 'len': 22, 'parse': lambda i: f"BLZ: {i[4:12]}, Acc: {i[12:22]}"},
         'GB': {'name': 'United Kingdom', 'len': 22, 'parse': lambda i: f"Sort Code: {i[4:10]}, Acc: {i[10:18]}"},
         'IT': {'name': 'Italy', 'len': 27, 'parse': lambda i: f"CIN: {i[4:5]}, ABI: {i[5:10]}, CAB: {i[10:15]}, Acc: {i[15:27]}"},
@@ -1036,50 +1074,71 @@ def get_country_format(iban):
     }
     return formats.get(country, {'name': 'Other/International', 'len': len(iban), 'parse': lambda i: f"BBAN: {i[4:]}"})
 
+def local_heuristic_search(iban):
+    """Локальный поиск банка по сигнатурам, если сеть недоступна"""
+    country = iban[:2]
+    # Для Франции парсим код банка из структуры RIB (индексы 4-9)
+    if country == "FR":
+        bank_code = iban[4:9]
+        if bank_code in LOCAL_BANKS:
+            return LOCAL_BANKS[bank_code]
+    
+    # Для международных проверяем совпадение по SWIFT-маркерам (индексы 4-8)
+    swift_prefix = iban[4:8]
+    if swift_prefix in LOCAL_BANKS:
+        return LOCAL_BANKS[swift_prefix]
+        
+    return None
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2: sys.exit(1)
+    if len(sys.argv) < 2: sys.argv[1]
     
     target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
     provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else "NONE"
 
-    print(f"\033[1;34m--- OMNI-BANKER v2.0: GLOBAL ANALYSIS ---\033[0m")
+    print(f"\033[1;34m--- OMNI-BANKER v$v_num: GLOBAL FINANCIAL INTELLIGENCE ---\033[0m")
     
     # 1. Структурный анализ (Всегда работает Offline)
     fmt = get_country_format(target)
     print(f"\033[96mCountry:\033[0m {fmt['name']}")
     print(f"\033[96mStructure:\033[0m {fmt['parse'](target)}")
 
-    # 2. Агрегация данных из внешних источников
-    print(f"[*] Analyzing with Failover Protection...")
+    # 2. Попытка локального офлайн определения банка
+    local_bank = local_heuristic_search(target)
+    if local_bank:
+        print(f"\033[92mLocal Signature Match:\033[0m {local_bank}")
+
+    # 3. Агрегация данных из внешних динамических источников
+    print(f"[*] Analyzing with Failover Protection via Core API Matrix...")
     data = get_bank_data(target)
     
     if data:
-        bank_name = data.get('bank_name', data.get('bank', 'N/A')).upper()
+        bank_name = data.get('bank_name', data.get('bank', local_bank if local_bank else 'N/A')).upper()
         bic = data.get('bic', 'N/A')
         
         print(f"\n\033[1;32m[+] DATA VERIFIED VIA MULTI-SOURCE\033[0m")
         print(f"🏦 Bank: {bank_name}")
         print(f"🔑 BIC/SWIFT: {bic}")
 
-        # Сверка Имени (Heuristic Check)
-        # В 2026 году сверка идет через подтверждение принадлежности счета банку
         if provided_name != "NONE":
             print(f"\n\033[1;35m--- SMART MATCH REPORT ---\033[0m")
             print(f"Target Name: {provided_name}")
-            # Если банк найден, подтверждаем связь
             if bank_name != 'N/A':
-                print(f"✅ Account Link: Номер {target[-4:]} привязан к {bank_name}")
+                print(f"✅ Account Link: Номер *{target[-4:]} привязан к {bank_name}")
                 print(f"ℹ️ Status: Владелец '{provided_name}' соответствует региону обслуживания.")
     else:
-        print(f"\n\033[91m[-] ALERT: All sources failed or IBAN is blacklisted/invalid.\033[0m")
+        if local_bank:
+            print(f"\n\033[1;33m[!] NOTICE: Сетевые API недоступны, применен локальный фингерпринт Ядра\033[0m")
+            print(f"🏦 Bank (Heuristic): {local_bank.upper()}")
+        else:
+            print(f"\n\033[91m[-] ALERT: All sources failed and no local signatures matched.\033[0m")
 EOF
 )
-    # Внедряем версию
-    code="${code//\{\{V_NUM\}\}/$v_num}"
 
-    # Используем smart_cat для записи (права 755 по умолчанию)
+    # Запись сгенерированного скрипта на диск через smart_cat Ядра
     smart_cat "$target_file" "$code"
 }
+
 
 
 # Функция-генератор для AV-Server (v1.2)
