@@ -2694,80 +2694,86 @@ run_pass_lab() {
 }
 
 
+# ==============================================================================
+# @description: Эвристический сканер уязвимостей (GHOST-ENGINE INTEG v7.2)
+# ==============================================================================
 run_prime_exploiter_v5() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "PRIME HEURISTIC VULN-SCANNER v7.0"
+    clear
+    # Слой 1: Заголовок ядра
+    core_engine_ui "h" "PRIME HEURISTIC VULN-SCANNER v7.2"
 
-    # Слой 2: Органы чувств [3] — Прием цели
+    # Слой 2: Прием цели
     local target=$(core_engine_input "text" "Enter Target Domain/URL")
     [[ -z "$target" ]] && return
 
-    # Подготовка путей согласно архитектуре [8]
-    local loot_dir="${BASE_DIR:-./}/prime_loot"
+    # Подготовка путей согласно архитектуре ядра
+    local loot_dir="$BASE_DIR/loot"
+    mkdir -p "$loot_dir"
     local results_file="$loot_dir/vuln_$(date +%s).log"
     local signals_file="/tmp/signals_$RANDOM.tmp"
-    
+
     # --- СЛОЙ 1: ПАССИВНЫЙ ГЕНЕРАТОР СИГНАЛОВ ---
     core_engine_ui "i" "Ingesting target aura (Passive Mode)..."
-    
-    # Сбор данных через Глушитель [7]
+
+    # Сбор данных с использованием глобального User-Agent ядра
     {
-        curl -Is --connect-timeout 5 -A "Mozilla/5.0 (compatible; Googlebot/2.1)" "$target"
+        curl -Is --connect-timeout 5 -A "$GLOBAL_NETWORK_UA" "$target"
         host -t txt "$target" 2>/dev/null
         whois "$target" 2>/dev/null | grep -iE "city|country|orgname"
     } > "$signals_file" 2>&1
 
-    # --- СЛОЙ 2: АДАПТИВНАЯ МАТРИЦА (Мозг [5]) ---
-    # Оценка сложности через Метрики [12]
+    # --- СЛОЙ 2: АДАПТИВНАЯ МАТРИЦА (Мозг системы) ---
     local entropy_level=$(wc -c < "$signals_file")
     local stealth_delay=$(( (entropy_level % 5) + 2 ))
-    
-    # Эвристический выбор модулей
+
+    # Эвристический выбор модулей на основе глобальных сигнатур веб-структуры
     local sql_engine="dormant"
-    grep -qiE "php|db|sql|id=" "$signals_file" && sql_engine="active"
-    
+    grep -qiE "$GLOBAL_SIG_WEB_STRUCTURE" "$signals_file" && sql_engine="active"
+
+    # Адаптивное управление интенсивностью при обнаружении WAF через глобальные сигнатуры
     local scan_intensity="-T3"
-    grep -qiE "cloudflare|akamai|sucuri" "$signals_file" && scan_intensity="-T1 --spoof-mac 0"
+    grep -qiE "$GLOBAL_SIG_WAF" "$signals_file" && scan_intensity="-T1 --spoof-mac 0"
 
     # --- СЛОЙ 3: ЦИКЛ АМОРФНОГО ИСПОЛНЕНИЯ ---
     core_engine_ui "w" "Deploying Ghost-Engine (Intensity: $scan_intensity)..."
 
-    # Запускаем фоновый процесс через Санитара [8]
+    # Запуск параллельного фонового процесса сбора артефактов
     (
         nmap $scan_intensity -n -Pn --version-intensity 0 "$target" >> "$results_file" 2>&1
-        
+
         if [[ "$sql_engine" == "active" ]]; then
-            # Адаптивный вызов sqlmap через Глушитель
+            # Адаптивный вызов sqlmap с автоматическими параметрами безопасности
             sqlmap -u "$target" --batch --random-agent --delay="$stealth_delay" \
                   --threads=1 >> "$results_file" 2>&1
         fi
     ) &
 
-    # Визуализация прогресса через Синхронизацию [13]
+    # Визуализация прогресса
     core_engine_progress 10 "Processing heuristic feedback loops"
 
     # --- СЛОЙ 4: ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТЕЗ ---
     core_engine_wait "L"
     core_engine_ui "s" "INTELLIGENCE SYNTHESIS COMPLETE"
-    
-    # Парсинг результатов через Валидатор [5]
+
+    # Парсинг результатов через Валидатор с использованием глобальных алертов уязвимостей
     if [[ -s "$results_file" ]]; then
-        grep -Ei "critical|vulnerable|payload|exploit|dbms|open" "$results_file" | \
+        grep -Ei "$GLOBAL_SIG_VULN_ALERTS" "$results_file" | \
         sed -r "s/(.*vulnerable.*)/\1 ${Y}[HIGH PRIORITY]${NC}/" | sort -u
-        
-        # Интеграция в Сборщик трофеев [11]
+
+        # Интеграция в Сборщик трофеев ядра
         core_engine_loot "vulnerabilities" "Target: $target | Entropy: $entropy_level\n$(cat "$results_file")"
     else
         core_engine_ui "e" "No significant anomalies detected in initial scan."
     fi
 
-    # Сигнал для Моста [10]
+    # Сигнал для Моста логов
     echo "[$(date)] VULN_SCAN: $target | ENTROPY: $entropy_level" >> "$loot_dir/bridge_signals.log"
-    
-    # Очистка через Санитара [8]
-    core_engine_remove "$signals_file"
+
+    # Очистка временных файлов через Санитара
+    rm -f "$signals_file"
     core_engine_wait
 }
+
 
 
 # ==============================================================================
