@@ -338,6 +338,16 @@ GLOBAL_REGEX_TG_TOKEN="^[0-9]{8,10}:[A-Za-z0-9_-]{35}$"
 GLOBAL_REGEX_JWT="^eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+=]*$"
 
 
+# --- Сигнатуры эвристического движка анализа уязвимостей (Exploiter Engine Signatures) ---
+# Сигналы присутствия WAF / защитных прокси-систем для адаптивного замедления сканирования
+GLOBAL_SIG_WAF="cloudflare|akamai|sucuri|incapsula|barracuda|f5_big-ip"
+
+# Сигналы структуры веб-приложения для активации движка поиска инъекций (SQL-Engine)
+GLOBAL_SIG_WEB_STRUCTURE="php|db|sql|id=|query=|select|insert|update"
+
+# Сигналы выявления критических аномалий и уязвимостей в финальных отчетах
+GLOBAL_SIG_VULN_ALERTS="critical|vulnerable|payload|exploit|dbms|open|cve-|injection|bypass"
+
 # ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
 # ==============================================================================
