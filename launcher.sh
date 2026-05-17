@@ -157,6 +157,57 @@ GLOBAL_CRYPTO_TYPES=(
 )
 
 # ==============================================================================
+# УЛЬТИМАТИВНАЯ МАТРИЦА ВНЕШНИХ API-ЭНДПОИНТОВ (GLOBAL OSINT API ENDPOINTS)
+# ==============================================================================
+# Формат структуры: "БАЗОВЫЙ_URL|СИСТЕМНОЕ_ИМЯ_ПЛАТФОРМЫ"
+
+# --- Сектор 1: Анализ параметров мобильных номеров (Phone Intel) ---
+GLOBAL_API_PHONE_NODES=(
+    "https://htmlweb.ru/geo/api.php?json&telcod=|HtmlWeb GeoAPI"
+    "https://api.numlookupapi.com/v1/validate/|NumLookupProvider"
+    "https://htmlweb.ru/geo/api.php?json&oper=|HtmlWeb Operator Matrix"
+)
+
+# --- Сектор 2: Сверка с глобальными базами утечек и COMB (Breach Analysers) ---
+GLOBAL_API_BREACH_NODES=(
+    "https://api.proxynova.com/comb?query=|ProxyNova COMB Registry"
+    "https://leakcheck.io/api/public?check=|LeakCheck Public Core"
+    "https://scylla.sh/search?q_email=|Scylla Breach Database"
+)
+
+# --- Сектор 3: Аналитика сетевой инфраструктуры и провайдеров (IP/ASN Intel) ---
+GLOBAL_API_NETWORK_NODES=(
+    "https://ipapi.co/|IP-API Co Decoder"
+    "https://ipinfo.io/|IPInfo Core Engine"
+    "https://api.bgpview.io/ip/|BGPView ASN Tracker"
+    "https://ipapi.com/api/|IPApi Advanced Matrix"
+    "https://api.ipify.org?format=json|Ipify Public Check"
+)
+
+# --- Сектор 4: Криптографический трекинг балансов (Crypto Explorers) ---
+GLOBAL_API_CRYPTO_NODES=(
+    "https://api.blockcypher.com/v1/btc/main/addrs/|BlockCypher BTC Node"
+    "https://api.etherscan.io/api?module=account&action=balance&address=|EtherScan ETH Node"
+    "https://apilist.tronscan.org/api/account?address=|TronScan TRC20 Node"
+    "https://api.blockchair.com/bitcoin/dashboards/address/|Blockchair BTC Ledger"
+)
+
+# --- Сектор 5: Интеллект доменных имен, DNS и серверов (Domain & DNS Intel) ---
+GLOBAL_API_DOMAIN_NODES=(
+    "https://dns.google/resolve?name=|Google Secure DNS Core"
+    "https://cloudflare-dns.com/dns-query?name=|Cloudflare Quad9 DNS"
+    "https://api.hackertarget.com/reversedns/?q=|HackerTarget ReverseDNS"
+    "https://api.hackertarget.com/whois/?q=|HackerTarget Whois Core"
+)
+
+# --- Сектор 6: Метаданные, Соцсети и Поиск связей (Social Identity Intel) ---
+GLOBAL_API_IDENTITY_NODES=(
+    "https://api.github.com/users/|GitHub Developer Core API"
+    "https://archive.org/advancedsearch.php?q=|Wayback Machine Meta-Archive"
+)
+
+
+# ==============================================================================
 # СИСТЕМНЫЕ СИГНАТУРЫ И СЕТЕВЫЕ НАСТРОЙКИ (GLOBAL SIGNATURES & NETWORK)
 # ==============================================================================
 # Регулярные выражения для валидации входных векторов
@@ -1983,23 +2034,26 @@ suggest_action() {
 }
 
 # ==============================================================================
-# @description: Высокоскоростной движок OSINT с глобальными сигнатурами
+# @description: Высокоскоростной движок OSINT с каскадными API-матрицами
 # ==============================================================================
 run_smart_osint_engine() {
     clear
-    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v14.0"
+    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v14.1"
 
     # Ввод через стандартный input Ядра
-    local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, or Email)")
+    local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, Email, IP, or Domain)")
     [[ -z "$INPUT" ]] && return
 
     local raw_log="/tmp/prime_recon_$RANDOM.log"
     
-    # Используем новый однострочный прогресс
+    # Системные регулярные выражения для распознавания типов данных
+    local is_ip="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
+    local is_domain="^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+
     core_engine_progress 2 "OSINT_SCAN_INIT"
 
-    # --- 1. SOCIAL SCAN (Проверка: если ввод НЕ email и НЕ телефон) ---
-    if [[ ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL && ! "$INPUT" =~ $GLOBAL_REGEX_PHONE ]]; then
+    # --- 1. SOCIAL SCAN (Если ввод — это никнейм) ---
+    if [[ ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL && ! "$INPUT" =~ $GLOBAL_REGEX_PHONE && ! "$INPUT" =~ $is_ip && ! "$INPUT" =~ $is_domain ]]; then
         core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
         
         local sites=("${GLOBAL_OSINT_SITES[@]}")
@@ -2014,9 +2068,8 @@ run_smart_osint_engine() {
             local progress
             progress=$(printf "[%02d/%02d]" "$current_index" "$total_sites")
 
-            # Запрос утилитой curl с использованием глобального User-Agent
             local status
-            status=$(curl -s -o /dev/null -L -w "%{http_code}" -A "$GLOBAL_NETWORK_UA" "${url}${INPUT}" --connect-timeout 5)
+            status=$(curl -s -o /dev/null -L -w "%{http_code}" -A "$GLOBAL_NETWORK_UA" "${url}${INPUT}" --connect-timeout 4)
             
             if [ "$status" == "200" ]; then
                 echo "[+] FOUND on $name: ${url}${INPUT}" >> "$raw_log"
@@ -2026,38 +2079,74 @@ run_smart_osint_engine() {
             fi
         done
         echo -ne "                                                       \r"
+        
+        # Дополнительный запрос к GitHub API для вытягивания открытых метаданных никнейма
+        local gh_api="${GLOBAL_API_IDENTITY_NODES[0]%%|*}"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${gh_api}${INPUT}" >> "$raw_log" 2>/dev/null
     fi
 
-    # --- 2. PHONE INTEL ---
+    # --- 2. PHONE INTEL (Если ввод — мобильный номер) ---
     if [[ "$INPUT" =~ $GLOBAL_REGEX_PHONE ]]; then
         core_engine_ui "i" "Deep-Querying Global Phone Databases..."
-        curl -s -A "$GLOBAL_NETWORK_UA" "https://htmlweb.ru/geo/api.php?json&telcod=${INPUT}" >> "$raw_log" 2>/dev/null
+        
+        local active_phone_api="${GLOBAL_API_PHONE_NODES[0]%%|*}"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${active_phone_api}${INPUT}" >> "$raw_log" 2>/dev/null
+        
         local phone_info=$(grep -oE '"name":"[^"]+"|"oper":"[^"]+"' "$raw_log" | sed 's/"//g')
         [[ -n "$phone_info" ]] && core_engine_ui "s" "Operator Data: $phone_info"
     fi
 
-    # --- 3. DATA BREACH ANALYZER ---
+    # --- 3. DATA BREACH ANALYZER (Если ввод — email) ---
     if [[ "$INPUT" =~ $GLOBAL_REGEX_EMAIL ]]; then
         core_engine_ui "i" "Cross-referencing Leak Databases..."
-        curl -s -A "$GLOBAL_NETWORK_UA" "https://api.proxynova.com/comb?query=${INPUT}" >> "$raw_log" 2>/dev/null
+        
+        local active_breach_api="${GLOBAL_API_BREACH_NODES[0]%%|*}"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${active_breach_api}${INPUT}" >> "$raw_log" 2>/dev/null
+        
         if grep -q "results" "$raw_log"; then
             core_engine_ui "w" "Breach Detected: Target found in global COMB leak."
             echo "[!] WARNING: Data leak detected for $INPUT" >> "$raw_log"
         fi
     fi
 
-    # --- 4. ГЕНЕРАЦИЯ ФИНАЛЬНОГО ДОСЬЕ ---
+    # --- 4. NETWORK & IP ANALYZER (Если ввод — IP адрес) ---
+    if [[ "$INPUT" =~ $is_ip ]]; then
+        core_engine_ui "i" "Analyzing Network Infrastructure & GeoIP..."
+        
+        local active_net_api="${GLOBAL_API_NETWORK_NODES[0]%%|*}"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${active_net_api}${INPUT}/json" >> "$raw_log" 2>/dev/null
+        
+        local net_info=$(grep -oE '"org":"[^"]+"|"country_name":"[^"]+"|"city":"[^"]+"' "$raw_log" | sed 's/"//g')
+        [[ -n "$net_info" ]] && core_engine_ui "s" "Network Route Found:\n$net_info"
+    fi
+
+    # --- 5. DOMAIN & DNS CORE (Если ввод — сайт или домен) ---
+    if [[ "$INPUT" =~ $is_domain && ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL ]]; then
+        core_engine_ui "i" "Resolving Domain DNS Records & Whois Registry..."
+        
+        local active_dns_api="${GLOBAL_API_DOMAIN_NODES[2]%%|*}" # Используем ReverseDNS
+        curl -s -A "$GLOBAL_NETWORK_UA" "${active_dns_api}${INPUT}" >> "$raw_log" 2>/dev/null
+        
+        local active_whois_api="${GLOBAL_API_DOMAIN_NODES[3]%%|*}" # Используем Whois Core
+        curl -s -A "$GLOBAL_NETWORK_UA" "${active_whois_api}${INPUT}" >> "$raw_log" 2>/dev/null
+    fi
+
+    # --- 6. ГЕНЕРАЦИЯ ФИНАЛЬНОГО ДОСЬЕ ---
     core_engine_ui "line" ""
     core_engine_ui "s" "INTELLIGENCE DOSSIER GENERATED"
     core_engine_ui "line" ""
     
-    local hits=$(grep -cE "FOUND|!|oper" "$raw_log" 2>/dev/null || echo 0)
+    local hits=$(grep -cE "FOUND|!|oper|org|country_name|login" "$raw_log" 2>/dev/null || echo 0)
     echo -e "${B}Target Identification:${NC} $INPUT"
     echo -e "${Y}Correlation Level:${NC} $hits matches found."
     
     echo -e "\n${G}--- DETAILED FINDINGS ---${NC}"
     if [ -f "$raw_log" ]; then
-        grep -E "FOUND|oper|name|location|WARNING" "$raw_log" | sort -u
+        grep -E "FOUND|oper|name|location|WARNING|org|country_name|city" "$raw_log" | sort -u
+        # Если это был домен или гигантский текстовый лог, выводим первые 10 строк
+        if [[ "$INPUT" =~ $is_domain ]]; then
+            head -n 15 "$raw_log" 2>/dev/null
+        fi
     else
         echo -e "${R}No data collected.${NC}"
     fi
@@ -2068,6 +2157,7 @@ run_smart_osint_engine() {
 
     core_engine_wait
 }
+
 
 
 run_pc_recovery_ultimate() {
