@@ -275,7 +275,9 @@ GLOBAL_API_IDENTITY_NODES=(
 # Регулярные выражения для валидации входных векторов
 GLOBAL_REGEX_EMAIL="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
 GLOBAL_REGEX_PHONE="^\+?[0-9]{10,15}$"
+
 GLOBAL_REGEX_IP="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
+
 GLOBAL_REGEX_DOMAIN="^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 
 # Регулярные выражения для валидации финансовых векторов (FinIntel Core)
@@ -2274,59 +2276,95 @@ run_network_intelligence() {
 }
 
 
-run_deep_bridge() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "PRIME BRIDGE: NEURAL INTELLIGENCE LINK"
+# ==============================================================================
+# @description: Центральный мост консолидации сигналов и эвристического декодинга (run_deep_bridge)
+# ==============================================================================
+core_engine_run_deep_bridge() {
+    clear
+    # Слой 1: Заголовок через компоненты интерфейса Ядра
+    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v2.0"
     
-    # Пути согласно твоей структуре (используем BASE_DIR для гибкости)
-    local loot_dir="${BASE_DIR:-./}/prime_loot"
-    local pool="/tmp/bridge_pool.tmp"
+    # Синхронизация путей согласно архитектуре фреймворка
+    local loot_dir="$BASE_DIR/loot"
+    local pool="/tmp/bridge_pool_$RANDOM.tmp"
     local master_loot="$loot_dir/master_intelligence.log"
     
-    # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (Стерилизация) ---
-    # Собираем данные из всех модулей через Глушитель [7]
-    # Используем твой принцип Банковского Гамбита — только чистые данные
-    sort -u "$loot_dir"/*.log "$master_loot" 2>/dev/null | grep -v '^$' > "$pool"
+    mkdir -p "$loot_dir"
     
-    # Проверка через Валидатор [5] без лишних IF
-    [[ ! -s "$pool" ]] && { core_engine_ui "w" "Awaiting intelligence signals..."; core_engine_wait; return; }
+    # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (Изоляция от циклической записи) ---
+    # Собираем данные изо всех логов, исключая мастер-лог из выборки во избежание конфликтов
+    if ls "$loot_dir"/*.log &>/dev/null; then
+        touch "$master_loot"
+        sort -u "$loot_dir"/*.log 2>/dev/null | grep -v '^$' | grep -v "master_intelligence" > "$pool"
+    fi
+    
+    # Безусловная проверка пула без использования тяжелых конструкций IF
+    [[ ! -s "$pool" ]] && { 
+        core_engine_ui "w" "Ожидание сигналов разведки... База трофеев чиста."
+        rm -f "$pool"
+        core_engine_wait
+        return
+    }
 
-    core_engine_ui "i" "Analyzing $(wc -l < "$pool") intelligence threads..."
-    core_engine_wait "L" # Разделительная линия [9]
+    local total_threads=$(wc -l < "$pool")
+    core_engine_ui "i" "Анализ $total_threads активных потоков метаданных..."
+    core_engine_ui "line" ""
+    
+    core_engine_progress 3 "DECODING_INTELLIGENCE_POOL"
+    sleep 1
 
-    # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ---
+    # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ЯДРА ---
     while read -r line; do
-        # Извлекаем данные, очищая от шума через xargs
+        # Очистка входящей строки от технического шума и разделителей
         local raw_data=$(echo "$line" | awk -F ' -> ' '{print $2}' | xargs || echo "$line")
-        local len="${#raw_data}"
-
-        # 1. Детекция Крипто-сигнатур (Хеши)
-        if [[ "$len" =~ ^(32|40|64|60)$ ]]; then
-            core_engine_ui "y" "RESONANCE: Possible Hash Artifact ($len chars)"
-            # Здесь будет мост к run_pass_lab
+        
+        # 1. Детекция криптографических хэшей через глобальные регулярки ядра
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_MD5"; then
+            core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт MD5 -> $raw_data"
+            continue
+        fi
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_SHA256"; then
+            core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт SHA-256 -> $raw_data"
+            continue
         fi
 
-        # 2. Детекция Банковских Сигнатур (IBAN) — Твоя защита Гамбита
+        # 2. Финансовый сектор: Детекция валидных IBAN (Стратегия Банковский Гамбит)
         if [[ "$raw_data" =~ ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30} ]]; then
-            core_engine_ui "y" "RESONANCE: Financial Asset (IBAN) detected"
+            core_engine_ui "s" "RESONANCE: Финансовый актив (IBAN) верифицирован -> $raw_data"
+            continue
         fi
 
-        # 3. Семантические Маркеры (Доступы) через Нейро-мутатор [4]
-        if echo "$raw_data" | grep -qiE "pass|secret|key|token|auth|admin"; then
-            core_engine_ui "w" "RESONANCE: Identity Leak detected"
+        # 3. Финансовый сектор: Поиск следов крипто-транзакций (BTC / ETH)
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_CRYPTO_BTC"; then
+            core_engine_ui "s" "RESONANCE: Блокчейн-след (Bitcoin Asset) зафиксирован."
+            continue
+        fi
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_CRYPTO_ETH"; then
+            core_engine_ui "s" "RESONANCE: Блокчейн-след (Ethereum Asset) зафиксирован."
+            continue
         fi
 
-        # 4. Детекция Скрытых Сетей (Onion/I2P)
-        if [[ "$raw_data" =~ \.(onion|i2p) ]]; then
-            core_engine_ui "r" "RESONANCE: Dark Web Gateway found"
+        # 4. Анализ утечек идентификаторов через глобальные сигнатуры форензики
+        if echo "$raw_data" | grep -qiE "$GLOBAL_SIG_FORENSIC_CONFIG"; then
+            core_engine_ui "w" "RESONANCE: Критическая утечка учетных данных / Secret Leak"
+            continue
+        fi
+
+        # 5. Инфраструктурный анализ скрытых сетей (Dark Web Gateways)
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_DARKWEB"; then
+            core_engine_ui "e" "RESONANCE: Обнаружена скрытая точка маршрутизации Dark Web"
+            continue
         fi
 
     done < "$pool"
 
-    # --- СЛОЙ 3: ОЧИСТКА ТРЕКА через Санитара [8] ---
-    core_engine_remove "$pool"
-    core_engine_wait "L"
-    core_engine_ui "i" "Intelligence synchronization complete"
+    # --- СЛОЙ 3: СИНХРОНИЗАЦИЯ И САНИТАРНАЯ ОЧИСТКА ---
+    # Аппендим результаты анализа в главный исторический лог фреймворка
+    cat "$pool" >> "$master_loot"
+    rm -f "$pool"
+    
+    core_engine_ui "line" ""
+    core_engine_ui "i" "Синхронизация потоков нейро-моста успешно завершена."
     core_engine_wait
 }
 
