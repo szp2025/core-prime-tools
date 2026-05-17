@@ -144,6 +144,46 @@ GLOBAL_PHONE_CODES=(
 )
 
 # ==============================================================================
+# МАТРИЦА ФИНАНСОВЫХ ИНСТИТУТОВ И БАНКОВСКИХ КОДОВ (BANK MATRIX & RIB CODES)
+# ==============================================================================
+# Формат: "КОД_БАНКА_ИЛИ_SWIFT|НАЗВАНИЕ_БАНКА|РЕГИОН"
+GLOBAL_BANK_MATRIX=(
+    # --- Крупнейшие Французские Банки (Сеть RIB / SEPA) ---
+    "30002|BNP Paribas|Франция (FR)"
+    "30003|Société Générale|Франция (FR)"
+    "30004|Crédit Agricole|Франция (FR)"
+    "30066|Crédit Mutuel|Франция (FR)"
+    "10278|La Banque Postale|Франция (FR)"
+    "30007|BPCE (Banque Populaire / Caisse d'Epargne)|Франция (FR)"
+    "16108|LCL (Le Crédit Lyonnais)|Франция (FR)"
+    "14518|Boursorama Banque|Франция (FR)"
+    "11708|Fortuneo|Франция (FR)"
+    "17515|N26 (French Branch)|Франция (FR)"
+    "16575|Revolut (French Branch / SEPA)|Франция (FR)"
+    
+    # --- Международные и Европейские Гиганты (Global SWIFT) ---
+    "BARC|Barclays Bank|Великобритания (UK)"
+    "HSBC|HSBC Holdings|Великобритания (UK)"
+    "DEUT|Deutsche Bank|Германия (DE)"
+    "COMM|Commerzbank|Германия (DE)"
+    "INGB|ING Group|Нидерланды (NL)"
+    "SANTA|Banco Santander|Испания (ES)"
+    "CHAS|JPMorgan Chase|США (US)"
+    "CITI|Citigroup|США (US)"
+    
+    # --- Крупнейшие Банки СНГ ---
+    "SBER|Сбербанк|Россия (RU)"
+    "VTBR|ВТБ|Россия (RU)"
+    "ALFA|Альфа-Банк|Россия (RU)"
+    "TCSB|Т-Банк (Тинкофф)|Россия (RU)"
+    "KZBK|Kaspi Bank|Казахстан (KZ)"
+    "HALK|Halyk Bank|Казахстан (KZ)"
+    "BAPB|Белагропромбанк|Беларусь (BY)"
+    "ASB|Беларусбанк|Беларусь (BY)"
+)
+
+
+# ==============================================================================
 # 4. КРИПТОГРАФИЧЕСКИЕ СИГНАТУРЫ ДЛЯ БЛОКЧЕЙН-ТРЕКИНГА (CRYPTO SIGNATURES)
 # ==============================================================================
 GLOBAL_CRYPTO_TYPES=(
@@ -215,6 +255,13 @@ GLOBAL_REGEX_EMAIL="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
 GLOBAL_REGEX_PHONE="^\+?[0-9]{10,15}$"
 GLOBAL_REGEX_IP="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
 GLOBAL_REGEX_DOMAIN="^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+
+# Регулярные выражения для валидации финансовых векторов (FinIntel Core)
+# Универсальный международный IBAN (от 14 до 34 символов, начинается с кода страны)
+GLOBAL_REGEX_IBAN="^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$"
+
+# Французский формат RIB (Structure: 5d Banque + 5d Guichet + 11x Compte + 2d Clé)
+GLOBAL_REGEX_RIB="^[0-9]{5}[0-9]{5}[A-Z0-9]{11}[0-9]{2}$"
 
 # Эмуляция легитимного окружения для обхода базовых блокировок (User-Agent)
 GLOBAL_NETWORK_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
