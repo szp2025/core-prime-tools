@@ -288,6 +288,32 @@ GLOBAL_REGEX_RIB="^[0-9]{5}[0-9]{5}[A-Z0-9]{11}[0-9]{2}$"
 # Эмуляция легитимного окружения для обхода базовых блокировок (User-Agent)
 GLOBAL_NETWORK_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
+# ==============================================================================
+# МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
+# ==============================================================================
+# Регулярное выражение для поиска расширений файлов в веб-документах
+GLOBAL_REGEX_WEB_EXTENSIONS='[a-zA-Z0-9_\/\.-]+\.(php|pdf|docx|xlsx|zip|sql|env|htaccess|bak|log|conf|ini)'
+
+# Базовый словарь фаззинга чувствительных точек и бэкапов (Web Fuzzing Dict)
+GLOBAL_FUZZ_WORDLIST=(
+    ".env"
+    ".htaccess"
+    "backup.sql"
+    "config.php.bak"
+    ".git/config"
+    "phpinfo.php"
+    "wp-config.php"
+    "config.php"
+    "database.sql"
+    "dump.sql"
+    ".git/HEAD"
+    "config.json"
+    "docker-compose.yml"
+)
+
+# Сигнатуры для статического анализа бинарных файлов и логов (Static Analysis Signatures)
+GLOBAL_STATIC_SIGNATURES="(http|https|ftp|/etc/passwd|cmd\.exe|powershell|password|passwd|secret_key|api_key|token|ssh-rsa)"
+
 
 
 # ==========================================
