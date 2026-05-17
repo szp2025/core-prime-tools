@@ -369,6 +369,9 @@ GLOBAL_WEBHOOK_WORDLIST=(
     "v1/webhooks"
 )
 
+# Паттерн обнаружения скрытых сетей (Dark Web Gateways) в потоке логов
+GLOBAL_REGEX_DARKWEB="\b[a-z2-7]{16,56}\.onion\b|\b[a-z0-9]{52}\.b32\.i2p\b"
+
 # ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
 # ==============================================================================
@@ -1978,35 +1981,102 @@ run_bluetooth_scan() {
 }
 
 
-# --- Глубокий аудит системы ---
-run_deep_audit() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "SMART SYSTEM AUDIT"
-    core_engine_ui "i" "Analyzing local environment for misconfigurations..."
+# ==============================================================================
+# @description: Центральный мост консолидации сигналов и эвристического декодинга
+# ==============================================================================
+run_deep_bridge() {
+    clear
+    # Слой 1: Заголовок через компоненты интерфейса Ядра
+    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v2.0"
     
-    # Слой 2: Визуализация через Синхронизацию [13]
-    core_engine_progress 4 "EXAMINING SYSTEM VULNERABILITIES"
+    # Синхронизация путей согласно архитектуре фреймворка (с использованием BASE_DIR)
+    local loot_dir="${BASE_DIR:-./}/prime_loot"
+    local pool="/tmp/bridge_pool_$RANDOM.tmp"
+    local master_loot="$loot_dir/master_intelligence.log"
     
-    # Слой 3: Поиск SUID-бинарников (потенциальные векторы LPE)
-    core_engine_ui "!" "Checking SUID binaries..."
-    # Используем Глушитель [7] для выполнения тяжелых поисков
-    local suid_files=$(find / -perm -4000 -type f 2>/dev/null | head -n 5)
-    echo -e "${W}${suid_files:-No critical SUID found}${NC}"
+    mkdir -p "$loot_dir"
     
-    # Слой 4: Поиск файлов с правами на запись для всех (World-Writable)
-    core_engine_ui "!" "Checking World-Writable files..."
-    local writable_files=$(find / -writable -type f 2>/dev/null | head -n 5)
-    echo -e "${W}${writable_files:-No world-writable files found}${NC}"
+    # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (Изоляция от циклической записи) ---
+    # Собираем данные изо всех логов, исключая мастер-лог из выборки во избежание конфликтов
+    if ls "$loot_dir"/*.log &>/dev/null; then
+        touch "$master_loot"
+        sort -u "$loot_dir"/*.log 2>/dev/null | grep -v '^$' | grep -v "master_intelligence" > "$pool"
+    fi
     
-    # Слой 5: Сбор трофеев через узел [11]
-    local audit_data="SUID Scan:\n$suid_files\n\nWritable Scan:\n$writable_files"
-    core_engine_loot "audit" "$audit_data"
+    # Безусловная проверка пула без использования тяжелых конструкций IF
+    [[ ! -s "$pool" ]] && { 
+        core_engine_ui "w" "Ожидание сигналов разведки... База трофеев чиста."
+        rm -f "$pool"
+        core_engine_wait
+        return
+    }
+
+    local total_threads=$(wc -l < "$pool")
+    core_engine_ui "i" "Анализ $total_threads активных потоков метаданных..."
+    core_engine_ui "line" ""
     
-    core_engine_ui "+" "Audit Complete. Results secured."
+    core_engine_progress 3 "DECODING_INTELLIGENCE_POOL"
+    sleep 1
+
+    # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ЯДРА ---
+    while read -r line; do
+        # Очистка входящей строки от технического шума и разделителей
+        local raw_data=$(echo "$line" | awk -F ' -> ' '{print $2}' | xargs || echo "$line")
+        
+        # 1. Детекция криптографических хэшей через глобальные регулярки ядра
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_MD5"; then
+            core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт MD5 -> $raw_data"
+            continue
+        fi
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_SHA256"; then
+            core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт SHA-256 -> $raw_data"
+            continue
+        fi
+
+        # 2. Финансовый сектор: Детекция валидных IBAN (Стратегия Банковский Гамбит)
+        if [[ "$raw_data" =~ ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30} ]]; then
+            core_engine_ui "s" "RESONANCE: Финансовый актив (IBAN) верифицирован -> $raw_data"
+            continue
+        fi
+
+        # 3. Финансовый сектор: Динамический перебор твоей матрицы GLOBAL_CRYPTO_TYPES
+        local crypto_matched=0
+        for crypto_entry in "${GLOBAL_CRYPTO_TYPES[@]}"; do
+            local pattern="${crypto_entry%%|*}"
+            local desc="${crypto_entry#*|}"
+            
+            if echo "$raw_data" | grep -qE "$pattern"; then
+                core_engine_ui "s" "RESONANCE: Блокчейн-след ($desc) зафиксирован -> $raw_data"
+                crypto_matched=1
+                break
+            fi
+        done
+        [[ "$crypto_matched" -eq 1 ]] && continue
+
+        # 4. Анализ утечек идентификаторов через глобальные сигнатуры форензики
+        if echo "$raw_data" | grep -qiE "$GLOBAL_SIG_FORENSIC_CONFIG"; then
+            core_engine_ui "w" "RESONANCE: Критическая утечка учетных данных / Secret Leak"
+            continue
+        fi
+
+        # 5. Инфраструктурный анализ скрытых сетей (Dark Web Gateways)
+        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_DARKWEB"; then
+            core_engine_ui "e" "RESONANCE: Обнаружена скрытая точка маршрутизации Dark Web -> $raw_data"
+            continue
+        fi
+
+    done < "$pool"
+
+    # --- СЛОЙ 3: СИНХРОНИЗАЦИЯ И САНИТАРНАЯ ОЧИСТКА ---
+    # Аппендим результаты анализа в главный исторический лог фреймворка
+    cat "$pool" >> "$master_loot"
+    rm -f "$pool"
     
-    # Финализация через Барьер [9]
+    core_engine_ui "line" ""
+    core_engine_ui "i" "Синхронизация потоков нейро-моста успешно завершена."
     core_engine_wait
 }
+
 
 
 # --- Сетевое мапирование (Network Mapper) ---
