@@ -338,24 +338,93 @@ GLOBAL_REGEX_TG_TOKEN="^[0-9]{8,10}:[A-Za-z0-9_-]{35}$"
 GLOBAL_REGEX_JWT="^eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+=]*$"
 
 
-parse_target_log() {
+# ==============================================================================
+# @description: Системный движок глубокого анализа и парсинга логов/артефактов
+# ==============================================================================
+core_engine_parse_target_log() {
     local log_file="$1"
-    [[ ! -f "$log_file" ]] && return
+    
+    # Проверка физического существования целевого объекта анализа
+    if [[ ! -f "$log_file" ]]; then
+        core_engine_ui "e" "Критическая ошибка: Файл '$log_file' не найден или недоступен."
+        return 1
+    fi
 
-    # Использование глобальных регулярных выражений для автоматической классификации
-    core_engine_ui "i" "Запуск глубокого анализа артефактов..."
+    clear
+    core_engine_ui "h" "CORE PARSER: ARTIFACT & FORENSICS ENGINE"
+    core_engine_ui "i" "Цель анализа: $(basename "$log_file")"
+    core_engine_ui "line" ""
+    
+    # Используем новый однострочный прогресс ядра
+    core_engine_progress 2 "STARTING_DEEP_PARSING"
+    sleep 1
 
-    # 1. Извлекаем все токены Telegram-ботов, если разработчик забыл их в коде
-    local tg_tokens=$(grep -oE "$GLOBAL_REGEX_TG_TOKEN" "$log_file")
-    [[ -n "$tg_tokens" ]] && core_engine_ui "w" "Обнаружены токены Telegram: \n$tg_tokens"
+    # Создаем изолированный файл для сохранения извлеченных учетных данных в loot-директорию
+    local log_name=$(basename "$log_file" | sed 's/\.[^.]*$//')
+    local creds_loot_file="$BASE_DIR/loot/${log_name}_extracted_creds.txt"
+    mkdir -p "$BASE_DIR/loot"
 
-    # 2. Ищем хэши SHA-256 (возможно, зашифрованные пароли)
-    local sha_hashes=$(grep -oE "$GLOBAL_REGEX_HASH_SHA256" "$log_file" | sort -u)
-    [[ -n "$sha_hashes" ]] && core_engine_ui "s" "Найдены хэши SHA-256 для расшифровки."
+    core_engine_ui "i" "Сканирование структуры на критические маркеры..."
 
-    # 3. Фильтруем строки формата email:password
-    grep -oE "$GLOBAL_REGEX_CREDENTIALS" "$log_file" >> /tmp/extracted_creds.txt
+    # --- 1. АНАЛИЗ СЕКРЕТОВ: ТОКЕНЫ TELEGRAM ---
+    local tg_tokens
+    tg_tokens=$(grep -oE "$GLOBAL_REGEX_TG_TOKEN" "$log_file" | sort -u)
+    if [[ -n "$tg_tokens" ]]; then
+        local count_tg=$(echo "$tg_tokens" | wc -l)
+        core_engine_ui "w" "ОБНАРУЖЕНО КРИТИЧЕСКИХ ТОКЕНОВ TELEGRAM: $count_tg"
+        echo -e "${R}$tg_tokens${NC}\n"
+    fi
+
+    # --- 2. АНАЛИЗ КРИПТОГРАФИИ: ХЭШИ MD5 ---
+    local md5_hashes
+    md5_hashes=$(grep -oE "$GLOBAL_REGEX_HASH_MD5" "$log_file" | sort -u)
+    if [[ -n "$md5_hashes" ]]; then
+        local count_md5=$(echo "$md5_hashes" | wc -l)
+        core_engine_ui "s" "Найдены хэш-сигнатуры MD5: $count_md5 объектов."
+    fi
+
+    # --- 3. АНАЛИЗ КРИПТОГРАФИИ: ХЭШИ SHA-256 ---
+    local sha_hashes
+    sha_hashes=$(grep -oE "$GLOBAL_REGEX_HASH_SHA256" "$log_file" | sort -u)
+    if [[ -n "$sha_hashes" ]]; then
+        local count_sha=$(echo "$sha_hashes" | wc -l)
+        core_engine_ui "s" "Найдены хэш-сигнатуры SHA-256: $count_sha объектов."
+    fi
+
+    # --- 4. СЕТЕВОЙ УРОВЕНЬ: IPV6 И MAC АДРЕСА ---
+    local ipv6_addresses=$(grep -oE "$GLOBAL_REGEX_IPV6" "$log_file" | sort -u)
+    local mac_addresses=$(grep -oE "$GLOBAL_REGEX_MAC" "$log_file" | sort -u)
+    
+    if [[ -n "$ipv6_addresses" || -n "$mac_addresses" ]]; then
+        local count_ip=$(echo "$ipv6_addresses" | grep -v '^$' | wc -l || echo 0)
+        local count_mac=$(echo "$mac_addresses" | grep -v '^$' | wc -l || echo 0)
+        core_engine_ui "i" "Сетевые следы: Обнаружено IPv6 ($count_ip), MAC-адресов ($count_mac)."
+    fi
+
+    # --- 5. УЧЕТНЫЕ ДАННЫЕ: EMAIL/LOGIN:PASSWORD (Парсинг COMB) ---
+    grep -oE "$GLOBAL_REGEX_CREDENTIALS" "$log_file" | sort -u > "$creds_loot_file"
+    local count_creds=$(grep -c "^" "$creds_loot_file" || echo 0)
+
+    # --- 6. ИТОГОВЫЙ СИСТЕМНЫЙ ОТЧЕТ В КОНСОЛЬ ---
+    core_engine_ui "line" ""
+    core_engine_ui "s" "ГЛУБОКИЙ СТАТИЧЕСКИЙ АНАЛИЗ ЗАВЕРШЕН"
+    core_engine_ui "line" ""
+    
+    echo -e "${B}Файл базы данных лога:${NC} $log_file"
+    echo -e "${Y}Извлечено учетных записей:${NC} $count_creds пар(ы) логин:пароль."
+    
+    if (( count_creds > 0 )); then
+        core_engine_ui "s" "Артефакты успешно экспортированы в защищенное хранилище:"
+        echo -e "${G}📂 Path: $creds_loot_file${NC}"
+        core_engine_loot "parser" "Парсинг $log_name завершен. Извлечено записей: $count_creds"
+    else
+        rm -f "$creds_loot_file"
+    fi
+    
+    core_engine_ui "line" ""
+    core_engine_wait
 }
+
 
 
 # ==========================================
