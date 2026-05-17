@@ -315,6 +315,48 @@ GLOBAL_FUZZ_WORDLIST=(
 GLOBAL_STATIC_SIGNATURES="(http|https|ftp|/etc/passwd|cmd\.exe|powershell|password|passwd|secret_key|api_key|token|ssh-rsa)"
 
 
+# --- Расширенные сигнатуры глубокого анализа (Deep Forensics & OSINT RegEx) ---
+# Строки утечек учетных записей (Форматы: email:pass, login:pass)
+GLOBAL_REGEX_CREDENTIALS="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}:[^[:space:]]+$"
+
+# Сетевой уровень: IPv6 Адреса (Стандарт ISO/IEC)
+GLOBAL_REGEX_IPV6="^([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,7}:$|^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$"
+
+# Сетевой уровень: Аппаратные MAC-адреса устройств
+GLOBAL_REGEX_MAC="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+
+# Криптография: Хэш-функция MD5 (32 символа Hex)
+GLOBAL_REGEX_HASH_MD5="\b[a-fA-F0-9]{32}\b"
+
+# Криптография: Хэш-функция SHA-256 (64 символа Hex)
+GLOBAL_REGEX_HASH_SHA256="\b[a-fA-F0-9]{64}\b"
+
+# Разведка: Токены управления Telegram-ботов (ID:Token)
+GLOBAL_REGEX_TG_TOKEN="^[0-9]{8,10}:[A-Za-z0-9_-]{35}$"
+
+# Разведка: Стандартизированные веб-токены JWT (Три зоны через точку)
+GLOBAL_REGEX_JWT="^eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+=]*$"
+
+
+parse_target_log() {
+    local log_file="$1"
+    [[ ! -f "$log_file" ]] && return
+
+    # Использование глобальных регулярных выражений для автоматической классификации
+    core_engine_ui "i" "Запуск глубокого анализа артефактов..."
+
+    # 1. Извлекаем все токены Telegram-ботов, если разработчик забыл их в коде
+    local tg_tokens=$(grep -oE "$GLOBAL_REGEX_TG_TOKEN" "$log_file")
+    [[ -n "$tg_tokens" ]] && core_engine_ui "w" "Обнаружены токены Telegram: \n$tg_tokens"
+
+    # 2. Ищем хэши SHA-256 (возможно, зашифрованные пароли)
+    local sha_hashes=$(grep -oE "$GLOBAL_REGEX_HASH_SHA256" "$log_file" | sort -u)
+    [[ -n "$sha_hashes" ]] && core_engine_ui "s" "Найдены хэши SHA-256 для расшифровки."
+
+    # 3. Фильтруем строки формата email:password
+    grep -oE "$GLOBAL_REGEX_CREDENTIALS" "$log_file" >> /tmp/extracted_creds.txt
+}
+
 
 # ==========================================
 # 1. CORE ENGINE (Должны быть ПЕРВЫМИ)
