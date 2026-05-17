@@ -196,6 +196,28 @@ GLOBAL_CRYPTO_TYPES=(
     "^(D)[a-km-zA-HJ-NP-Z1-9]{33}$|Dogecoin (DOGE) Address"
 )
 
+# --- Сектор 7: Верификация международных банковских реквизитов (IBAN / RIB / SWIFT Intel) ---
+GLOBAL_API_FINANCE_NODES=(
+    # Основные публичные валидаторы структуры и метаданных IBAN
+    "https://api.ibanlist.com/v1/validate/|IBANList Verification Node"
+    "https://openiban.com/validate/|OpenIBAN Core Validator"
+    "https://api.iban-check.com/v1/verify/|IBAN-Check Security Gate"
+    "https://www.iban.com/lon-checker?iban=|IBAN.com Luhn & Structure Check"
+    
+    # Европейские шлюзы и проверка реестров SEPA (Франция/ЕС)
+    "https://api.bankauth.co/v1/verify/|BankAuth SEPA Gateway"
+    "https://api.upclink.com/v1/iban/|UPCLink EuroBank Validator"
+    
+    # Сервисы проверки БИК (BIC/SWIFT) и маршрутизации платежей
+    "https://api.swiftcodesfinder.com/v1/swift/|SWIFT Codes Finder Core"
+    "https://api.macaddress.io/v1/bank/|MacAddress Bank-Routing Decoder"
+    
+    # Системы проверки банковских кодов и БИК РФ/СНГ (Парсинг ЦБ)
+    "https://bik-info.ru/api.html?bik=|BikInfo National Registry"
+    "https://api.gasi.gov.ru/dictionary/bik/|State Financial Dictionary API"
+)
+
+
 # ==============================================================================
 # УЛЬТИМАТИВНАЯ МАТРИЦА ВНЕШНИХ API-ЭНДПОИНТОВ (GLOBAL OSINT API ENDPOINTS)
 # ==============================================================================
