@@ -213,9 +213,12 @@ GLOBAL_API_IDENTITY_NODES=(
 # Регулярные выражения для валидации входных векторов
 GLOBAL_REGEX_EMAIL="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
 GLOBAL_REGEX_PHONE="^\+?[0-9]{10,15}$"
+GLOBAL_REGEX_IP="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
+GLOBAL_REGEX_DOMAIN="^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 
 # Эмуляция легитимного окружения для обхода базовых блокировок (User-Agent)
 GLOBAL_NETWORK_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
 
 
 # ==========================================
@@ -2034,11 +2037,11 @@ suggest_action() {
 }
 
 # ==============================================================================
-# @description: Высокоскоростной движок OSINT с каскадными API-матрицами
+# @description: Высокоскоростной движок OSINT с каскадными API-матрицами v14.2
 # ==============================================================================
 run_smart_osint_engine() {
     clear
-    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v14.1"
+    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v14.2"
 
     # Ввод через стандартный input Ядра
     local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, Email, IP, or Domain)")
@@ -2046,14 +2049,10 @@ run_smart_osint_engine() {
 
     local raw_log="/tmp/prime_recon_$RANDOM.log"
     
-    # Системные регулярные выражения для распознавания типов данных
-    local is_ip="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
-    local is_domain="^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-
     core_engine_progress 2 "OSINT_SCAN_INIT"
 
     # --- 1. SOCIAL SCAN (Если ввод — это никнейм) ---
-    if [[ ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL && ! "$INPUT" =~ $GLOBAL_REGEX_PHONE && ! "$INPUT" =~ $is_ip && ! "$INPUT" =~ $is_domain ]]; then
+    if [[ ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL && ! "$INPUT" =~ $GLOBAL_REGEX_PHONE && ! "$INPUT" =~ $GLOBAL_REGEX_IP && ! "$INPUT" =~ $GLOBAL_REGEX_DOMAIN ]]; then
         core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
         
         local sites=("${GLOBAL_OSINT_SITES[@]}")
@@ -2080,7 +2079,6 @@ run_smart_osint_engine() {
         done
         echo -ne "                                                       \r"
         
-        # Дополнительный запрос к GitHub API для вытягивания открытых метаданных никнейма
         local gh_api="${GLOBAL_API_IDENTITY_NODES[0]%%|*}"
         curl -s -A "$GLOBAL_NETWORK_UA" "${gh_api}${INPUT}" >> "$raw_log" 2>/dev/null
     fi
@@ -2110,7 +2108,7 @@ run_smart_osint_engine() {
     fi
 
     # --- 4. NETWORK & IP ANALYZER (Если ввод — IP адрес) ---
-    if [[ "$INPUT" =~ $is_ip ]]; then
+    if [[ "$INPUT" =~ $GLOBAL_REGEX_IP ]]; then
         core_engine_ui "i" "Analyzing Network Infrastructure & GeoIP..."
         
         local active_net_api="${GLOBAL_API_NETWORK_NODES[0]%%|*}"
@@ -2121,13 +2119,13 @@ run_smart_osint_engine() {
     fi
 
     # --- 5. DOMAIN & DNS CORE (Если ввод — сайт или домен) ---
-    if [[ "$INPUT" =~ $is_domain && ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL ]]; then
+    if [[ "$INPUT" =~ $GLOBAL_REGEX_DOMAIN && ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL ]]; then
         core_engine_ui "i" "Resolving Domain DNS Records & Whois Registry..."
         
-        local active_dns_api="${GLOBAL_API_DOMAIN_NODES[2]%%|*}" # Используем ReverseDNS
+        local active_dns_api="${GLOBAL_API_DOMAIN_NODES[2]%%|*}"
         curl -s -A "$GLOBAL_NETWORK_UA" "${active_dns_api}${INPUT}" >> "$raw_log" 2>/dev/null
         
-        local active_whois_api="${GLOBAL_API_DOMAIN_NODES[3]%%|*}" # Используем Whois Core
+        local active_whois_api="${GLOBAL_API_DOMAIN_NODES[3]%%|*}"
         curl -s -A "$GLOBAL_NETWORK_UA" "${active_whois_api}${INPUT}" >> "$raw_log" 2>/dev/null
     fi
 
@@ -2143,8 +2141,7 @@ run_smart_osint_engine() {
     echo -e "\n${G}--- DETAILED FINDINGS ---${NC}"
     if [ -f "$raw_log" ]; then
         grep -E "FOUND|oper|name|location|WARNING|org|country_name|city" "$raw_log" | sort -u
-        # Если это был домен или гигантский текстовый лог, выводим первые 10 строк
-        if [[ "$INPUT" =~ $is_domain ]]; then
+        if [[ "$INPUT" =~ $GLOBAL_REGEX_DOMAIN ]]; then
             head -n 15 "$raw_log" 2>/dev/null
         fi
     else
