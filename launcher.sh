@@ -304,22 +304,79 @@ GLOBAL_NETWORK_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, li
 GLOBAL_REGEX_WEB_EXTENSIONS='\b[a-zA-Z0-9_\/\.-]+\.(php|php[0-9]|aspx?|jspx?|pdf|docx?|xlsx?|zip|gz|tar\.gz|tgz|rar|sql|db|sqlite|env|htaccess|htpasswd|bak|old|swp|log|conf|ini|json|ya?ml|git|key|pem|crt)\b'
 
 
-# Базовый словарь фаззинга чувствительных точек и бэкапов (Web Fuzzing Dict)
+# ==============================================================================
+# 5. СЛОВАРЬ ФАЗЗИНГА ЧУВСТВИТЕЛЬНЫХ ТОЧЕК И АРТЕФАКТОВ (ULTIMATE FUZZ WORDLIST)
+# ==============================================================================
 GLOBAL_FUZZ_WORDLIST=(
+    # --- Ядро окружения и секреты (Environment & Secrets) ---
     ".env"
+    ".env.local"
+    ".env.production"
+    ".env.stage"
+    ".env.bak"
+    ".env.old"
+    "config.env"
+    
+    # --- Конфигурации и Веб-серверы (Configurations & Web Servers) ---
     ".htaccess"
-    "backup.sql"
-    "config.php.bak"
-    ".git/config"
-    "phpinfo.php"
-    "wp-config.php"
+    ".htpasswd"
+    "web.config"
+    "nginx.conf"
     "config.php"
+    "config.inc.php"
+    "config.json"
+    "wp-config.php"
+    "wp-config.bak"
+    "configuration.php"
+    "settings.py"
+    "application.properties"
+    "application.yml"
+    
+    # --- Репозитории и CI/CD оркестрация (Repositories & CI/CD) ---
+    ".git/HEAD"
+    ".git/config"
+    ".git/index"
+    ".gitignore"
+    ".svn/entries"
+    "docker-compose.yml"
+    "Dockerfile"
+    ".gitlab-ci.yml"
+    "jenkins.xml"
+    "package.json"
+    
+    # --- Дампы баз данных и бэкапы (Database Dumps & Backups) ---
+    "backup.sql"
     "database.sql"
     "dump.sql"
-    ".git/HEAD"
-    "config.json"
-    "docker-compose.yml"
+    "db.sql"
+    "mysql.sql"
+    "data.sqlite"
+    "backup.zip"
+    "backup.tar.gz"
+    "backup.rar"
+    "site.zip"
+    "www.zip"
+    "html.zip"
+    "archive.zip"
+    "config.php.bak"
+    "config.php.old"
+    "index.php.bak"
+    "index.php.old"
+    
+    # --- Логи и Отладка (Logs, Debugging & Panel Entrances) ---
+    "phpinfo.php"
+    "info.php"
+    "test.php"
+    "debug.log"
+    "error.log"
+    "access.log"
+    "laravel.log"
+    "pm2.log"
+    "cron.log"
+    "status"
+    "server-status"
 )
+
 
 # Сигнатуры для статического анализа бинарных файлов и логов (Static Analysis Signatures)
 GLOBAL_STATIC_SIGNATURES="(http|https|ftp|/etc/passwd|cmd\.exe|powershell|password|passwd|secret_key|api_key|token|ssh-rsa)"
