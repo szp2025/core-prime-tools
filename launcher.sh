@@ -1207,6 +1207,53 @@ GLOBAL_GATEWAY_ENCODED_VECTOR_SIGNATURES="(?i)(html\.duckduckgo\.com|search\.bra
 
 
 # ==============================================================================
+# GLOBAL CORE NETWORK DNS INFRASTRUCTURE MATRIX (v22.0 INDUSTRIAL COMPLETE)
+# ==============================================================================
+# Максимально мощный и полный массив параметров конфигурации dnsmasq.
+# Маркеры %IP% и %HOST% динамически интерполируются ядром в момент синхронизации.
+# Защищено от: DNS-утечек, Rebind-атак, зацикливания и деградации производительности кэша.
+GLOBAL_DNS_CONFIG_MATRIX=(
+    # --- БЛОК 1: БАЗОВАЯ БЕЗОПАСНОСТЬ И ФИЛЬТРАЦИЯ ЗАПРОСОВ ---
+    "domain-needed"                             # Не передавать простые имена (без точки/домена) в upstream-серверы
+    "bogus-priv"                                # Не передавать запросы обратного просмотра (reverse lookup) для приватных подсетей в WAN
+    "no-resolv"                                 # Полный игнорировать системный /etc/resolv.conf (защита от перехвата провайдером)
+    "no-poll"                                   # Не опрашивать внешние файлы конфигурации на предмет изменений
+    "stop-dns-rebind"                           # Защита от Rebind-атак (блокирует ответы 127.0.0.0/8 и приватных IP от внешних серверов)
+    "rebind-localhost-ok"                       # Разрешить loopback-адреса для легитимных локальных связок
+
+    # --- БЛОК 2: СЕТЕВЫЕ ИНТЕРФЕЙСЫ И МАРШРУТИЗАЦИЯ ---
+    "interface=lo"                              # Локальная петля обратной связи
+    "interface=wlan0"                           # Беспроводной адаптер ядра
+    "interface=eth0"                            # Проводной физический интерфейс
+    "bind-dynamic"                              # Динамическое связывание сокетов при падении/поднятии сетевых карт
+    
+    # --- БЛОК 3: УЛЬТИМАТИВНОЕ КЭШИРОВАНИЕ И ОПТИМИЗАЦИЯ ТАЙМ-АУТОВ ---
+    "cache-size=10000"                          # Выкрученный на максимум кэш (стандарт: 150, оптимум для жесткого OSINT/сканирования: 10000)
+    "local-ttl=300"                             # Время жизни (TTL) для локальных ответов из файла/массива (5 минут стабильности)
+    "neg-ttl=60"                                # Время кэширования негативных ответов (если домен не существует, не опрашивать WAN 60 сек)
+    "max-cache-ttl=3600"                        # Максимальный лимит удержания валидного кэша в секундах
+    "dns-forward-max=150"                       # Максимальное количество одновременных конкурентных DNS-запросов
+
+    # --- БЛОК 4: ИЗОЛЯЦИЯ ЛОКАЛЬНОЙ ЗОНЫ (Предотвращение утечек) ---
+    "local=/local/"                             # Объявление суффикса .local чисто внутренним (запросы к нему никогда не уйдут на 1.1.1.1)
+    "local=/portal/"                            # Изоляция зоны .portal внутри периметра ядра
+    
+    # --- БЛОК 5: ДИНАМИЧЕСКАЯ МАТРИЦА ШЛЮЗОВ И СЕРВИСОВ ---
+    "address=/scanclamavlocal/%IP%"             # Внутренний выделенный шлюз антивирусного сканера ClamAV
+    "address=/%HOST%.local/%IP%"                # Динамический хост-резолв текущей машины
+    "address=/prime.portal/%IP%"                # Главный веб-интерфейс управления платформы
+    "address=/audit.local/%IP%"                 # Выделенная точка сбора логов безопасности и аудита
+    "address=/localhost/127.0.0.1"              # Принудительный хардкод петли
+    "address=/localhost/::1"                    # IPv6 петля для предотвращения задержек парсеров
+
+    # --- БЛОК 6: ГЛОБАЛЬНЫЕ ВНЕШНИЕ АПСТРИМЫ (Скорость + Шифрование/Резерв) ---
+    "server=1.1.1.1"                            # Cloudflare Primary (Максимальный показатель TTFB в мире)
+    "server=8.8.8.8"                            # Google Secondary (Резервный стабильный глобальный узел)
+    "server=9.9.9.9"                            # Quad9 Security (Пассивный фильтр вредоносных и фишинговых доменов)
+)
+
+
+# ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
 # ==============================================================================
 core_engine_parse_target_log() {
@@ -1620,76 +1667,107 @@ core_engine_loot() {
 #Настройки 
 
 
-# Настройка DNS для локальных сервисов (например, scanclamavlocal)
+# ==============================================================================
+# @description: Синхронизация сетевого слоя DNS и локальной маршрутизации v22.0
+# СИНХРОНИЗАЦИЯ: Полная поддержка промышленной матрицы GLOBAL_DNS_CONFIG_MATRIX v22.0
+# МОДЕРНИЗАЦИЯ: Интеллектуальный контроль зомби-сокетов, деликатная зачистка PID
+# БЕЗОПАСНОСТЬ: Автономная инъекция loopback-резолвера для обхода блокировок WAN
+# ==============================================================================
 core_network_dns_sync() {
-    core_engine_ui "i" "Syncing Network DNS Layer..."
+    core_engine_ui "h" "NEXUS LAYER: NETWORK DNS ADAPTATION & SYNC v22.0"
 
-    # Проверка зависимостей
-    if ! command -v dnsmasq >/dev/null 2>&1; then
-        core_engine_ui "!" "dnsmasq не найден. DNS-адаптация пропущена."
+    # Слой 0: Верификация прав доступа (изменение /etc/ требует привилегий root)
+    if [[ $EUID -ne 0 ]]; then
+        core_engine_ui "!" "Ошибка доступа: Требуются права суперпользователя (sudo)."
         return 1
     fi
 
-    # 1. ЭВРИСТИКА: Поиск лучшего активного IP
-    # Берем IP самого активного интерфейса (исключая docker и loopback)
-    local active_ip=$(ip -4 addr show | grep -vE '127.0.0.1|docker' | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
+    # Проверка доступности бинарного файла dnsmasq в системе
+    if ! command -v dnsmasq >/dev/null 2>&1; then
+        core_engine_ui "!" "Сбой окружения: dnsmasq не найден в системе. Пропуск слоя."
+        return 1
+    fi
+
+    # --- ШАГ 1: ЭВРИСТИКА АКТИВНОГО IP (Изоляция интерфейса) ---
+    local active_ip
+    active_ip=$(ip -4 addr show | grep -vE '127.0.0.1|docker|veth|br-|lxd' | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
     
-    # Если IP не найден, откатываемся на localhost
+    # Резервный откат на локальный интерфейс в случае автономного режима
     [[ -z "$active_ip" ]] && active_ip="127.0.0.1"
 
-    # 2. АДАПТИВНОСТЬ: Сбор имен для регистрации
-    # Мы можем регистрировать не только статику, но и имя хоста машины
-    local hostname=$(hostname)
+    # --- ШАГ 2: СБОР МЕТРИК ОКРУЖЕНИЯ ---
+    local hostname
+    hostname=$(hostname)
     local dns_conf="/etc/dnsmasq.conf"
     
-    core_engine_ui "i" "Binding DNS to IP: $active_ip"
+    core_engine_ui "i" "Связывание локальных доменов с активным узлом IP: $active_ip"
 
-    # 3. ГЕНЕРАЦИЯ (Smart Config)
-    # Используем временный файл, чтобы не убить рабочий конфиг раньше времени
-    local tmp_dns=$(mktemp)
+    # --- ШАГ 3: ДИНАМИЧЕСКАЯ ИНЪЕКЦИЯ КОНФИГУРАЦИИ ИЗ ГЛОБАЛЬНОЙ МАТРИЦЫ ---
+    local tmp_dns
+    tmp_dns=$(mktemp)
     
-    cat << EOD > "$tmp_dns"
-# --- Core Prime DNS Configuration ---
-domain-needed
-bogus-priv
-interface=lo
-interface=wlan0
-interface=eth0
-bind-dynamic
-local-ttl=60
-cache-size=1500
-
-# Динамические локальные домены
-address=/scanclamavlocal/$active_ip
-address=/$hostname.local/$active_ip
-address=/prime.portal/$active_ip
-address=/audit.local/$active_ip
-
-# Ускорение для upstream (используем Cloudflare как резерв)
-server=1.1.1.1
-server=8.8.8.8
-EOD
-
-    # 4. ВАЛИДАЦИЯ И ПРИМЕНЕНИЕ
-    if dnsmasq --test -C "$tmp_dns" >/dev/null 2>&1; then
-        cp "$tmp_dns" "$dns_conf"
+    local raw_line
+    for raw_line in "${GLOBAL_DNS_CONFIG_MATRIX[@]}"; do
+        # Интеллектуальная подстановка живых переменных вместо шаблонов на лету
+        local processed_line="$raw_line"
+        processed_line="${processed_line//%IP%/$active_ip}"
+        processed_line="${processed_line//%HOST%/$hostname}"
         
-        # Умный перезапуск
-        if service dnsmasq restart 2>/dev/null; then
+        # Безопасная запись с принудительным завершением строки \n
+        printf "%s\n" "$processed_line" >> "$tmp_dns"
+    done
+
+    # --- ШАГ 4: ВАЛИДАЦИЯ, ПАТЧ И ИНТЕЛЛЕКТУАЛЬНЫЙ ПЕРЕЗАПУСК ДВИЖКА ---
+    if dnsmasq --test -C "$tmp_dns" >/dev/null 2>&1; then
+        # Конфиг полностью валиден — производим атомарную подмену рабочего файла
+        cp "$tmp_dns" "$dns_conf"
+        chmod 644 "$dns_conf"
+        
+        core_engine_ui "i" "Конфигурация успешно верифицирована. Перезапуск демона..."
+        
+        # Попытка мягкого перезапуска через системный менеджер служб (systemd или init.d)
+        if systemctl restart dnsmasq 2>/dev/null || service dnsmasq restart 2>/dev/null; then
             core_engine_ui "+" "DNS Sync Complete: http://$hostname.local"
         else
-            killall dnsmasq 2>/dev/null
-            dnsmasq -C "$dns_conf" && core_engine_ui "+" "DNS Engine Restarted (Manual)"
+            # Критический путь: если служба зависла, сначала пробуем мягкий SIGTERM (15)
+            core_engine_ui "w" "Служба заблокирована сокетом. Очистка дедлоков..."
+            killall -15 dnsmasq 2>/dev/null
+            sleep 1
+            
+            # Если процесс проигнорировал мягкий сброс, выжигаем его через SIGKILL (9)
+            if pidof dnsmasq >/dev/null; then
+                killall -9 dnsmasq 2>/dev/null
+                sleep 1
+            fi
+            
+            # Прямой ручной запуск демона на основе обновленного конфигурационного файла
+            if dnsmasq -C "$dns_conf"; then
+                core_engine_ui "+" "DNS Engine Restarted (Manual Recovery Mode)"
+            else
+                core_engine_ui "!" "Критический сбой: Порт 53 занят сторонним процессом (systemd-resolved?)."
+                rm -f "$tmp_dns"
+                return 1
+            fi
+        fi
+        
+        # --- ШАГ 5: АВТОНОМНАЯ ФИКСАЦИЯ ЛОКАЛЬНОГО РЕЗОЛВЕРА ---
+        # Так как в матрице v22.0 включен флаг no-resolv, принудительно переводим 
+        # текущую машину на обслуживание созданным локальным сервером dnsmasq.
+        if ! grep -q "nameserver 127.0.0.1" /etc/resolv.conf 2>/dev/null; then
+            # Запись инъекции петли в начало системного резолвера
+            sed -i '1i nameserver 127.0.0.1' /etc/resolv.conf 2>/dev/null
         fi
     else
-        core_engine_ui "!" "Критическая ошибка в конфигурации DNS. Откат."
+        core_engine_ui "!" "Критическая ошибка: Сгенерированный конфиг v22.0 поврежден. Откат изменений."
         rm -f "$tmp_dns"
         return 1
     fi
 
+    # Финальная санитарная очистка временных файлов из директории /tmp/
     rm -f "$tmp_dns"
     return 0
 }
+
 
 core_engine_info() {
     # ==========================================================================
@@ -3119,7 +3197,7 @@ generate_poly_payload() {
 # @description: Модуль сбора системной информации и разведки вебхуков (RECON v2.6)
 # ==============================================================================
 run_system_info() {
-    clear
+   # clear
     # Слой 1: Заголовок через компоненты интерфейса Ядра
     core_engine_ui "h" "PRIME INTELLIGENCE & RECON v2.6"
 
