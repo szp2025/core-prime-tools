@@ -338,42 +338,56 @@ GLOBAL_PHONE_CODES=(
 )
 
 # ==============================================================================
-# МАТРИЦА ФИНАНСОВЫХ ИНСТИТУТОВ И БАНКОВСКИХ КОДОВ (BANK MATRIX & RIB CODES)
+# 11. МАТРИЦА ФИНАНСОВЫХ ИНСТИТУТОВ И БАНКОВСКИХ КОДОВ (ULTIMATE BANK MATRIX)
 # ==============================================================================
-# Формат: "КОД_БАНКА_ИЛИ_SWIFT|НАЗВАНИЕ_БАНКА|РЕГИОН"
+# Формат: "КОД_BANQUE_ИЛИ_SWIFT_PREFIX|BIC_SWIFT|НАЗВАНИЕ_БАНКА|РЕГИОН"
 GLOBAL_BANK_MATRIX=(
-    # --- Крупнейшие Французские Банки (Сеть RIB / SEPA) ---
-    "30002|BNP Paribas|Франция (FR)"
-    "30003|Société Générale|Франция (FR)"
-    "30004|Crédit Agricole|Франция (FR)"
-    "30066|Crédit Mutuel|Франция (FR)"
-    "10278|La Banque Postale|Франция (FR)"
-    "30007|BPCE (Banque Populaire / Caisse d'Epargne)|Франция (FR)"
-    "16108|LCL (Le Crédit Lyonnais)|Франция (FR)"
-    "14518|Boursorama Banque|Франция (FR)"
-    "11708|Fortuneo|Франция (FR)"
-    "17515|N26 (French Branch)|Франция (FR)"
-    "16575|Revolut (French Branch / SEPA)|Франция (FR)"
+    # --- Крупнейшие Французские Банки и Традиционная Сеть (RIB / SEPA FR) ---
+    "30002|BNPAFRPP|BNP Paribas|Франция (FR)"
+    "30003|SOGEFRPP|Société Générale|Франция (FR)"
+    "30004|CAGRFRPP|Crédit Agricole|Франция (FR)"
+    "30066|CMCIFRPP|Crédit Mutuel|Франция (FR)"
+    "10278|POSSFRPP|La Banque Postale|Франция (FR)"
+    "30007|CEPACFRP|BPCE (Banque Populaire / Caisse d'Epargne)|Франция (FR)"
+    "16108|LCLXFRPP|LCL (Le Crédit Lyonnais)|Франция (FR)"
+    "10207|CHAFFRPP|Crédit du Nord|Франция (FR)"
+    "30056|HSBCFRPP|HSBC Continental Europe (France)|Франция (FR)"
+    "42559|BICPFRPP|Banque Palatine|Франция (FR)"
+    
+    # --- Французские Необанки и Финтех (Digital & FinTech FR) ---
+    "14518|BOURFRPP|BoursoBank (ex-Boursorama)|Франция (FR)"
+    "11708|FOTEFRPP|Fortuneo|Франция (FR)"
+    "17515|N26EFR2X|N26 (French Branch)|Франция (FR)"
+    "16575|REVOFR21|Revolut (French Branch)|Франция (FR)"
+    "17315|NICKFRPP|Compte Nickel (Financière des Paiements)|Франция (FR)"
+    "17218|QONTFRPP|Qonto (Olinda SAS)|Франция (FR)"
+    "17525|BUNQFRWW|Bunq (French Branch)|Франция (FR)"
+    "11328|HELLFRPP|Hello Bank!|Франция (FR)"
     
     # --- Международные и Европейские Гиганты (Global SWIFT) ---
-    "BARC|Barclays Bank|Великобритания (UK)"
-    "HSBC|HSBC Holdings|Великобритания (UK)"
-    "DEUT|Deutsche Bank|Германия (DE)"
-    "COMM|Commerzbank|Германия (DE)"
-    "INGB|ING Group|Нидерланды (NL)"
-    "SANTA|Banco Santander|Испания (ES)"
-    "CHAS|JPMorgan Chase|США (US)"
-    "CITI|Citigroup|США (US)"
+    "BARC|BARCGB2L|Barclays Bank|Великобритания (UK)"
+    "HSBC|HSBCHGB2L|HSBC Holdings|Великобритания (UK)"
+    "DEUT|DEUTDEFF|Deutsche Bank|Германия (DE)"
+    "COMM|COERDEFF|Commerzbank|Германия (DE)"
+    "INGB|INGBNL2A|ING Group|Нидерланды (NL)"
+    "SANTA|BSCHESMM|Banco Santander|Испания (ES)"
+    "CHAS|CHASUS33|JPMorgan Chase|США (US)"
+    "CITI|CITIUS33|Citigroup|США (US)"
+    "UBSW|UBSWCHZH|UBS Group|Швейцария (CH)"
+    "BNPA|BNPABEBB|BNP Paribas Fortis|Бельгия (BE)"
     
-    # --- Крупнейшие Банки СНГ ---
-    "SBER|Сбербанк|Россия (RU)"
-    "VTBR|ВТБ|Россия (RU)"
-    "ALFA|Альфа-Банк|Россия (RU)"
-    "TCSB|Т-Банк (Тинкофф)|Россия (RU)"
-    "KZBK|Kaspi Bank|Казахстан (KZ)"
-    "HALK|Halyk Bank|Казахстан (KZ)"
-    "BAPB|Белагропромбанк|Беларусь (BY)"
-    "ASB|Беларусбанк|Беларусь (BY)"
+    # --- Крупнейшие Банки СНГ (SWIFT & Национальные Системы) ---
+    "SBER|SABR付けて|Сбербанк|Россия (RU)"
+    "VTBR|VTBRRU2M|ВТБ|Россия (RU)"
+    "ALFA|ALFARU2A|Альфа-Банк|Россия (RU)"
+    "TCSB|TCSBRUM1|Т-Банк (Тинкофф)|Россия (RU)"
+    "VBRR|VBRRRUM1|ВБРР|Россия (RU)"
+    "KZBK|KSBKKZKX|Kaspi Bank|Казахстан (KZ)"
+    "HALK|HSBKKZKX|Halyk Bank|Казахстан (KZ)"
+    "BCCK|KREDKZKX|Банк ЦентрКредит|Казахстан (KZ)"
+    "BAPB|BAPBBY2X|Белагропромбанк|Беларусь (BY)"
+    "ASB|AKBBBY2X|Беларусбанк|Беларусь (BY)"
+    "PBUA|PBUAUA2X|ПриватБанк|Украина (UA)"
 )
 
 
