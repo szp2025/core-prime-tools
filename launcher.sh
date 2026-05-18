@@ -1770,15 +1770,14 @@ core_network_dns_sync() {
 
 
 # ==============================================================================
-# @description: Сбор аппаратных метрик и вывод системного статуса ядра v23.9
-# ОПТИМИЗАЦИЯ: Максимально короткий и сжатый вывод для экранов смартфонов
-# СТИЛИЗАЦИЯ: Полное сохранение оригинальной цветовой палитры и структуры UI
-# АДАПТИВНОСТЬ: Безопасный обход netlink ограничений Android (Termux non-root)
+# @description: System metrics harvester and kernel status display v24.0
+# OPTIMIZATION: Ultra-compact English layout for mobile terminal screens
+# COMPATIBILITY: Secure bypass for Android netlink restriction (Termux non-root)
 # ==============================================================================
 core_engine_info() {
-    core_engine_ui "i" "СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
+    core_engine_ui "i" "INFRASTRUCTURE SYSTEM STATUS"
 
-    # --- СЛОЙ 1: МЕТРИКИ ПАМЯТИ ---
+    # --- LAYER 1: MEMORY METRICS ---
     local ram_status="\e[1;31m[N/A]\e[0m"
     local free_output
     free_output=$(free -m 2>/dev/null | grep "Mem:")
@@ -1800,9 +1799,9 @@ core_engine_info() {
         disk_status="\e[1;32m$disk_free free\e[0m"
     fi
 
-    echo -e " Память/Диск  : RAM: $ram_status | ROM: $disk_status"
+    echo -e " Memory/Disk  : RAM: $ram_status | ROM: $disk_status"
 
-    # --- СЛОЙ 2: СЕТЕВОЙ ШЛЮЗ ---
+    # --- LAYER 2: NETWORK GATEWAY ---
     local active_uplink="\e[1;31m[OFFLINE]\e[0m"
     local target_interface="\e[1;31m[NONE]\e[0m"
     local default_route
@@ -1823,9 +1822,9 @@ core_engine_info() {
         fi
     fi
 
-    echo -e " Сеть/Шлюз    : $active_uplink -> Link: $target_interface"
+    echo -e " Net/Gateway  : $active_uplink -> Link: $target_interface"
 
-    # --- СЛОЙ 3: РАДИОМОДУЛИ ---
+    # --- LAYER 3: RADIO MODULES ---
     local wifi_status="\e[1;31m[ABS]\e[0m"
     local bt_status="\e[1;31m[ABS]\e[0m"
 
@@ -1841,9 +1840,9 @@ core_engine_info() {
         fi
     fi
 
-    echo -e " Радиомодули  : Wi-Fi: $wifi_status | BT: $bt_status"
+    echo -e " Radio Links  : Wi-Fi: $wifi_status | BT: $bt_status"
 
-    # --- СЛОЙ 4: ЗАЩИЩЕННЫЕ ТУННЕЛИ ---
+    # --- LAYER 4: SECURE TUNNELS ---
     local vpn_status="\e[1;31m[INACTIVE]\e[0m"
     
     if ifconfig 2>/dev/null | grep -qE 'tun|tap|ppp|wg|tun0|abstract'; then
@@ -1852,7 +1851,7 @@ core_engine_info() {
         vpn_status="\e[1;32m[TOR ACTIVE]\e[0m"
     fi
 
-    echo -e " Безопасность : $vpn_status"
+    echo -e " Security     : $vpn_status"
     echo "--------------------------------------------------"
 }
 
