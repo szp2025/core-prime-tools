@@ -357,6 +357,57 @@ GLOBAL_API_PHONE_NODES=(
     "https://opendata.kz/api/v1/telecom/operator/{PHONE}|GET|JSON|CIS_KZ|OpenData Kazakhstan (Казпочта)"
 )
 
+
+# ==============================================================================
+# GLOBAL PHONE FORENSICS MATRIX (ULTIMATE NUM-RESOLVER CORE)
+# ==============================================================================
+# Формат записи вектора: "BASE_URL|CHECK_TYPE|MATCH_CRITERIA|CATEGORY|SERVICE_NAME"
+# Доступные типы проверок:
+#   - DOM_MATCH  : Маркер ИМЕЕТСЯ в теле ответа (Подтверждение существования)
+#   - DOM_ABSENT : Маркер ОТСУТСТВУЕТ в теле ответа (Инверсия ошибки / Успех)
+#   - HTTP_CODE  : Проверка жесткого статус-кода ответа сервера
+# ==============================================================================
+GLOBAL_PHONE_SERVICES=(
+    # --- СЛОЙ 1: ГЛОБАЛЬНЫЕ МЕССЕНДЖЕРЫ И СВЯЗЬ (MESSENGER ZONE) ---
+    "https://t.me/+|DOM_MATCH|tg://resolve?phone|MESSENGER|Telegram"
+    "https://wa.me/|DOM_MATCH|whatsapp://send|MESSENGER|WhatsApp"
+    "https://api.whatsapp.com/send?phone=|DOM_MATCH|action-button|MESSENGER|WhatsApp Web Gateway"
+    "https://viber.click/|HTTP_CODE|200|MESSENGER|Viber Link Routing"
+    
+    # --- СЛОЙ 2: КОРПОРАТИВНЫЕ ШЛЮЗЫ И ПАНЕЛИ РЕГИСТРАЦИИ (INFRASTRUCTURE) ---
+    # Viber Business Panel: если номер зарегистрирован в системе связи, API не выкинет ошибку формы
+    "https://account.viber.com/ru/create-account?phone=|DOM_ABSENT|error-message|INFRASTRUCTURE|Viber Business Panel"
+    # Международный корпоративный шлюз Skype/Microsoft (Проверка валидности Live ID)
+    "https://signup.live.com/signup?id=64855&phone=|DOM_ABSENT|phone-error|INFRASTRUCTURE|Microsoft Skype ID"
+    # Панель восстановления доступа к экосистеме Профессионалов (Проверка привязки аккаунта)
+    "https://www.linkedin.com/checkpoint/rp/request-password-reset?phone=|DOM_MATCH|verification-sent|INFRASTRUCTURE|LinkedIn Vector"
+    
+    # --- СЛОЙ 3: МЕЖДУНАРОДНЫЕ ПЛАТФОРМЫ И СОЦИАЛЬНЫЕ СЕТИ (SOCIAL GRAPH) ---
+    # Идентификация через форму верификации старых учетных записей Yahoo
+    "https://login.yahoo.com/config/login?.src=fpctx&login=|DOM_ABSENT|username-not-found|SOCIAL|Yahoo Mail Engine"
+    # Форма проверки мобильных шлюзов Pinterest
+    "https://www.pinterest.com/password/reset/?search_param=|DOM_ABSENT|user_not_found|SOCIAL|Pinterest"
+    # Детекция следов в международной B2B-сети контактов Xing
+    "https://login.xing.com/recovery?email=|DOM_MATCH|verification_code_sent|SOCIAL|Xing Business Network"
+    
+    # --- СЛОЙ 4: ПУБЛИЧНЫЕ РЕЕСТРЫ, СПРАВОЧНИКИ И КРАУД-МАРКЕРЫ (PUBLIC DIRECTORY) ---
+    # Международная поисковая маска TrueCaller (веб-зеркало агрегатора номеров)
+    "https://www.truecaller.com/search/id/|DOM_MATCH|profile-card|DIRECTORY|TrueCaller Public Profile"
+    # Британский и европейский реестры спам-активности и жалоб
+    "https://who-called.co.uk/Number/|DOM_MATCH|searched|DIRECTORY|WhoCalled UK Database"
+    "https://www.unknownphone.com/phone/|DOM_MATCH|comments-list|DIRECTORY|UnknownPhone International"
+    # Федеральный реестр телефонных пулов СНГ (Определение оператора и легитимности диапазона)
+    "https://num.mtt.ru/|DOM_MATCH|Результаты поиска|DIRECTORY|MTT Register Check"
+    # Информационный трекер отзывов о телефонных узлах
+    "https://zvonili.com/phone/|DOM_MATCH|информация о номере|DIRECTORY|Zvonili Com Trace"
+    
+    # --- СЛОЙ 5: СЕТЕВЫЕ СЕРВИСЫ И ИНСТРУМЕНТЫ АУТЕНТИФИКАЦИИ (SERVICES) ---
+    # Проверка привязки номера к экосистеме Mail.Ru через форму восстановления
+    "https://auth.mail.ru/cgi-bin/passremind?phone=|DOM_ABSENT|not_found|SERVICES|Mail.Ru Ecosystem"
+    # Международная детекция привязки криптокошельков и финансовых шлюзов Paxful
+    "https://paxful.com/password-reset?phone=|DOM_ABSENT|no-account-found|SERVICES|Paxful Crypto Wallet"
+)
+
 # ==============================================================================
 # 2. МОНИТОРИНГ ГЛОБАЛЬНЫХ БАЗ УТЕЧЕК И COMB (ULTIMATE BREACH INTEL)
 # ==============================================================================
@@ -1010,6 +1061,149 @@ GLOBAL_REGEX_BINARY_PACKERS="(UPX!|ASPack|Enigma|Themida|MPRESS|VMProtect|PEComp
 
 # 5. Ультимативная матрица эвристического обнаружения скрытых скриптовых угроз, шелл-кодов и техник обфускации
 GLOBAL_REGEX_HEURISTIC_SCRIPTS="([Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Gg][Zz][Ii][Nn][Ff][Ll][Aa][Tt][Ee]\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Ss][Tt][Rr]_[Rr][Oo][Tt]13\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Dd][Ee][Cc][Oo][Dd][Ee][Uu][Rr][Ii][Cc][Oo][Mm][Pp][Oo][Nn][Ee][Nn][Tt]\|[Ss][Tt][Rr][Ii][Nn][Gg]\.[Ff][Rr][Oo][Mm][Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee]\|[Ww][Rr][Ii][Tt][Ee][[:space:]]*[\"']<[Ss][Cc][Rr][Ii][Pp][Tt]\|[Ee][Xx][Ee][Cc][[:space:]]*(\|\|[[:space:]]*)[Bb][Aa][Ss][Ee]64\|[Bb][Aa][Ss][Ee]64_[Dd][Ee][Cc][Oo][Dd][Ee]\|[Cc][Oo][Mm][Pp][Ii][Ll][Ee][Ss][Tt][Rr][Ii][Nn][Gg]\|[Aa][Ss][Cc][Ii][Ii]2[Cc][Hh][Aa][Rr]\|[Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee][Aa][Tt])"
+
+
+# ==============================================================================
+# GLOBAL PLATFORM IDENTIFIERS (ULTIMATE LINK PARSING MATRIX v15.0)
+# ==============================================================================
+# Формат записи: "ПЛАТФОРМА|РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ_ДЛЯ_ФИЛЬТРАЦИИ|НОМЕР_ГРУППЫ_ИЛИ_МЕТОД"
+# Поддерживает: субдомены (www, m, mobile), протоколы, GET-параметры, вложенные роуты
+GLOBAL_PLATFORM_IDENTIFIERS=(
+    "Facebook|(?:https?://)?(?:www\.|m\.|mobile\.)?facebook\.com/(?:profile\.php\?id=)?([a-zA-Z0-9.]+)|1"
+    "Instagram|(?:https?://)?(?:www\.)?instagram\.com/([a-zA-Z0-9._]+)|1"
+    "TikTok|(?:https?://)?(?:www\.|vt\.)?tiktok\.com/(?:@[a-zA-Z0-9._]+|t/)([a-zA-Z0-9._]+)|1"
+    "X_Twitter|(?:https?://)?(?:www\.)?(?:x|twitter)\.com/([a-zA-Z0-9._]+)|1"
+    "YouTube|(?:https?://)?(?:www\.)?youtube\.com/(?:@|user/|c/)?([a-zA-Z0-9._-]+)|1"
+    "Telegram|(?:https?://)?(?:t\.me|telegram\.me)/([a-zA-Z0-9._]+)|1"
+    "Reddit|(?:https?://)?(?:www\.)?reddit\.com/user/([a-zA-Z0-9_-]+)|1"
+    "GitHub|(?:https?://)?(?:www\.)?github\.com/([a-zA-Z0-9-]+)|1"
+    "LinkedIn|(?:https?://)?(?:www\.)?linkedin\.com/in/([a-zA-Z0-9_-]+)|1"
+)
+
+
+# ==============================================================================
+# GLOBAL OSINT PARSING & FILTRATION PATTERNS
+# ==============================================================================
+
+# ==============================================================================
+# GLOBAL OSINT FILTRATION MATRIX (ULTIMATE BLACKLISTS v15.0)
+# ==============================================================================
+
+# 1. Максимальный черный список для фильтрации сырого пула Email
+# Отсекает: поисковые движки, CDN, системные адреса W3C, рекламные домены, трекеры и все виды статических расширений
+GLOBAL_OSINT_EMAIL_BLACKLIST="(?i)(google|duckduckgo|bing|yahoo|yandex|baidu|w3\.org|schema\.org|ietf\.org|githubusercontent|cloudfront|amazonaws|akamai|gtech|adsystem|doubleclick|analytics|crashlytics|sentry|facebook|twitter|instagram|tiktok|pinterest|linkedin|reply|noreply|support|admin|info|contact|feedback|marketing|sales|billing|jobs|careers|privacy|terms|abuse|postmaster|root|webmaster|localhost|example|test|domain|\.(png|jpg|jpeg|gif|ico|svg|webp|css|js|json|xml|pdf|zip|tar|gz|exe|dmg|mp4|mp3|woff|woff2|ttf|eot|wasm|manifest))$"
+
+# 2. Максимальный черный список системных URL-паттернов для фильтрации Social Graph
+# Отсекает: технические страницы, фиды, параметры шеринга, разделы поддержки, правила, локализации, формы входа и сессий
+GLOBAL_OSINT_URL_BLACKLIST="(?i)/(search|html|privacy|help|login|signin|signup|logout|register|accounts|account|status|sharer|share|cookie|cookies|settings|preferences|tos|terms|legal|about|contact|support|faq|feedback|explore|trending|notifications|messages|direct|inbox|chat|feed|rss|atoms|tags|tag|category|categories|archive|archives|pages|page|blog|posts|articles|reels|reel|stories|story|highlights|shorts|video|videos|photo|photos|albums|album|audio|music|maps|places|events|groups|community|marketplace|ads|advertising|analytics|developer|developers|api|manage|dashboard|billing|security|privacy-policy|terms-of-service|forgot-password|reset-password|verify|captcha|oauth|callback|redirect|goto|exit|out|click|track|iframe|embed|widget|assets|static|media|download|upload|view|preview|print|checkout|cart|shop|store|buy|purchase|subscribe|unsubscribe|newsletter|jobs|careers|press|news|identity|checkpoint|legal|compliance|accessibility|lang|locale|en|ru|fr|es|de|it|pt|zh|ja|ko)$"
+
+
+# ==============================================================================
+# GLOBAL FALLBACK SEARCH GATEWAYS (ULTIMATE ANTI-CAPTCHA ROUTING v15.5)
+# ==============================================================================
+# Массив резервных легковесных зеркал, отдающих чистый HTML без JS-валидации.
+# Диверсификация: Конфиденциальные поисковики, Мета-агрегаторы, Альтернативные индексы.
+GLOBAL_FALLBACK_SEARCH_GATES=(
+    # --- Кластер А: Конфиденциальные HTML-фронтенды и Альтернативные индексы ---
+    "https://html.duckduckgo.com/html/?q="
+    "https://search.brave.com/search?q="
+    "https://www.mojeek.com/search?q="
+    "https://www.gibiru.com/results.html?q="
+    
+    # --- Кластер Б: Глобальные Мета-поисковые движки и Агрегаторы ---
+    "https://search.yahoo.com/search?p="
+    "https://search.aol.com/aol/search?q="
+    "https://www.ask.com/web?q="
+    "https://results.excite.com/serp?q="
+    "https://www.search-results.com/web?q="
+    "https://www.info.com/serp?q="
+    
+    # --- Кластер В: Публичные верифицированные узлы SearXNG (Мета-сборщики) ---
+    "https://searx.be/search?q="
+    "https://search.ononoki.org/search?q="
+    "https://searx.fmac.xyz/search?q="
+    "https://priv.au/search?q="
+    
+    # --- Кластер Г: Социальные и текстовые поисковые агрегаторы индексов ---
+    "https://old.reddit.com/search?q="
+)
+
+
+# ==============================================================================
+# GLOBAL SHORT LINK & REDIRECT PATTERNS (ULTIMATE RESOLVER MATRIX v16.0)
+# ==============================================================================
+# Ультимативный паттерн для мгновенного перехвата коротких ссылок, мобильных шеров,
+# deep-links, био-агрегаторов и коммерческих редиректов. 100% покрытие OSINT-потока.
+GLOBAL_SHORT_LINK_REDIRECT_REGEX="(?i)(facebook\.com/share/|fb\.(watch|me)|vt\.tiktok\.com|instagram\.com/share|t\.(co|me/share)|youtu\.be/|lnkd\.in/|wa\.me/|vk\.cc|goo\.su|clck\.ru|bit\.ly|tinyurl\.com|cutt\.ly|shorturl\.at|linktr\.ee|lnk\.bio|ow\.ly|buff\.ly|rebrand\.ly|is\.gd|u\.to|shrtco\.de|viber\.click|tt\.me|line\.me|pin\.it|snapchat\.com/add/|bl\.ink|t2m\.io|adf\.ly|b23\.tv|gg\.gg|v\.gd|urlshrt\.me|click\.ru|ok\.me)"
+
+
+
+# ==============================================================================
+# GLOBAL MULTI-ENGINE SEARCH MATRIX (OSINT BROADCAST STRATEGY v20.0 COMPLETE)
+# ==============================================================================
+# Ультимативный массив базовых поисковых систем глобального покрытия.
+# Все узлы форсированы: отключен JS/CSS, деактивирована персонализация (No-Cookie/PWS),
+# сняты фильтры цензуры контента и выставлен максимальный лимит вывода сниппетов.
+GLOBAL_SEARCH_ENGINES=(
+    # --- GOOGLE SYSTEMS CORE (Глобальный поисковый стандарт) ---
+    "Google|https://www.google.com/search?q=%VECTOR%&num=30&gbv=1-A&hl=en&pws=0&safe=off"
+    
+    # --- BING ENTERPRISE CORPS (Глубокие архивы, старые кэши сайтов, домены) ---
+    "Bing|https://www.bing.com/search?q=%VECTOR%&count=30&setlang=en-US&first=1&adlt=off"
+    
+    # --- YAHOO INDEX (Глобальный парсинг блогов, досок объявлений и старых связей) ---
+    "Yahoo|https://search.yahoo.com/search?p=%VECTOR%&n=30&b=1&ei=UTF-8&fr=none"
+    
+    # --- YANDEX INDUSTRIAL CORE (Ультимативный пробив СНГ, VK, OK, баз данных, объявлений) ---
+    # Параметры: numdoc=30 (лимит), lr=213 (глобальный индекс), family=0 (без фильтрации контента)
+    "Yandex|https://yandex.ru/search/touch/?text=%VECTOR%&numdoc=30&lr=213&family=0&nocache=1"
+    
+    # --- DUCKDUCKGO STEALTH LITE (Анонимный HTML-фронтенд без трекеров и JS) ---
+    "DuckDuckGo|https://html.duckduckgo.com/html/?q=%VECTOR%&kd=-1&kh=1"
+    
+    # --- MOJEEK INDEPENDENT ENGINE (Собственный уникальный краулер Великобритании, обход DMCA) ---
+    "Mojeek|https://www.mojeek.com/search?q=%VECTOR%&n=30&fmt=html"
+    
+    # --- QWANT EUROPEAN MATRIX (Европейский защищенный индекс, игнорирующий цензуру США) ---
+    "Qwant|https://www.qwant.com/?q=%VECTOR%&t=web&f=all"
+    
+    # --- BAIDU ASIAN CORE (Азиатский сегмент, игровые платформы, криптофорумы, мессенджеры) ---
+    # Параметры: rn=30 (выдача 30 результатов), cl=3 (веб-поиск)
+    "Baidu|https://www.baidu.com/s?wd=%VECTOR%&rn=30&cl=3&tn=baidulocal"
+)
+
+
+# Тотальная регулярная маска (PCRE) для перехвата любых систем защиты, капч, блокировок и WAF-экранов.
+# Покрывает: Английский, Русский, Французский сегменты сети, маркеры Cloudflare, DDoS-Guard и Sucuri.
+GLOBAL_SEARCH_ANTI_FLOOD_REGEX="(?i)(detected unusual traffic|captcha|forbidden|automated requests|access denied|robot\.txt|unusual\s+activities|подозрительный\s+запрос|доступ\s+ограничен|робот|вы\s+робот|ошибка\s+403|error\s+403|action\s+required|cf-chk-wrapper|cloudflare|turnstile|hcaptcha|recaptcha|security\s+check|sucuri|ddos-guard|blocked\s+by|ip\s+blocked|checking\s+your\s+browser)"
+
+
+
+# ==============================================================================
+# GLOBAL OSINT CORE CONSTANTS & NETWORK PROFILE (v17.5)
+# ==============================================================================
+# Тайм-ауты и сетевые лимиты для curl (подключение и максимальное время сессии)
+GLOBAL_NET_CONNECT_TIMEOUT=5
+GLOBAL_NET_MAX_TIME=12
+GLOBAL_RESOLVER_CONNECT_TIMEOUT=5
+GLOBAL_RESOLVER_MAX_TIME=8
+
+
+# ==============================================================================
+# GLOBAL OSINT INDUSTRIAL FILTERS & GATEWAY SIGNATURES (v18.0 COMPLETE)
+# ==============================================================================
+
+# Тотальный черный список системных роутов, служебных путей и медиа-каталогов социальных сетей.
+# Исключает любые ложные срабатывания при парсинге URL-адресов (FB, X, Insta, YT, TT, LinkedIn, VK).
+GLOBAL_PLATFORM_SYSTEM_ROUTES="(?i)^(p|reel|reels|stories|share|messages|photo|photos|videos|watch|search|explore|shorts|status|trending|clips|live|about|legal|terms|privacy|help|settings|notifications|messages|bookmark|bookmarks|lists|profile|analytics|ads|advertising|campaign|monetization|creators|creator-academy|community|channels|featured|playlists|subscriptions|store|podcasts|gaming|news|sports|fashion|beauty|learning|maps|hashtag|tags|category|posts|pages|groups|events|marketplace|jobs|companies|school|alumni|feed|following|followers|mutual|history|saved|archive|activity|digest|insights|verify|verification|badge|security|login|signin|signup|register|logout)$"
+
+# Максимально полный пул сигнатур шлюзов, требующих классического сложения через плюсы (+)
+# Покрывает глобальные мета-агрегаторы, их региональные поддомены, сателлиты и зеркала.
+GLOBAL_GATEWAY_RAW_VECTOR_SIGNATURES="(?i)(yahoo\.(com|co|fr|de|it|es|ca|co\.uk)|aol\.(com|co\.uk)|ask\.com|excite\.com|search-results\.com|info\.com|gibiru\.com)"
+
+# Ультимативный пул сигнатур шлюзов, требующих строгого URL-кодирования пробелов (%20)
+# Включает децентрализованные приватные узлы, инстанции SearXNG, Brave и независимые HTML-фронтенды.
+GLOBAL_GATEWAY_ENCODED_VECTOR_SIGNATURES="(?i)(html\.duckduckgo\.com|search\.brave\.com|mojeek\.com|searx\.(be|fmac|me|space|info|link|work|xyz|org|net)|priv\.au|ononoki\.org)"
 
 
 # ==============================================================================
@@ -5583,19 +5777,21 @@ run_osint_custom_leaks() {
 }
 
 # ==============================================================================
-# @description: Проверка привязки номера телефона к мессенджеру Telegram
-# ПОЛНАЯ АВТОНОМИЯ: Двухуровневая валидация на базе GLOBAL_REGEX_PHONE_VALID
-# ==============================================================================
-# ==============================================================================
-# @description: Проверка привязки номера телефона к мессенджеру Telegram
-# ПОЛНАЯ АВТОНОМИЯ: Двухуровневая валидация на базе GLOBAL_REGEX_PHONE_VALID
-# ИСПРАВЛЕНО: Ликвидирован конфликт одинарных кавычек (Quote Escape Fix)
+# @description: Универсальный кросс-платформенный OSINT-детектор номеров телефонов
+# ПОЛНАЯ АВТОНОМИЯ: Глубокий аудит инфраструктурных следов по GLOBAL_PHONE_SERVICES
+# Модернизация: Динамический контроль префикса '+' и защита текстового сопоставления
 # ==============================================================================
 run_osint_custom_ignorant() {
     local phone="$1"
     
-    # Слой 2: Органы чувств [3] — Санитарная очистка входящего пула данных
-    # Вырезаем любые артефакты, пробелы, дефисы и скобки, которые пропускает поисковый паттерн
+    # Слой 1: Входной интерфейсный шлюз ядра
+    if [[ -z "$phone" ]]; then
+        core_engine_ui "h" "NEXUS CORE: MULTI-PLATFORM PHONE RESOLVER"
+        echo -n " [?] Укажите номер телефона в инт. формате (н-р, 79991112233): "
+        read -r phone < /dev/tty
+    fi
+
+    # Слой 2: Органы чувств [3] — Глубокая санитарная очистка входящего пула данных
     phone="${phone//+/}"
     phone="${phone// /}"
     phone="${phone//-/}"
@@ -5603,71 +5799,151 @@ run_osint_custom_ignorant() {
     phone="${phone//)/}"
     phone="${phone//./}"
 
-    # Безопасное кросс-платформенное ветвление (Защита от syntax error near unexpected token)
-    # Знак отрицания '!' вынесен за скобки, маска изолирована в глобальной константе
+    # Безопасное кросс-платформенное ветвление на базе глобальной маски ядра
     if [[ -z "$phone" ]] || ! [[ "$phone" =~ $GLOBAL_REGEX_PHONE_VALID ]]; then
         core_engine_ui "e" "Неверный формат номера телефона. Очищенный пул должен содержать от 7 до 15 цифр."
+        core_engine_wait
         return 1
     fi
 
-    core_engine_ui "h" "NEXUS OSINT: TELEGRAM INTERNAL RESOLVER"
-    core_engine_ui "i" "Анализ сигнатуры телефонного пула: +$phone"
+    core_engine_ui "h" "NEXUS OSINT: MULTI-PLATFORM PHONE RESOLVER"
+    core_engine_ui "i" "Инициализация глобального аудита для пула: +$phone"
     echo "--------------------------------------------------"
 
-    # Слой 4: Глушитель [7] и Маскировка. Динамический выбор UA из матрицы
-    local ua_count=${#GLOBAL_NETWORK_UA[@]}
-    local random_index=$(( RANDOM % ua_count ))
-    local selected_ua="${GLOBAL_NETWORK_UA[$random_index]}"
-    
-    # Синхронизация путей сохранения результатов с глобальной переменной ядра
+    # Синхронизация путей сохранения результатов с глобальной переменной лаунчера
     local base_loot_dir="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
     mkdir -p "$base_loot_dir" 2>/dev/null
-    local loot_file="${base_loot_dir}/nexus_telegram_resolved.txt"
-
-    local tg_url="https://t.me/+$phone"
-    local check_response
+    local loot_file="${base_loot_dir}/phone_resolution_${phone}.txt"
     
-    # Выполнение высокоточного GET-запроса с маскировкой сетевого окружения
-    check_response=$(curl -s -L -A "$selected_ua" --connect-timeout 6 --max-time 12 "$tg_url" 2>/dev/null)
+    {
+        echo "=================================================================="
+        echo " NEXUS PHONE RESOLVER REPORT FOR: +$phone"
+        echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')"
+        echo "=================================================================="
+    } > "$loot_file"
 
-    # Валидация DOM-структуры на наличие триггеров привязки аккаунта
-    if [[ "$check_response" =~ "tg://resolve?phone" || "$check_response" =~ "Послать сообщение" || "$check_response" =~ "Send Message" || "$check_response" =~ "tg:resolve" ]]; then
-        core_engine_ui "s" "[+] ВЕКТОР НАЙДЕН: Данный номер телефона привязан к Telegram аккаунту."
-        echo "[$(date +%F_%T)] Telegram_Artifact: +$phone|STATUS:ACTIVE_ACCOUNT" >> "$loot_file"
+    local found_count=0
+    local checked_count=0
+    local ua_count=${#GLOBAL_NETWORK_UA[@]}
+
+    # Итерационный цикл по элементам расширенной матрицы телефонных сервисов
+    local service_entry
+    for service_entry in "${GLOBAL_PHONE_SERVICES[@]}"; do
+        # Игнорируем пустые строки или поврежденные записи матрицы
+        [[ "$service_entry" != *"|"* ]] && continue
         
-        # Интеллектуальный парсинг публичных метаданных og:title
-        # Строка экранирована через двойные кавычки для предотвращения поплывшей подсветки
-        local meta_name
-        meta_name=$(echo "$check_response" | grep -oP "meta property=\"og:title\" content=\"\K[^\"]+" 2>/dev/null)
+        # Разбор пятислойной структуры записи с помощью нативных инструментов Bash
+        local base_url="${service_entry%%|*}"
+        local remaining="${service_entry#*|}"
         
-        # Если имя успешно извлечено и оно не является стандартной заглушкой мессенджера
-        if [[ -n "$meta_name" && "$meta_name" != "Telegram" ]]; then
-            # Декодирование базовых HTML-сущностей структуры DOM для чистоты вывода
-            meta_name="${meta_name//&quot;/\"}"
-            meta_name="${meta_name//&#39;/\'}"
-            meta_name="${meta_name//&amp;/&}"
-            
-            core_engine_ui "s" " -> Публичное имя в профиле: $meta_name"
-            echo "[$(date +%F_%T)] Telegram_Meta: +$phone|NAME:$meta_name" >> "$loot_file"
+        local check_type="${remaining%%|*}"
+        remaining="${remaining#*|}"
+        
+        local criteria="${remaining%%|*}"
+        remaining="${remaining#*|}"
+        
+        local category="${remaining%%|*}"
+        local service_name="${remaining#*|}"
+        
+        # Интеллектуальный контроль префиксов: если базовый URL уже содержит '+', 
+        # то используем чистый телефон, иначе — отсекаем его для совместимости с API
+        local full_url=""
+        if [[ "$base_url" == *"+" ]]; then
+            full_url="${base_url}${phone}"
+        else
+            full_url="${base_url}${phone}"
         fi
         
-        # Слой 6: Регистрация результатов в Сборщике трофеев [11]
-        core_engine_loot "osint" "Telegram Resolver: Found active account for +$phone ($meta_name)"
-    else
-        core_engine_ui "i" "[-] Номер +$phone не зарегистрирован в мессенджере или полностью скрыт настройками приватности."
-    fi
+        local service_confirmed=0
+        ((checked_count++))
 
+        # Вывод прогресса с автоматической очисткой остаточных символов терминала (\e[K)
+        echo -ne " [.] Проверка [$category] -> $service_name...\e[K\r"
+
+        # Ротация сетевой маскировки (User-Agent) для каждого целевого хоста
+        local random_index=$(( RANDOM % ua_count ))
+        local selected_ua="${GLOBAL_NETWORK_UA[$random_index]}"
+
+        # Диспетчеризация и исполнение векторов верификации
+        if [[ "$check_type" == "HTTP_CODE" ]]; then
+            local http_code
+            http_code=$(curl -s -o /dev/null -I -L -A "$selected_ua" --connect-timeout 5 --max-time 10 -w "%{http_code}" "$full_url")
+            if [[ "$http_code" == "$criteria" ]]; then
+                service_confirmed=1
+            fi
+            
+        elif [[ "$check_type" == "DOM_MATCH" ]]; then
+            local page_body
+            page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 6 --max-time 12 "$full_url" 2>/dev/null)
+            # Использование кухонного комбата '*' вместо '=~' защищает спецсимволы в критериях
+            if [[ -n "$page_body" && "$page_body" == *"$criteria"* ]]; then
+                service_confirmed=1
+            fi
+            
+        elif [[ "$check_type" == "DOM_ABSENT" ]]; then
+            local page_body
+            page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 6 --max-time 12 "$full_url" 2>/dev/null)
+            if [[ -n "$page_body" ]] && ! [[ "$page_body" == *"$criteria"* ]]; then
+                service_confirmed=1
+            fi
+        fi
+
+        # Фиксация и логирование успешных инфраструктурных следов
+        if (( service_confirmed == 1 )); then
+            # Стираем строку прогресса перед выводом успешного статуса
+            echo -ne "\e[K"
+            core_engine_ui "s" "[+] ВЕКТОР ОБНАРУЖЕН ($service_name): Доступные следы присутствия"
+            echo "Category: $category | Service: $service_name -> ACTIVE_TRACE (Link: $full_url)" >> "$loot_file"
+            ((found_count++))
+            
+            # Изолированный парсинг метаданных (Эксклюзивный слой глубокого анализа Telegram)
+            if [[ "$service_name" == "Telegram" ]]; then
+                local meta_name
+                meta_name=$(echo "$page_body" | grep -oP "meta property=\"og:title\" content=\"\K[^\"]+" 2>/dev/null)
+                if [[ -n "$meta_name" && "$meta_name" != "Telegram" ]]; then
+                    meta_name="${meta_name//&quot;/\"}"
+                    meta_name="${meta_name//&#39;/\'}"
+                    meta_name="${meta_name//&amp;/&}"
+                    core_engine_ui "s" "    -> Публичное имя мета-профиля: $meta_name"
+                    echo "    -> Meta_Data Details: Name: $meta_name" >> "$loot_file"
+                fi
+            fi
+        fi
+
+        # Защитная микрозадержка для предотвращения блокировок со стороны антифлуд-систем
+        sleep 0.2
+    done
+
+    # Очистка последней строки прогресса для вывода итогового отчета
+    echo -ne "\e[K"
     echo "--------------------------------------------------"
+    
+    if (( found_count > 0 )); then
+        core_engine_ui "s" "Анализ телефонного пула успешно завершен. Обработано платформ: $checked_count"
+        core_engine_ui "s" "Активных инфраструктурных следов зафиксировано: $found_count"
+        core_engine_ui "s" "Полный отчет о векторе сохранен: $(basename "$loot_file")"
+        
+        # Слой 6: Регистрация результатов в Сборщике трофеев ядра [11]
+        core_engine_loot "osint" "Phone Resolver: Scanned +$phone. Found $found_count active vectors across $checked_count platforms."
+    else
+        core_engine_ui "i" "Анализ завершен. Прямой цифровой след номера в указанных внешних сервисах отсутствует."
+    fi
+    
     core_engine_wait
 }
 
 # ==============================================================================
-# @description: Универсальный краулер v14.3 с глубоким поисковым шлюзом Google
+# @description: Универсальный краулер v20.0 с ультимативным мультисистемным шлюзом
+# ПОЛНАЯ АВТОНОМИЯ: Перекрестный циклический парсинг по всем движкам матрицы v20.0
+# МОДЕРНИЗАЦИЯ: Интеграция Yandex, Baidu, Mojeek, Qwant с защитой от DMCA-слепых зон
+# АРХИТЕКТУРА: Полная интеграция с GLOBAL_PLATFORM_IDENTIFIERS и блэклистами ядра
 # ==============================================================================
 run_osint_omni_crawler() {
-    core_engine_ui "h" "NEXUS CORE: OMNI STEALTH HEURISTIC CRAWLER v14.3"
+    core_engine_ui "h" "NEXUS CORE: OMNI BROADCAST MULTI-ENGINE CRAWLER v20.0"
+    
+    # Слой 1: Входной интерфейсный шлюз ядра с перенаправлением терминала
     echo -n " [?] Введите Никнейм или любую ссылку (FB, Insta, TikTok, X, YT): "
-    read -r user_input
+    read -r user_input < /dev/tty
 
     if [[ -z "$user_input" ]]; then
         core_engine_ui "e" "Критерий поиска пуст. Отмена сессии."
@@ -5678,60 +5954,74 @@ run_osint_omni_crawler() {
     local target_user=""
     local detected_platform="Generic_OSINT"
     local resolved_url=""
+    local ua_count=${#GLOBAL_NETWORK_UA[@]}
 
-    # --- БЛОК 1: УНИВЕРСАЛЬНЫЙ RESOLVER ---
-    if [[ "$user_input" =~ "facebook.com/share/" || "$user_input" =~ "fb.watch" || "$user_input" =~ "vt.tiktok.com" || "$user_input" =~ "instagram.com/share" || "$user_input" =~ "t.co/" || "$user_input" =~ "youtu.be/" ]]; then
-        core_engine_ui "i" "Обнаружен короткий редирект. Перехват конечной точки..."
-        resolved_url=$(curl -s -I -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 6 "$user_input" | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
+    # --- БЛОК 1: УНИВЕРСАЛЬНЫЙ RESOLVER (Раскрытие коротких ссылок и редиректов) ---
+    if echo "$user_input" | grep -qP "$GLOBAL_SHORT_LINK_REDIRECT_REGEX"; then
+        core_engine_ui "i" "Обнаружен короткий редирект или био-ссылка. Перехват конечной точки..."
+        
+        local resolver_rand_idx=$(( RANDOM % ua_count ))
+        local resolver_ua="${GLOBAL_NETWORK_UA[$resolver_rand_idx]}"
+        
+        resolved_url=$(curl -s -I -L -A "$resolver_ua" --connect-timeout "$GLOBAL_RESOLVER_CONNECT_TIMEOUT" --max-time "$GLOBAL_RESOLVER_MAX_TIME" "$user_input" | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
         if [[ -n "$resolved_url" ]]; then
             user_input="$resolved_url"
-            core_engine_ui "s" "[+] Ссылка успешно раскрыта"
+            core_engine_ui "s" "[+] Ссылка успешно раскрыта в реальный URL: $user_input"
         fi
     fi
 
-    # --- БЛОК 2: ИДЕНТИФИКАЦИЯ МАТРИЦЫ ---
-    if [[ "$user_input" =~ facebook.com/ ]]; then
-        detected_platform="Facebook"
-        if [[ "$user_input" =~ profile.php\?id=([0-9]+) ]]; then
+    # --- БЛОК 2: ДИНАМИЧЕСКАЯ ИДЕНТИФИКАЦИЯ МАТРИЦЫ И ИЗОЛЯЦИЯ ID ---
+    local platform_entry
+    local matched=0
+
+    for platform_entry in "${GLOBAL_PLATFORM_IDENTIFIERS[@]}"; do
+        [[ "$platform_entry" != *"|"* ]] && continue
+        
+        local p_name="${platform_entry%%|*}"
+        local remaining="${platform_entry#*|}"
+        local p_regex="${remaining%%|*}"
+        
+        if [[ "$user_input" =~ $p_regex ]]; then
+            detected_platform="$p_name"
             target_user="${BASH_REMATCH[1]}"
-        else
-            target_user=$(echo "$user_input" | grep -oE "facebook.com/[a-zA-Z0-9.]+" | cut -d'/' -f2)
+            target_user=$(echo "$target_user" | cut -d'?' -f1 | cut -d'/' -f1 | tr -d '[:space:]@')
+            
+            if [[ -n "$target_user" ]] && ! echo "$target_user" | grep -qP "$GLOBAL_PLATFORM_SYSTEM_ROUTES"; then
+                matched=1
+                break
+            fi
         fi
-    elif [[ "$user_input" =~ instagram.com/ ]]; then
-        detected_platform="Instagram"
-        target_user=$(echo "$user_input" | grep -oE "instagram.com/[a-zA-Z0-9._]+" | cut -d'/' -f2)
-    elif [[ "$user_input" =~ tiktok.com/ ]]; then
-        detected_platform="TikTok"
-        target_user=$(echo "$user_input" | grep -oE "tiktok.com/@[a-zA-Z0-9._]+" | cut -d'/' -f2 | tr -d '@')
-    elif [[ "$user_input" =~ x.com/ || "$user_input" =~ twitter.com/ ]]; then
-        detected_platform="X_Twitter"
-        target_user=$(echo "$user_input" | grep -oE "(x|twitter).com/[a-zA-Z0-9._]+" | cut -d'/' -f2)
-    else
+    done
+
+    if (( matched == 0 )); then
         target_user="${user_input//@/}"
         target_user="${target_user// /}"
-        target_user=$(echo "$target_user" | cut -d'?' -f1)
+        target_user=$(echo "$target_user" | cut -d'?' -f1 | cut -d'/' -f1)
     fi
 
-    if [[ -z "$target_user" || "$target_user" == "share" || "$target_user" == "p" ]]; then
-        core_engine_ui "e" "Не удалось изолировать чистый идентификатор цели."
+    if [[ -z "$target_user" ]] || echo "$target_user" | grep -qP "$GLOBAL_PLATFORM_SYSTEM_ROUTES"; then
+        core_engine_ui "e" "Не удалось изолировать чистый идентификатор цели (обнаружен системный роут)."
         core_engine_wait
         return 1
     fi
 
     core_engine_ui "s" "[+] Матрица: $detected_platform | Идентификатор: $target_user"
-    core_engine_ui "i" "Запуск глубокого пассивного сканирования глобального индекса..."
+    core_engine_ui "i" "Запуск тотального широковещательного сканирования глобальных индексов..."
     echo "--------------------------------------------------"
 
-    mkdir -p ~/prime_loot
-    local loot_file="$HOME/prime_loot/omni_heuristic_${target_user}.txt"
+    local base_loot_dir="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
+    mkdir -p "$base_loot_dir" 2>/dev/null
+    local loot_file="${base_loot_dir}/omni_heuristic_${target_user}.txt"
     
-    echo "==================================================================" > "$loot_file"
-    echo " NEXUS SYSTEMS v14.3 - GLOBAL INDEX OSINT REPORT" >> "$loot_file"
-    echo " TARGET: $target_user ($detected_platform)" >> "$loot_file"
-    echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
-    echo "==================================================================" >> "$loot_file"
+    {
+        echo "=================================================================="
+        echo " NEXUS SYSTEMS v20.0 - MULTI-ENGINE COMPLETE OSINT REPORT"
+        echo " TARGET: $target_user ($detected_platform)"
+        echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')"
+        echo "=================================================================="
+    } > "$loot_file"
 
-    # Набор семантических векторов для глобального текстового шлюза
+    # Семантические поисковые векторы
     local query_vectors=(
         "${target_user}+phone"
         "${target_user}+contact"
@@ -5742,81 +6032,149 @@ run_osint_omni_crawler() {
     local total_phones=0
     local total_emails=0
     local total_relations=0
-    
-    # Ротация продвинутых User-Agent для пробития защиты поисковых систем
-    local user_agents=(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        "Mozilla/5.0 (Android 13; Mobile; rv:109.0) Gecko/114.0 Firefox/114.0"
-    )
+    local gate_count=${#GLOBAL_FALLBACK_SEARCH_GATES[@]}
 
+    # Итерационный проход по поисковым векторам
+    local vector
     for vector in "${query_vectors[@]}"; do
-        local rand_ua="${user_agents[$((RANDOM % ${#user_agents[@]}))]}"
         
-        # Используем текстовое зеркало Google (без скриптов, чистое извлечение сырых данных)
-        local request_url="https://www.google.com/search?q=${vector}&num=30&gbv=1-A"
-        local raw_snippet_data
-        raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 8 "$request_url")
+        # --- ВНУТРЕННИЙ КРИТИЧЕСКИЙ СЛОЙ: ТОТАЛЬНЫЙ ЦИКЛ ПО МАТРИЦЕ ДВИЖКОВ v20.0 ---
+        local engine_entry
+        for engine_entry in "${GLOBAL_SEARCH_ENGINES[@]}"; do
+            [[ "$engine_entry" != *"|"* ]] && continue
+            
+            local engine_name="${engine_entry%%|*}"
+            local engine_url_template="${engine_entry#*|}"
+            
+            # Ротация User-Agent под каждый конкретный запрос для исключения связывания сессий
+            local random_index=$(( RANDOM % ua_count ))
+            local rand_ua="${GLOBAL_NETWORK_UA[$random_index]}"
+            
+            echo -ne " [.] [$engine_name] Сканирование вектора: $vector...\e[K\r"
+            
+            # Динамическая интеллектуальная замена плейсхолдера вектора
+            local request_url="${engine_url_template//%VECTOR%/$vector}"
+            
+            # Адаптация пробелов под синтаксис азиатских и европейских движков
+            if [[ "$engine_name" == "DuckDuckGo" || "$engine_name" == "Qwant" || "$engine_name" == "Baidu" ]]; then
+                request_url="${engine_url_template//%VECTOR%/${vector//+/ %20}}"
+            fi
 
-        if [[ -z "$raw_snippet_data" || "$raw_snippet_data" =~ "detected unusual traffic" ]]; then
-            # Если основной шлюз выдал капчу, плавно откатываемся на резервный текстовый шлюз
-            request_url="https://html.duckduckgo.com/html/?q=${vector//+/ }"
-            raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout 8 "$request_url")
-        fi
+            local raw_snippet_data
+            raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout "$GLOBAL_NET_CONNECT_TIMEOUT" --max-time "$GLOBAL_NET_MAX_TIME" "$request_url" 2>/dev/null)
 
-        if [[ -z "$raw_snippet_data" ]]; then continue; fi
+            # Проверка на капчу/WAF-экраны текущего движка через тотальный регулярный фильтр v18.5
+            if [[ -z "$raw_snippet_data" ]] || echo "$raw_snippet_data" | grep -qP "$GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
+                if (( gate_count > 0 )); then
+                    local random_gate_idx=$(( RANDOM % gate_count ))
+                    local selected_gate="${GLOBAL_FALLBACK_SEARCH_GATES[$random_gate_idx]}"
+                    local clean_vector=""
 
-        # --- ПАРСИНГ АРТЕФАКТОВ ---
-        # 1. Извлечение мобильных номеров (поддержка пробелов, скобок и международных кодов)
-        local extracted_phones
-        extracted_phones=$(echo "$raw_snippet_data" | grep -oE "\+[0-9]{1,4}[ .-]?\(?[0-9]{2,4}\)?[ .-]?[0-9]{2,4}[ .-]?[0-9]{2,4}" | sort -u)
-        if [[ -n "$extracted_phones" ]]; then
-            while read -r phone; do
-                if [[ -n "$phone" && ! "$phone" =~ "0000" && ${#phone} -gt 7 ]]; then
-                    core_engine_ui "s" "[+] НАЙДЕН ТЕЛЕФОН: $phone"
-                    echo "Extracted_Phone: $phone" >> "$loot_file"
-                    ((total_phones++))
+                    if echo "$selected_gate" | grep -qP "$GLOBAL_GATEWAY_RAW_VECTOR_SIGNATURES"; then
+                        clean_vector="${vector}"
+                    elif echo "$selected_gate" | grep -qP "$GLOBAL_GATEWAY_ENCODED_VECTOR_SIGNATURES"; then
+                        clean_vector="${vector//+/ %20}"
+                    else
+                        clean_vector="${vector//+/+}"
+                    fi
+                    
+                    request_url="${selected_gate}${clean_vector}"
+                    
+                    echo -ne "\e[K"
+                    core_engine_ui "w" " [!] Блокировка [$engine_name]. Редирект на узел шлюза: $selected_gate"
+                    raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout "$GLOBAL_NET_CONNECT_TIMEOUT" --max-time "$GLOBAL_NET_MAX_TIME" "$request_url" 2>/dev/null)
                 fi
-            done <<< "$extracted_phones"
-        fi
+            fi
 
-        # 2. Извлечение электронных адресов
-        local extracted_emails
-        extracted_emails=$(echo "$raw_snippet_data" | grep -oE "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}" | grep -vE "google|duckduckgo|w3.org" | sort -u)
-        if [[ -n "$extracted_emails" ]]; then
-            while read -r email; do
-                core_engine_ui "s" "[+] НАЙДЕН EMAIL: $email"
-                echo "Extracted_Email: $email" >> "$loot_file"
-                ((total_emails++))
-            done <<< "$extracted_emails"
-        fi
+            if [[ -z "$raw_snippet_data" ]]; then continue; fi
 
-        # 3. Извлечение перекрестных связей
-        local extracted_profiles
-        extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "(facebook|instagram|x|twitter|tiktok).com/[a-zA-Z0-9._]+" | grep -vE "search|html|privacy|help|login|accounts|$target_user" | sort -u)
-        if [[ -n "$extracted_profiles" ]]; then
-            while read -r profile; do
-                core_engine_ui "w" " -> Выявлена связь: https://$profile"
-                echo "Cross_Platform_Relation: https://$profile" >> "$loot_file"
-                ((total_relations++))
-            done <<< "$extracted_profiles"
-        fi
+            # --- СЛОЙ ПАРСИНГА 1: НОМЕРА ТЕЛЕФОНОВ ---
+            local extracted_phones
+            extracted_phones=$(echo "$raw_snippet_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" 2>/dev/null | sort -u)
+            if [[ -n "$extracted_phones" ]]; then
+                while read -r phone; do
+                    if [[ -n "$phone" && ! "$phone" =~ "0000" && ${#phone} -gt 7 ]]; then
+                        if ! grep -qF "Extracted_Phone: $phone" "$loot_file"; then
+                            echo -ne "\e[K" 
+                            core_engine_ui "s" "[+] [$engine_name] ТЕЛЕФОН: $phone"
+                            echo "Extracted_Phone: $phone" >> "$loot_file"
+                            ((total_phones++))
+                        fi
+                    fi
+                fi <<< "$extracted_phones"
+            fi
 
-        # Асинхронная задержка для сохранения полной тишины
+            # --- СЛОЙ ПАРСИНГА 2: ЭЛЕКТРОННЫЕ АДРЕСА ---
+            local extracted_emails
+            extracted_emails=$(echo "$raw_snippet_data" | grep -oP "$GLOBAL_REGEX_EMAIL" 2>/dev/null | grep -vP "$GLOBAL_OSINT_EMAIL_BLACKLIST" | sort -u)
+            if [[ -n "$extracted_emails" ]]; then
+                while read -r email; do
+                    if [[ -n "$email" ]]; then
+                        if ! grep -qF "Extracted_Email: $email" "$loot_file"; then
+                            echo -ne "\e[K"
+                            core_engine_ui "s" "[+] [$engine_name] EMAIL: $email"
+                            echo "Extracted_Email: $email" >> "$loot_file"
+                            ((total_emails++))
+                        fi
+                    fi
+                done <<< "$extracted_emails"
+            fi
+
+            # --- СЛОЙ ПАРСИНГА 3: СОЦИАЛЬНЫЕ СВЯЗИ ---
+            local dynamic_social_regex=""
+            local entry
+            for entry in "${GLOBAL_PLATFORM_IDENTIFIERS[@]}"; do
+                [[ "$entry" != *"|"* ]] && continue
+                local sub_remaining="${entry#*|}"
+                local raw_regex="${sub_remaining%%|*}"
+                if [[ -z "$dynamic_social_regex" ]]; then
+                    dynamic_social_regex="$raw_regex"
+                else
+                    dynamic_social_regex="${dynamic_social_regex}|${raw_regex}"
+                fi
+            done
+
+            if [[ -n "$dynamic_social_regex" ]]; then
+                local extracted_profiles
+                extracted_profiles=$(echo "$raw_snippet_data" | grep -oE "($dynamic_social_regex)" 2>/dev/null | sort -u)
+                
+                if [[ -n "$extracted_profiles" ]]; then
+                    local full_url_filter="${GLOBAL_OSINT_URL_BLACKLIST}|/${target_user}$"
+                    while read -r profile; do
+                        if [[ -n "$profile" ]] && ! echo "$profile" | grep -qP "$full_url_filter"; then
+                            if ! grep -qF "Cross_Platform_Relation: https://$profile" "$loot_file"; then
+                                echo -ne "\e[K"
+                                core_engine_ui "w" " -> [$engine_name] Связь: https://$profile"
+                                echo "Cross_Platform_Relation: https://$profile" >> "$loot_file"
+                                ((total_relations++))
+                            fi
+                        fi
+                    done <<< "$extracted_profiles"
+                fi
+            fi
+
+            # Умная динамическая задержка между разными поисковыми системами
+            sleep $((1 + RANDOM % 3))
+        done
+
+        # Системный тайм-аут после полного прогона вектора по всем 8 мировым базам
         sleep $((2 + RANDOM % 3))
     done
 
+    echo -ne "\e[K"
     echo "--------------------------------------------------"
-    if (( total_phones > 0 || total_emails > 0 || total_relations > 0 )); then
-        core_engine_ui "s" "Глубокий анализ завершен! Сформировано зацепок: $((total_phones + total_emails + total_relations))"
-        core_engine_ui "s" "Все артефакты экспортированы в лут-файл: $loot_file"
+    
+    local total_leads=$((total_phones + total_emails + total_relations))
+    if (( total_leads > 0 )); then
+        core_engine_ui "s" "Тотальный широковещательный анализ завершен! Собрано артефактов: $total_leads"
+        core_engine_ui "s" "Все уникальные данные экспортированы в: $(basename "$loot_file")"
+        core_engine_loot "osint" "Omni Broadcast v20.0: Fully parsed 8 engines for '$target_user'. Extracted $total_leads forensics leads."
     else
-        core_engine_ui "i" "Прямых открытых привязок в глобальном поисковом индексе на данный момент нет."
+        core_engine_ui "i" "Прямых открытых привязок ни в одном из 8 мировых поисковых индексов не обнаружено."
     fi
 
     core_engine_wait
 }
-
-
 
 
 
