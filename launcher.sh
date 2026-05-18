@@ -1770,9 +1770,9 @@ core_network_dns_sync() {
 
 
 # ==============================================================================
-# @description: System metrics harvester and kernel status display v24.0
+# @description: System metrics harvester and kernel status display v24.5
 # OPTIMIZATION: Ultra-compact English layout for mobile terminal screens
-# COMPATIBILITY: Secure bypass for Android netlink restriction (Termux non-root)
+# COMPATIBILITY: Advanced non-root engine for Termux (Cellular & BT state fixes)
 # ==============================================================================
 core_engine_info() {
     core_engine_ui "i" "INFRASTRUCTURE SYSTEM STATUS"
@@ -1801,7 +1801,7 @@ core_engine_info() {
 
     echo -e " Memory/Disk  : RAM: $ram_status | ROM: $disk_status"
 
-    # --- LAYER 2: NETWORK GATEWAY ---
+    # --- LAYER 2: NETWORK GATEWAY (Cellular Data & Wi-Fi Fix) ---
     local active_uplink="\e[1;31m[OFFLINE]\e[0m"
     local target_interface="\e[1;31m[NONE]\e[0m"
     local default_route
@@ -1812,31 +1812,64 @@ core_engine_info() {
         target_interface=$(echo "$default_route" | awk '{print_idx=0; for(i=1;i<=NF;i++) if($i=="dev") print_idx=i+1; if(print_idx>0) print $print_idx}')
         active_uplink="\e[1;32m[ONLINE]\e[0m"
     else
-        local termux_gateway
-        termux_gateway=$(getprop net.gprs.local-ip 2>/dev/null)
-        [[ -z "$termux_gateway" ]] && termux_gateway=$(ifconfig 2>/dev/null | grep -v '127.0.0.1' | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -n 1)
+        # Глубокий non-root парсинг сетевых интерфейсов Android (Wi-Fi / Mobile Data)
+        local active_ip=""
+        # Проверяем IP сотовой связи или Wi-Fi через внутренние проперти Android
+        active_ip=$(getprop net.gprs.local-ip 2>/dev/null)
+        [[ -z "$active_ip" ]] && active_ip=$(getprop dhcp.wlan0.ipaddress 2>/dev/null)
         
-        if [[ -n "$termux_gateway" ]]; then
-            active_uplink="\e[1;32m[ONLINE (TMX)]\e[0m"
-            target_interface="\e[1;32mwlan0\e[0m"
+        # Резервный поиск черезproc/net/route, доступный без прав root
+        if [[ -z "$active_ip" && -f /proc/net/route ]]; then
+            local raw_interface=$(awk '$2=="00000000" {print $1}' /proc/net/route | head -n 1)
+            if [[ -n "$raw_interface" ]]; then
+                target_interface="\e[1;32m$raw_interface\e[0m"
+                active_uplink="\e[1;32m[ONLINE]\e[0m"
+            fi
+        fi
+
+        # Если интерфейс определен черезproc, пропускаем, иначе ставим сотовый маркер
+        if [[ "$active_uplink" =~ "OFFLINE" && -n "$active_ip" ]]; then
+            active_uplink="\e[1;32m[ONLINE]\e[0m"
+            # Проверяем, мобильные данные это или Wi-Fi
+            if getprop net.lte.ims.reg.state 2>/dev/null | grep -q "1" || [[ -n $(getprop gsm.network.type 2>/dev/null) ]]; then
+                target_interface="\e[1;32mrmnet/lte\e[0m"
+            else
+                target_interface="\e[1;32mwlan0\e[0m"
+            fi
         fi
     fi
 
     echo -e " Net/Gateway  : $active_uplink -> Link: $target_interface"
 
-    # --- LAYER 3: RADIO MODULES ---
+    # --- LAYER 3: RADIO MODULES (Advanced Bluetooth & Wi-Fi Check) ---
     local wifi_status="\e[1;31m[ABS]\e[0m"
     local bt_status="\e[1;31m[ABS]\e[0m"
 
-    if command -v rfkill >/dev/null 2>&1; then
-        if rfkill list wifi 2>/dev/null | grep -q "yes"; then wifi_status="\e[1;31m[LCK]\e[0m";
-        elif rfkill list wifi 2>/dev/null | grep -q "no"; then wifi_status="\e[1;32m[ACT]\e[0m"; fi
+    # 1. Проверка Wi-Fi
+    if command -v rfkill >/dev/null 2>&1 && rfkill list wifi 2>/dev/null | grep -q "no"; then
+        wifi_status="\e[1;32m[ACT]\e[0m"
+    elif getprop init.svc.wpa_supplicant 2>/dev/null | grep -q "running" || getprop net.wlan0.dns1 2>/dev/null | grep -qE '[0-9]'; then
+        wifi_status="\e[1;32m[ACT]\e[0m"
+    elif [[ -f /proc/net/wireless ]] && grep -qE 'wlan|p2p' /proc/net/wireless; then
+        wifi_status="\e[1;32m[ACT]\e[0m"
+    fi
 
-        if rfkill list bluetooth 2>/dev/null | grep -q "yes"; then bt_status="\e[1;31m[LCK]\e[0m";
-        elif rfkill list bluetooth 2>/dev/null | grep -q "no"; then bt_status="\e[1;32m[ACT]\e[0m"; fi
+    # 2. Проверка Bluetooth без root-прав через внутренний менеджер Android
+    local bt_state
+    bt_state=$(getprop bluetooth.status 2>/dev/null)
+    [[ -z "$bt_state" ]] && bt_state=$(getprop init.svc.bluetoothd 2>/dev/null)
+    
+    if [[ "$bt_state" =~ "on" || "$bt_state" =~ "running" ]]; then
+        bt_status="\e[1;32m[ACT]\e[0m"
+    elif command -v dumpsys >/dev/null 2>&1; then
+        # Чтение дампа сервиса, если доступно в текущей сборке Termux
+        if dumpsys bluetooth_manager 2>/dev/null | grep -q "Bluetooth Status: ON"; then
+            bt_status="\e[1;32m[ACT]\e[0m"
+        fi
     else
-        if ifconfig wlan0 2>/dev/null | grep -q "UP"; then
-            wifi_status="\e[1;32m[ACT]\e[0m"
+        # Альтернативная эмуляция: проверка наличия hci-дескрипторов в системном логе
+        if [[ -d /sys/class/bluetooth ]] && [[ -n $(ls /sys/class/bluetooth 2>/dev/null) ]]; then
+            bt_status="\e[1;32m[ACT]\e[0m"
         fi
     fi
 
@@ -1845,7 +1878,10 @@ core_engine_info() {
     # --- LAYER 4: SECURE TUNNELS ---
     local vpn_status="\e[1;31m[INACTIVE]\e[0m"
     
-    if ifconfig 2>/dev/null | grep -qE 'tun|tap|ppp|wg|tun0|abstract'; then
+    # Кросс-платформенная проверка туннелей (включая проперти Android vpn)
+    if [[ -f /proc/net/dev ]] && grep -qE 'tun|tap|ppp|wg|tun0|p2p' /proc/net/dev; then
+        vpn_status="\e[1;32m[VPN ACTIVE]\e[0m"
+    elif [[ -n $(getprop net.vpn.up 2>/dev/null) ]] || getprop lnd.vpn.status 2>/dev/null | grep -q "1"; then
         vpn_status="\e[1;32m[VPN ACTIVE]\e[0m"
     elif pgrep -x "tor" >/dev/null 2>&1; then
         vpn_status="\e[1;32m[TOR ACTIVE]\e[0m"
@@ -3073,11 +3109,17 @@ run_ghost_commander() {
 
 
 
+# ==============================================================================
+# @description: Универсальный модуль горячей перезагрузки ядра платформы v25.5
+# МОДЕРНИЗАЦИЯ: Интеграция глобального ротатора User-Agent (GLOBAL_NETWORK_UA)
+# БЕЗОПАСНОСТЬ: Имитация живого трафика (DPI/WAF Bypass) при обращении к GitHub
+# АРХИТЕКТУРА: Разделение Root / Non-Root сред с поддержкой префиксов Android
+# ==============================================================================
 run_update_prime() {
     # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "SYSTEM UPDATE & SYNC"
+    core_engine_ui "h" "SYSTEM UPDATE & SYNC v25.5"
     
-    # --- МОДЕРНИЗАЦИЯ: Динамическая эвристика Root / Non-Root окружения ---
+    # --- ЭВРИСТИКА ОКРУЖЕНИЯ (Вычисление изолированной зоны) ---
     local base_work_dir
     if [[ $EUID -eq 0 ]]; then
         base_work_dir="/root"
@@ -3089,28 +3131,56 @@ run_update_prime() {
     local repo="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
     local tmp="${target}.tmp"
 
-    core_engine_ui "Connecting to GitHub..."
-
-    # Слой 2: Безопасная загрузка через Глушитель [7]
-    core_engine_run "curl -s -L $repo -o $tmp" "Fetching Repository Source"
+    # --- ДИНАМИЧЕСКИЙ РОТАТОР USER-AGENT ---
+    local selected_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     
-    # Слой 3: Валидация данных через Мозг [5]
-    if ! core_engine_validator "file" "$tmp" "Repository Source"; then
-        core_engine_remove "$tmp"
+    # Проверяем, инициализирован ли глобальный массив легитимных окружений
+    if [[ -n "${GLOBAL_NETWORK_UA[*]}" ]]; then
+        # Генерируем случайный индекс в диапазоне размера массива
+        local ua_size=${#GLOBAL_NETWORK_UA[@]}
+        local rand_idx=$(( RANDOM % ua_size ))
+        selected_ua="${GLOBAL_NETWORK_UA[$rand_idx]}"
+    fi
+
+    core_engine_ui "i" "Connecting to GitHub Repository..."
+    core_engine_ui "d" "Network Identity Set: $selected_ua"
+
+    # Слой 2: Безопасная загрузка через Глушитель [7] с маскировкой UA
+    if command -v curl >/dev/null 2>&1; then
+        core_engine_run "curl -s -L -A '$selected_ua' --connect-timeout 15 $repo -o $tmp" "Fetching Repository Source via cURL"
+    elif command -v wget >/dev/null 2>&1; then
+        core_engine_run "wget -q --user-agent='$selected_ua' --timeout=15 -O $tmp $repo" "Fetching Repository Source via Wget"
+    else
+        core_engine_ui "e" "CRITICAL: Network harvesters (curl/wget) not found!"
+        core_engine_wait
+        return 1
+    fi
+    
+    # Слой 3: АВТОНОМНАЯ ВАЛИДАЦИЯ ДАННЫХ
+    if [[ ! -f "$tmp" || ! -s "$tmp" ]]; then
+        core_engine_ui "e" "CRITICAL: Downloaded script is empty or missing!"
+        [[ -f "$tmp" ]] && rm -f "$tmp"
         core_engine_wait
         return 1
     fi
 
-    # Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (Защита синтаксиса)
+    # Проверка сигнатуры шебанга (Защита от HTML страниц ошибок 404/WAF)
+    if ! head -n 5 "$tmp" | grep -qE '^#!/bin/|^#!/usr/bin/|^#'; then
+        core_engine_ui "e" "CRITICAL: Target source signature is corrupted (Not a script)!"
+        rm -f "$tmp"
+        core_engine_wait
+        return 1
+    fi
+
+    # Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (Защита синтаксиса ядра)
     if ! bash -n "$tmp" 2>/dev/null; then
-        core_engine_ui "e" "CRITICAL: Remote code is corrupted!"
-        core_engine_remove "$tmp"
+        core_engine_ui "e" "CRITICAL: Remote code has broken Bash syntax!"
+        rm -f "$tmp"
         core_engine_wait
         return 1
     fi
 
     # Слой 5: Атомарная замена и права через Санитара [8]
-    # Права chown root:root применяются только если скрипт запущен суперпользователем
     if [[ $EUID -eq 0 ]]; then
         core_engine_run "mv $tmp $target && chmod 755 $target && chown root:root $target 2>/dev/null" "Applying Atomic Update (Root Mode)"
     else
@@ -3118,33 +3188,41 @@ run_update_prime() {
     fi
 
     # Слой 6: Восстановление среды (Alias & Symlink)
-    if ! grep -q "alias launcher=" ~/.bashrc; then
-        echo "alias launcher='bash $target'" >> ~/.bashrc
-        core_engine_ui "y" "Alias 'launcher' restored in .bashrc"
+    local bashrc_path="${HOME}/.bashrc"
+    [[ -f "${HOME}/.bash_profile" ]] && bashrc_path="${HOME}/.bash_profile"
+
+    if [[ -f "$bashrc_path" ]]; then
+        if ! grep -q "alias launcher=" "$bashrc_path"; then
+            echo "alias launcher='bash $target'" >> "$bashrc_path"
+            core_engine_ui "s" "Alias 'launcher' injected into $(basename "$bashrc_path")"
+        fi
+    else
+        echo "alias launcher='bash $target'" > "$bashrc_path"
+        core_engine_ui "s" "Configuration profile created with 'launcher' alias."
     fi
     
-    # Создаем системную ссылку через Глушитель (только при наличии прав на запись в системный путь)
+    # Создаем системную ссылку в зависимости от типа архитектуры и прав доступа
     if [[ $EUID -eq 0 ]]; then
-        core_engine_run "ln -sf $target /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Path"
-    elif [[ -d "$PREFIX/bin" ]]; then
-        # Специальный адаптивный слой для Termux (non-root среда)
-        core_engine_run "ln -sf $target $PREFIX/bin/launcher && chmod +x $PREFIX/bin/launcher" "Updating Termux Local Path"
+        core_engine_run "ln -sf $target /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Global Path"
+    elif [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
+        core_engine_run "ln -sf $target $PREFIX/bin/launcher && chmod +x $PREFIX/bin/launcher" "Updating Termux Local Binary Path"
     else
-        core_engine_ui "w" "System path upgrade skipped: Requires root privileges."
+        core_engine_ui "w" "System path upgrade skipped: Handled in local space."
     fi
 
-    core_engine_ui "+" "Code updated, permissions set, alias active!"
+    core_engine_ui "s" "Code updated successfully, permissions aligned!"
     
     # Слой 7: Синхронизация и перезапуск [13]
-    core_engine_progress 1 "System rebooting"
+    core_engine_progress 1 "Rebooting Matrix Launcher Core"
     
     # Полная очистка перед перезапуском [10]
-    core_engine_clean_env
+    if command -v core_engine_clean_env >/dev/null 2>&1; then
+        core_engine_clean_env
+    fi
     
-    # Мгновенная передача управления новому коду
+    # Мгновенный бесшовный перехват управления дескриптора нового кода
     exec bash "$target"
 }
-
 
 # --- ENGINE: DYNAMIC POLYMORPHISM (ZERO-FOOTPRINT) ---
 
