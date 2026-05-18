@@ -378,8 +378,10 @@ GLOBAL_FUZZ_WORDLIST=(
 )
 
 
-# Сигнатуры для статического анализа бинарных файлов и логов (Static Analysis Signatures)
-GLOBAL_STATIC_SIGNATURES="(http|https|ftp|/etc/passwd|cmd\.exe|powershell|password|passwd|secret_key|api_key|token|ssh-rsa)"
+# ==============================================================================
+# @description: Ультимативные сигнатуры для статического анализа (PE/ELF/Logs)
+# ==============================================================================
+GLOBAL_STATIC_SIGNATURES="(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(passwd|shadow|issue|hostname|resolv\.conf)|\/proc\/(self|net|version)|\b(cmd\.exe|powershell\.exe|sh|bash|zsh|csh|tcsh|wscript\.exe|cscript\.exe|rundll32\.exe|regsvr32\.exe)\b|\b(Authorization|Bearer|X-API-Key|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|token|secret_key|api_key|passwd|password|private_key|id_rsa|ssh-rsa)\b|VirtualAlloc|VirtualProtect|IsDebuggerPresent|CheckRemoteDebuggerPresent|GetProcAddress|LoadLibraryA|system|execve|popen|fork"
 
 
 # --- Расширенные сигнатуры глубокого анализа (Deep Forensics & OSINT RegEx) ---
