@@ -411,8 +411,11 @@ GLOBAL_REGEX_JWT="^eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+=]*$"
 # ==============================================================================
 GLOBAL_SIG_WAF="(?i)(cloudflare|akamai|sucuri|incapsula|imperva|barracuda|f5_big-ip|mod_security|comodo|radware|fortigate|wordfence|asm|citrix|aws-waf|cloudfront|edgesuite|fastly|stackpath|__cfuid|cf-ray|cf-cache-status|x-sucuri-id|x-protected-by|x-waf-|x-cdn|err_connection_refused|captcha-bypass|challenge-platform|429 too many requests|block_id|security_challenge)"
 
-# Сигналы структуры веб-приложения для активации движка поиска инъекций (SQL-Engine)
-GLOBAL_SIG_WEB_STRUCTURE="php|db|sql|id=|query=|select|insert|update"
+# ==============================================================================
+# 7. СИГНАЛЫ СТРУКТУРЫ ДЛЯ АКТИВАЦИИ SQL-ENGINE (ULTIMATE STRUCTURE MATRIX)
+# ==============================================================================
+GLOBAL_SIG_WEB_STRUCTURE="(?i)(\b(id|uid|uuid|p|page|cat|category|sec|section|art|article|post|prod|product|item|file|doc|lang|action|act|mode|view|search|q|query|sort|order|by|limit|offset|from|to|start|end|file_id|user_id|group_id|token_id|hash|data|payload|json|xml|ajax)\b\s*=|(\/api\/(v[0-9]|v1|v2|v3)\/[a-zA-Z0-9_-]+\/[0-9]+)|\b(select|insert|update|delete|drop|alter|union|where|having|orderby|groupby|into|load_file|benchmark|sleep|md5|sha1|concat)\b|\b(graphql|query\s*\{|\"query\"\s*:|mutation\b|\$gql))"
+
 
 # Сигналы выявления критических аномалий и уязвимостей в финальных отчетах
 GLOBAL_SIG_VULN_ALERTS="critical|vulnerable|payload|exploit|dbms|open|cve-|injection|bypass"
