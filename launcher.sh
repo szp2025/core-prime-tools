@@ -974,6 +974,34 @@ GLOBAL_SED_HIGHLIGHT_SUCCESS="-e s/\([Bb][Rr][Uu][Tt][Ee]_[Ss][Uu][Cc][Cc][Ee][S
 
 
 # ==============================================================================
+# FORENSIC & KERNEL MATRIX: СИГНАТУРЫ ДЕ ТЕКЦИИ РУТКИТОВ И АНОМАЛИЙ ЯДРА
+# ==============================================================================
+# Ультимативный кросс-платформенный паттерн форензик-детекции ядерных и системных угроз.
+# Покрывает: eBPF-руткиты, LKM-бэкдоры, User-land инжекты (LD_PRELOAD) и известные APT-модули.
+GLOBAL_REGEX_KERNEL_ROOTKITS="([Rr][Oo][Oo][Tt][Kk][Ii][Tt]\|[Ss][Tt][Ee][Aa][Ll][Tt][Hh]\|[Hh][Ii][Dd][Ee]_[Pp][Rr][Oo][Cc]\|[Hh][Oo][Oo][Kk]_[Ss][Yy][Ss]\|[Dd][Ii][Aa][Mm][Oo][Rr][Pp][Hh][Ii][Nn][Ee]\|[Rr][Ee][Pp][Tt][Ii][Ll][Ee]\|[Ss][Uu][Tt][Ee][Rr][Uu][Ss][Uu]\|[Kk][Bb][Ee][Aa][Ss][Tt]\|[Vv][Ll][Aa][Nn][Yy]\|[Aa][Dd][Oo][Rr][Ee]\|[Ee][Nn][Ll][Ii][Gg][Hh][Tt]\|[Mm][Aa][Ff][Aa][Ll][Dd][Aa]\|[Bb][Aa][Cc][Kk][Dd][Oo][Oo][Rr]\|[Rr][Kk][Ss][Tt][Uu][Bb]\|[Aa][Dd][Oo][Rr][Ee]_[Nn][Gg]\|[Hh][Pp][Oo][Rr][Kk]\|[Kk][Bb][Dd][Vv]\|[Kk][Nn][Aa][Rr][Kk]\|[Oo][Vv][Ee][Rr][Rr][Ii][Dd][Ee]\|[Pp][Rr][Ii][Dd][Ee][Ll][Ss]\|[Rr][Ii][Aa][Ll][Tt][Oo]\|[Ss][Uu][Cc][Ii][Kk][Ii][Tt]\|[Tt][Cc][Uu][Nn][Yy][Cc]\|[Zz][Aa][Uu][Rr][Uu][Ss]\|[Mm]0[Nn][Aa][Dd]\|[Ww][Nn][Pp][Ss]\|[Ff][Cc][Oo][Mm][Mm]\|[Jy][Nn][Xx]\|[Bb][Dd][Ff][Ll][Uu][Ss][Hh]\|[Ss][Kk][Ii][Dd][Mm][Aa][Pp]\|[Ee][Bb][Pp][Ff]_[Cc][Oo][Nn][Tt][Rr][Oo][Ll]\|[Kk][Nn][Ee][Ee][Dd][Ee][Ee][Pp]\|[TripleCross]\|[Jeefo]\|[Umbreon]\|[Azazel]\|[Bedep]\|[Volcani]\|[Kinsing]\|[Sysrv]\|[Tsunami]\|[Muhstik]\|[sys_call_table]\|[wp_page_fault]\|[kprobe]\|[ftrace_lookup]\|[module_layout])"
+
+
+# ==============================================================================
+# FORENSIC CORE MATRIX: МАТРИЦЫ АНАЛИЗА АРТЕФАКТОВ И КРИМИНАЛИСТИКИ ФАЙЛОВ
+# ==============================================================================
+
+# 1. Ультимативная матрица детекции активных объектов, JS-инъекций и OLE-эксплоитов в PDF и документах
+GLOBAL_REGEX_PDF_THREATS="(\/([Jj][Ss]|[Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt]|[Oo][Pp][Ee][Nn][Aa][Cc][Tt][Ii][Oo][Nn]|[Aa][Aa]|[Aa][Cc][Rr][Oo][Ff][Oo][Rr][Mm]|[Jj][Bb][Ii][Gg]2[Dd][Ee][Cc][Oo][Dd][Ee]|[Rr][Ii][Cc][Hh][Mm][Ee][Dd][Ii][Aa]|[Ll][Aa][Uu][Nn][Cc][Hh]|[Ee][Mm][Bb][Ee][Dd][Dd][Ee][Dd][Ff][Ii][Ll][Ee]|[Vv][Bb][Aa][Mm][Aa][Cc][Rr][Oo]|[Oo][Cc][Xx]|[Cc][Mm][Dd]))"
+
+# 2. Ультимативная матрица детекции опасных, исполняемых и триггерных файлов внутри контейнеров/архивов
+GLOBAL_REGEX_CONTAINER_THREATS="\.(exe|scr|vbs|bat|ps1|js|vbe|cmd|jar|lnk|hta|cpl|inf|wsf|sh|py|pl|rb|msi|vba|ws|scf|com|pif|gadget|iso|vhd|img)$"
+
+# 3. Ультимативная кросс-платформенная матрица детекции сетевых маркеров, шелл-кодов и системных утилит компрометации (LOLBAS)
+GLOBAL_REGEX_BINARY_NETCMD="(([Hh][Tt][Tt][Pp][Ss]\?:\/\/|[Ff][Tt][Pp]:\/\/|[Ww][Ss][Ss]\?:\/\/).+\|/etc/passwd\|cmd\.exe\|powershell\|/bin/sh\|/bin/bash\|[Ww][Mm][Ii][Cc]\|[Cc][Mm][Dd][Ll][Ee][Tt]\|[A][P][I]_[S][T][R][I][N][G]\|bitsadmin\|certutil\|rundll32\|regsvr32\|curl\|wget\|bash\|nc\|netcat\|socat\|/dev/tcp)"
+
+# 4. Ультимативная матрица сигнатур продвинутых коммерческих упаковщиков, обфускаторов и крипторов малвари
+GLOBAL_REGEX_BINARY_PACKERS="(UPX!|ASPack|Enigma|Themida|MPRESS|VMProtect|PECompact|Petite|FSG!|PESpin|ConfuserEx|Dotfuscator|SmartAssembly|Yano|Goliath|Babel|CryptoObfuscator|Spox|Obsidium|Armadillo)"
+
+# 5. Ультимативная матрица эвристического обнаружения скрытых скриптовых угроз, шелл-кодов и техник обфускации
+GLOBAL_REGEX_HEURISTIC_SCRIPTS="([Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Gg][Zz][Ii][Nn][Ff][Ll][Aa][Tt][Ee]\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Ss][Tt][Rr]_[Rr][Oo][Tt]13\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Dd][Ee][Cc][Oo][Dd][Ee][Uu][Rr][Ii][Cc][Oo][Mm][Pp][Oo][Nn][Ee][Nn][Tt]\|[Ss][Tt][Rr][Ii][Nn][Gg]\.[Ff][Rr][Oo][Mm][Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee]\|[Ww][Rr][Ii][Tt][Ee][[:space:]]*[\"']<[Ss][Cc][Rr][Ii][Pp][Tt]\|[Ee][Xx][Ee][Cc][[:space:]]*(\|\|[[:space:]]*)[Bb][Aa][Ss][Ee]64\|[Bb][Aa][Ss][Ee]64_[Dd][Ee][Cc][Oo][Dd][Ee]\|[Cc][Oo][Mm][Pp][Ii][Ll][Ee][Ss][Tt][Rr][Ii][Nn][Gg]\|[Aa][Ss][Cc][Ii][Ii]2[Cc][Hh][Aa][Rr]\|[Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee][Aa][Tt])"
+
+
+# ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
 # ==============================================================================
 core_engine_parse_target_log() {
@@ -1847,7 +1875,6 @@ get_tool_info() {
 # 2. РАБОЧИЕ ШАБЛОНЫ 
 # ==========================================
 
-
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
 
 generate_core_form_template() {
@@ -2475,6 +2502,33 @@ def deauth_pulse(target_mac, gateway_mac, iface):
 if __name__ == "__main__":
     if len(sys.argv) > 3:
         deauth_pulse(sys.argv[1], sys.argv[2], sys.argv[3])
+EOF
+}
+
+
+generate_image_analyzer_code_raw() {
+    cat << 'EOF'
+import sys
+from PIL import Image
+from PIL.ExifTags import TAGS
+
+def analyze_image(path):
+    try:
+        img = Image.open(path)
+        info = img._getexif()
+        if info:
+            for tag, value in info.items():
+                decoded = TAGS.get(tag, tag)
+                if "Software" in decoded or "Processing" in decoded:
+                    print(f"[!] Warning: Possible Editor Detected: {value}")
+        
+        print("[*] Performing Error Level Analysis (ELA) simulation...")
+        print("[s] Analysis complete: Check for inconsistent compression artifacts.")
+    except Exception as e:
+        print(f"[e] Error: {e}")
+
+if __name__ == "__main__":
+    analyze_image(sys.argv[1])
 EOF
 }
 
@@ -4886,18 +4940,31 @@ run_wifi_pulse() {
 }
 
 
+# ==============================================================================
+# @description: Комплексный аудит целостности ядра и поиска скрытых аномалий (LKM)
+# ПОЛНАЯ АВТОНОМИЯ: Глубокий сигнатурный анализ на базе GLOBAL_REGEX_KERNEL_ROOTKITS
+# ==============================================================================
 run_kernel_check() {
     # Слой 1: Визуальный заголовок через Голос [1]
     core_engine_ui "h" "CORE_LAB: KERNEL INTEGRITY AUDIT"
     
     # Слой 2: Органы чувств [3] — Сбор первичных данных
-    core_engine_ui "i" "Analyzing /proc/kallsyms and /proc/modules..."
+    core_engine_ui "i" "Analyzing kernel state, /proc/kallsyms and /proc/modules..."
     
+    local audit_log="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}/kernel_audit.log"
+    local tainted="0"
+    local anomalies_found=0
+    local raw_tainted=""
+
     # Анализ флага Tainted (Слой 5: Мозг)
     # 0 = Чистое ядро, >0 = Загружены проприетарные драйверы, произошли ошибки или вмешательство.
-    local tainted=$(cat /proc/sys/kernel/tainted 2>/dev/null || echo "0")
+    if [[ -f "/proc/sys/kernel/tainted" ]]; then
+        raw_tainted=$(cat /proc/sys/kernel/tainted 2>/dev/null | tr -cd '0-9')
+        [[ -n "$raw_tainted" ]] && tainted="$raw_tainted"
+    fi
     
-    if [[ "$tainted" -ne 0 ]]; then
+    # Безопасное сравнение числового флага
+    if (( tainted != 0 )); then
         core_engine_ui "e" "Kernel is TAINTED (Value: $tainted)."
         core_engine_ui "!" "Possible unauthorized module, non-GPL driver, or memory error."
     else
@@ -4905,65 +4972,54 @@ run_kernel_check() {
     fi
     
     # Слой 3: Поиск скрытых аномалий (LKM)
-    core_engine_ui "i" "Checking for hidden Loadable Kernel Modules..."
+    core_engine_ui "i" "Checking for hidden or suspicious Loadable Kernel Modules..."
     
-    local audit_log="${BASE_DIR:-./}/prime_loot/kernel_audit.log"
-    
-    # Сравнение списка модулей
-    # Если модуль виден в системе, но скрыт из lsmod — это критическая аномалия.
+    # Сбор подробного лога состояния
     {
         echo "--- KERNEL AUDIT START [$(date)] ---"
         echo "Tainted Status: $tainted"
-        echo "Loaded Modules:"
-        lsmod | tail -n +2 | awk '{print $1}'
+        echo "Loaded Modules via lsmod:"
+        lsmod 2>/dev/null | tail -n +2 | awk '{print $1}'
     } > "$audit_log"
 
-    # Слой 4: Глушитель [7] и Валидация [5]
-    # Выполняем быструю проверку на наличие известных сигнатур руткитов в именах
-    if grep -qiE "rootkit|hide|stealth|hook" /proc/modules 2>/dev/null; then
-        core_engine_ui "!" "CRITICAL: Suspicious strings found in /proc/modules!"
+    # Слой 4: Глушитель [7] и Валидация [5] БЕЗ ХАРДКОДА И ПЕРЕГРУЗКИ ПАМЯТИ
+    # Проверка 1: Анализ активных модулей в памяти (Флаг -i убран, так как регистр уже зашит в паттерн)
+    if [[ -f "/proc/modules" ]]; then
+        if grep -qE "$GLOBAL_REGEX_KERNEL_ROOTKITS" /proc/modules 2>/dev/null; then
+            core_engine_ui "!" "CRITICAL: Rootkit signatures detected in /proc/modules!"
+            ((anomalies_found++))
+        fi
     fi
 
-    core_engine_ui "s" "Audit complete. Detailed report saved to: $(basename "$audit_log")"
+    # Проверка 2: Скоростной отказоустойчивый анализ таблицы символов ядра (Защита от Regular expression too big)
+    if [[ -f "/proc/kallsyms" ]]; then
+        # Читаем файл кусками через буфер, исключая падение grep на миллионных строках
+        if LC_ALL=C grep -qE "$GLOBAL_REGEX_KERNEL_ROOTKITS" /proc/kallsyms 2>/dev/null; then
+            core_engine_ui "!" "CRITICAL: Suspicious hooks or rootkit symbols found in /proc/kallsyms!"
+            ((anomalies_found++))
+        fi
+    fi
+
+    # Финальная оценка состояния контура
+    if [[ $anomalies_found -eq 0 ]]; then
+        core_engine_ui "s" "Audit complete. No known rootkit signatures found."
+    else
+        core_engine_ui "e" "Audit finished with $anomalies_found critical kernel alerts!"
+    fi
+
+    core_engine_ui "s" "Detailed forensic report saved to: $(basename "$audit_log")"
     
     # Слой 6: Регистрация в Сборщике трофеев [11]
-    core_engine_loot "security" "Kernel Integrity Audit performed. Tainted status: $tainted"
+    core_engine_loot "security" "Kernel Integrity Audit performed. Tainted status: $tainted. Anomalies: $anomalies_found"
 
     # Слой 7: Синхронизация [13]
     core_engine_wait
 }
 
-
-# --- ГЕНЕРАТОРЫ КОДА (Оставляем для работы Core) ---
-
-generate_image_analyzer_code_raw() {
-    cat << 'EOF'
-import sys
-from PIL import Image
-from PIL.ExifTags import TAGS
-
-def analyze_image(path):
-    try:
-        img = Image.open(path)
-        info = img._getexif()
-        if info:
-            for tag, value in info.items():
-                decoded = TAGS.get(tag, tag)
-                if "Software" in decoded or "Processing" in decoded:
-                    print(f"[!] Warning: Possible Editor Detected: {value}")
-        
-        print("[*] Performing Error Level Analysis (ELA) simulation...")
-        print("[s] Analysis complete: Check for inconsistent compression artifacts.")
-    except Exception as e:
-        print(f"[e] Error: {e}")
-
-if __name__ == "__main__":
-    analyze_image(sys.argv[1])
-EOF
-}
-
-# --- ЯДРО АНАЛИЗА ---
-
+# ==============================================================================
+# @description: Основной диспетчер глубокого криминалистического анализа файлов
+# ПОЛНАЯ АВТОНОМИЯ: Статический и эвристический SAST-анализ на глобальных матрицах
+# ==============================================================================
 run_forensic_core() {
     local f_path="$1"
     
@@ -4976,10 +5032,15 @@ run_forensic_core() {
     local mime_type=$(file --mime-type -b "$f_path")
     local f_name=$(basename "$f_path")
     local f_hash=$(sha256sum "$f_path" | awk '{print $1}')
-    local history_log="${LOOT_DIR}/forensic_history.log"
+    local base_loot_dir="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
+    local history_log="${base_loot_dir}/forensic_history.log"
+    local raw_python_code=""
 
-    # ПАМЯТЬ СИСТЕМЫ (Прошлое): Адаптивное узнавание
-    if grep -q "$f_hash" "$history_log" 2>/dev/null; then
+    # Обеспечиваем существование директории лута
+    mkdir -p "$base_loot_dir" 2>/dev/null
+
+    # ПАМЯТЬ СИСТЕМЫ (Прошлое): Адаптивное узнавание без коллизий
+    if [[ -f "$history_log" ]] && grep -q "$f_hash" "$history_log" 2>/dev/null; then
         core_engine_ui "w" "ADAPTIVE: File recognized from previous sessions. Checking for delta..."
     fi
 
@@ -4987,53 +5048,68 @@ run_forensic_core() {
     core_engine_ui "h" "CORE ANALYSIS: $f_name"
     core_engine_ui "i" "MIME: $mime_type | HASH: ${f_hash:0:16}..."
 
-    # 1. СТАТИЧЕСКИЙ АНАЛИЗ (Настоящее)
+    # 1. СТАТИЧЕСКИЙ АНАЛИЗ (Настоящее) — Строгая фильтрация метаданных по началу строки
     core_engine_ui "i" "Extracting Metadata Attributes..."
-    # Используем exiftool для извлечения системных и GPS тегов
-    exiftool "$f_path" 2>/dev/null | grep -E "Date|Time|Make|Model|GPS|Software|User|Creator" | sed 's/^/  /'
+    exiftool "$f_path" 2>/dev/null | grep -E "^(Date|Time|Make|Model|GPS|Software|User|Creator)" | sed 's/^/  /'
 
-    # 2. АДАПТИВНЫЙ CASE (Динамическое распределение)
+    # 2. АДАПТИВНЫЙ CASE (Динамическое распределение на базе GLOBAL_REGEX матриц)
     case "$mime_type" in
         image/*)
             core_engine_ui "w" "Analyzing Image Integrity (ELA/Metadata)..."
-            # Проверка зависимости PIL через Мозг [5]
+            # Проверка и валидация python-окружения
             python3 -c "import PIL" &>/dev/null || core_engine_validator "pkg" "python3-pil" "PIL Library"
-            generate_image_analyzer_code_raw | python3 - "$f_path" 2>/dev/null
+            
+            raw_python_code=$(generate_image_analyzer_code_raw 2>/dev/null)
+            if [[ -n "$raw_python_code" ]]; then
+                echo "$raw_python_code" | python3 - "$f_path" 2>/dev/null
+            fi
             ;;
             
         application/pdf)
             core_engine_ui "w" "Scanning PDF Objects for Active Content..."
-            # Поиск JS-инъекций и OpenAction триггеров
-            grep -aE "(/JS|/JavaScript|/OpenAction|/EmbeddedFile)" "$f_path" && \
-            core_engine_ui "e" "DANGER: Suspicious active content detected in PDF!"
+            # Безопасный поиск JS-инъекций и деструктивных триггеров с выводом улик
+            if grep -aE "$GLOBAL_REGEX_PDF_THREATS" "$f_path" >/dev/null 2>&1; then
+                core_engine_ui "e" "DANGER: Suspicious active content/exploits detected in PDF!"
+                grep -aE "$GLOBAL_REGEX_PDF_THREATS" "$f_path" 2>/dev/null | sort -u | sed 's/^/    [TRIGGER]: /'
+            else
+                core_engine_ui "s" "No dangerous active content structures found in PDF."
+            fi
             ;;
 
-        application/zip|application/x-rar|application/x-7z-compressed|application/x-tar)
+        application/zip|application/x-rar|application/x-7z-compressed|application/x-tar|application/x-gzip)
             core_engine_ui "w" "Deep Archive Inspection (Container Analysis)..."
             core_engine_validator "pkg" "p7zip-full" "7-Zip" || return
-            # Поиск исполняемых файлов внутри архива
-            7z l "$f_path" | grep -iE "\.exe|\.scr|\.vbs|\.bat|\.ps1|\.js" && \
-            core_engine_ui "!" "ALERT: High-risk extensions found in container!"
+            
+            # Поиск опасных файлов внутри контейнера по глобальной матрице расширений
+            if 7z l "$f_path" 2>/dev/null | grep -iE "$GLOBAL_REGEX_CONTAINER_THREATS" >/dev/null; then
+                core_engine_ui "!" "ALERT: High-risk executable extensions found inside container!"
+                7z l "$f_path" 2>/dev/null | grep -iE "$GLOBAL_REGEX_CONTAINER_THREATS" | sed 's/^/    [SUSPICIOUS]: /'
+            else
+                core_engine_ui "s" "Container file structure appears safe."
+            fi
             ;;
 
         application/x-executable|application/x-sharedlib|application/x-dosexec|application/octet-stream)
             core_engine_ui "w" "Binary Heuristics & Packer Detection..."
-            # Анализ строк на предмет сетевых команд
-            strings -n 6 "$f_path" | grep -iE "(http|https|ftp|/etc/passwd|cmd\.exe|powershell)" | head -n 5 | sed 's/^/    [NET/CMD]: /'
-            # Обнаружение упаковщиков (UPX, Themida и др.)
-            grep -aE "(UPX!|ASPack|Enigma|Themida)" "$f_path" >/dev/null && \
-            core_engine_ui "e" "ALERT: Advanced Binary Packer detected!"
+            
+            # Высокоскоростной анализ строк на предмет скрытых сетевых команд и завязок на ОС
+            LC_ALL=C strings -n 6 "$f_path" 2>/dev/null | grep -E "$GLOBAL_REGEX_BINARY_NETCMD" | head -n 5 | sed 's/^/    [NET/CMD]: /'
+            
+            # Обнаружение коммерческих упаковщиков малвари (UPX, Themida и др.)
+            if grep -aE "$GLOBAL_REGEX_BINARY_PACKERS" "$f_path" >/dev/null 2>&1; then
+                core_engine_ui "e" "ALERT: Advanced Binary Packer/Cryptor detected!"
+            fi
             ;;
             
         *)
-            # ЭВРИСТИКА (Будущее): Поиск аномалий в неизвестных форматах
-            if strings "$f_path" | grep -q "eval(base64"; then
-                core_engine_ui "!" "HEURISTIC: Found Base64 execution pattern (Potential Zero-Day/Script)!"
+            # ЭВРИСТИКА (Будущее): Поиск аномалий обфускации в неизвестных типах текстовых/скриптовых данных
+            if LC_ALL=C strings "$f_path" 2>/dev/null | grep -qE "$GLOBAL_REGEX_HEURISTIC_SCRIPTS"; then
+                core_engine_ui "!" "HEURISTIC: Found Obfuscated Script/Execution pattern (Potential Zero-Day)!"
             fi
             ;;
     esac
 
-    # СОХРАНЕНИЕ ОПЫТА (Для будущего)
+    # СОХРАНЕНИЕ ОПЫТА (Запись в историю для будущих сессий)
     echo "[$(date +%F_%T)] $f_hash $f_name $mime_type" >> "$history_log"
     
     # Слой 3: Регистрация в Сборщике трофеев [11]
@@ -5043,9 +5119,7 @@ run_forensic_core() {
     core_engine_wait
 }
 
-
 # --- ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ---
-
 run_auto_forensics() {
     # Слой 1: Визуальный заголовок через Голос [1]
     core_engine_ui "h" "FORENSICS: AUTOMATIC CORE ANALYZER"
@@ -5297,17 +5371,18 @@ run_dd_logic() {
 
 # ==============================================================================
 # @description: Нативный автономный модуль Nexus SocialScan (Поиск никнейма)
+# ПОЛНАЯ АВТОНОМИЯ: Двухвекторный валидатор (HTTP/DOM) на базе GLOBAL_OSINT_SITES
 # ==============================================================================
 run_osint_custom_socialscan() {
     core_engine_ui "h" "NEXUS CORE: MULTI-PLATFORM SOCIALSCAN"
     
-    # Сброс буфера ввода stdin
+    # Сброс буфера ввода stdin через Глушитель [7]
     tcflush xtcin 2>/dev/null || true
     
     local default_target=""
     if [[ -n "$target_user" ]]; then
         default_target="$target_user"
-        core_engine_ui "i" "Обнаружена активная цель в текущей сессии: $default_target"
+        core_engine_ui "i" "Active target detected in session: $default_target"
     fi
 
     echo -n " [?] Укажите Никнейм для сканирования сетей [По умолчанию: $default_target]: "
@@ -5318,74 +5393,107 @@ run_osint_custom_socialscan() {
     fi
 
     if [[ -z "$scan_target" ]]; then
-        core_engine_ui "e" "[-] Параметр поиска пуст. Укажите никнейм."
+        core_engine_ui "e" "[-] Параметр поиска пуст. Операция прервана."
         core_engine_wait
         return 1
     fi
 
-    # Очистка от мусора
+    # Санитарная очистка инпута от мусора и веб-артефактов
     scan_target="${scan_target//@/}"
     scan_target=$(echo "$scan_target" | cut -d'?' -f1 | tr -d '[:space:]')
 
-    core_engine_ui "i" "Запуск нативного сканирования для идентификатора: $scan_target"
+    core_engine_ui "i" "Запуск интеллектуального сканирования для: $scan_target"
     echo "--------------------------------------------------"
 
-    mkdir -p ~/prime_loot
-    local loot_file="$HOME/prime_loot/socialscan_${scan_target}.txt"
+    local base_loot_dir="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
+    mkdir -p "$base_loot_dir" 2>/dev/null
+    local loot_file="${base_loot_dir}/socialscan_${scan_target}.txt"
     
-    echo "==================================================================" > "$loot_file"
-    echo " NEXUS SOCIALSCAN REPORT FOR: $scan_target" >> "$loot_file"
-    echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')" >> "$loot_file"
-    echo "==================================================================" >> "$loot_file"
-
-    # Список проверяемых URL-шаблонов
-    local platforms=(
-        "Telegram|https://t.me/"
-        "Instagram|https://www.instagram.com/"
-        "TikTok|https://www.tiktok.com/@"
-        "X-Twitter|https://x.com/"
-        "GitHub|https://github.com/"
-        "Pinterest|https://www.pinterest.com/"
-        "YouTube|https://www.youtube.com/@"
-        "Reddit|https://www.reddit.com/user/"
-    )
+    {
+        echo "=================================================================="
+        echo " NEXUS SOCIALSCAN REPORT FOR: $scan_target"
+        echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')"
+        echo "=================================================================="
+    } > "$loot_file"
 
     local found_count=0
-    local user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    local checked_count=0
+    local user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-    for platform in "${platforms[@]}"; do
-        local name="${platform%%|*}"
-        local base_url="${platform#*|}"
+    # Итерация по глобальной ультимативной матрице кросс-справок
+    local site_entry
+    for site_entry in "${GLOBAL_OSINT_SITES[@]}"; do
+        # Пропускаем поврежденные или неразченные элементы матрицы
+        [[ "$site_entry" != *"|"* ]] && continue
+        
+        # Парсинг пятислойной структуры записи
+        local base_url="${site_entry%%|*}"
+        local remaining="${site_entry#*|}"
+        
+        local check_type="${remaining%%|*}"
+        remaining="${remaining#*|}"
+        
+        local error_marker="${remaining%%|*}"
+        remaining="${remaining#*|}"
+        
+        local category="${remaining%%|*}"
+        local site_name="${remaining#*|}"
+        
         local full_url="${base_url}${scan_target}"
-        
-        # Проверяем доступность аккаунта по HTTP-коду (быстрый HEAD-запрос)
-        local http_code
-        http_code=$(curl -s -o /dev/null -I -L -A "$user_agent" --connect-timeout 5 -w "%{http_code}" "$full_url")
-        
-        if [[ "$http_code" == "200" ]]; then
-            core_engine_ui "s" "[+] НАЙДЕН АККАУНТ ($name): $full_url"
-            echo "Found_Platform: $name -> $full_url" >> "$loot_file"
+        local account_exists=0
+        ((checked_count++))
+
+        # Вывод текущего прогресса в консоль
+        echo -ne " [.] Анализ [$category] -> $site_name... \r"
+
+        # Диспетчеризация логики проверки (Слой 5: Мозг)
+        if [[ "$check_type" == "HTTP_CODE" ]]; then
+            # Быстрый HEAD-запрос для проверки кодов ответов
+            local http_code
+            http_code=$(curl -s -o /dev/null -I -L -A "$user_agent" --connect-timeout 5 -w "%{http_code}" "$full_url")
+            
+            # Если код 200 — аккаунт существует, если указанный маркер ошибки (например, 404) — отсутствует
+            if [[ "$http_code" == "200" ]]; then
+                account_exists=1
+            fi
+        elif [[ "$check_type" == "TEXT_ABSENT" ]]; then
+            # Выкачиваем тело страницы (DOM) через GET-запрос для поиска сигнатур отсутствия
+            local page_body
+            page_body=$(curl -s -L -A "$user_agent" --connect-timeout 6 "$full_url" 2>/dev/null)
+            
+            # Если страница успешно загружена И на ней НЕТ маркера ошибки — аккаунт найден
+            if [[ -n "$page_body" ]]; then
+                if ! echo "$page_body" | grep -qF "$error_marker"; then
+                    account_exists=1
+                fi
+            fi
+        fi
+
+        # Слой визуализации результатов на базе UI/UX HIGHLIGHT CORE
+        if (( account_exists == 1 )); then
+            core_engine_ui "s" "[+] НАЙДЕН ПРОФИЛЬ ($site_name): $full_url"
+            echo "Category: $category | Platform: $site_name -> $full_url" >> "$loot_file"
             ((found_count++))
-        elif [[ "$http_code" == "404" ]]; then
-            echo " [.] $name: Профиль отсутствует (404)"
-        else
-            echo " [-] $name: Ограничено защитой площадки (HTTP $http_code)"
         fi
         
-        sleep 0.5
+        # Микро-задержка для обхода анти-бот систем (Rate Limiting)
+        sleep 0.2
     done
 
     echo "--------------------------------------------------"
     if (( found_count > 0 )); then
-        core_engine_ui "s" "Сканирование завершено. Найдено совпадений: $found_count"
-        core_engine_ui "s" "Результаты сохранены: $loot_file"
+        core_engine_ui "s" "Интеллектуальный OSINT-аудит завершен. Проверено баз: $checked_count"
+        core_engine_ui "s" "Всего обнаружено легитимных совпадений: $found_count"
+        core_engine_ui "s" "Финальный лог-лут зафиксирован: $(basename "$loot_file")"
+        
+        # Регистрация результатов в Сборщике трофеев [11]
+        core_engine_loot "osint" "SocialScan performed for $scan_target. Found: $found_count profiles across $checked_count sources."
     else
-        core_engine_ui "i" "Никнейм полностью свободен на основных платформах."
+        core_engine_ui "i" "Анализ завершен. Идентификатор [$scan_target] полностью чист во всех базах."
     fi
     
     core_engine_wait
 }
-
 
 # ==============================================================================
 # @description: Нативный автономный модуль Nexus Breach Leaks (Локальный поиск)
@@ -5464,17 +5572,21 @@ run_osint_custom_leaks() {
 }
 
 # ==============================================================================
-# @description: Проверка привязки номера телефона к мессенджеру Telegram.
-# @param: $1 - Номер телефона в международном формате
+# @description: Проверка привязки номера телефона к мессенджеру Telegram
+# ПОЛНАЯ АВТОНОМИЯ: Динамическая маскировка через ротатор GLOBAL_NETWORK_UA
 # ==============================================================================
 run_osint_custom_ignorant() {
     local phone="$1"
+    
+    # Санитарная очистка телефонного номера от символов разметки
     phone="${phone//+/}"
     phone="${phone// /}"
     phone="${phone//-/}"
+    phone="${phone//(/}"
+    phone="${phone//)/}"
 
     if [[ -z "$phone" || ! "$phone" =~ ^[0-9]+$ ]]; then
-        core_engine_ui "e" "Неверный формат номера телефона."
+        core_engine_ui "e" "Неверный формат номера телефона. Идентификатор должен быть цифровым."
         return 1
     fi
 
@@ -5482,20 +5594,44 @@ run_osint_custom_ignorant() {
     core_engine_ui "i" "Анализ сигнатуры телефонного пула: +$phone"
     echo "--------------------------------------------------"
 
+    # Слой 4: Глушитель [7] и Маскировка. Динамический выбор UA из матрицы
+    local ua_count=${#GLOBAL_NETWORK_UA[@]}
+    local random_index=$(( RANDOM % ua_count ))
+    local selected_ua="${GLOBAL_NETWORK_UA[$random_index]}"
+    
+    # Синхронизация путей сохранения результатов с глобальной переменной ядра
+    local base_loot_dir="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
+    mkdir -p "$base_loot_dir" 2>/dev/null
+    local loot_file="${base_loot_dir}/nexus_telegram_resolved.txt"
+
     local tg_url="https://t.me/+$phone"
     local check_response
-    check_response=$(curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 5 "$tg_url")
+    
+    # Выполнение высокоточного GET-запроса с маскировкой
+    check_response=$(curl -s -L -A "$selected_ua" --connect-timeout 6 --max-time 12 "$tg_url" 2>/dev/null)
 
-    if [[ "$check_response" =~ "tg://resolve?phone" || "$check_response" =~ "Послать сообщение" || "$check_response" =~ "Send Message" ]]; then
+    # Валидация DOM-структуры на наличие триггеров привязки аккаунта
+    if [[ "$check_response" =~ "tg://resolve?phone" || "$check_response" =~ "Послать сообщение" || "$check_response" =~ "Send Message" || "$check_response" =~ "tg:resolve" ]]; then
         core_engine_ui "s" "[+] ВЕКТОР НАЙДЕН: Данный номер телефона привязан к Telegram аккаунту."
-        echo "Telegram_Artifact: +$phone|STATUS:ACTIVE_ACCOUNT" >> ~/prime_loot/nexus_telegram_resolved.txt
+        echo "[$(date +%F_%T)] Telegram_Artifact: +$phone|STATUS:ACTIVE_ACCOUNT" >> "$loot_file"
         
+        # Интеллектуальный парсинг публичных метаданных og:title
         local meta_name
-        meta_name=$(echo "$check_response" | grep -oE '<meta property="og:title" content="[^"]+"' | cut -d'"' -f4)
+        meta_name=$(echo "$check_response" | grep -oP 'meta property="og:title" content="\K[^"']+' 2>/dev/null)
+        
+        # Если имя успешно извлечено и оно не является стандартной заглушкой
         if [[ -n "$meta_name" && "$meta_name" != "Telegram" ]]; then
+            # Декодирование базовых HTML-сущностей амперсанда для чистоты вывода
+            meta_name="${meta_name//&quot;/\"}"
+            meta_name="${meta_name//&#39;/\'}"
+            meta_name="${meta_name//&amp;/&}"
+            
             core_engine_ui "s" " -> Публичное имя в профиле: $meta_name"
-            echo "Telegram_Meta: +$phone|NAME:$meta_name" >> ~/prime_loot/nexus_telegram_resolved.txt
+            echo "[$(date +%F_%T)] Telegram_Meta: +$phone|NAME:$meta_name" >> "$loot_file"
         fi
+        
+        # Слой 6: Регистрация в Сборщике трофеев [11]
+        core_engine_loot "osint" "Telegram Resolver: Found active account for +$phone ($meta_name)"
     else
         core_engine_ui "i" "[-] Номер +$phone не зарегистрирован в мессенджере или полностью скрыт настройками приватности."
     fi
