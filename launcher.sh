@@ -430,20 +430,83 @@ GLOBAL_SIG_VULN_ALERTS="(?i)(\b(vulnerable|exploit_matched|rce_triggered|shell_s
 GLOBAL_SIG_WEB_RUNTIMES="(?i)\b(python([0-9](\.[0-9]+)?)?|node([0-9]+)?|php(-fpm)?([0-9](\.[0-9]+)?)?|go|ruby([0-9](\.[0-9]+)?)?|java|perl|dotnet|nginx|apache[0-9]?|httpd|lighttpd|caddy|traefik|gunicorn|uwsgi|puma|unicorn|passenger|tomcat|jetty|wildfly|glassfish|docker(-containerd|-current)?|dockerd|podman|containerd|kubelet|hypercorn|uvicorn|daphne)\b"
 
 
-# Базовый словарь эндпоинтов для поиска открытых вебхуков и API (Webhook Fuzzing Dict)
+# ==============================================================================
+# 10. СЛОВАРЬ ФАЗЗИНГА ВЕБХУКОВ И API ЭНДПОИНТОВ (ULTIMATE WEBHOOK WORDLIST)
+# ==============================================================================
 GLOBAL_WEBHOOK_WORDLIST=(
-    "webhook"
-    "webhooks"
+    # --- Версионированные API и Точки Входа (Core API Routs) ---
+    "api"
     "api/v1"
     "api/v2"
+    "api/v3"
+    "api/v4"
+    "rest/v1"
+    "rest/v2"
+    "v1/api"
+    "v2/api"
+    "graphql"
+    "api/graphql"
+    
+    # --- Универсальные Вебхуки (Generic Webhooks) ---
+    "webhook"
+    "webhooks"
     "hooks"
-    "tg-hook.php"
-    "stripe-webhook"
-    "git-hook"
-    "slack-hook"
+    "hook"
+    "api/webhook"
     "api/webhooks"
+    "api/hooks"
     "v1/webhooks"
+    "v2/webhooks"
+    "webhooks.json"
+    "webhook.php"
+    
+    # --- Мессенджеры и Чат-боты (Messengers & Bots) ---
+    "tg-hook.php"
+    "telegram-webhook"
+    "telegram/webhook"
+    "api/telegram"
+    "slack-hook"
+    "slack/webhook"
+    "api/slack"
+    "discord-webhook"
+    "discord/webhook"
+    "teams-webhook"
+    
+    # --- Финансовые и Платежные Шлюзы (FinTech & Payment Gateways) ---
+    "stripe-webhook"
+    "stripe/webhook"
+    "api/stripe"
+    "paypal-webhook"
+    "paypal/webhook"
+    "api/paypal"
+    "braintree-webhook"
+    "razorpay-webhook"
+    "shopify-webhook"
+    "shopify/webhook"
+    
+    # --- Разработка, CI/CD и Облака (DevOps & Cloud Providers) ---
+    "git-hook"
+    "github-webhook"
+    "github/webhook"
+    "gitlab-webhook"
+    "gitlab/webhook"
+    "bitbucket-webhook"
+    "jenkins-webhook"
+    "jira-webhook"
+    "aws-webhook"
+    "firebase-webhook"
+    
+    # --- CRM, Маркетинг и Телефония (SaaS, Marketing & Telephony) ---
+    "mailchimp-webhook"
+    "sendgrid-webhook"
+    "twilio-webhook"
+    "twilio/webhook"
+    "hubspot-webhook"
+    "hubspot/webhook"
+    "amocrm-webhook"
+    "bitrix-webhook"
 )
+
 
 # Паттерн обнаружения скрытых сетей (Dark Web Gateways) в потоке логов
 GLOBAL_REGEX_DARKWEB="\b[a-z2-7]{16,56}\.onion\b|\b[a-z0-9]{52}\.b32\.i2p\b"
