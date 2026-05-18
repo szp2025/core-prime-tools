@@ -6011,13 +6011,13 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: Универсальный краулер v20.0 с ультимативным мультисистемным шлюзом
-# ПОЛНАЯ АВТОНОМИЯ: Перекрестный циклический парсинг по всем движкам матрицы v20.0
-# МОДЕРНИЗАЦИЯ: Интеграция Yandex, Baidu, Mojeek, Qwant с защитой от DMCA-слепых зон
-# АРХИТЕКТУРА: Полная интеграция с GLOBAL_PLATFORM_IDENTIFIERS и блэклистами ядра
+# @description: Универсальный краулер v22.2 с ультимативным мультисистемным шлюзом
+# ПОЛНАЯ АВТОНОМИЯ: Перекрестный циклический парсинг по всем движкам матрицы
+# МОДЕРНИЗАЦИЯ: Исправлен критический сбой синтаксиса (fi -> done) на строке 6182
+# АРХИТЕКТУРА: Идеальное сопряжение с блэклистами ядра и дедупликацией артефактов
 # ==============================================================================
 run_osint_omni_crawler() {
-    core_engine_ui "h" "NEXUS CORE: OMNI BROADCAST MULTI-ENGINE CRAWLER v20.0"
+    core_engine_ui "h" "NEXUS CORE: OMNI BROADCAST MULTI-ENGINE CRAWLER v22.2"
     
     # Слой 1: Входной интерфейсный шлюз ядра с перенаправлением терминала
     echo -n " [?] Введите Никнейм или любую ссылку (FB, Insta, TikTok, X, YT): "
@@ -6093,7 +6093,7 @@ run_osint_omni_crawler() {
     
     {
         echo "=================================================================="
-        echo " NEXUS SYSTEMS v20.0 - MULTI-ENGINE COMPLETE OSINT REPORT"
+        echo " NEXUS SYSTEMS v22.2 - MULTI-ENGINE COMPLETE OSINT REPORT"
         echo " TARGET: $target_user ($detected_platform)"
         echo " TIMESTAMP: $(date +'%Y-%m-%d %H:%M:%S')"
         echo "=================================================================="
@@ -6116,7 +6116,7 @@ run_osint_omni_crawler() {
     local vector
     for vector in "${query_vectors[@]}"; do
         
-        # --- ВНУТРЕННИЙ КРИТИЧЕСКИЙ СЛОЙ: ТОТАЛЬНЫЙ ЦИКЛ ПО МАТРИЦЕ ДВИЖКОВ v20.0 ---
+        # --- ВНУТРЕННИЙ КРИТИЧЕСКИЙ СЛОЙ: ЦИКЛ ПО МАТРИЦЕ ДВИЖКОВ ---
         local engine_entry
         for engine_entry in "${GLOBAL_SEARCH_ENGINES[@]}"; do
             [[ "$engine_entry" != *"|"* ]] && continue
@@ -6130,7 +6130,7 @@ run_osint_omni_crawler() {
             
             echo -ne " [.] [$engine_name] Сканирование вектора: $vector...\e[K\r"
             
-            # Динамическая интеллектуальная замена плейсхолдера вектора
+            # Динамическая замена плейсхолдера вектора
             local request_url="${engine_url_template//%VECTOR%/$vector}"
             
             # Адаптация пробелов под синтаксис азиатских и европейских движков
@@ -6141,7 +6141,7 @@ run_osint_omni_crawler() {
             local raw_snippet_data
             raw_snippet_data=$(curl -s -A "$rand_ua" --connect-timeout "$GLOBAL_NET_CONNECT_TIMEOUT" --max-time "$GLOBAL_NET_MAX_TIME" "$request_url" 2>/dev/null)
 
-            # Проверка на капчу/WAF-экраны текущего движка через тотальный регулярный фильтр v18.5
+            # Проверка на капчу/WAF-экраны текущего движка через тотальный регулярный фильтр
             if [[ -z "$raw_snippet_data" ]] || echo "$raw_snippet_data" | grep -qP "$GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
                 if (( gate_count > 0 )); then
                     local random_gate_idx=$(( RANDOM % gate_count ))
@@ -6179,7 +6179,7 @@ run_osint_omni_crawler() {
                             ((total_phones++))
                         fi
                     fi
-                fi <<< "$extracted_phones"
+                done <<< "$extracted_phones" # <--- ФИКСАЦИЯ: Здесь теперь корректно стоит done вместо fi
             fi
 
             # --- СЛОЙ ПАРСИНГА 2: ЭЛЕКТРОННЫЕ АДРЕСА ---
@@ -6235,7 +6235,7 @@ run_osint_omni_crawler() {
             sleep $((1 + RANDOM % 3))
         done
 
-        # Системный тайм-аут после полного прогона вектора по всем 8 мировым базам
+        # Системный тайм-аут после полного прогона вектора
         sleep $((2 + RANDOM % 3))
     done
 
@@ -6246,14 +6246,13 @@ run_osint_omni_crawler() {
     if (( total_leads > 0 )); then
         core_engine_ui "s" "Тотальный широковещательный анализ завершен! Собрано артефактов: $total_leads"
         core_engine_ui "s" "Все уникальные данные экспортированы в: $(basename "$loot_file")"
-        core_engine_loot "osint" "Omni Broadcast v20.0: Fully parsed 8 engines for '$target_user'. Extracted $total_leads forensics leads."
+        core_engine_loot "osint" "Omni Broadcast v22.2: Fully parsed engines for '$target_user'. Extracted $total_leads forensics leads."
     else
-        core_engine_ui "i" "Прямых открытых привязок ни в одном из 8 мировых поисковых индексов не обнаружено."
+        core_engine_ui "i" "Прямых открытых привязок ни в одном из мировых поисковых индексов не обнаружено."
     fi
 
     core_engine_wait
 }
-
 
 
 # ==========================================
