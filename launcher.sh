@@ -463,6 +463,17 @@ GLOBAL_REGEX_EMAIL="(?i)\b[a-z0-9._%+-]+@([a-z0-9-]+\.)+[a-z]{2,63}\b"
 # ==============================================================================
 GLOBAL_REGEX_PHONE="(?i)(?:\+?([0-9]{1,4})[\s.-]?)?(?:\([0-9]{1,5}\)[\s.-]?)?([0-9]{2,5}[\s.-]?){2,5}[0-9]{2,5}"
 
+# ==============================================================================
+# GLOBAL VALIDATION & OSINT PHONENUMBER MATRICES
+# ==============================================================================
+
+# 1. Мощная ПОИСКОВАЯ матрица (Твой паттерн, адаптированный под кросс-платформенный POSIX ERE для grep/Bash)
+# Используется для форензики, парсинга логов и поиска упоминаний номеров в текстах.
+GLOBAL_REGEX_PHONE_SEARCH="(\+?([0-9]{1,4})[[:space:]\.-]?)?(\([0-9]{1,5}\)[[:space:]\.-]?)?([0-9]{2,5}[[:space:]\.-]?){2,5}[0-9]{2,5}"
+
+# 2. Строгая ВАЛИДИРУЮЩАЯ матрица ядра
+# Используется перед отправкой в сетевые OSINT-запросы, проверяя, что строка полностью очищена до цифр.
+GLOBAL_REGEX_PHONE_VALID="^[0-9]{7,15}$"
 
 # ==============================================================================
 # @description: Ультимативный паттерн для потокового поиска IPv4/IPv6 и CIDR
@@ -5572,46 +5583,83 @@ run_osint_custom_leaks() {
 }
 
 # ==============================================================================
-# @description: Проверка привязки номера телефона к мессенджеру Telegram.
-# @param: $1 - Номер телефона в международном формате
+# @description: Проверка привязки номера телефона к мессенджеру Telegram
+# ПОЛНАЯ АВТОНОМИЯ: Двухуровневая валидация на базе GLOBAL_REGEX_PHONE_VALID
+# ==============================================================================
+# ==============================================================================
+# @description: Проверка привязки номера телефона к мессенджеру Telegram
+# ПОЛНАЯ АВТОНОМИЯ: Двухуровневая валидация на базе GLOBAL_REGEX_PHONE_VALID
+# ИСПРАВЛЕНО: Ликвидирован конфликт одинарных кавычек (Quote Escape Fix)
 # ==============================================================================
 run_osint_custom_ignorant() {
-    local phone="$1"
-    phone="${phone//+/}"
-    phone="${phone// /}"
-    phone="${phone//-/}"
+    local phone="$1"
+    
+    # Слой 2: Органы чувств [3] — Санитарная очистка входящего пула данных
+    # Вырезаем любые артефакты, пробелы, дефисы и скобки, которые пропускает поисковый паттерн
+    phone="${phone//+/}"
+    phone="${phone// /}"
+    phone="${phone//-/}"
+    phone="${phone//(/}"
+    phone="${phone//)/}"
+    phone="${phone//./}"
 
-    if [[ -z "$phone" || ! "$phone" =~ ^[0-9]+$ ]]; then
-        core_engine_ui "e" "Неверный формат номера телефона."
-        return 1
-    fi
+    # Безопасное кросс-платформенное ветвление (Защита от syntax error near unexpected token)
+    # Знак отрицания '!' вынесен за скобки, маска изолирована в глобальной константе
+    if [[ -z "$phone" ]] || ! [[ "$phone" =~ $GLOBAL_REGEX_PHONE_VALID ]]; then
+        core_engine_ui "e" "Неверный формат номера телефона. Очищенный пул должен содержать от 7 до 15 цифр."
+        return 1
+    fi
 
-    core_engine_ui "h" "NEXUS OSINT: TELEGRAM INTERNAL RESOLVER"
-    core_engine_ui "i" "Анализ сигнатуры телефонного пула: +$phone"
-    echo "--------------------------------------------------"
+    core_engine_ui "h" "NEXUS OSINT: TELEGRAM INTERNAL RESOLVER"
+    core_engine_ui "i" "Анализ сигнатуры телефонного пула: +$phone"
+    echo "--------------------------------------------------"
 
-    local tg_url="https://t.me/+$phone"
-    local check_response
-    check_response=$(curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --connect-timeout 5 "$tg_url")
+    # Слой 4: Глушитель [7] и Маскировка. Динамический выбор UA из матрицы
+    local ua_count=${#GLOBAL_NETWORK_UA[@]}
+    local random_index=$(( RANDOM % ua_count ))
+    local selected_ua="${GLOBAL_NETWORK_UA[$random_index]}"
+    
+    # Синхронизация путей сохранения результатов с глобальной переменной ядра
+    local base_loot_dir="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
+    mkdir -p "$base_loot_dir" 2>/dev/null
+    local loot_file="${base_loot_dir}/nexus_telegram_resolved.txt"
 
-    if [[ "$check_response" =~ "tg://resolve?phone" || "$check_response" =~ "Послать сообщение" || "$check_response" =~ "Send Message" ]]; then
-        core_engine_ui "s" "[+] ВЕКТОР НАЙДЕН: Данный номер телефона привязан к Telegram аккаунту."
-        echo "Telegram_Artifact: +$phone|STATUS:ACTIVE_ACCOUNT" >> ~/prime_loot/nexus_telegram_resolved.txt
-        
-        local meta_name
-        meta_name=$(echo "$check_response" | grep -oE '<meta property="og:title" content="[^"]+"' | cut -d'"' -f4)
-        if [[ -n "$meta_name" && "$meta_name" != "Telegram" ]]; then
-            core_engine_ui "s" " -> Публичное имя в профиле: $meta_name"
-            echo "Telegram_Meta: +$phone|NAME:$meta_name" >> ~/prime_loot/nexus_telegram_resolved.txt
-        fi
-    else
-        core_engine_ui "i" "[-] Номер +$phone не зарегистрирован в мессенджере или полностью скрыт настройками приватности."
-    fi
+    local tg_url="https://t.me/+$phone"
+    local check_response
+    
+    # Выполнение высокоточного GET-запроса с маскировкой сетевого окружения
+    check_response=$(curl -s -L -A "$selected_ua" --connect-timeout 6 --max-time 12 "$tg_url" 2>/dev/null)
 
-    echo "--------------------------------------------------"
-    core_engine_wait
+    # Валидация DOM-структуры на наличие триггеров привязки аккаунта
+    if [[ "$check_response" =~ "tg://resolve?phone" || "$check_response" =~ "Послать сообщение" || "$check_response" =~ "Send Message" || "$check_response" =~ "tg:resolve" ]]; then
+        core_engine_ui "s" "[+] ВЕКТОР НАЙДЕН: Данный номер телефона привязан к Telegram аккаунту."
+        echo "[$(date +%F_%T)] Telegram_Artifact: +$phone|STATUS:ACTIVE_ACCOUNT" >> "$loot_file"
+        
+        # Интеллектуальный парсинг публичных метаданных og:title
+        # Строка экранирована через двойные кавычки для предотвращения поплывшей подсветки
+        local meta_name
+        meta_name=$(echo "$check_response" | grep -oP "meta property=\"og:title\" content=\"\K[^\"]+" 2>/dev/null)
+        
+        # Если имя успешно извлечено и оно не является стандартной заглушкой мессенджера
+        if [[ -n "$meta_name" && "$meta_name" != "Telegram" ]]; then
+            # Декодирование базовых HTML-сущностей структуры DOM для чистоты вывода
+            meta_name="${meta_name//&quot;/\"}"
+            meta_name="${meta_name//&#39;/\'}"
+            meta_name="${meta_name//&amp;/&}"
+            
+            core_engine_ui "s" " -> Публичное имя в профиле: $meta_name"
+            echo "[$(date +%F_%T)] Telegram_Meta: +$phone|NAME:$meta_name" >> "$loot_file"
+        fi
+        
+        # Слой 6: Регистрация результатов в Сборщике трофеев [11]
+        core_engine_loot "osint" "Telegram Resolver: Found active account for +$phone ($meta_name)"
+    else
+        core_engine_ui "i" "[-] Номер +$phone не зарегистрирован в мессенджере или полностью скрыт настройками приватности."
+    fi
+
+    echo "--------------------------------------------------"
+    core_engine_wait
 }
-
 
 # ==============================================================================
 # @description: Универсальный краулер v14.3 с глубоким поисковым шлюзом Google
