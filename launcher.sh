@@ -1265,7 +1265,7 @@ core_engine_parse_target_log() {
         return 1
     fi
 
-    clear
+    #clear
     core_engine_ui "h" "CORE PARSER: ARTIFACT & FORENSICS ENGINE"
     core_engine_ui "i" "Цель анализа: $(basename "$log_file")"
     core_engine_ui "line" ""
