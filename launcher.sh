@@ -376,8 +376,8 @@ GLOBAL_BANK_MATRIX=(
     "UBSW|UBSWCHZH|UBS Group|Швейцария (CH)"
     "BNPA|BNPABEBB|BNP Paribas Fortis|Бельгия (BE)"
     
-    # --- Крупнейшие Банки СНГ (SWIFT & Национальные Системы) ---
-    "SBER|SABR付けて|Сбербанк|Россия (RU)"
+        # --- Крупнейшие Банки СНГ (SWIFT & Национальные Системы) ---
+    "SBER|SABRRUMM|Сбербанк|Россия (RU)"
     "VTBR|VTBRRU2M|ВТБ|Россия (RU)"
     "ALFA|ALFARU2A|Альфа-Банк|Россия (RU)"
     "TCSB|TCSBRUM1|Т-Банк (Тинкофф)|Россия (RU)"
@@ -388,6 +388,7 @@ GLOBAL_BANK_MATRIX=(
     "BAPB|BAPBBY2X|Белагропромбанк|Беларусь (BY)"
     "ASB|AKBBBY2X|Беларусбанк|Беларусь (BY)"
     "PBUA|PBUAUA2X|ПриватБанк|Украина (UA)"
+
 )
 
 
