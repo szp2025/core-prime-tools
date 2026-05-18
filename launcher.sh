@@ -102,26 +102,169 @@ GLOBAL_OSINT_SITES=(
     "https://archive.org/details/@|Archive.org"
 )
 
+#!/bin/bash
+# --- PRIME MASTER LAUNCHER v35.0m1 ---
+CURRENT_VERSION="35.4"
+G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
+set +o history
+
+CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
+[ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
+
+SILENT="> /dev/null 2>&1"
+# Использование:
+command -v curl eval $SILENT
+
+# --- CORE PATH INITIALIZATION ---
+# Сначала определяем, где мы находимся
+if [[ -n "$TERMUX_VERSION" ]]; then
+    # Среда: Termux (Android)
+    BASE_DIR="$HOME/core-prime-tools"
+    PRIME_LOOT="$HOME/prime_loot"
+    PRIME_SHARE="$HOME/prime_share"
+    # Расширяем PATH для бинарников Termux
+    PATH="$PATH:/data/data/com.termux/files/usr/bin"
+else
+    # Среда: Стандартный Linux
+    # Проверяем, есть ли права root, чтобы решить, куда писать
+    if [[ $EUID -eq 0 ]]; then
+        BASE_DIR="/root/core-prime-tools"
+        PRIME_LOOT="/root/prime_loot"
+        PRIME_SHARE="/root/prime_share"
+    else
+        BASE_DIR="$HOME/core-prime-tools"
+        PRIME_LOOT="$HOME/prime_loot"
+        PRIME_SHARE="$HOME/prime_share"
+    fi
+fi
+
+# Вторичные директории
+MOD_DIR="$BASE_DIR/modules"
+
+# Создание инфраструктуры (без ошибок доступа)
+mkdir -p "$BASE_DIR" "$MOD_DIR" "$PRIME_LOOT" "$PRIME_SHARE" 2>/dev/null
+
+export BASE_DIR MOD_DIR PRIME_LOOT PRIME_SHARE
+
+
+
 # ==============================================================================
-# 2. МАТРИЦА ПОЧТОВЫХ ПРОВАЙДЕРОВ ДЛЯ ВАЛИДАЦИИ И ДОРКИНГА (EMAIL DOMAINS)
+# 1. ГЛОБАЛЬНАЯ МАТРИЦА ПЛАТФОРМ ДЛЯ КРОСС-СПРАВОК (GLOBAL OSINT SITES)
 # ==============================================================================
-GLOBAL_EMAIL_DOMAINS=(
-    "gmail.com|Google Mail"
-    "yahoo.com|Yahoo Mail"
-    "outlook.com|Microsoft Outlook"
-    "hotmail.com|Hotmail"
-    "icloud.com|Apple iCloud"
-    "mail.ru|Mail.ru Group"
-    "yandex.ru|Yandex Mail"
-    "rambler.ru|Rambler Mail"
-    "proton.me|ProtonMail Encrypted"
-    "protonmail.com|ProtonMail Legacy"
-    "tutanota.com|Tutanota Secure"
-    "gmx.de|GMX Mail"
-    "zoho.com|Zoho Mail"
-    "aoi.com|AOL Mail"
+GLOBAL_OSINT_SITES=(
+    # Основные социальные сети и мессенджеры
+    "https://t.me/|Telegram"
+    "https://instagram.com/|Instagram"
+    "https://twitter.com/|Twitter"
+    "https://vk.com/|VK"
+    "https://ok.ru/|Odnoklassniki"
+    "https://www.facebook.com/|Facebook"
+    "https://www.tiktok.com/@|TikTok"
+    
+    # Профессиональные, ИТ-платформы и репозитории
+    "https://github.com/|GitHub"
+    "https://gitlab.com/|GitLab"
+    "https://bitbucket.org/|BitBucket"
+    "https://www.linkedin.com/in/|LinkedIn"
+    "https://habr.com/ru/users/|Habr"
+    "https://stackoverflow.com/users/|StackOverflow"
+    
+    # Блоги, форумы и контент-платформы
+    "https://www.reddit.com/user/|Reddit"
+    "https://medium.com/@|Medium"
+    "https://pikabu.ru/@|Pikabu"
+    "https://livejournal.com/~|LiveJournal"
+    "https://pbase.com/|PBase"
+    "https://vc.ru/u/|VCRu"
+    
+    # Видео, стриминг и музыкальные сервисы
+    "https://www.youtube.com/@|YouTube"
+    "https://www.twitch.tv/|Twitch"
+    "https://vimeo.com/|Vimeo"
+    "https://soundcloud.com/|SoundCloud"
+    "https://open.spotify.com/user/|Spotify"
+    "https://www.dailymotion.com/|Dailymotion"
+    
+    # Дизайн, фото, портфолио и хобби
+    "https://www.pinterest.com/|Pinterest"
+    "https://www.behance.net/|Behance"
+    "https://www.deviantart.com/|DeviantArt"
+    "https://www.flickr.com/people/|Flickr"
+    "https://www.artstation.com/|ArtStation"
+    "https://unsplash.com/@|Unsplash"
+    
+    # Игровые платформы и сообщества
+    "https://steamcommunity.com/id/|Steam"
+    "https://www.chess.com/member/|Chess.com"
+    "https://psnprofiles.com/|PSNProfiles"
+    "https://xboxgamertag.com/search/|XboxGamertags"
+    
+    # Фриланс, коммерция и прочие сервисы
+    "https://www.fl.ru/users/|FL.ru"
+    "https://www.freelancer.com/u/|Freelancer"
+    "https://www.patreon.com/|Patreon"
+    "https://archive.org/details/@|Archive.org"
 )
 
+# ==============================================================================
+# 2. МАТРИЦА ПОЧТОВЫХ ПРОВАЙДЕРОВ ДЛЯ ВАЛИДАЦИИ И OSINT (ULTIMATE EMAIL CORE)
+# ==============================================================================
+GLOBAL_EMAIL_DOMAINS=(
+    # --- Международные гиганты (Global Providers) ---
+    "gmail.com|GLOBAL|Google Mail"
+    "yahoo.com|GLOBAL|Yahoo Mail"
+    "outlook.com|GLOBAL|Microsoft Outlook"
+    "hotmail.com|GLOBAL|Microsoft Hotmail Legacy"
+    "icloud.com|GLOBAL|Apple iCloud"
+    "aol.com|GLOBAL|AOL Mail"
+    "zoho.com|GLOBAL|Zoho Mail"
+    
+    # --- Регион СНГ (CIS Mail Services) ---
+    "mail.ru|CIS|Mail.ru Group"
+    "internet.ru|CIS|Mail.ru Clean Domain"
+    "bk.ru|CIS|Mail.ru Subdomain (BK)"
+    "inbox.ru|CIS|Mail.ru Subdomain (Inbox)"
+    "list.ru|CIS|Mail.ru Subdomain (List)"
+    "yandex.ru|CIS|Yandex Mail (RU)"
+    "yandex.kz|CIS|Yandex Mail (KZ)"
+    "yandex.by|CIS|Yandex Mail (BY)"
+    "ya.ru|CIS|Yandex Short Domain"
+    "rambler.ru|CIS|Rambler Mail"
+    "ukr.net|CIS|Ukr.net Mail"
+    
+    # --- Криптографические и защищенные сервисы (Encrypted & Secure) ---
+    "proton.me|SECURE|ProtonMail Modern"
+    "protonmail.com|SECURE|ProtonMail Legacy"
+    "tutanota.com|SECURE|Tutanota Secure"
+    "tuta.com|SECURE|Tuta Mail Modern"
+    "mailfence.com|SECURE|Mailfence Crypt"
+    "startmail.com|SECURE|StartMail Private"
+    
+    # --- Локальные и ISP провайдеры (Western Europe & US Regional) ---
+    "gmx.de|EUROPE|GMX Mail (Germany)"
+    "gmx.net|EUROPE|GMX Mail International"
+    "web.de|EUROPE|Web.de (Germany)"
+    "orange.fr|EUROPE|Orange S.A. (France)"
+    "wanadoo.fr|EUROPE|Orange Legacy (France)"
+    "free.fr|EUROPE|Free Telecom (France)"
+    "sfr.fr|EUROPE|SFR Box Mail (France)"
+    "laposte.net|EUROPE|La Poste (France)"
+    "libero.it|EUROPE|Libero Mail (Italy)"
+    "t-online.de|EUROPE|Deutsche Telekom"
+    "comcast.net|US_ISP|Comcast Cable"
+    "verizon.net|US_ISP|Verizon Telecom"
+    "att.net|US_ISP|AT&T Webmail"
+    
+    # --- Сервисы временных и одноразовых почт (Disposable / Burner Email) ---
+    "yopmail.com|DISPOSABLE|YOPmail Burner"
+    "mailinator.com|DISPOSABLE|Mailinator Public"
+    "10minutemail.com|DISPOSABLE|10MinuteMail"
+    "temp-mail.org|DISPOSABLE|Temp-Mail Engine"
+    "guerrillamail.com|DISPOSABLE|GuerrillaMail"
+    "trashmail.com|DISPOSABLE|TrashMail Manager"
+)
+
+   
 # ==============================================================================
 # 3. МЕЖДУНАРОДНЫЕ ТЕЛЕФОННЫЕ КОДЫ ДЛЯ OSINT И ГЕО-АНАЛИЗА (ULTIMATE TELEPHONY)
 # ==============================================================================
