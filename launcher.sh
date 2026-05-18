@@ -1807,7 +1807,8 @@ core_engine_info() {
     local target_interface="[NONE]"
     
     # Пытаемся получить дефолтный интерфейс через таблицу маршрутизации
-    local default_route=$(ip route show default 2>/dev/null | head -n 1)
+    local default_route
+    default_route=$(ip route show default 2>/dev/null | head -n 1)
     
     if [[ -n "$default_route" ]]; then
         target_interface=$(echo "$default_route" | awk '{print_idx=0; for(i=1;i<=NF;i++) if($i=="dev") print_idx=i+1; if(print_idx>0) print $print_idx}')
@@ -1845,7 +1846,6 @@ core_engine_info() {
         fi
     else
         # Безопасный режим заглушки, если rfkill отсутствует в системе
-        # Проверяем наличие беспроводных дескрипторов в выводе ip/iwconfig
         if command -v iwconfig >/dev/null 2>&1 && iwconfig 2>&1 | grep -qW "wlan0"; then
             wifi_status="[PRESENT/UNMANAGED]"
         elif ip link show 2>/dev/null | grep -q "wlan0"; then
