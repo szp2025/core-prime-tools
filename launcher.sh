@@ -3110,17 +3110,16 @@ run_ghost_commander() {
 
 
 # ==============================================================================
-# @description: Универсальный модуль горячей перезагрузки ядра платформы v26.0
-# МОДЕРНИЗАЦИЯ: Принудительная стабилизация PATH + прямая эвристика бинарников
-# БЕЗОПАСНОСТЬ: Ротация User-Agent (GLOBAL_NETWORK_UA) для обхода WAF/DPI блокировок
-# АРХИТЕКТУРА: Абсолютная отказоустойчивость в изолированных средах Android/Termux
+# @description: Универсальный модуль горячей перезагрузки ядра платформы v27.0
+# МОДЕРНИЗАЦИЯ: Форсированный обход SSL/TLS проверок (ca-certificates bypass)
+# БЕЗОПАСНОСТЬ: Ротация User-Agent (GLOBAL_NETWORK_UA) для бесшовного обхода WAF/DPI
+# АРХИТЕКТУРА: Открытый стрим ошибок сетевых харвестеров для Termux non-root
 # ==============================================================================
 run_update_prime() {
     # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "h" "SYSTEM UPDATE & SYNC v26.0"
+    core_engine_ui "h" "SYSTEM UPDATE & SYNC v27.0"
     
     # --- СТАБИЛИЗАЦИЯ И ХАРДЕНИНГ ОКРУЖЕНИЯ $PATH ---
-    # Гарантируем, что Bash видит пути Termux, даже если предыдущие модули очистили среду
     if [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
         [[ ! "$PATH" =~ "$PREFIX/bin" ]] && export PATH="${PREFIX}/bin:${PATH}"
     fi
@@ -3138,39 +3137,34 @@ run_update_prime() {
     local repo="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
     local tmp="${target}.tmp"
 
-    # --- ИНТЕЛЛЕКТУАЛЬНЫЙ ПОИСК СЕТЕВЫХ ХАРВЕСТЕРОВ (Абсолютные + Относительные пути) ---
-    local curl_cmd=""
-    local wget_cmd=""
+    # --- ИНТЕЛЛЕКТУАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ БИНАРНИКОВ ---
+    local exe_cmd=""
 
-    # Проверяем curl
-    if command -v curl >/dev/null 2>&1; then curl_cmd="curl";
-    elif [[ -x "${PREFIX}/bin/curl" ]]; then curl_cmd="${PREFIX}/bin/curl";
-    elif [[ -x "/usr/bin/curl" ]]; then curl_cmd="/usr/bin/curl"; fi
+    if command -v curl >/dev/null 2>&1; then
+        exe_cmd="curl"
+    elif [[ -x "${PREFIX}/bin/curl" ]]; then
+        exe_cmd="${PREFIX}/bin/curl"
+    fi
 
-    # Проверяем wget
-    if command -v wget >/dev/null 2>&1; then wget_cmd="wget";
-    elif [[ -x "${PREFIX}/bin/wget" ]]; then wget_cmd="${PREFIX}/bin/wget";
-    elif [[ -x "/usr/bin/wget" ]]; then wget_cmd="/usr/bin/wget"; fi
-
-    # Если ничего не нашли — запускаем модуль автоустановки
-    if [[ -z "$curl_cmd" && -z "$wget_cmd" ]]; then
-        core_engine_ui "w" "Network harvesters undetected in PATH. Re-deploying..."
-        
-        if command -v pkg >/dev/null 2>&1; then
-            core_engine_run "pkg install curl wget -y" "Termux Package Manager: Deploying Network Tools"
-        elif command -v apt-get >/dev/null 2>&1; then
-            core_engine_run "apt-get update && apt-get install curl wget -y" "APT Package Manager: Deploying Network Tools"
+    if [[ -n "$exe_cmd" ]]; then
+        core_engine_ui "i" "Network harvester verified: cURL Engine active."
+    else
+        if command -v wget >/dev/null 2>&1; then
+            exe_cmd="wget"
+        elif [[ -x "${PREFIX}/bin/wget" ]]; then
+            exe_cmd="${PREFIX}/bin/wget"
         fi
+        [[ -n "$exe_cmd" ]] && core_engine_ui "i" "Network harvester verified: Wget Engine active."
+    fi
 
-        # Перепроверка после деплоя
-        if command -v curl >/dev/null 2>&1; then curl_cmd="curl";
-        elif [[ -x "${PREFIX}/bin/curl" ]]; then curl_cmd="${PREFIX}/bin/curl"; fi
-        if command -v wget >/dev/null 2>&1; then wget_cmd="wget";
-        elif [[ -x "${PREFIX}/bin/wget" ]]; then wget_cmd="${PREFIX}/bin/wget"; fi
-        
-        if [[ -z "$curl_cmd" && -z "$wget_cmd" ]]; then
-            core_engine_ui "e" "CRITICAL: Network harvesters (curl/wget) completely blocked!"
-            core_engine_ui "!" "Manual fallback required: run 'pkg install curl' in terminal."
+    if [[ -z "$exe_cmd" ]]; then
+        core_engine_ui "w" "Internal verification failed. Using Termux fallback paths..."
+        if [[ -x "${PREFIX}/bin/curl" ]]; then
+            exe_cmd="${PREFIX}/bin/curl"
+        elif [[ -x "${PREFIX}/bin/wget" ]]; then
+            exe_cmd="${PREFIX}/bin/wget"
+        else
+            core_engine_ui "e" "CRITICAL: cURL/Wget binaries completely inaccessible!"
             core_engine_wait
             return 1
         fi
@@ -3185,24 +3179,31 @@ run_update_prime() {
     fi
 
     core_engine_ui "i" "Connecting to GitHub Repository..."
-    core_engine_ui "d" "Active Identity Spoof: $selected_ua"
+    core_engine_ui "d" "Active UA: $selected_ua"
 
-    # Слой 2: Безопасная загрузка через Глушитель [7] с использованием точного дескриптора
-    if [[ -n "$curl_cmd" ]]; then
-        core_engine_run "$curl_cmd -s -L -A '$selected_ua' --connect-timeout 15 '$repo' -o '$tmp'" "Fetching Repository Source via cURL"
-    elif [[ -n "$wget_cmd" ]]; then
-        core_engine_run "$wget_cmd -q --user-agent='$selected_ua' --timeout=15 '$repo' -O '$tmp'" "Fetching Repository Source via Wget"
+    # Слой 2: Безопасный стрим с обходом валидации SSL-сертификатов
+    rm -f "$tmp"
+    
+    if [[ "$exe_cmd" =~ "curl" ]]; then
+        core_engine_ui "i" "Executing cURL SSL-Bypass stream..."
+        # Добавлен флаг -k (--insecure) для обхода проблем с ca-certificates в Android
+        $exe_cmd -k -L -A "$selected_ua" --connect-timeout 15 "$repo" -o "$tmp"
+    else
+        core_engine_ui "i" "Executing Wget SSL-Bypass stream..."
+        # Добавлен флаг --no-check-certificate
+        $exe_cmd --no-check-certificate -q --user-agent="$selected_ua" --timeout=15 "$repo" -O "$tmp"
     fi
     
     # Слой 3: АВТОНОМНАЯ ВАЛИДАЦИЯ ДАННЫХ
     if [[ ! -f "$tmp" || ! -s "$tmp" ]]; then
-        core_engine_ui "e" "CRITICAL: Downloaded script is empty or missing!"
+        core_engine_ui "e" "CRITICAL: Download failed (Empty or missing payload)!"
+        core_engine_ui "!" "Network handshake drop or DNS restriction detected."
         [[ -f "$tmp" ]] && rm -f "$tmp"
         core_engine_wait
         return 1
     fi
 
-    # Проверка сигнатуры шебанга (Защита от HTML страниц ошибок 404/WAF-заглушек)
+    # Проверка сигнатуры (Защита от заглушек WAF / Ошибок 404)
     if ! head -n 5 "$tmp" | grep -qE '^#!/bin/|^#!/usr/bin/|^#'; then
         core_engine_ui "e" "CRITICAL: Target source signature is corrupted (Not a script)!"
         rm -f "$tmp"
@@ -3218,11 +3219,12 @@ run_update_prime() {
         return 1
     fi
 
-    # Слой 5: Атомарная замена и права через Санитара [8]
+    # Слой 5: Атомарная замена и права
+    core_engine_ui "i" "Applying code synchronization..."
     if [[ $EUID -eq 0 ]]; then
-        core_engine_run "mv '$tmp' '$target' && chmod 755 '$target' && chown root:root '$target' 2>/dev/null" "Applying Atomic Update (Root Mode)"
+        mv "$tmp" "$target" && chmod 755 "$target" && chown root:root "$target" 2>/dev/null
     else
-        core_engine_run "mv '$tmp' '$target' && chmod 755 '$target'" "Applying Atomic Update (Non-Root Mode)"
+        mv "$tmp" "$target" && chmod 755 "$target"
     fi
 
     # Слой 6: Восстановление среды (Alias & Symlink)
@@ -3239,19 +3241,19 @@ run_update_prime() {
         core_engine_ui "s" "Configuration profile created with 'launcher' alias."
     fi
     
-    # Создаем системную ссылку в зависимости от типа архитектуры и прав доступа
+    # Создаем системную ссылку
     if [[ $EUID -eq 0 ]]; then
-        core_engine_run "ln -sf '$target' /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Global Path"
+        ln -sf "$target" /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher
     elif [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
-        core_engine_run "ln -sf '$target' '$PREFIX/bin/launcher' && chmod +x '$PREFIX/bin/launcher'" "Updating Termux Local Binary Path"
-    else
-        core_engine_ui "w" "System path upgrade skipped: Handled in local space."
+        ln -sf "$target" "$PREFIX/bin/launcher" && chmod +x "$PREFIX/bin/launcher"
     fi
 
     core_engine_ui "s" "Code updated successfully, permissions aligned!"
     
     # Слой 7: Синхронизация и перезапуск [13]
-    core_engine_progress 1 "Rebooting Matrix Launcher Core"
+    if command -v core_engine_progress >/dev/null 2>&1; then
+        core_engine_progress 1 "Rebooting Matrix Launcher Core"
+    fi
     
     # Полная очистка перед перезапуском [10]
     if command -v core_engine_clean_env >/dev/null 2>&1; then
@@ -3261,6 +3263,7 @@ run_update_prime() {
     # Мгновенный бесшовный перехват управления дескриптора нового кода
     exec bash "$target"
 }
+
 
 # --- ENGINE: DYNAMIC POLYMORPHISM (ZERO-FOOTPRINT) ---
 
