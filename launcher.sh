@@ -417,8 +417,11 @@ GLOBAL_SIG_WAF="(?i)(cloudflare|akamai|sucuri|incapsula|imperva|barracuda|f5_big
 GLOBAL_SIG_WEB_STRUCTURE="(?i)(\b(id|uid|uuid|p|page|cat|category|sec|section|art|article|post|prod|product|item|file|doc|lang|action|act|mode|view|search|q|query|sort|order|by|limit|offset|from|to|start|end|file_id|user_id|group_id|token_id|hash|data|payload|json|xml|ajax)\b\s*=|(\/api\/(v[0-9]|v1|v2|v3)\/[a-zA-Z0-9_-]+\/[0-9]+)|\b(select|insert|update|delete|drop|alter|union|where|having|orderby|groupby|into|load_file|benchmark|sleep|md5|sha1|concat)\b|\b(graphql|query\s*\{|\"query\"\s*:|mutation\b|\$gql))"
 
 
-# Сигналы выявления критических аномалий и уязвимостей в финальных отчетах
-GLOBAL_SIG_VULN_ALERTS="critical|vulnerable|payload|exploit|dbms|open|cve-|injection|bypass"
+# ==============================================================================
+# 8. СИГНАЛЫ ВЫЯВЛЕНИЯ КРИТИЧЕСКИХ АНОМАЛИЙ И УЯЗВТИМОСТЕЙ (ULTIMATE ALERTS)
+# ==============================================================================
+GLOBAL_SIG_VULN_ALERTS="(?i)(\b(vulnerable|exploit_matched|rce_triggered|shell_spawned|privilege_escalation|unauthenticated|auth_bypass|remote_code_execution|buffer_overflow|segmentation_fault|core_dumped|access_denied|permission_denied)\b|\bcve-[0-9]{4}-[0-9]{4,7}\b|\b(sql_error|syntax_error|mariadb|postgresql|sqlite|oracle_error|unhandled_exception|stack_trace|fatal_error|null_pointer)\b|\b(lfi|rfi|ssrf|xxe|deserialization|command_injection|path_traversal)\b)"
+
 
 # --- Сигнатуры для сбора информации и разведки вебхуков (Recon & Webhook Signatures) ---
 # Паттерн для фильтрации активных веб-интерпретаторов и служб в системе
