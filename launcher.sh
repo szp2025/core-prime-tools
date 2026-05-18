@@ -406,8 +406,10 @@ GLOBAL_REGEX_JWT="^eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+=]*$"
 
 
 # --- Сигнатуры эвристического движка анализа уязвимостей (Exploiter Engine Signatures) ---
-# Сигналы присутствия WAF / защитных прокси-систем для адаптивного замедления сканирования
-GLOBAL_SIG_WAF="cloudflare|akamai|sucuri|incapsula|barracuda|f5_big-ip"
+# ==============================================================================
+# 6. СИГНАЛЫ ПРИСУТСТВИЯ WAF И ЗАЩИТНЫХ СИСТЕМ (ULTIMATE WAF CORE)
+# ==============================================================================
+GLOBAL_SIG_WAF="(?i)(cloudflare|akamai|sucuri|incapsula|imperva|barracuda|f5_big-ip|mod_security|comodo|radware|fortigate|wordfence|asm|citrix|aws-waf|cloudfront|edgesuite|fastly|stackpath|__cfuid|cf-ray|cf-cache-status|x-sucuri-id|x-protected-by|x-waf-|x-cdn|err_connection_refused|captcha-bypass|challenge-platform|429 too many requests|block_id|security_challenge)"
 
 # Сигналы структуры веб-приложения для активации движка поиска инъекций (SQL-Engine)
 GLOBAL_SIG_WEB_STRUCTURE="php|db|sql|id=|query=|select|insert|update"
