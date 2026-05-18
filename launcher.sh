@@ -1770,95 +1770,91 @@ core_network_dns_sync() {
 
 
 # ==============================================================================
-# @description: Сбор аппаратных метрик и вывод системного статуса ядра v23.5
-# СТИЛИЗАЦИЯ: Полное восстановление фирменного UI-слоя платформы
-# АДАПТИВНОСТЬ: Фикс ошибки "Cannot bind netlink socket" в Termux (non-root mode)
+# @description: Сбор аппаратных метрик и вывод системного статуса ядра v23.9
+# ОПТИМИЗАЦИЯ: Максимально короткий и сжатый вывод для экранов смартфонов
+# СТИЛИЗАЦИЯ: Полное сохранение оригинальной цветовой палитры и структуры UI
+# АДАПТИВНОСТЬ: Безопасный обход netlink ограничений Android (Termux non-root)
 # ==============================================================================
 core_engine_info() {
-    echo "--------------------------------------------------"
-    core_engine_ui "i" "ТЕКУЩИЙ СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
+    core_engine_ui "i" "СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
 
-    # --- СЛОЙ 1: АППРАТНЫЕ МЕТРИКИ (Память и Хранилище) ---
-    local ram_status="[НЕДОСТУПНО]"
+    # --- СЛОЙ 1: МЕТРИКИ ПАМЯТИ ---
+    local ram_status="\e[1;31m[N/A]\e[0m"
     local free_output
     free_output=$(free -m 2>/dev/null | grep "Mem:")
     
     if [[ -n "$free_output" ]]; then
         local ram_total=$(echo "$free_output" | awk '{print $2}')
         local ram_used=$(echo "$free_output" | awk '{print $3}')
-        ram_status="\e[1;36m[${ram_used}/${ram_total} MB]\e[0m"
+        ram_status="\e[1;36m${ram_used}/${ram_total} MB\e[0m"
     else
         local mem_total=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
         if [[ -n "$mem_total" ]]; then
-            ram_status="\e[1;36m[$((mem_total / 1024)) MB (Всего)]\e[0m"
+            ram_status="\e[1;36m$((mem_total / 1024)) MB\e[0m"
         fi
     fi
 
-    local disk_status="\e[1;31m[НЕДОСТУПНО]\e[0m"
+    local disk_status="\e[1;31m[N/A]\e[0m"
     if command -v df >/dev/null 2>&1; then
         local disk_free=$(df -h / | tail -n 1 | awk '{print $4}')
-        disk_status="\e[1;32m[$disk_free свободно]\e[0m"
+        disk_status="\e[1;32m$disk_free free\e[0m"
     fi
 
-    echo -e " \e[1;34mРесурсы памяти\e[0m : RAM: $ram_status | ROM: $disk_status"
+    echo -e " Память/Диск  : RAM: $ram_status | ROM: $disk_status"
 
-    # --- ШАГ 2: ЭВРИСТИКА СЕТЕВЫХ ИНТЕРФЕЙСОВ (Обход netlink restriction) ---
+    # --- СЛОЙ 2: СЕТЕВОЙ ШЛЮЗ ---
     local active_uplink="\e[1;31m[OFFLINE]\e[0m"
     local target_interface="\e[1;31m[NONE]\e[0m"
     local default_route
     
-    # Пытаемся безопасно прочитать маршруты, подавляя netlink-ошибки Android
     default_route=$(ip route show default 2>/dev/null | head -n 1)
     
     if [[ -n "$default_route" && ! "$default_route" =~ "Permission denied" ]]; then
         target_interface=$(echo "$default_route" | awk '{print_idx=0; for(i=1;i<=NF;i++) if($i=="dev") print_idx=i+1; if(print_idx>0) print $print_idx}')
         active_uplink="\e[1;32m[ONLINE]\e[0m"
     else
-        # В Termux (non-root) читаем шлюз напрямую через системные свойства Android
         local termux_gateway
         termux_gateway=$(getprop net.gprs.local-ip 2>/dev/null)
         [[ -z "$termux_gateway" ]] && termux_gateway=$(ifconfig 2>/dev/null | grep -v '127.0.0.1' | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -n 1)
         
         if [[ -n "$termux_gateway" ]]; then
-            active_uplink="\e[1;32m[ONLINE (Termux Mode)]\e[0m"
-            target_interface="\e[1;32m[wlan0/rmnet]\e[0m"
+            active_uplink="\e[1;32m[ONLINE (TMX)]\e[0m"
+            target_interface="\e[1;32mwlan0\e[0m"
         fi
     fi
 
-    echo -e " \e[1;34mГлобальный шлюз\e[0m: Активный аплинк: $active_uplink -> Интерфейс: $target_interface"
+    echo -e " Сеть/Шлюз    : $active_uplink -> Link: $target_interface"
 
-    # --- ШАГ 3: МОНИТОРИНГ РАДИОМОДУЛЕЙ (Кастомизация стилей) ---
-    local wifi_status="\e[1;31m[ABSENT]\e[0m"
-    local bt_status="\e[1;31m[ABSENT]\e[0m"
+    # --- СЛОЙ 3: РАДИОМОДУЛИ ---
+    local wifi_status="\e[1;31m[ABS]\e[0m"
+    local bt_status="\e[1;31m[ABS]\e[0m"
 
     if command -v rfkill >/dev/null 2>&1; then
-        if rfkill list wifi 2>/dev/null | grep -q "yes"; then wifi_status="\e[1;31m[BLOCKED]\e[0m";
-        elif rfkill list wifi 2>/dev/null | grep -q "no"; then wifi_status="\e[1;32m[ACTIVE]\e[0m"; fi
+        if rfkill list wifi 2>/dev/null | grep -q "yes"; then wifi_status="\e[1;31m[LCK]\e[0m";
+        elif rfkill list wifi 2>/dev/null | grep -q "no"; then wifi_status="\e[1;32m[ACT]\e[0m"; fi
 
-        if rfkill list bluetooth 2>/dev/null | grep -q "yes"; then bt_status="\e[1;31m[BLOCKED]\e[0m";
-        elif rfkill list bluetooth 2>/dev/null | grep -q "no"; then bt_status="\e[1;32m[ACTIVE]\e[0m"; fi
+        if rfkill list bluetooth 2>/dev/null | grep -q "yes"; then bt_status="\e[1;31m[LCK]\e[0m";
+        elif rfkill list bluetooth 2>/dev/null | grep -q "no"; then bt_status="\e[1;32m[ACT]\e[0m"; fi
     else
-        # Эмуляция для сред без rfkill (проверяем поднятые линки)
         if ifconfig wlan0 2>/dev/null | grep -q "UP"; then
-            wifi_status="\e[1;32m[ACTIVE (UNMANAGED)]\e[0m"
+            wifi_status="\e[1;32m[ACT]\e[0m"
         fi
     fi
 
-    echo -e " \e[1;34mРадио-модули\e[0m   : Wi-Fi: $wifi_status | Bluetooth: $bt_status"
+    echo -e " Радиомодули  : Wi-Fi: $wifi_status | BT: $bt_status"
 
-    # --- ШАГ 4: АНАЛИЗ ЗАЩИЩЕННЫХ ТУННЕЛЕЙ (VPN / TOR) ---
-    local vpn_status="\e[1;31m[НЕТ АКТИВНЫХ ТУННЕЛЕЙ]\e[0m"
+    # --- СЛОЙ 4: ЗАЩИЩЕННЫЕ ТУННЕЛИ ---
+    local vpn_status="\e[1;31m[INACTIVE]\e[0m"
     
     if ifconfig 2>/dev/null | grep -qE 'tun|tap|ppp|wg|tun0|abstract'; then
-        vpn_status="\e[1;32m[АКТИВЕН ИНФРАСТРУКТУРНЫЙ VPN]\e[0m"
+        vpn_status="\e[1;32m[VPN ACTIVE]\e[0m"
     elif pgrep -x "tor" >/dev/null 2>&1; then
-        vpn_status="\e[1;32m[МАРШРУТИЗАЦИЯ TOR АКТИВНА]\e[0m"
+        vpn_status="\e[1;32m[TOR ACTIVE]\e[0m"
     fi
 
-    echo -e " \e[1;34mАктивная защита\e[0m: $vpn_status"
+    echo -e " Безопасность : $vpn_status"
     echo "--------------------------------------------------"
 }
-
 
 # --- CORE ENGINE: PROGRESS v13.8.2 (Fixed Width Edition) ---
 core_engine_progress() {
