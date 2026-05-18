@@ -1770,103 +1770,95 @@ core_network_dns_sync() {
 
 
 # ==============================================================================
-# @description: Сбор аппаратных метрик и вывод системного статуса ядра v23.0
-# АДАПТИВНОСТЬ: Полная совместимость с Termux (Android), Docker и chroot-средой
-# ИЗОЛЯЦИЯ: Замена прямого чтения /sys/class/net/ на парсинг дескрипторов ip-route
-# БЕЗОПАСНОСТЬ: Эмуляция заглушек для rfkill при отсутствии бинарников в WAN
+# @description: Сбор аппаратных метрик и вывод системного статуса ядра v23.5
+# СТИЛИЗАЦИЯ: Полное восстановление фирменного UI-слоя платформы
+# АДАПТИВНОСТЬ: Фикс ошибки "Cannot bind netlink socket" в Termux (non-root mode)
 # ==============================================================================
 core_engine_info() {
-    # СЛОЙ 1: АППРАТНЫЕ МЕТРИКИ (Память и Хранилище)
+    echo "--------------------------------------------------"
+    core_engine_ui "i" "ТЕКУЩИЙ СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
+
+    # --- СЛОЙ 1: АППРАТНЫЕ МЕТРИКИ (Память и Хранилище) ---
+    local ram_status="[НЕДОСТУПНО]"
     local free_output
     free_output=$(free -m 2>/dev/null | grep "Mem:")
     
-    local ram_status="[НЕДОСТУПНО]"
     if [[ -n "$free_output" ]]; then
         local ram_total=$(echo "$free_output" | awk '{print $2}')
         local ram_used=$(echo "$free_output" | awk '{print $3}')
-        ram_status="[${ram_used}/${ram_total} MB]"
+        ram_status="\e[1;36m[${ram_used}/${ram_total} MB]\e[0m"
     else
-        # Альтернативный парсинг для урезанных сред/Android
         local mem_total=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
         if [[ -n "$mem_total" ]]; then
-            ram_status="$((mem_total / 1024)) MB (Всего)"
+            ram_status="\e[1;36m[$((mem_total / 1024)) MB (Всего)]\e[0m"
         fi
     fi
 
-    local disk_status="[НЕДОСТУПНО]"
+    local disk_status="\e[1;31m[НЕДОСТУПНО]\e[0m"
     if command -v df >/dev/null 2>&1; then
         local disk_free=$(df -h / | tail -n 1 | awk '{print $4}')
-        disk_status="[$disk_free свободно]"
+        disk_status="\e[1;32m[$disk_free свободно]\e[0m"
     fi
 
-    core_engine_ui "i" "ТЕКУЩИЙ СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
-    echo " Ресурсы памяти : RAM: $ram_status | ROM: $disk_status"
+    echo -e " \e[1;34mРесурсы памяти\e[0m : RAM: $ram_status | ROM: $disk_status"
 
-    # --- ШАГ 2: ЭВРИСТИКА СЕТЕВЫХ ИНТЕРФЕЙСОВ (Фикс падения /sys/class/net/) ---
-    local active_uplink="[OFFLINE]"
-    local target_interface="[NONE]"
-    
-    # Пытаемся получить дефолтный интерфейс через таблицу маршрутизации
+    # --- ШАГ 2: ЭВРИСТИКА СЕТЕВЫХ ИНТЕРФЕЙСОВ (Обход netlink restriction) ---
+    local active_uplink="\e[1;31m[OFFLINE]\e[0m"
+    local target_interface="\e[1;31m[NONE]\e[0m"
     local default_route
+    
+    # Пытаемся безопасно прочитать маршруты, подавляя netlink-ошибки Android
     default_route=$(ip route show default 2>/dev/null | head -n 1)
     
-    if [[ -n "$default_route" ]]; then
+    if [[ -n "$default_route" && ! "$default_route" =~ "Permission denied" ]]; then
         target_interface=$(echo "$default_route" | awk '{print_idx=0; for(i=1;i<=NF;i++) if($i=="dev") print_idx=i+1; if(print_idx>0) print $print_idx}')
-        active_uplink="[ONLINE]"
+        active_uplink="\e[1;32m[ONLINE]\e[0m"
     else
-        # Резервный поиск любого активного интерфейса, кроме петли (lo)
-        local any_interface=""
-        if command -v ip >/dev/null 2>&1; then
-            any_interface=$(ip -4 addr show | grep -vE '127.0.0.1|docker|veth' | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
-        fi
-        if [[ -n "$any_interface" ]]; then
-            active_uplink="[LOCAL-ONLY]"
-            target_interface="DETECTED"
+        # В Termux (non-root) читаем шлюз напрямую через системные свойства Android
+        local termux_gateway
+        termux_gateway=$(getprop net.gprs.local-ip 2>/dev/null)
+        [[ -z "$termux_gateway" ]] && termux_gateway=$(ifconfig 2>/dev/null | grep -v '127.0.0.1' | grep -oP '(?<=inet )\d+(\.\d+){3}' | head -n 1)
+        
+        if [[ -n "$termux_gateway" ]]; then
+            active_uplink="\e[1;32m[ONLINE (Termux Mode)]\e[0m"
+            target_interface="\e[1;32m[wlan0/rmnet]\e[0m"
         fi
     fi
 
-    echo " Глобальный шлюз: Активный аплинк: $active_uplink -> Интерфейс: $target_interface"
+    echo -e " \e[1;34mГлобальный шлюз\e[0m: Активный аплинк: $active_uplink -> Интерфейс: $target_interface"
 
-    # --- ШАГ 3: МОНИТОРИНГ РАДИОМОДУЛЕЙ (Фикс отсутствия rfkill) ---
-    local wifi_status="[ABSENT]"
-    local bt_status="[ABSENT]"
+    # --- ШАГ 3: МОНИТОРИНГ РАДИОМОДУЛЕЙ (Кастомизация стилей) ---
+    local wifi_status="\e[1;31m[ABSENT]\e[0m"
+    local bt_status="\e[1;31m[ABSENT]\e[0m"
 
     if command -v rfkill >/dev/null 2>&1; then
-        # Если утилита установлена, парсим реальное состояние устройств
-        if rfkill list wifi 2>/dev/null | grep -q "yes"; then
-            wifi_status="[BLOCKED]"
-        elif rfkill list wifi 2>/dev/null | grep -q "no"; then
-            wifi_status="[ACTIVE]"
-        fi
+        if rfkill list wifi 2>/dev/null | grep -q "yes"; then wifi_status="\e[1;31m[BLOCKED]\e[0m";
+        elif rfkill list wifi 2>/dev/null | grep -q "no"; then wifi_status="\e[1;32m[ACTIVE]\e[0m"; fi
 
-        if rfkill list bluetooth 2>/dev/null | grep -q "yes"; then
-            bt_status="[BLOCKED]"
-        elif rfkill list bluetooth 2>/dev/null | grep -q "no"; then
-            bt_status="[ACTIVE]"
-        fi
+        if rfkill list bluetooth 2>/dev/null | grep -q "yes"; then bt_status="\e[1;31m[BLOCKED]\e[0m";
+        elif rfkill list bluetooth 2>/dev/null | grep -q "no"; then bt_status="\e[1;32m[ACTIVE]\e[0m"; fi
     else
-        # Безопасный режим заглушки, если rfkill отсутствует в системе
-        if command -v iwconfig >/dev/null 2>&1 && iwconfig 2>&1 | grep -qW "wlan0"; then
-            wifi_status="[PRESENT/UNMANAGED]"
-        elif ip link show 2>/dev/null | grep -q "wlan0"; then
-            wifi_status="[PRESENT/UNMANAGED]"
+        # Эмуляция для сред без rfkill (проверяем поднятые линки)
+        if ifconfig wlan0 2>/dev/null | grep -q "UP"; then
+            wifi_status="\e[1;32m[ACTIVE (UNMANAGED)]\e[0m"
         fi
     fi
 
-    echo " Радио-модули   : Wi-Fi: $wifi_status | Bluetooth: $bt_status"
+    echo -e " \e[1;34mРадио-модули\e[0m   : Wi-Fi: $wifi_status | Bluetooth: $bt_status"
 
     # --- ШАГ 4: АНАЛИЗ ЗАЩИЩЕННЫХ ТУННЕЛЕЙ (VPN / TOR) ---
-    local vpn_status="[НЕТ АКТИВНЫХ ТУННЕЛЕЙ]"
+    local vpn_status="\e[1;31m[НЕТ АКТИВНЫХ ТУННЕЛЕЙ]\e[0m"
     
-    if ip link show 2>/dev/null | grep -qE 'tun|tap|ppp|wg|wireguard|wg0'; then
-        vpn_status="[АКТИВЕН ИНФРАСТРУКТУРНЫЙ VPN]"
+    if ifconfig 2>/dev/null | grep -qE 'tun|tap|ppp|wg|tun0|abstract'; then
+        vpn_status="\e[1;32m[АКТИВЕН ИНФРАСТРУКТУРНЫЙ VPN]\e[0m"
     elif pgrep -x "tor" >/dev/null 2>&1; then
-        vpn_status="[МАРШРУТИЗАЦИЯ TOR АКТИВНА]"
+        vpn_status="\e[1;32m[МАРШРУТИЗАЦИЯ TOR АКТИВНА]\e[0m"
     fi
 
-    echo " Активная защита: $vpn_status"
+    echo -e " \e[1;34mАктивная защита\e[0m: $vpn_status"
     echo "--------------------------------------------------"
 }
+
 
 # --- CORE ENGINE: PROGRESS v13.8.2 (Fixed Width Edition) ---
 core_engine_progress() {
@@ -3086,13 +3078,19 @@ run_ghost_commander() {
 
 
 
-# --- [ SYSTEM UPDATE ENGINE v35.4 ] ---
-
 run_update_prime() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "SYSTEM UPDATE & SYNC"
     
-    local target="/root/launcher.sh"
+    # --- МОДЕРНИЗАЦИЯ: Динамическая эвристика Root / Non-Root окружения ---
+    local base_work_dir
+    if [[ $EUID -eq 0 ]]; then
+        base_work_dir="/root"
+    else
+        base_work_dir="$HOME"
+    fi
+    
+    local target="${base_work_dir}/launcher.sh"
     local repo="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
     local tmp="${target}.tmp"
 
@@ -3102,7 +3100,6 @@ run_update_prime() {
     core_engine_run "curl -s -L $repo -o $tmp" "Fetching Repository Source"
     
     # Слой 3: Валидация данных через Мозг [5]
-    # Проверяем существование и размер файла
     if ! core_engine_validator "file" "$tmp" "Repository Source"; then
         core_engine_remove "$tmp"
         core_engine_wait
@@ -3110,7 +3107,6 @@ run_update_prime() {
     fi
 
     # Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (Защита синтаксиса)
-    # Проверка Bash-синтаксиса перед заменой живого ядра
     if ! bash -n "$tmp" 2>/dev/null; then
         core_engine_ui "e" "CRITICAL: Remote code is corrupted!"
         core_engine_remove "$tmp"
@@ -3119,7 +3115,12 @@ run_update_prime() {
     fi
 
     # Слой 5: Атомарная замена и права через Санитара [8]
-    core_engine_run "mv $tmp $target && chmod 755 $target && chown root:root $target 2>/dev/null" "Applying Atomic Update"
+    # Права chown root:root применяются только если скрипт запущен суперпользователем
+    if [[ $EUID -eq 0 ]]; then
+        core_engine_run "mv $tmp $target && chmod 755 $target && chown root:root $target 2>/dev/null" "Applying Atomic Update (Root Mode)"
+    else
+        core_engine_run "mv $tmp $target && chmod 755 $target" "Applying Atomic Update (Non-Root Mode)"
+    fi
 
     # Слой 6: Восстановление среды (Alias & Symlink)
     if ! grep -q "alias launcher=" ~/.bashrc; then
@@ -3127,8 +3128,15 @@ run_update_prime() {
         core_engine_ui "y" "Alias 'launcher' restored in .bashrc"
     fi
     
-    # Создаем системную ссылку через Глушитель
-    core_engine_run "ln -sf $target /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Path"
+    # Создаем системную ссылку через Глушитель (только при наличии прав на запись в системный путь)
+    if [[ $EUID -eq 0 ]]; then
+        core_engine_run "ln -sf $target /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Path"
+    elif [[ -d "$PREFIX/bin" ]]; then
+        # Специальный адаптивный слой для Termux (non-root среда)
+        core_engine_run "ln -sf $target $PREFIX/bin/launcher && chmod +x $PREFIX/bin/launcher" "Updating Termux Local Path"
+    else
+        core_engine_ui "w" "System path upgrade skipped: Requires root privileges."
+    fi
 
     core_engine_ui "+" "Code updated, permissions set, alias active!"
     
@@ -3141,7 +3149,6 @@ run_update_prime() {
     # Мгновенная передача управления новому коду
     exec bash "$target"
 }
-
 
 
 # --- ENGINE: DYNAMIC POLYMORPHISM (ZERO-FOOTPRINT) ---
