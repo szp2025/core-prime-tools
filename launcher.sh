@@ -1769,100 +1769,103 @@ core_network_dns_sync() {
 }
 
 
+# ==============================================================================
+# @description: Сбор аппаратных метрик и вывод системного статуса ядра v23.0
+# АДАПТИВНОСТЬ: Полная совместимость с Termux (Android), Docker и chroot-средой
+# ИЗОЛЯЦИЯ: Замена прямого чтения /sys/class/net/ на парсинг дескрипторов ip-route
+# БЕЗОПАСНОСТЬ: Эмуляция заглушек для rfkill при отсутствии бинарников в WAN
+# ==============================================================================
 core_engine_info() {
-    # ==========================================================================
-    # СЛОЙ 1: АППАРАТНЫЕ МЕТРИКИ (Память и Хранилище)
-    # ==========================================================================
-    local free_output=$(free -m | grep "Mem:")
-    local ram_total=$(echo "$free_output" | tr -s ' ' | cut -d' ' -f2)
-    local ram_avail=$(echo "$free_output" | tr -s ' ' | cut -d' ' -f7)
-    local ram="${ram_avail}/${ram_total}"
-    local rom=$(df -h / | tail -1 | tr -s ' ' | cut -d' ' -f4)
-
-    # ==========================================================================
-    # СЛОЙ 2: АНАЛИЗ АКТИВНОГО МАРШРУТА (Глобальный Аплинк)
-    # ==========================================================================
-    local main_iface=$(ip -4 route show default 2>/dev/null | grep -oPm1 '(?<=dev )[a-z0-9.-]+')
-    local uplink_type="OFFLINE"
+    # СЛОЙ 1: АППРАТНЫЕ МЕТРИКИ (Память и Хранилище)
+    local free_output
+    free_output=$(free -m 2>/dev/null | grep "Mem:")
     
-    if [[ -n "$main_iface" ]]; then
-        if [[ "$main_iface" =~ $GLOBAL_REGEX_PRIVACY_INTERFACES ]]; then
-            uplink_type="VPN/SECURE"
-        elif [[ -d "/sys/class/net/$main_iface/wireless" ]] || [[ "$main_iface" =~ ^wlan[0-9]|^wlp ]]; then
-            uplink_type="WLAN"
-        elif [[ "$main_iface" =~ ^(rmnet|wwan|pccard|usb) ]]; then
-            uplink_type="CELL"
-        else
-            uplink_type="ETH"
-        fi
-    fi
-
-    # ==========================================================================
-    # СЛОЙ 3: АППАРАТНЫЙ СКАНЕР ЛОКАЛЬНЫХ ИНТЕРФЕЙСОВ (Wi-Fi, Bluetooth, VPN)
-    # ==========================================================================
-    local active_vpn=""
-    local wifi_hardware="${R}ABSENT${NC}"
-    local bt_hardware="${R}ABSENT${NC}"
-
-    # 1. Сбор активных шифрованных туннелей
-    for sys_iface in /sys/class/net/*; do
-        [ -e "$sys_iface" ] || continue
-        local iface_name=$(basename "$sys_iface")
-        if [[ -f "$sys_iface/operstate" ]] && [[ "$(cat "$sys_iface/operstate" 2>/dev/null)" == "up" ]]; then
-            if [[ "$iface_name" =~ $GLOBAL_REGEX_PRIVACY_INTERFACES ]]; then
-                active_vpn+="${iface_name} "
-            fi
-        fi
-    done
-    active_vpn=$(echo "$active_vpn" | xargs)
-
-    # 2. Проверка физического Wi-Fi модуля в ОС (через /sys или утилиту iw/rfkill)
-    if ls /sys/class/net/ | grep -qEi "^wlan|^wlp" || [ -d /sys/class/net/*/wireless ]; then
-        # Нашли беспроводную карту. Проверяем, включена ли она
-        local wifi_iface=$(ls /sys/class/net/ | grep -m1 -Ei "^wlan|^wlp")
-        if [[ "$(cat /sys/class/net/$wifi_iface/operstate 2>/dev/null)" == "up" ]]; then
-            wifi_hardware="${G}ACTIVE${NC} ($wifi_iface)"
-        else
-            wifi_hardware="${Y}DISABLED${NC}"
-        fi
-    fi
-
-    # 3. Проверка физического Bluetooth модуля
-    if [ -d /sys/class/bluetooth ] || hciconfig >/dev/null 2>&1 || rfkill list bluetooth | grep -q "Bluetooth"; then
-        # Нашли Bluetooth адаптер. Проверяем его состояние через rfkill или hciconfig
-        if rfkill list bluetooth 2>/dev/null | grep -q "Soft blocked: yes"; then
-            bt_hardware="${Y}BLOCKED${NC}"
-        else
-            bt_hardware="${G}READY/ACTIVE${NC}"
-        fi
-    fi
-
-    # ==========================================================================
-    # СЛОЙ 4: СТРУКТУРИРОВАННЫЙ ВЫВОД В СТИЛЕ CORE ENGINE
-    # ==========================================================================
-    core_engine_ui "i" "ТЕКУЩИЙ СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
-    
-    echo -e "  ${B}Ресурсы памяти :${NC} RAM: [${ram} MB] | ROM: [${rom} свободно]"
-    echo -e "  ${B}Глобальный шлюз:${NC} Активный аплинк: [${uplink_type}] -> Интерфейс: [${main_iface:-NONE}]"
-    echo -e "  ${B}Радио-модули   :${NC} Wi-Fi: [${wifi_hardware}] | Bluetooth: [${bt_hardware}]"
-    
-    if [[ -n "$active_vpn" ]]; then
-        echo -e "  ${B}Активная защита:${NC} [${G}${active_vpn}${NC}]"
+    local ram_status="[НЕДОСТУПНО]"
+    if [[ -n "$free_output" ]]; then
+        local ram_total=$(echo "$free_output" | awk '{print $2}')
+        local ram_used=$(echo "$free_output" | awk '{print $3}')
+        ram_status="[${ram_used}/${ram_total} MB]"
     else
-        echo -e "  ${B}Активная защита:${NC} [${R}НЕТ АКТИВНЫХ ТУННЕЛЕЙ${NC}]"
+        # Альтернативный парсинг для урезанных сред/Android
+        local mem_total=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+        if [[ -n "$mem_total" ]]; then
+            ram_status="$((mem_total / 1024)) MB (Всего)"
+        fi
     fi
-    
-    # ==========================================================================
-    # СЛОЙ 5: КОНТРОЛЬ СЕРВИСОВ
-    # ==========================================================================
-    local srv_status=""
-    pgrep -f "av_server" >/dev/null && srv_status+="${G}[AV-CORE]${NC} "
-    pgrep -f "share_server" >/dev/null && srv_status+="${G}[SHARE-MESH]${NC} "
-    
-    if [[ -n "$srv_status" ]]; then
-        echo -e "  ${B}Активные узлы  :${NC} ${srv_status}"
+
+    local disk_status="[НЕДОСТУПНО]"
+    if command -v df >/dev/null 2>&1; then
+        local disk_free=$(df -h / | tail -n 1 | awk '{print $4}')
+        disk_status="[$disk_free свободно]"
     fi
-    echo "----------------------------------------------------------------------"
+
+    core_engine_ui "i" "ТЕКУЩИЙ СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
+    echo " Ресурсы памяти : RAM: $ram_status | ROM: $disk_status"
+
+    # --- ШАГ 2: ЭВРИСТИКА СЕТЕВЫХ ИНТЕРФЕЙСОВ (Фикс падения /sys/class/net/) ---
+    local active_uplink="[OFFLINE]"
+    local target_interface="[NONE]"
+    
+    # Пытаемся получить дефолтный интерфейс через таблицу маршрутизации
+    local default_route=$(ip route show default 2>/dev/null | head -n 1)
+    
+    if [[ -n "$default_route" ]]; then
+        target_interface=$(echo "$default_route" | awk '{print_idx=0; for(i=1;i<=NF;i++) if($i=="dev") print_idx=i+1; if(print_idx>0) print $print_idx}')
+        active_uplink="[ONLINE]"
+    else
+        # Резервный поиск любого активного интерфейса, кроме петли (lo)
+        local any_interface=""
+        if command -v ip >/dev/null 2>&1; then
+            any_interface=$(ip -4 addr show | grep -vE '127.0.0.1|docker|veth' | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
+        fi
+        if [[ -n "$any_interface" ]]; then
+            active_uplink="[LOCAL-ONLY]"
+            target_interface="DETECTED"
+        fi
+    fi
+
+    echo " Глобальный шлюз: Активный аплинк: $active_uplink -> Интерфейс: $target_interface"
+
+    # --- ШАГ 3: МОНИТОРИНГ РАДИОМОДУЛЕЙ (Фикс отсутствия rfkill) ---
+    local wifi_status="[ABSENT]"
+    local bt_status="[ABSENT]"
+
+    if command -v rfkill >/dev/null 2>&1; then
+        # Если утилита установлена, парсим реальное состояние устройств
+        if rfkill list wifi 2>/dev/null | grep -q "yes"; then
+            wifi_status="[BLOCKED]"
+        elif rfkill list wifi 2>/dev/null | grep -q "no"; then
+            wifi_status="[ACTIVE]"
+        fi
+
+        if rfkill list bluetooth 2>/dev/null | grep -q "yes"; then
+            bt_status="[BLOCKED]"
+        elif rfkill list bluetooth 2>/dev/null | grep -q "no"; then
+            bt_status="[ACTIVE]"
+        fi
+    else
+        # Безопасный режим заглушки, если rfkill отсутствует в системе
+        # Проверяем наличие беспроводных дескрипторов в выводе ip/iwconfig
+        if command -v iwconfig >/dev/null 2>&1 && iwconfig 2>&1 | grep -qW "wlan0"; then
+            wifi_status="[PRESENT/UNMANAGED]"
+        elif ip link show 2>/dev/null | grep -q "wlan0"; then
+            wifi_status="[PRESENT/UNMANAGED]"
+        fi
+    fi
+
+    echo " Радио-модули   : Wi-Fi: $wifi_status | Bluetooth: $bt_status"
+
+    # --- ШАГ 4: АНАЛИЗ ЗАЩИЩЕННЫХ ТУННЕЛЕЙ (VPN / TOR) ---
+    local vpn_status="[НЕТ АКТИВНЫХ ТУННЕЛЕЙ]"
+    
+    if ip link show 2>/dev/null | grep -qE 'tun|tap|ppp|wg|wireguard|wg0'; then
+        vpn_status="[АКТИВЕН ИНФРАСТРУКТУРНЫЙ VPN]"
+    elif pgrep -x "tor" >/dev/null 2>&1; then
+        vpn_status="[МАРШРУТИЗАЦИЯ TOR АКТИВНА]"
+    fi
+
+    echo " Активная защита: $vpn_status"
+    echo "--------------------------------------------------"
 }
 
 # --- CORE ENGINE: PROGRESS v13.8.2 (Fixed Width Edition) ---
