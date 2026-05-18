@@ -424,8 +424,11 @@ GLOBAL_SIG_VULN_ALERTS="(?i)(\b(vulnerable|exploit_matched|rce_triggered|shell_s
 
 
 # --- Сигнатуры для сбора информации и разведки вебхуков (Recon & Webhook Signatures) ---
-# Паттерн для фильтрации активных веб-интерпретаторов и служб в системе
-GLOBAL_SIG_WEB_RUNTIMES="python|node|php|go|ruby|java|nginx|apache"
+# ==============================================================================
+# 9. СИГНАТУРЫ АКТИВНЫХ ИНТЕРПРЕТАТОРОВ И СЛУЖБ (ULTIMATE RUNTIMES MATRIX)
+# ==============================================================================
+GLOBAL_SIG_WEB_RUNTIMES="(?i)\b(python([0-9](\.[0-9]+)?)?|node([0-9]+)?|php(-fpm)?([0-9](\.[0-9]+)?)?|go|ruby([0-9](\.[0-9]+)?)?|java|perl|dotnet|nginx|apache[0-9]?|httpd|lighttpd|caddy|traefik|gunicorn|uwsgi|puma|unicorn|passenger|tomcat|jetty|wildfly|glassfish|docker(-containerd|-current)?|dockerd|podman|containerd|kubelet|hypercorn|uvicorn|daphne)\b"
+
 
 # Базовый словарь эндпоинтов для поиска открытых вебхуков и API (Webhook Fuzzing Dict)
 GLOBAL_WEBHOOK_WORDLIST=(
