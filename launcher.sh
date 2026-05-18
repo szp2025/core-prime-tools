@@ -3110,16 +3110,23 @@ run_ghost_commander() {
 
 
 # ==============================================================================
-# @description: Универсальный модуль горячей перезагрузки ядра платформы v25.5
-# МОДЕРНИЗАЦИЯ: Интеграция глобального ротатора User-Agent (GLOBAL_NETWORK_UA)
-# БЕЗОПАСНОСТЬ: Имитация живого трафика (DPI/WAF Bypass) при обращении к GitHub
-# АРХИТЕКТУРА: Разделение Root / Non-Root сред с поддержкой префиксов Android
+# @description: Универсальный модуль горячей перезагрузки ядра платформы v26.0
+# МОДЕРНИЗАЦИЯ: Принудительная стабилизация PATH + прямая эвристика бинарников
+# БЕЗОПАСНОСТЬ: Ротация User-Agent (GLOBAL_NETWORK_UA) для обхода WAF/DPI блокировок
+# АРХИТЕКТУРА: Абсолютная отказоустойчивость в изолированных средах Android/Termux
 # ==============================================================================
 run_update_prime() {
     # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "h" "SYSTEM UPDATE & SYNC v25.5"
+    core_engine_ui "h" "SYSTEM UPDATE & SYNC v26.0"
     
-    # --- ЭВРИСТИКА ОКРУЖЕНИЯ (Вычисление изолированной зоны) ---
+    # --- СТАБИЛИЗАЦИЯ И ХАРДЕНИНГ ОКРУЖЕНИЯ $PATH ---
+    # Гарантируем, что Bash видит пути Termux, даже если предыдущие модули очистили среду
+    if [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
+        [[ ! "$PATH" =~ "$PREFIX/bin" ]] && export PATH="${PREFIX}/bin:${PATH}"
+    fi
+    [[ ! "$PATH" =~ "/usr/local/bin" ]] && export PATH="${PATH}:/usr/local/bin:/usr/bin:/bin"
+    
+    # --- ЭВРИСТИКА ОКРУЖЕНИЯ (Вычисление рабочей зоны) ---
     local base_work_dir
     if [[ $EUID -eq 0 ]]; then
         base_work_dir="/root"
@@ -3131,29 +3138,60 @@ run_update_prime() {
     local repo="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
     local tmp="${target}.tmp"
 
+    # --- ИНТЕЛЛЕКТУАЛЬНЫЙ ПОИСК СЕТЕВЫХ ХАРВЕСТЕРОВ (Абсолютные + Относительные пути) ---
+    local curl_cmd=""
+    local wget_cmd=""
+
+    # Проверяем curl
+    if command -v curl >/dev/null 2>&1; then curl_cmd="curl";
+    elif [[ -x "${PREFIX}/bin/curl" ]]; then curl_cmd="${PREFIX}/bin/curl";
+    elif [[ -x "/usr/bin/curl" ]]; then curl_cmd="/usr/bin/curl"; fi
+
+    # Проверяем wget
+    if command -v wget >/dev/null 2>&1; then wget_cmd="wget";
+    elif [[ -x "${PREFIX}/bin/wget" ]]; then wget_cmd="${PREFIX}/bin/wget";
+    elif [[ -x "/usr/bin/wget" ]]; then wget_cmd="/usr/bin/wget"; fi
+
+    # Если ничего не нашли — запускаем модуль автоустановки
+    if [[ -z "$curl_cmd" && -z "$wget_cmd" ]]; then
+        core_engine_ui "w" "Network harvesters undetected in PATH. Re-deploying..."
+        
+        if command -v pkg >/dev/null 2>&1; then
+            core_engine_run "pkg install curl wget -y" "Termux Package Manager: Deploying Network Tools"
+        elif command -v apt-get >/dev/null 2>&1; then
+            core_engine_run "apt-get update && apt-get install curl wget -y" "APT Package Manager: Deploying Network Tools"
+        fi
+
+        # Перепроверка после деплоя
+        if command -v curl >/dev/null 2>&1; then curl_cmd="curl";
+        elif [[ -x "${PREFIX}/bin/curl" ]]; then curl_cmd="${PREFIX}/bin/curl"; fi
+        if command -v wget >/dev/null 2>&1; then wget_cmd="wget";
+        elif [[ -x "${PREFIX}/bin/wget" ]]; then wget_cmd="${PREFIX}/bin/wget"; fi
+        
+        if [[ -z "$curl_cmd" && -z "$wget_cmd" ]]; then
+            core_engine_ui "e" "CRITICAL: Network harvesters (curl/wget) completely blocked!"
+            core_engine_ui "!" "Manual fallback required: run 'pkg install curl' in terminal."
+            core_engine_wait
+            return 1
+        fi
+    fi
+
     # --- ДИНАМИЧЕСКИЙ РОТАТОР USER-AGENT ---
     local selected_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    
-    # Проверяем, инициализирован ли глобальный массив легитимных окружений
     if [[ -n "${GLOBAL_NETWORK_UA[*]}" ]]; then
-        # Генерируем случайный индекс в диапазоне размера массива
         local ua_size=${#GLOBAL_NETWORK_UA[@]}
         local rand_idx=$(( RANDOM % ua_size ))
         selected_ua="${GLOBAL_NETWORK_UA[$rand_idx]}"
     fi
 
     core_engine_ui "i" "Connecting to GitHub Repository..."
-    core_engine_ui "d" "Network Identity Set: $selected_ua"
+    core_engine_ui "d" "Active Identity Spoof: $selected_ua"
 
-    # Слой 2: Безопасная загрузка через Глушитель [7] с маскировкой UA
-    if command -v curl >/dev/null 2>&1; then
-        core_engine_run "curl -s -L -A '$selected_ua' --connect-timeout 15 $repo -o $tmp" "Fetching Repository Source via cURL"
-    elif command -v wget >/dev/null 2>&1; then
-        core_engine_run "wget -q --user-agent='$selected_ua' --timeout=15 -O $tmp $repo" "Fetching Repository Source via Wget"
-    else
-        core_engine_ui "e" "CRITICAL: Network harvesters (curl/wget) not found!"
-        core_engine_wait
-        return 1
+    # Слой 2: Безопасная загрузка через Глушитель [7] с использованием точного дескриптора
+    if [[ -n "$curl_cmd" ]]; then
+        core_engine_run "$curl_cmd -s -L -A '$selected_ua' --connect-timeout 15 '$repo' -o '$tmp'" "Fetching Repository Source via cURL"
+    elif [[ -n "$wget_cmd" ]]; then
+        core_engine_run "$wget_cmd -q --user-agent='$selected_ua' --timeout=15 '$repo' -O '$tmp'" "Fetching Repository Source via Wget"
     fi
     
     # Слой 3: АВТОНОМНАЯ ВАЛИДАЦИЯ ДАННЫХ
@@ -3164,7 +3202,7 @@ run_update_prime() {
         return 1
     fi
 
-    # Проверка сигнатуры шебанга (Защита от HTML страниц ошибок 404/WAF)
+    # Проверка сигнатуры шебанга (Защита от HTML страниц ошибок 404/WAF-заглушек)
     if ! head -n 5 "$tmp" | grep -qE '^#!/bin/|^#!/usr/bin/|^#'; then
         core_engine_ui "e" "CRITICAL: Target source signature is corrupted (Not a script)!"
         rm -f "$tmp"
@@ -3182,9 +3220,9 @@ run_update_prime() {
 
     # Слой 5: Атомарная замена и права через Санитара [8]
     if [[ $EUID -eq 0 ]]; then
-        core_engine_run "mv $tmp $target && chmod 755 $target && chown root:root $target 2>/dev/null" "Applying Atomic Update (Root Mode)"
+        core_engine_run "mv '$tmp' '$target' && chmod 755 '$target' && chown root:root '$target' 2>/dev/null" "Applying Atomic Update (Root Mode)"
     else
-        core_engine_run "mv $tmp $target && chmod 755 $target" "Applying Atomic Update (Non-Root Mode)"
+        core_engine_run "mv '$tmp' '$target' && chmod 755 '$target'" "Applying Atomic Update (Non-Root Mode)"
     fi
 
     # Слой 6: Восстановление среды (Alias & Symlink)
@@ -3203,9 +3241,9 @@ run_update_prime() {
     
     # Создаем системную ссылку в зависимости от типа архитектуры и прав доступа
     if [[ $EUID -eq 0 ]]; then
-        core_engine_run "ln -sf $target /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Global Path"
+        core_engine_run "ln -sf '$target' /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher" "Updating System Global Path"
     elif [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
-        core_engine_run "ln -sf $target $PREFIX/bin/launcher && chmod +x $PREFIX/bin/launcher" "Updating Termux Local Binary Path"
+        core_engine_run "ln -sf '$target' '$PREFIX/bin/launcher' && chmod +x '$PREFIX/bin/launcher'" "Updating Termux Local Binary Path"
     else
         core_engine_ui "w" "System path upgrade skipped: Handled in local space."
     fi
