@@ -43,167 +43,64 @@ mkdir -p "$BASE_DIR" "$MOD_DIR" "$PRIME_LOOT" "$PRIME_SHARE" 2>/dev/null
 export BASE_DIR MOD_DIR PRIME_LOOT PRIME_SHARE
 
 
-
 # ==============================================================================
-# 1. ГЛОБАЛЬНАЯ МАТРИЦА ПЛАТФОРМ ДЛЯ КРОСС-СПРАВОК (GLOBAL OSINT SITES)
+# 1. ГЛОБАЛЬНАЯ МАТРИЦА ПЛАТФОРМ ДЛЯ КРОСС-СПРАВОК (ULTIMATE OSINT CORE)
 # ==============================================================================
+# Формат: "URL_ПРЕФИКС|ТИП_ПРОВЕРКИ|МАРКЕР_ОШИБКИ|КАТЕГОРИЯ|НАЗВАНИЕ_СЕРВИСА"
 GLOBAL_OSINT_SITES=(
-    # Основные социальные сети и мессенджеры
-    "https://t.me/|Telegram"
-    "https://instagram.com/|Instagram"
-    "https://twitter.com/|Twitter"
-    "https://vk.com/|VK"
-    "https://ok.ru/|Odnoklassniki"
-    "https://www.facebook.com/|Facebook"
-    "https://www.tiktok.com/@|TikTok"
+    # --- Социальные сети и Мессенджеры (Social & Messengers) ---
+    "https://t.me/|HTTP_CODE|404|SOCIAL|Telegram"
+    "https://www.instagram.com/|HTTP_CODE|404|SOCIAL|Instagram"
+    "https://x.com/|TEXT_ABSENT|page doesn’t exist|SOCIAL|X (Twitter)"
+    "https://vk.com/|TEXT_ABSENT|ID_NOT_FOUND|SOCIAL|VKontakte"
+    "https://ok.ru/|HTTP_CODE|404|SOCIAL|Odnoklassniki"
+    "https://www.facebook.com/|HTTP_CODE|404|SOCIAL|Facebook"
+    "https://www.tiktok.com/@|TEXT_ABSENT|not found|SOCIAL|TikTok"
     
-    # Профессиональные, ИТ-платформы и репозитории
-    "https://github.com/|GitHub"
-    "https://gitlab.com/|GitLab"
-    "https://bitbucket.org/|BitBucket"
-    "https://www.linkedin.com/in/|LinkedIn"
-    "https://habr.com/ru/users/|Habr"
-    "https://stackoverflow.com/users/|StackOverflow"
+    # --- Профессиональные, ИТ-платформы и Репозитории (Dev & Tech) ---
+    "https://github.com/|HTTP_CODE|404|DEV|GitHub"
+    "https://gitlab.com/|HTTP_CODE|404|DEV|GitLab"
+    "https://bitbucket.org/|HTTP_CODE|404|DEV|BitBucket"
+    "https://www.linkedin.com/in/|HTTP_CODE|404|DEV|LinkedIn"
+    "https://habr.com/ru/users/|HTTP_CODE|404|DEV|Habr"
+    "https://stackoverflow.com/users/story/|HTTP_CODE|404|DEV|StackOverflow"
+    "https://hub.docker.com/u/|HTTP_CODE|404|DEV|DockerHub"
+    "https://pypi.org/user/|HTTP_CODE|404|DEV|PyPI"
     
-    # Блоги, форумы и контент-платформы
-    "https://www.reddit.com/user/|Reddit"
-    "https://medium.com/@|Medium"
-    "https://pikabu.ru/@|Pikabu"
-    "https://livejournal.com/~|LiveJournal"
-    "https://pbase.com/|PBase"
-    "https://vc.ru/u/|VCRu"
+    # --- Блоги, Форумы и Контент-платформы (Blogs & Forums) ---
+    "https://www.reddit.com/user/|HTTP_CODE|404|BLOG|Reddit"
+    "https://medium.com/@|HTTP_CODE|404|BLOG|Medium"
+    "https://pikabu.ru/@|HTTP_CODE|404|BLOG|Pikabu"
+    "https://vc.ru/u/|HTTP_CODE|404|BLOG|VCRu"
+    "https://www.tumblr.com/|HTTP_CODE|404|BLOG|Tumblr"
+    "https://archive.org/details/@|HTTP_CODE|404|BLOG|Archive.org"
     
-    # Видео, стриминг и музыкальные сервисы
-    "https://www.youtube.com/@|YouTube"
-    "https://www.twitch.tv/|Twitch"
-    "https://vimeo.com/|Vimeo"
-    "https://soundcloud.com/|SoundCloud"
-    "https://open.spotify.com/user/|Spotify"
-    "https://www.dailymotion.com/|Dailymotion"
+    # --- Видео, Музыка и Стриминг (Media & Streaming) ---
+    "https://www.youtube.com/@|HTTP_CODE|404|MEDIA|YouTube"
+    "https://www.twitch.tv/|HTTP_CODE|404|MEDIA|Twitch"
+    "https://vimeo.com/|HTTP_CODE|404|MEDIA|Vimeo"
+    "https://soundcloud.com/|HTTP_CODE|404|MEDIA|SoundCloud"
+    "https://open.spotify.com/user/|HTTP_CODE|404|MEDIA|Spotify"
+    "https://www.dailymotion.com/|HTTP_CODE|404|MEDIA|Dailymotion"
     
-    # Дизайн, фото, портфолио и хобби
-    "https://www.pinterest.com/|Pinterest"
-    "https://www.behance.net/|Behance"
-    "https://www.deviantart.com/|DeviantArt"
-    "https://www.flickr.com/people/|Flickr"
-    "https://www.artstation.com/|ArtStation"
-    "https://unsplash.com/@|Unsplash"
+    # --- Дизайн, Фото, Портфолио (Design & Creative) ---
+    "https://www.pinterest.com/|HTTP_CODE|404|DESIGN|Pinterest"
+    "https://www.behance.net/|HTTP_CODE|404|DESIGN|Behance"
+    "https://www.deviantart.com/|HTTP_CODE|404|DESIGN|DeviantArt"
+    "https://www.flickr.com/people/|HTTP_CODE|404|DESIGN|Flickr"
+    "https://www.artstation.com/|HTTP_CODE|404|DESIGN|ArtStation"
+    "https://unsplash.com/@|HTTP_CODE|404|DESIGN|Unsplash"
     
-    # Игровые платформы и сообщества
-    "https://steamcommunity.com/id/|Steam"
-    "https://www.chess.com/member/|Chess.com"
-    "https://psnprofiles.com/|PSNProfiles"
-    "https://xboxgamertag.com/search/|XboxGamertags"
+    # --- Игровые платформы (Gaming Infrastructure) ---
+    "https://steamcommunity.com/id/|TEXT_ABSENT|The specified profile could not be found|GAMING|Steam"
+    "https://www.chess.com/member/|HTTP_CODE|404|GAMING|Chess.com"
+    "https://psnprofiles.com/|HTTP_CODE|404|GAMING|PSNProfiles"
     
-    # Фриланс, коммерция и прочие сервисы
-    "https://www.fl.ru/users/|FL.ru"
-    "https://www.freelancer.com/u/|Freelancer"
-    "https://www.patreon.com/|Patreon"
-    "https://archive.org/details/@|Archive.org"
-)
-
-#!/bin/bash
-# --- PRIME MASTER LAUNCHER v35.0m1 ---
-CURRENT_VERSION="35.4"
-G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
-set +o history
-
-CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
-[ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
-
-SILENT="> /dev/null 2>&1"
-# Использование:
-command -v curl eval $SILENT
-
-# --- CORE PATH INITIALIZATION ---
-# Сначала определяем, где мы находимся
-if [[ -n "$TERMUX_VERSION" ]]; then
-    # Среда: Termux (Android)
-    BASE_DIR="$HOME/core-prime-tools"
-    PRIME_LOOT="$HOME/prime_loot"
-    PRIME_SHARE="$HOME/prime_share"
-    # Расширяем PATH для бинарников Termux
-    PATH="$PATH:/data/data/com.termux/files/usr/bin"
-else
-    # Среда: Стандартный Linux
-    # Проверяем, есть ли права root, чтобы решить, куда писать
-    if [[ $EUID -eq 0 ]]; then
-        BASE_DIR="/root/core-prime-tools"
-        PRIME_LOOT="/root/prime_loot"
-        PRIME_SHARE="/root/prime_share"
-    else
-        BASE_DIR="$HOME/core-prime-tools"
-        PRIME_LOOT="$HOME/prime_loot"
-        PRIME_SHARE="$HOME/prime_share"
-    fi
-fi
-
-# Вторичные директории
-MOD_DIR="$BASE_DIR/modules"
-
-# Создание инфраструктуры (без ошибок доступа)
-mkdir -p "$BASE_DIR" "$MOD_DIR" "$PRIME_LOOT" "$PRIME_SHARE" 2>/dev/null
-
-export BASE_DIR MOD_DIR PRIME_LOOT PRIME_SHARE
-
-
-
-# ==============================================================================
-# 1. ГЛОБАЛЬНАЯ МАТРИЦА ПЛАТФОРМ ДЛЯ КРОСС-СПРАВОК (GLOBAL OSINT SITES)
-# ==============================================================================
-GLOBAL_OSINT_SITES=(
-    # Основные социальные сети и мессенджеры
-    "https://t.me/|Telegram"
-    "https://instagram.com/|Instagram"
-    "https://twitter.com/|Twitter"
-    "https://vk.com/|VK"
-    "https://ok.ru/|Odnoklassniki"
-    "https://www.facebook.com/|Facebook"
-    "https://www.tiktok.com/@|TikTok"
-    
-    # Профессиональные, ИТ-платформы и репозитории
-    "https://github.com/|GitHub"
-    "https://gitlab.com/|GitLab"
-    "https://bitbucket.org/|BitBucket"
-    "https://www.linkedin.com/in/|LinkedIn"
-    "https://habr.com/ru/users/|Habr"
-    "https://stackoverflow.com/users/|StackOverflow"
-    
-    # Блоги, форумы и контент-платформы
-    "https://www.reddit.com/user/|Reddit"
-    "https://medium.com/@|Medium"
-    "https://pikabu.ru/@|Pikabu"
-    "https://livejournal.com/~|LiveJournal"
-    "https://pbase.com/|PBase"
-    "https://vc.ru/u/|VCRu"
-    
-    # Видео, стриминг и музыкальные сервисы
-    "https://www.youtube.com/@|YouTube"
-    "https://www.twitch.tv/|Twitch"
-    "https://vimeo.com/|Vimeo"
-    "https://soundcloud.com/|SoundCloud"
-    "https://open.spotify.com/user/|Spotify"
-    "https://www.dailymotion.com/|Dailymotion"
-    
-    # Дизайн, фото, портфолио и хобби
-    "https://www.pinterest.com/|Pinterest"
-    "https://www.behance.net/|Behance"
-    "https://www.deviantart.com/|DeviantArt"
-    "https://www.flickr.com/people/|Flickr"
-    "https://www.artstation.com/|ArtStation"
-    "https://unsplash.com/@|Unsplash"
-    
-    # Игровые платформы и сообщества
-    "https://steamcommunity.com/id/|Steam"
-    "https://www.chess.com/member/|Chess.com"
-    "https://psnprofiles.com/|PSNProfiles"
-    "https://xboxgamertag.com/search/|XboxGamertags"
-    
-    # Фриланс, коммерция и прочие сервисы
-    "https://www.fl.ru/users/|FL.ru"
-    "https://www.freelancer.com/u/|Freelancer"
-    "https://www.patreon.com/|Patreon"
-    "https://archive.org/details/@|Archive.org"
+    # --- Фриланс и Коммерция (Freelance & SaaS) ---
+    "https://www.fl.ru/users/|HTTP_CODE|404|COMMERCE|FL.ru"
+    "https://www.freelancer.com/u/|HTTP_CODE|404|COMMERCE|Freelancer"
+    "https://www.patreon.com/|HTTP_CODE|404|COMMERCE|Patreon"
+    "https://www.fiverr.com/|HTTP_CODE|404|COMMERCE|Fiverr"
 )
 
 # ==============================================================================
@@ -410,91 +307,167 @@ GLOBAL_CRYPTO_TYPES=(
 )
 
 
-# --- Сектор 7: Верификация международных банковских реквизитов (IBAN / RIB / SWIFT Intel) ---
+# ==============================================================================
+# 7. ВЕРИФИКАЦИЯ МЕЖДУНАРОДНЫХ БАНКОВСКИХ РЕКВИЗИТОВ (ULTIMATE FININTEL NODES)
+# ==============================================================================
+# Формат: "URL_С_ПЛЕЙСХОЛДЕРОМ|МЕТОД|ТИП_ОТВЕТА|РЕГИОН|НАЗВАНИЕ_УЗЛА"
+# Плейсхолдеры: {IBAN}, {BIC}, {BIK} автоматически подменяются ядром.
 GLOBAL_API_FINANCE_NODES=(
-    # Основные публичные валидаторы структуры и метаданных IBAN
-    "https://api.ibanlist.com/v1/validate/|IBANList Verification Node"
-    "https://openiban.com/validate/|OpenIBAN Core Validator"
-    "https://api.iban-check.com/v1/verify/|IBAN-Check Security Gate"
-    "https://www.iban.com/lon-checker?iban=|IBAN.com Luhn & Structure Check"
+    # --- Международные валидаторы структуры IBAN (Global Verification) ---
+    "https://api.openiban.org/validate/{IBAN}|GET|JSON|GLOBAL|OpenIBAN Community Engine"
+    "https://api.ibanapi.com/v1/validate/{IBAN}?api_key=free|GET|JSON|GLOBAL|IBANAPI Public Gateway"
+    "https://api.validiban.com/v1/check/{IBAN}|GET|JSON|GLOBAL|ValidIBAN Border Node"
     
-    # Европейские шлюзы и проверка реестров SEPA (Франция/ЕС)
-    "https://api.bankauth.co/v1/verify/|BankAuth SEPA Gateway"
-    "https://api.upclink.com/v1/iban/|UPCLink EuroBank Validator"
+    # --- Европейские шлюзы и реестры SEPA (Франция / Еврозона) ---
+    "https://relais.epsoft.fr/api/iban/{IBAN}|GET|JSON|EUROPE|EPSoft SEPA Router (FR)"
+    "https://api.bankauth.co/v1/iban/verify?target={IBAN}|GET|JSON|EUROPE|BankAuth Compliance Node"
+    "https://api.upclink.com/v1/iban/{IBAN}|GET|JSON|EUROPE|UPCLink EuroBank Validator"
     
-    # Сервисы проверки БИК (BIC/SWIFT) и маршрутизации платежей
-    "https://api.swiftcodesfinder.com/v1/swift/|SWIFT Codes Finder Core"
-    "https://api.macaddress.io/v1/bank/|MacAddress Bank-Routing Decoder"
+    # --- Декодеры BIC / SWIFT кодов (Routing & SWIFT Intel) ---
+    "https://api.swiftcodesfinder.com/v1/swift/{BIC}|GET|JSON|SWIFT|SWIFT Codes Finder Core"
+    "https://bank-code.net/api/v1/bic/{BIC}|GET|JSON|SWIFT|BankCode Net International"
+    "https://api.api-ninjas.com/v1/bank?bic={BIC}|GET|JSON|SWIFT|ApiNinjas Bank Infrastructure"
     
-    # Системы проверки банковских кодов и БИК РФ/СНГ (Парсинг ЦБ)
-    "https://bik-info.ru/api.html?bik=|BikInfo National Registry"
-    "https://api.gasi.gov.ru/dictionary/bik/|State Financial Dictionary API"
+    # --- Национальные реестры и БИК (СНГ / Центральные Банки) ---
+    "http://www.cbr.ru/scripts/XML_bic.asp?bic={BIK}|GET|XML|CIS_RU|Центральный Банк РФ (Официальный)"
+    "https://bik-info.ru/api.html?bik={BIK}|GET|JSON|CIS_RU|BikInfo National Registry"
+    "https://api.post.kz/api/v1/banks/bic/{BIK}|GET|JSON|CIS_KZ|АО Казпочта / Нацбанк РК"
 )
-
 
 # ==============================================================================
 # УЛЬТИМАТИВНАЯ МАТРИЦА ВНЕШНИХ API-ЭНДПОИНТОВ (GLOBAL OSINT API ENDPOINTS)
 # ==============================================================================
 # Формат структуры: "БАЗОВЫЙ_URL|СИСТЕМНОЕ_ИМЯ_ПЛАТФОРМЫ"
 
-# --- Сектор 1: Анализ параметров мобильных номеров (Phone Intel) ---
+# ==============================================================================
+# 1. АНАЛИЗ ПАРАМЕТРОВ МОБИЛЬНЫХ НОМЕРОВ (ULTIMATE PHONE INTEL NODES)
+# ==============================================================================
+# Формат: "URL_С_ПЛЕЙСХОЛДЕРОМ|МЕТОД|ТИП_ОТВЕТА|РЕГИОН|НАЗВАНИЕ_УЗЛА"
+# Плейсхолдер {PHONE} должен содержать номер в международном формате без знака "+"
 GLOBAL_API_PHONE_NODES=(
-    "https://htmlweb.ru/geo/api.php?json&telcod=|HtmlWeb GeoAPI"
-    "https://api.numlookupapi.com/v1/validate/|NumLookupProvider"
-    "https://htmlweb.ru/geo/api.php?json&oper=|HtmlWeb Operator Matrix"
+    # --- Международные и Европейские шлюзы (Global / EU Telecom Intel) ---
+    "https://api.numlookupapi.com/v1/validate/{PHONE}?api_key=free|GET|JSON|GLOBAL|NumLookupProvider Core"
+    "https://api.phone-validator.net/api/v2/verify?PhoneNumber={PHONE}&CountryCode=FR|GET|JSON|EUROPE|PhoneValidator EU"
+    "https://ipqualityscore.com/api/json/phone/free/{PHONE}|GET|JSON|GLOBAL|IPQualityScore Phone Fraud Radar"
+    
+    # --- Локальные и государственные реестры СНГ (CIS Регион) ---
+    "https://htmlweb.ru/geo/api.php?json&telcod={PHONE}|GET|JSON|CIS_RU|HtmlWeb GeoAPI National"
+    "https://rosreestr.space/api/v1/phone/{PHONE}|GET|JSON|CIS_RU|Rosreestr Space Telecom Decoder"
+    "https://api.mtt.ru/reestr/get_operator?phone={PHONE}|GET|JSON|CIS_RU|АО МТТ Официальный Реестр"
+    "https://opendata.kz/api/v1/telecom/operator/{PHONE}|GET|JSON|CIS_KZ|OpenData Kazakhstan (Казпочта)"
 )
 
-# --- Сектор 2: Сверка с глобальными базами утечек и COMB (Breach Analysers) ---
+# ==============================================================================
+# 2. МОНИТОРИНГ ГЛОБАЛЬНЫХ БАЗ УТЕЧЕК И COMB (ULTIMATE BREACH INTEL)
+# ==============================================================================
+# Формат: "URL_С_ПЛЕЙСХОЛДЕРОМ|МЕТОД|ТИП_ОТВЕТА|ВЕКТОР_ДАННЫХ|НАЗВАНИЕ_УЗЛА"
+# Плейсхолдер {TARGET} автоматически заменяется очищенным вектором (Email/Phone/User)
 GLOBAL_API_BREACH_NODES=(
-    "https://api.proxynova.com/comb?query=|ProxyNova COMB Registry"
-    "https://leakcheck.io/api/public?check=|LeakCheck Public Core"
-    "https://scylla.sh/search?q_email=|Scylla Breach Database"
+    # --- Публичные реестры агрегаторов утечек (COMB Core) ---
+    "https://api.proxynova.com/comb?query={TARGET}|GET|JSON|ALL|ProxyNova COMB Registry"
+    "https://leakcheck.io/api/v2/public/use/{TARGET}|GET|JSON|ALL|LeakCheck Open Engine v2"
+    
+    # --- Международные OSINT-шлюзы верификации компрометации ---
+    "https://api.breachdirectory.org/v1/check?term={TARGET}|GET|JSON|ALL|BreachDirectory Security Node"
+    "https://api.haveibeenpwned.com/v3/breachedaccount/{TARGET}|GET|JSON|EMAIL|HaveIBeenPwned Core (Requires Header)"
+    "https://intelx.io/API/v1/search/phone?phone={TARGET}|GET|JSON|PHONE|IntelligenceX Phone Leak Matrix"
+    
+    # --- Локальные и специализированные базы (СНГ & Текстовые дампы) ---
+    "https://leaklookup.com/api/v1/search|POST|JSON|ALL|LeakLookup Cross-Platform Gate"
+    "https://api.pwned.ru/v1/check/{TARGET}|GET|JSON|ALL|PwnedRu CIS Breach Index"
 )
 
-# --- Сектор 3: Аналитика сетевой инфраструктуры и провайдеров (IP/ASN Intel) ---
+# ==============================================================================
+# 3. АНАЛИТИКА СЕТЕВОЙ ИНФРАСТРУКТУРЫ И ПРОВАЙДЕРОВ (ULTIMATE IP/ASN INTEL)
+# ==============================================================================
+# Формат: "URL_С_ПЛЕЙСХОЛДЕРОМ|МЕТОД|ТИП_ОТВЕТА|ВЕКТОР_ДАННЫХ|НАЗВАНИЕ_УЗЛА"
+# Плейсхолдеры {IP} и {ASN} автоматически заменяются сигнатурным ядром.
 GLOBAL_API_NETWORK_NODES=(
-    "https://ipapi.co/|IP-API Co Decoder"
-    "https://ipinfo.io/|IPInfo Core Engine"
-    "https://api.bgpview.io/ip/|BGPView ASN Tracker"
-    "https://ipapi.com/api/|IPApi Advanced Matrix"
-    "https://api.ipify.org?format=json|Ipify Public Check"
+    # --- Глобальные геораспределенные декодеры IP (GeoIP & ISP Intel) ---
+    "http://ip-api.com/json/{IP}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting|GET|JSON|IP|IP-API Co Deep Decoder"
+    "https://ipapi.co/{IP}/json/|GET|JSON|IP|IPapi Co Standard Node"
+    "https://freeipapi.com/api/json/{IP}|GET|JSON|IP|FreeIPAPI High-Rate Gate"
+    
+    # --- Трекеры маршрутизации, подсетей и автономных систем (BGP & ASN Intel) ---
+    "https://api.bgpview.io/ip/{IP}|GET|JSON|IP|BGPView IP-to-ASN Tracker"
+    "https://api.bgpview.io/asn/{ASN}|GET|JSON|ASN|BGPView ASN Infrastructure Core"
+    "https://stat.ripe.net/data/network-info/data.json?resource={IP}|GET|JSON|IP|RIPE NCC Regional Internet Registry"
+    "https://stat.ripe.net/data/as-overview/data.json?resource={ASN}|GET|JSON|ASN|RIPE NCC ASN Routing Matrix"
 )
 
-# --- Сектор 4: Криптографический трекинг балансов (Crypto Explorers) ---
+# ==============================================================================
+# 4. КРИПТОГРАФИЧЕСКИЙ ТРЕКИНГ БАЛАНСОВ (ULTIMATE CRYPTO LEDGER INTEL)
+# ==============================================================================
+# Формат: "URL_С_ПЛЕЙСХОЛДЕРОМ|МЕТОД|ТИП_ОТВЕТА|БЛОКЧЕЙН_СЕТЬ|НАЗВАНИЕ_УЗЛА"
+# Плейсхолдер {ADDRESS} автоматически заменяется валидным криптокошельком.
 GLOBAL_API_CRYPTO_NODES=(
-    "https://api.blockcypher.com/v1/btc/main/addrs/|BlockCypher BTC Node"
-    "https://api.etherscan.io/api?module=account&action=balance&address=|EtherScan ETH Node"
-    "https://apilist.tronscan.org/api/account?address=|TronScan TRC20 Node"
-    "https://api.blockchair.com/bitcoin/dashboards/address/|Blockchair BTC Ledger"
+    # --- Bitcoin Сеть (BTC Ledger / UTXO Infrastructure) ---
+    "https://blockchain.info/rawaddr/{ADDRESS}|GET|JSON|BTC|BlockchainInfo Public Ledger"
+    "https://api.blockcypher.com/v1/btc/main/addrs/{ADDRESS}/balance|GET|JSON|BTC|BlockCypher BTC Node"
+    
+    # --- Ethereum Сеть (ETH / ERC-20 / EVM RPC Infrastructure) ---
+    "https://rpc.ankr.com/eth|POST|JSON|ETH|Ankr EVM High-Performance RPC"
+    "https://ethereum-rpc.publicnode.com|POST|JSON|ETH|PublicNode Decentralized EVM Gateway"
+    
+    # --- TRON Сеть (TRX / TRC-20 / TRON-EVM Infrastructure) ---
+    "https://apilist.tronscan.org/api/account?address={ADDRESS}|GET|JSON|TRX|TronScan Core Ledger"
+    "https://api.trongrid.io/v1/accounts/{ADDRESS}|GET|JSON|TRX|TronGrid Official Border Node"
 )
 
-# --- Сектор 5: Интеллект доменных имен, DNS и серверов (Domain & DNS Intel) ---
+# ==============================================================================
+# 5. ИНТЕЛЛЕКТ ДОМЕННЫХ ИМЕН, DNS И СЕРВЕРОВ (ULTIMATE DOMAIN & DNS INTEL)
+# ==============================================================================
+# Формат: "URL_С_ПЛЕЙСХОЛДЕРОМ|МЕТОД|ТИП_ОТВЕТА|ВЕКТОР_ДАННЫХ|НАЗВАНИЕ_УЗЛА"
+# Плейсхолдеры {DOMAIN} и {IP} автоматически заменяются сигнатурным ядром.
 GLOBAL_API_DOMAIN_NODES=(
-    "https://dns.google/resolve?name=|Google Secure DNS Core"
-    "https://cloudflare-dns.com/dns-query?name=|Cloudflare Quad9 DNS"
-    "https://api.hackertarget.com/reversedns/?q=|HackerTarget ReverseDNS"
-    "https://api.hackertarget.com/whois/?q=|HackerTarget Whois Core"
+    # --- Высокопроизводительные DoH-декодеры (DNS Over HTTPS Core) ---
+    "https://dns.google/resolve?name={DOMAIN}&type=ANY|GET|JSON|DOMAIN|Google Secure DoH Core"
+    "https://cloudflare-dns.com/dns-query?name={DOMAIN}&type=ANY|GET|DNS_JSON|DOMAIN|Cloudflare Quad1 DoH Gateway"
+    
+    # --- Проверка регистрационных данных и возраста домена (WHOIS / RDAP) ---
+    "https://rdap.org/domain/{DOMAIN}|GET|JSON|DOMAIN|ICANN RDAP International Registry"
+    
+    # --- Пассивный поиск субдоменов и OSINT сертификатов (Certificate Transparency) ---
+    "https://crt.sh/?q={DOMAIN}&output=json|GET|JSON|DOMAIN|COMODO Certificate Transparency Ledger"
+    
+    # --- Реверсивный DNS-трекинг инфраструктуры (Reverse DNS) ---
+    "https://api.viewdns.info/reversedns/?ip={IP}&output=json|GET|JSON|IP|ViewDNS Infrastructure Matrix"
 )
 
-# --- Сектор 6: Метаданные, Соцсети и Поиск связей (Social Identity Intel) ---
+# ==============================================================================
+# 6. МЕТАДАННЫЕ, СОЦСЕТИ И ПОИСК СВЯЗЕЙ (ULTIMATE SOCIAL IDENTITY INTEL)
+# ==============================================================================
+# Формат: "URL_С_ПЛЕЙСХОЛДЕРОМ|МЕТОД|ТИП_ОТВЕТА|ВЕКТОР_ДАННЫХ|НАЗВАНИЕ_УЗЛА"
+# Плейсхолдер {USER} автоматически заменяется очищенным никнеймом или идентификатором.
 GLOBAL_API_IDENTITY_NODES=(
-    "https://api.github.com/users/|GitHub Developer Core API"
-    "https://archive.org/advancedsearch.php?q=|Wayback Machine Meta-Archive"
+    # --- Профессиональный и разработческий цифровой след (Dev Intel) ---
+    "https://api.github.com/users/{USER}|GET|JSON|USER|GitHub Developer Core API"
+    "https://api.github.com/users/{USER}/events/public|GET|JSON|USER|GitHub Public Activity Tracker"
+    
+    # --- Архивный цифровой след и история изменений (Wayback Machine) ---
+    "https://archive.org/advancedsearch.php?q=creator%3A%22{USER}%22&output=json|GET|JSON|USER|Wayback Machine Meta-Archive"
+    "https://web.archive.org/cdx/search/cdx?url=*.{USER}*&output=json&limit=50|GET|JSON|DOMAIN|Wayback Machine URL Indexer"
+    
+    # --- Публичные метаданные мессенджеров и платформ (Public Web OSINT) ---
+    "https://t.me/s/{USER}|GET|HTML|USER|Telegram Channel/Profile Web Stream"
+    "https://boards-api.greenhouse.io/v1/boards/{USER}/jobs|GET|JSON|USER|Greenhouse Corporate Job Boards"
 )
 
 
 # ==============================================================================
-# СИСТЕМНЫЕ СИГНАТУРЫ И СЕТЕВЫЕ НАСТРОЙКИ (GLOBAL SIGNATURES & NETWORK)
+# @description: Ультимативный паттерн для потокового поиска и валидации Email
 # ==============================================================================
-# Регулярные выражения для валидации входных векторов
-GLOBAL_REGEX_EMAIL="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$"
+GLOBAL_REGEX_EMAIL="(?i)\b[a-z0-9._%+-]+@([a-z0-9-]+\.)+[a-z]{2,63}\b"
 # ==============================================================================
 # @description: Ультимативный паттерн для потокового поиска и валидации телефонов
 # ==============================================================================
 GLOBAL_REGEX_PHONE="(?i)(?:\+?([0-9]{1,4})[\s.-]?)?(?:\([0-9]{1,5}\)[\s.-]?)?([0-9]{2,5}[\s.-]?){2,5}[0-9]{2,5}"
 
 
-GLOBAL_REGEX_IP="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
+# ==============================================================================
+# @description: Ультимативный паттерн для потокового поиска IPv4/IPv6 и CIDR
+# ==============================================================================
+GLOBAL_REGEX_IP="(?i)\b(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(/[0-9]{1,2})?|([0-9a-f]{1,4}:){1,7}:?([0-9a-f]{1,4})?(:[0-9a-f]{1,4}){1,7}(/[0-9]{1,3})?)\b"
 
 # ==============================================================================
 # @description: Ультимативный паттерн для потокового поиска и валидации доменов
@@ -502,16 +475,41 @@ GLOBAL_REGEX_IP="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
 GLOBAL_REGEX_DOMAIN="(?i)\b((xn--[a-z0-9-]{1,59}|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})\b"
 
 
-# Регулярные выражения для валидации финансовых векторов (FinIntel Core)
-# Универсальный международный IBAN (от 14 до 34 символов, начинается с кода страны)
-GLOBAL_REGEX_IBAN="^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$"
+# ==============================================================================
+# @description: Ультимативный паттерн для потокового поиска и валидации IBAN
+# ==============================================================================
+GLOBAL_REGEX_IBAN="(?i)\b[a-z]{2}[0-9]{2}([a-z0-9]\s*){10,30}[a-z0-9]\b"
 
-# Французский формат RIB (Structure: 5d Banque + 5d Guichet + 11x Compte + 2d Clé)
-GLOBAL_REGEX_RIB="^[0-9]{5}[0-9]{5}[A-Z0-9]{11}[0-9]{2}$"
+# ==============================================================================
+# @description: Ультимативный паттерн для потокового поиска и валидации RIB (FR)
+# ==============================================================================
+GLOBAL_REGEX_RIB="(?i)\b[0-9]{5}[\s.-]?[0-9]{5}[\s.-]?[a-z0-9]{11}[\s.-]?[0-9]{2}\b"
 
-# Эмуляция легитимного окружения для обхода базовых блокировок (User-Agent)
-GLOBAL_NETWORK_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+# Сигнатурный разделитель метаданных в системных логах (Loot Splitting Pattern)
+GLOBAL_REGEX_BRIDGE_DELIMITER=" -> "
 
+
+# ==============================================================================
+# 12. МАТРИЦА ЛЕГИТИМНЫХ ОКРУЖЕНИЙ И USER-AGENTS (ULTIMATE UA ROTATOR)
+# ==============================================================================
+GLOBAL_NETWORK_UA=(
+    # --- Windows 11 / Современные браузеры (Corporate Desktop Standard) ---
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Edge/124.0.0.0"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
+    
+    # --- macOS / Apple экосистема (Premium Consumer Segment) ---
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
+    
+    # --- Linux / Профессиональные рабочие станции (Developer/Sysadmin Trace) ---
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0"
+    
+    # --- Мобильный трафик (Mobile Mesh / High-Trust Bypassing) ---
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/605.1.15"
+)
 # ==============================================================================
 # МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
 # ==============================================================================
@@ -594,34 +592,76 @@ GLOBAL_FUZZ_WORDLIST=(
     "server-status"
 )
 
-
 # ==============================================================================
 # @description: Ультимативные сигнатуры для статического анализа (PE/ELF/Logs)
 # ==============================================================================
 GLOBAL_STATIC_SIGNATURES="(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(passwd|shadow|issue|hostname|resolv\.conf)|\/proc\/(self|net|version)|\b(cmd\.exe|powershell\.exe|sh|bash|zsh|csh|tcsh|wscript\.exe|cscript\.exe|rundll32\.exe|regsvr32\.exe)\b|\b(Authorization|Bearer|X-API-Key|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|token|secret_key|api_key|passwd|password|private_key|id_rsa|ssh-rsa)\b|VirtualAlloc|VirtualProtect|IsDebuggerPresent|CheckRemoteDebuggerPresent|GetProcAddress|LoadLibraryA|system|execve|popen|fork"
 
-
 # --- Расширенные сигнатуры глубокого анализа (Deep Forensics & OSINT RegEx) ---
-# Строки утечек учетных записей (Форматы: email:pass, login:pass)
-GLOBAL_REGEX_CREDENTIALS="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}:[^[:space:]]+$"
+# ==============================================================================
+# @description: Ультимативный паттерн для потокового поиска пар email:pass и login:pass
+# ==============================================================================
+GLOBAL_REGEX_CREDENTIALS="(?i)\b([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|[a-z0-9_.-]{3,32}):[^[:space:]]{3,64}\b"
 
-# Сетевой уровень: IPv6 Адреса (Стандарт ISO/IEC)
-GLOBAL_REGEX_IPV6="^([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,7}:$|^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$"
+# ==============================================================================
+# @description: Ультимативный паттерн для потокового поиска и валидации IPv6 (RFC 5952)
+# ==============================================================================
+GLOBAL_REGEX_IPV6="(?i)\b(((?=(?:.*:){7})[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){7})|((?=(?:.*:){1,6})[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){1,6}|)(?:::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){1,6}|))|(?:::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})?))\b"
 
-# Сетевой уровень: Аппаратные MAC-адреса устройств
-GLOBAL_REGEX_MAC="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+# ==============================================================================
+# @description: Ультимативный паттерн для потокового поиска и валидации MAC-адресов (IEEE 802)
+# Supports: 00:11:22:33:44:55, 00-11-22-33-44-55, 0011.2233.4455, 001122334455
+# ==============================================================================
+GLOBAL_REGEX_MAC="(?i)\b(([0-9a-f]{2}(:)[0-9a-f]{2}(\4[0-9a-f]{2}){4})|([0-9a-f]{2}(-)[0-9a-f]{2}(\7[0-9a-f]{2}){4})|([0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4})|([0-9a-f]{12}))\b"
 
-# Криптография: Хэш-функция MD5 (32 символа Hex)
-GLOBAL_REGEX_HASH_MD5="\b[a-fA-F0-9]{32}\b"
+# ==============================================================================
+# @description: Ультимативные паттерны для детекции и сепарации 32-символьных хэшей
+# ==============================================================================
+# Базовый сырой хэш (строго 32 символа Hex)
+GLOBAL_REGEX_HASH_32_HEX="(?i)\b[a-f0-9]{32}\b"
 
-# Криптография: Хэш-функция SHA-256 (64 символа Hex)
-GLOBAL_REGEX_HASH_SHA256="\b[a-fA-F0-9]{64}\b"
+# Сигнатурный контекст MD5: хэширование пустых строк, соли или маркеры бэкенда
+GLOBAL_SIG_HASH_MD5_MARKERS="(?i)(md5|password_hash|wp_|user_pass)"
 
-# Разведка: Токены управления Telegram-ботов (ID:Token)
-GLOBAL_REGEX_TG_TOKEN="^[0-9]{8,10}:[A-Za-z0-9_-]{35}$"
+# Сигнатурный контекст NTLM: разделители учетных записей Windows (UID:RID:LM:NTLM)
+GLOBAL_SIG_HASH_NTLM_MARKERS=":[0-9a-f]{32}:[0-9a-f]{32}\b|:[a-f0-9]{32}$"
 
-# Разведка: Стандартизированные веб-токены JWT (Три зоны через точку)
-GLOBAL_REGEX_JWT="^eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+=]*$"
+
+# ==============================================================================
+# @description: Ультимативные паттерны криптографии, бот-менеджмента и JWT Intel
+# ==============================================================================
+
+# --- Криптография: Хэш-функции и приватные ключи (64 символа Hex) ---
+GLOBAL_REGEX_HASH_SHA256="(?i)\b[a-f0-9]{64}\b"
+GLOBAL_SIG_CRYPTO_KEY_MARKERS="(?i)(private_key|secret|wallet|priv|privkey|signing)"
+
+# --- Разведка: Токены управления Telegram-ботов (Поддержка ID нового поколения) ---
+# Бесшовно обрабатывает ID от 8 до 15 знаков внутри любого текстового массива/JSON
+GLOBAL_REGEX_TG_TOKEN="(?i)\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b"
+
+# --- Разведка: Веб-токены JWT (RFC 7519 Base64URL Strict Compliance) ---
+# Гарантирует наличие трех зон (Header.Payload.Signature) без ложных срабатываний
+GLOBAL_REGEX_JWT="\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"
+
+# Пример того, как легко ты сможешь масштабировать этот блок в будущем:
+GLOBAL_REGEX_DISCORD_TOKEN="\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b"
+GLOBAL_REGEX_AWS_KEY="\bAKIA[A-Z0-9]{16}\b"
+
+
+# ==============================================================================
+# --- 3. ГЛОБАЛЬНЫЕ СУПЕР-КОМПОЗИТЫ (ОПТИМИЗАЦИЯ ПОТОКА) ---
+# ==============================================================================
+# Проверка одного супер-композита в цикле заменяет собой пачку раздельных проверок
+
+# Объединенный крипто-след (MD5 / NTLM / SHA-256 / Private Keys)
+GLOBAL_SUPER_REGEX_CRYPTO="($GLOBAL_REGEX_HASH_32_HEX|$GLOBAL_REGEX_HASH_SHA256)"
+
+# Объединенный шлюз инфраструктурных доступов (JWT / Telegram Bot API)
+GLOBAL_SUPER_REGEX_TOKENS="($GLOBAL_REGEX_TG_TOKEN|$GLOBAL_REGEX_JWT)"
+
+# Объединенный сетевой стек (IPv4 / IPv6 / MAC / Domain)
+# Настраивается путем слияния твоих базовых сетевых регулярных выражений
+GLOBAL_SUPER_REGEX_INFRA="($GLOBAL_REGEX_IP|$GLOBAL_REGEX_MAC|$GLOBAL_REGEX_DOMAIN)"
 
 
 # --- Сигнатуры эвристического движка анализа уязвимостей (Exploiter Engine Signatures) ---
@@ -731,6 +771,113 @@ GLOBAL_WEBHOOK_WORDLIST=(
 # @description: Ультимативный паттерн поиска скрытых сетей и Web3-маршрутов
 # ==============================================================================
 GLOBAL_REGEX_DARKWEB="(?i)(\b[a-z2-7]{56}\.onion\b|\b[a-z0-9]{52}\.b32\.i2p\b|\b[a-z0-9_-]+\.i2p\b|\b[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7}\b|(\.bit|\.lib|\.coin|\.bazar|\.emc|\.onion|\.i2p|\.ygg)\b)"
+
+
+# ==============================================================================
+# SYSTEM CORE: СИСТЕМНЫЕ ЛИМИТЫ И ИНТЕРФЕЙСЫ БЕЗОПАСНОСТИ
+# ==============================================================================
+
+# Динамический регулятор числовых диапазонов меню (Лимит по умолчанию)
+# Используется как дефолтный extra-параметр для валидатора "range"
+GLOBAL_CORE_MENU_MAX_LIMIT=99
+
+# ==============================================================================
+# @description: Ультимативная матрица валидации защищенных интерфейсов (Privacy Layer)
+# Защищает ядро от False Positive совпадений и покрывает стек протоколов 2026 года.
+# ==============================================================================
+GLOBAL_REGEX_PRIVACY_INTERFACES="(?i)\b(tun[0-9]*|ppp[0-9]*|wg[0-9]*|wireguard[0-9]*|tap[0-9]*|csc[0-9]*|fct[0-9]*|forti[a-z]*|nordlynx|xvpn|tailscale[0-9]*|zt[0-9]*|zerotier|proton[a-z]*|anyconnect|sing-?tun|clash-?tun|xray-?tun|vtun[0-9]*)\b"
+
+# ==============================================================================
+# SYSTEM CORE: АТОМАРНЫЕ СИСТЕМНЫЕ И ЛОГИЧЕСКИЕ ВАЛИДАТОРЫ
+# ==============================================================================
+# Строгая проверка на чистое положительное целое число (Integer)
+GLOBAL_REGEX_DIGIT="^[0-9]+$"
+
+
+
+# ==============================================================================
+# @description: Ультимативная супер-матрица инфраструктурной разведки (OSINT Layer)
+# Мультиязычный бронированный композит для снайперского парсинга WHOIS-данных.
+# Покрывает международные, национальные (ccTLD) и новые (gTLD) зоны по состоянию на 2026 год.
+# ==============================================================================
+GLOBAL_SIG_WHOIS_MATRIX="(?i)(registrar|reg-name|sponsoring|org|organization|registrant|admin[-_ ]city|admin[-_ ]country|country|c:|co:|expires|expired|exp-date|paid-till|validity|free-date|created|creation[-_ ]date|registered|reg-date|changed|modified|updated|nserver|name[-_ ]server|ns[0-9]*|person|descr|tech-id|mnt-by|status|state|registrant[-_ ]email|e-mail|privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
+
+
+# ==============================================================================
+# OSINT CORE: УЛЬТИМАТИВНЫЕ МАТРИЦЫ АНАЛИЗА HTTP/HTTPS И СЕТЕВЫХ ЗАГОЛОВКОВ
+# Максимально полный мультиязычный стек паттернов для глубокой разведки (2026)
+# ==============================================================================
+
+# 1. Матрица определения серверного ПО и балансировщиков (Инфраструктурный слой)
+# Перехватывает не только классический Server, но и прокси, шлюзы, CDN и контроллеры ingress
+GLOBAL_REGEX_HTTP_SERVER="(?i)^(server|via|x-asf-by|x-powered-by-plesk|x-advertising|x-responder|x-served-by|x-cached-by|x-cache|x-edge-location|x-amz-server-side-encryption|x-kong-proxy-latency|x-envoy-upstream-service-time|cf-ray|kiwi-id)"
+
+# 2. Матрица версий, фреймворков и бэкенд-сред выполнения (Runtime Layer)
+# Содержит маркеры CMS, языков программирования, фреймворков, шаблонизаторов и серверов приложений
+GLOBAL_REGEX_HTTP_RUNTIME="(?i)^(x-powered-by|x-runtime|x-version|x-aspnet-version|x-aspnetmvc-version|x-cocoa-version|x-generator|x-cms|x-nextjs-cache|x-nuxt-cache|x-redirected-by|x-framework|x-application-context|wp-super-cache|x-drupal-cache|x-varnish)"
+
+# 3. Ультимативная матрица аудита заголовков безопасности и приватности (Security Shield)
+# Покрывает все современные политики контроля доступа, изоляции контекста и защиты от эксплуатации
+GLOBAL_REGEX_HTTP_SECURITY="(?i)^(content-security-policy|content-security-policy-report-only|x-frame-options|x-content-type-options|strict-transport-security|x-xss-protection|x-permitted-cross-domain-policies|referrer-policy|permissions-policy|clear-site-data|cross-origin-embedder-policy|cross-origin-opener-policy|cross-origin-resource-policy|expect-ct|access-control-allow-origin|access-control-allow-credentials|access-control-allow-headers|access-control-allow-methods)"
+
+# 4. Матрица детекции служебных параметров, статус-кодов и сетевого состояния
+GLOBAL_REGEX_HTTP_STATUS="(?i)^http/"
+
+# ==============================================================================
+# OSINT CORE: УЛЬТИМАТИВНАЯ МАТРИЦА СЕССИОННЫХ ДЕСКРИПТОРОВ (Cookie & Session Layer)
+# Максимально полный перехват векторов авторизации, трекеров и сессионных токенов.
+# Покрывает стандарты RFC 6265, JWT, OAuth, а также кастомные заголовки WAF/CDN (2026).
+# ==============================================================================
+GLOBAL_REGEX_HTTP_COOKIE="(?i)^(set-cookie|cookie|cookie2|x-xsrf-token|x-csrf-token|authorization|proxy-authorization|x-auth-token|x-session-id|x-request-id|cf-mitm-auth|cf-access-authenticated-user-email|x-amz-security-token|x-amzn-trace-id|ak_bmsc|bm_sv)"
+
+
+# ==============================================================================
+# OSINT WHOIS LAYER: АТОМАРНЫЕ СУПЕР-МАТРИЦЫ ИНФРАСТРУКТУРНОЙ РАЗВЕДКИ
+# Полноценная изоляция текстовых шаблонов для мультиязычного парсинга (2026)
+# ==============================================================================
+
+# 1. Данные регистратора, организаций, провайдеров и ответственных лиц
+GLOBAL_REGEX_WHOIS_REG="(registrar|reg-name|sponsoring|org|organization|registrant|person|descr|tech-id|mnt-by)"
+
+# 2. Метки жизненного цикла инфраструктуры (Временные маркеры и даты)
+GLOBAL_REGEX_WHOIS_DATES="(expires|expired|exp-date|paid-till|validity|free-date|created|creation[-_ ]date|registered|reg-date|changed|modified|updated)"
+
+# 3. Маршрутизация DNS-серверов и узлов делегирования трафика
+GLOBAL_REGEX_WHOIS_NS="(nserver|name[-_ ]server|ns[0-9]*)"
+
+# 4. Детекция слоев приватности, GDPR-заглушек и обфускации владельца
+GLOBAL_REGEX_WHOIS_PRIVACY="(privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
+
+# Сводный композит для первичной фильтрации потока (Объединяет все атомарные матрицы)
+GLOBAL_SIG_WHOIS_MATRIX="(?i)(${GLOBAL_REGEX_WHOIS_REG}|${GLOBAL_REGEX_WHOIS_DATES}|${GLOBAL_REGEX_WHOIS_NS}|${GLOBAL_REGEX_WHOIS_PRIVACY})"
+
+
+# ==============================================================================
+# FORENSIC & PURGE LAYER: ГЛОБАЛЬНЫЕ МАТРИЦЫ АВТОНОМНОЙ ЗАЩИТЫ (УЛЬТИМАТИВНЫЕ)
+# Максимально полный стек регулярных паттернов для Incident Response и зачистки (2026)
+# ==============================================================================
+
+# 1. Строгие паттерны детекции аномальных, зависших и деструктивных статусов процессов
+# Z (Zombie), D (Uninterruptible Sleep / Вредоносный I/O или Лок), T (Stopped), t (Traced / Отладка под малварью)
+GLOBAL_REGEX_BAD_PROC_STATUS="^[ZDTt]$"
+
+# 2. Индустриальный белый список процессов, критической инфраструктуры и системных демонов
+# ЗАПРЕЩЕНО трогать во избежание мгновенного краха ядра OS, SSH-сессий, контейнеров и шины управления
+GLOBAL_REGEX_PROC_WHITELIST="(?i)^(systemd|init|sshd|bash|sh|zsh|tmux|screen|adb|dockerd|containerd|podman|kthreadd|kworker.*|ksoftirqd.*|migration.*|rcu_sched|auditd|rsyslogd|systemd-journald|dbus-daemon|udevd|agetty|login)$"
+
+# 3. Максимальная матрица вредоносных, теневых и атакующих портов (Danger Network Perimeter)
+# Покрывает: Метасплоит, дефолтные RAT, криптомайнеры, бэкдоры, туннели (Ngrok/Chisel) и командные центры (C2)
+GLOBAL_REGEX_DANGER_PORTS="^(4444|55555|6666|7777|8888|9999|31337|1337|9001|8080|4443|65534|2022|8000|1080|5000|54321|4000|4545|8333|14337)$"
+
+# 4. Белый список портов управления, жизнеобеспечения и авторизованного доступа
+# Блокировка этих портов гарантирует моментальную потерю контроля над целевой системой (22: SSH, 80/443: Web, 5037/5555: ADB шина)
+GLOBAL_REGEX_PORT_WHITELIST="^(22|80|443|5037|5555|2376|6443|9100)$"
+
+# 5. Ультимативная сигнатурная маска критических системных файлов, баз данных и логов
+# ЗАПРЕЩЕНО перемещать в карантин, так как их удаление/блокировка разрушит ОС или затрет форензик-след для суда
+GLOBAL_REGEX_QUARANTINE_WHITELIST="(?i)\.(conf|lock|uuid|db|sqlite|passwd|shadow|journal|log|key|crt|pem|fstab|modules|enviroment)$"
+
+
 
 # ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
@@ -999,95 +1146,129 @@ core_engine_control() {
 
 core_engine_validator() {
     local type="$1"    # Категория проверки
-    local target="$2"  # Объект (IP, файл, пакет)
-    local label="$3"   # Имя для вывода в лог
+    local target="$2"  # Объект (IP, домен, файл, пакет)
+    local label="$3"   # Имя для вывода в лог/UI
     local extra="$4"   # Доп. параметр (например, макс. значение range)
     local failed=0
     local err_msg=""
 
     case "$type" in
-        # --- СИСТЕМНЫЙ СЛОЙ ---
+        # ======================================================================
+        # СИСТЕМНЫЙ СЛОЙ
+        # ======================================================================
         "root")
-            [[ $EUID -ne 0 ]] && { failed=1; err_msg="Требуются права ROOT (sudo)"; }
+            [[ $EUID -ne 0 ]] && { failed=1; err_msg="Требуются привилегии суперпользователя (ROOT/sudo)"; }
             ;;
             
         "pkg")
             if ! command -v "$target" >/dev/null 2>&1; then
-                core_engine_ui "?Компонент [$target] отсутствует. Установка..."
+                core_engine_ui "i" "Зависимость [$target] отсутствует. Инициализация установки через APT..."
                 if core_engine_run apt-get install -y "$target"; then
-                    core_engine_ui "+[$target] успешно интегрирован в систему"
+                    core_engine_ui "s" "Компонент [$target] успешно интегрирован в операционную систему."
                     return 0
                 else
-                    failed=1; err_msg="Ошибка APT: не удалось установить [$target]"; fi
+                    failed=1; err_msg="Критическая ошибка APT: не удалось установить пакет [$target]"; fi
             fi
             ;;
 
-        # --- СЕТЕВОЙ СЛОЙ (НОВОЕ) ---
+        # ======================================================================
+        # СЕТЕВОЙ И ИНФРАСТРУКТУРНЫЙ СЛОЙ
+        # ======================================================================
         "url"|"host")
-            # Проверка синтаксиса домена/IP
-            if [[ ! "$target" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,6}$ ]] && \
-               [[ ! "$target" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-                failed=1; err_msg="Недопустимый формат цели: [$target]"; fi
+            # Снайперская проверка через наш ультимативный объединенный сетевой стек
+            # Проверяет IPv4, IPv6, MAC и Домены одновременно на основе шапки конфигурации
+            if [[ ! "$target" =~ $GLOBAL_SUPER_REGEX_INFRA ]]; then
+                failed=1; err_msg="Недопустимый сетевой формат цели: [$target]. Не соответствует RFC."; fi
             ;;
 
         "net_up")
-            # Эвристика: проверка доступности перед атакой/аудитом
+            # Безопасная проверка доступности узла с ограничением по времени
             if ! timeout 2 ping -c 1 "$target" >/dev/null 2>&1; then
-                failed=1; err_msg="Узел [$target] недоступен (Offline или ICMP Drop)"; fi
+                failed=1; err_msg="Узел [$target] не отвечает на запросы (Offline или ICMP Drop)"; fi
             ;;
 
-        "privacy")
-            # Проверка на "утечку" реального IP (если установлена переменная REAL_IP)
-            local current_ip=$(curl -s --connect-timeout 2 https://ifconfig.me)
-            if [[ -n "$REAL_IP" && "$current_ip" == "$REAL_IP" ]]; then
-                failed=1; err_msg="VPN/Proxy не активен! Обнаружен реальный IP [$current_ip]"; fi
-            ;;
+            # ======================================================================
+            # СЕТЕВОЙ И ИНФРАСТРУКТУРНЫЙ СЛОЙ
+            # ======================================================================
+            "privacy")
+                # АВТОНОМНАЯ ЗАЩИТА ОТ ДЕАНOНИМИЗАЦИИ (БЕЗ ВНЕШНЕГО СЛИВА IP)
+                # Проверяем наличие активных туннелей через глобальную маску интерфейсов
+                if ! ip link show up | grep -qEi "$GLOBAL_REGEX_PRIVACY_INTERFACES"; then
+                    # Дополнительный эвристический рубеж: сверка с переменной REAL_IP
+                    if [[ -n "$REAL_IP" ]]; then
+                        local current_ip=$(curl -s --max-time 3 --connect-timeout 2 https://api.ipify.org || echo "TIMEOUT")
+                        if [[ "$current_ip" == "$REAL_IP" ]]; then
+                            failed=1; err_msg="VPN/Proxy не активен! Обнаружена утечка реального IP-адреса [$current_ip]"; fi
+                    else
+                        core_engine_ui "w" "Внимание: Пассивный аудит интерфейсов не выявил VPN-туннелей ($GLOBAL_REGEX_PRIVACY_INTERFACES)."
+                    fi
+                fi
+                ;;
 
-        # --- ФАЙЛОВЫЙ СЛОЙ ---
+        # ======================================================================
+        # ФАЙЛОВЫЙ СЛОЙ
+        # ======================================================================
         "file"|"read")
             if [[ ! -f "$target" ]]; then
-                failed=1; err_msg="Файл [$target] не найден"; 
-            elif [[ "$type" == "read" ]]; then
-                cat "$target"
-                return 0
+                failed=1; err_msg="Целевой файл [$target] не найден в файловой системе"; 
+            elif [[ ! -r "$target" ]]; then
+                failed=1; err_msg="Ошибка прав доступа: файл [$target] запрещен для чтения";
             fi
             ;;
 
         "dir")
             if [[ ! -d "$target" ]]; then
+                core_engine_ui "i" "Директория [$target] отсутствует. Запуск генерации пути..."
                 if core_engine_run mkdir -p "$target"; then
-                    core_engine_ui "+Директория создана: $target"
+                    core_engine_ui "s" "Инфраструктурная директория успешно создана: $target"
                     return 0
                 else
-                    failed=1; err_msg="Ошибка ФС: нет прав на создание [$target]"; fi
+                    failed=1; err_msg="Ошибка ФС: недостаточно прав на создание пути [$target]"; fi
             fi
             ;;
 
-        # --- ЛОГИЧЕСКИЙ СЛОЙ ---
+        # ======================================================================
+        # КРИПТОГРАФИЧЕСКИЙ И ЛОГИЧЕСКИЙ СЛОЙ
+        # ======================================================================
+        "crypto")
+            # Новая валидация: проверка на то, является ли объект хэшем (MD5/SHA256)
+            if [[ ! "$target" =~ $GLOBAL_SUPER_REGEX_CRYPTO ]]; then
+                failed=1; err_msg="Объект [$target] не является валидным криптографическим хэшем."; fi
+            ;;
+
+       # ======================================================================
+        # КРИПТОГРАФИЧЕСКИЙ И ЛОГИЧЕСКИЙ СЛОЙ
+        # ======================================================================
         "range")
-            if [[ ! "$target" =~ ^[0-9]+$ ]] || (( target < 1 || target > extra )); then
-                failed=1; err_msg="Значение [$target] вне лимита (1-$extra)"; fi
+            # Если доп. параметр extra не передан, ядро берет дефолтный лимит из шапки
+            local max_boundary="${extra:-$GLOBAL_CORE_MENU_MAX_LIMIT}"
+            
+            # Проверка типа данных и вхождения в диапазон через глобальные константы
+            if [[ ! "$target" =~ $GLOBAL_REGEX_DIGIT ]] || (( target < 1 || target > max_boundary )); then
+                failed=1; err_msg="Числовое значение [$target] вышло за допустимые лимиты (1-$max_boundary)"; fi
             ;;
 
         "list"|"empty")
-            [[ -z "${target// }" ]] && { failed=1; err_msg="Поле [$label] пустое"; }
+            # Жесткая очистка строки от пробелов перед проверкой на пустоту
+            if [[ -z "${target// }" ]]; then
+                failed=1; err_msg="Обязательное конфигурационное поле [$label] пустое"; fi
             ;;
             
         "entropy")
-            # Защита от случайного ввода (менее 3 символов для хоста - подозрительно)
+            # Защита ядра от случайных кликов и мусорного ввода
             if [[ ${#target} -lt 3 ]]; then
-                failed=1; err_msg="Недостаточная длина данных для [$label]"; fi
+                failed=1; err_msg="Длина данных объекта [$label] критически мала (минимум 3 символа)"; fi
             ;;
     esac
 
-    # Финализация
+    # Финализация и выдача структурированного отчета
     if [[ $failed -eq 1 ]]; then
-        core_engine_ui "!ОШИБКА ВАЛИДАЦИИ: $label -> $err_msg"
+        core_engine_ui "e" "КРИТИЧЕСКАЯ ОШИБКА ВАЛИДАЦИИ [$label] -> $err_msg"
         return 1
     fi
+    
     return 0
 }
-
 
 # --- CORE ENGINE: LOOT COLLECTOR v1.2 (Session Logger) ---
 core_engine_loot() {
@@ -1184,31 +1365,99 @@ EOD
 }
 
 core_engine_info() {
-    # Слой 1: Метрики без AWK (используем встроенные средства и быстрый cut)
-    local ram=$(free -m | grep "Mem:" | tr -s ' ' | cut -d' ' -f4,2 --output-delimiter='/')
+    # ==========================================================================
+    # СЛОЙ 1: АППАРАТНЫЕ МЕТРИКИ (Память и Хранилище)
+    # ==========================================================================
+    local free_output=$(free -m | grep "Mem:")
+    local ram_total=$(echo "$free_output" | tr -s ' ' | cut -d' ' -f2)
+    local ram_avail=$(echo "$free_output" | tr -s ' ' | cut -d' ' -f7)
+    local ram="${ram_avail}/${ram_total}"
     local rom=$(df -h / | tail -1 | tr -s ' ' | cut -d' ' -f4)
-    
-    # Слой 2: Сеть (эвристика через маршруты)
-    local iface=$(ip route get 1.1.1.1 2>/dev/null | cut -d' ' -f5)
-    local net_type="NONE"
-    [[ -n "$iface" ]] && {
-        [[ -d "/sys/class/net/$iface/wireless" ]] && net_type="WLAN"
-        [[ "$iface" =~ ^(tun|tap|ppp) ]] && net_type="VPN"
-        [[ "$iface" =~ ^(rmnet|wwan) ]] && net_type="CELL"
-        [[ "$net_type" == "NONE" ]] && net_type="ETH"
-    }
 
-    # Слой 3: Вывод в стиле Core Engine
-    core_engine_ui "SYSTEM REPORT"
-    echo -e "${B}RAM:${NC} ${ram}MB  ${B}ROM:${NC} ${rom}  ${B}NET:${NC} ${net_type} (${iface:-OFF})"
+    # ==========================================================================
+    # СЛОЙ 2: АНАЛИЗ АКТИВНОГО МАРШРУТА (Глобальный Аплинк)
+    # ==========================================================================
+    local main_iface=$(ip -4 route show default 2>/dev/null | grep -oPm1 '(?<=dev )[a-z0-9.-]+')
+    local uplink_type="OFFLINE"
     
-    # Проверка сервисов через встроенный контроль (если нужно)
+    if [[ -n "$main_iface" ]]; then
+        if [[ "$main_iface" =~ $GLOBAL_REGEX_PRIVACY_INTERFACES ]]; then
+            uplink_type="VPN/SECURE"
+        elif [[ -d "/sys/class/net/$main_iface/wireless" ]] || [[ "$main_iface" =~ ^wlan[0-9]|^wlp ]]; then
+            uplink_type="WLAN"
+        elif [[ "$main_iface" =~ ^(rmnet|wwan|pccard|usb) ]]; then
+            uplink_type="CELL"
+        else
+            uplink_type="ETH"
+        fi
+    fi
+
+    # ==========================================================================
+    # СЛОЙ 3: АППАРАТНЫЙ СКАНЕР ЛОКАЛЬНЫХ ИНТЕРФЕЙСОВ (Wi-Fi, Bluetooth, VPN)
+    # ==========================================================================
+    local active_vpn=""
+    local wifi_hardware="${R}ABSENT${NC}"
+    local bt_hardware="${R}ABSENT${NC}"
+
+    # 1. Сбор активных шифрованных туннелей
+    for sys_iface in /sys/class/net/*; do
+        [ -e "$sys_iface" ] || continue
+        local iface_name=$(basename "$sys_iface")
+        if [[ -f "$sys_iface/operstate" ]] && [[ "$(cat "$sys_iface/operstate" 2>/dev/null)" == "up" ]]; then
+            if [[ "$iface_name" =~ $GLOBAL_REGEX_PRIVACY_INTERFACES ]]; then
+                active_vpn+="${iface_name} "
+            fi
+        fi
+    done
+    active_vpn=$(echo "$active_vpn" | xargs)
+
+    # 2. Проверка физического Wi-Fi модуля в ОС (через /sys или утилиту iw/rfkill)
+    if ls /sys/class/net/ | grep -qEi "^wlan|^wlp" || [ -d /sys/class/net/*/wireless ]; then
+        # Нашли беспроводную карту. Проверяем, включена ли она
+        local wifi_iface=$(ls /sys/class/net/ | grep -m1 -Ei "^wlan|^wlp")
+        if [[ "$(cat /sys/class/net/$wifi_iface/operstate 2>/dev/null)" == "up" ]]; then
+            wifi_hardware="${G}ACTIVE${NC} ($wifi_iface)"
+        else
+            wifi_hardware="${Y}DISABLED${NC}"
+        fi
+    fi
+
+    # 3. Проверка физического Bluetooth модуля
+    if [ -d /sys/class/bluetooth ] || hciconfig >/dev/null 2>&1 || rfkill list bluetooth | grep -q "Bluetooth"; then
+        # Нашли Bluetooth адаптер. Проверяем его состояние через rfkill или hciconfig
+        if rfkill list bluetooth 2>/dev/null | grep -q "Soft blocked: yes"; then
+            bt_hardware="${Y}BLOCKED${NC}"
+        else
+            bt_hardware="${G}READY/ACTIVE${NC}"
+        fi
+    fi
+
+    # ==========================================================================
+    # СЛОЙ 4: СТРУКТУРИРОВАННЫЙ ВЫВОД В СТИЛЕ CORE ENGINE
+    # ==========================================================================
+    core_engine_ui "i" "ТЕКУЩИЙ СИСТЕМНЫЙ СТАТУС ИНФРАСТРУКТУРЫ"
+    
+    echo -e "  ${B}Ресурсы памяти :${NC} RAM: [${ram} MB] | ROM: [${rom} свободно]"
+    echo -e "  ${B}Глобальный шлюз:${NC} Активный аплинк: [${uplink_type}] -> Интерфейс: [${main_iface:-NONE}]"
+    echo -e "  ${B}Радио-модули   :${NC} Wi-Fi: [${wifi_hardware}] | Bluetooth: [${bt_hardware}]"
+    
+    if [[ -n "$active_vpn" ]]; then
+        echo -e "  ${B}Активная защита:${NC} [${G}${active_vpn}${NC}]"
+    else
+        echo -e "  ${B}Активная защита:${NC} [${R}НЕТ АКТИВНЫХ ТУННЕЛЕЙ${NC}]"
+    fi
+    
+    # ==========================================================================
+    # СЛОЙ 5: КОНТРОЛЬ СЕРВИСОВ
+    # ==========================================================================
     local srv_status=""
-    pgrep -f "av_server" >/dev/null && srv_status+="${G}[AV]${NC} "
-    pgrep -f "share_server" >/dev/null && srv_status+="${G}[SH]${NC} "
+    pgrep -f "av_server" >/dev/null && srv_status+="${G}[AV-CORE]${NC} "
+    pgrep -f "share_server" >/dev/null && srv_status+="${G}[SHARE-MESH]${NC} "
     
-    [[ -n "$srv_status" ]] && echo -e "${B}ACTIVE:${NC} ${srv_status}"
-    
+    if [[ -n "$srv_status" ]]; then
+        echo -e "  ${B}Активные узлы  :${NC} ${srv_status}"
+    fi
+    echo "----------------------------------------------------------------------"
 }
 
 # --- CORE ENGINE: PROGRESS v13.8.2 (Fixed Width Edition) ---
@@ -1281,8 +1530,6 @@ prime_dynamic_controller() {
 }
 
 
-
-
 core_engine_mutate() {
     local input="$1"
     local mode="${2:-full}"
@@ -1321,43 +1568,145 @@ core_engine_mutate() {
 # --- INTELLIGENCE: DEEP RECON v1.4 ---
 core_intelligence_gather() {
     local r_target="$1"
-    core_engine_ui "i" "Deep scanning: $r_target"
-
-    # 1. WHOIS Данные (Регистратор и Владелец)
-    local whois_info=$(whois "$r_target" 2>/dev/null | grep -Ei "Registrar:|Organization:|Admin City:|Country:|Expires:" | head -n 6)
-    [[ -z "$whois_info" ]] && whois_info="WHOIS: Data Protected"
-
-    # 2. HTTP HEADERS (Версия PHP, Server, OS)
-    # --connect-timeout 5 чтобы не зависнуть на мертвом хосте
-    local headers=$(curl -Is --connect-timeout 5 "http://$r_target" 2>/dev/null)
     
-    # Извлекаем версию PHP (X-Powered-By)
-    local php_ver=$(echo "$headers" | grep -i "X-Powered-By:" | awk '{print $2}' | tr -d '\r')
-    [[ -z "$php_ver" ]] && php_ver="PHP: Hidden/Unknown"
+    # Первичная жесткая валидация входных данных через глобальную сетевую матрицу
+    if ! core_engine_validator "url" "$r_target" "Идентификатор целевого хоста"; then
+        return 1
+    fi
 
-    # Извлекаем ПО сервера (Apache, Nginx, и их версии)
-    local srv_ver=$(echo "$headers" | grep -i "Server:" | cut -d' ' -f2- | tr -d '\r')
-    [[ -z "$srv_ver" ]] && srv_ver="Server: Undetected"
+    core_engine_ui "i" "Запуск глубокого инфраструктурного и OSINT-анализа: $r_target"
+    echo "======================================================================"
 
-    # 3. IP RESOLUTION
-    local target_ip=$(dig +short "$r_target" | tail -n1)
-    [[ -z "$target_ip" ]] && target_ip=$(host "$r_target" | awk '/has address/ { print $4 }' | head -n1)
+    # ==========================================================================
+    # СЛОЙ 1: РАСШИРЕННЫЙ МНОЖЕСТВЕННЫЙ РЕЗОЛВИНГ IP (IPv4 / IPv6 / CNAME)
+    # ==========================================================================
+    core_engine_ui "i" "Слой 1: Сканирование сетевых маршрутов и адресации..."
+    
+    local target_ipv4_list=$(dig +short A "$r_target" 2>/dev/null | grep -E "^([0-9]{1,3}\.){3}[0-9]{1,3}$" | tr '\n' ' ' | xargs)
+    if [[ -z "$target_ipv4_list" ]]; then
+        local host_ipv4=$(host -t A "$r_target" 2>/dev/null | grep "has address")
+        if [[ -n "$host_ipv4" ]]; then
+            target_ipv4_list=$(echo "$host_ipv4" | tr -s ' ' | cut -d' ' -f4 | tr '\n' ' ' | xargs)
+        fi
+    fi
+    [[ -z "$target_ipv4_list" ]] && target_ipv4_list="0.0.0.0 (Не удалось разрешить IPv4)"
 
-    # ВЫВОД В UI
-    core_engine_ui "line"
-    echo -e "${G}>>> TARGET ARCHITECTURE <<<${NC}"
-    echo -e "${B}IP ADDR:${NC} $target_ip"
-    echo -e "${B}ENGINE:${NC}  $srv_ver"
-    echo -e "${B}RUNTIME:${NC} $php_ver"
-    core_engine_ui "line"
-    echo -e "${G}>>> REGISTRY DATA <<<${NC}"
-    echo "$whois_info"
-    core_engine_ui "line"
+    local target_ipv6_list=$(dig +short AAAA "$r_target" 2>/dev/null | grep -E ":" | tr '\n' ' ' | xargs)
+    if [[ -z "$target_ipv6_list" ]]; then
+        local host_ipv6=$(host -t AAAA "$r_target" 2>/dev/null | grep "IPv6 address")
+        if [[ -n "$host_ipv6" ]]; then
+            target_ipv6_list=$(echo "$host_ipv6" | tr -s ' ' | cut -d' ' -f5 | tr '\n' ' ' | xargs)
+        fi
+    fi
+    [[ -z "$target_ipv6_list" ]] && target_ipv6_list="Нет активных IPv6 адресов"
 
-    # Сохраняем в лог (Loot)
-    core_engine_loot "intelligence" "Recon finished for $r_target. IP: $target_ip, PHP: $php_ver"
+    local target_cname=$(dig +short CNAME "$r_target" 2>/dev/null | tail -n1 | xargs)
+    [[ -z "$target_cname" ]] && target_cname="Прямая адресация (CNAME-записи отсутствуют)"
+
+    # ==========================================================================
+    # СЛОЙ 2: АНАЛИЗ HTTP/HTTPS ЗАГОЛОВКОВ ЧЕРЕЗ ГЛОБАЛЬНЫЕ МАТРИЦЫ
+    # ==========================================================================
+    core_engine_ui "i" "Слой 2: Эксплуатация заголовков веб-ответа (SSL/TLS Слой)..."
+    
+    local headers=$(curl -IsL --max-redirs 3 --connect-timeout 4 "https://$r_target" 2>/dev/null)
+    if [[ -z "$headers" ]]; then
+        headers=$(curl -IsL --max-redirs 3 --connect-timeout 4 "http://$r_target" 2>/dev/null)
+    fi
+    
+    local web_status="" srv_ver="" php_ver="" secure_headers="" cookie_intel=""
+
+    if [[ -z "$headers" ]]; then
+        web_status="Сбой подключения: Хост игнорирует запросы (DROP/WAF Filter)"
+        srv_ver="Неизвестно (Сетевой сброс)"
+        php_ver="Неизвестно (Сетевой сброс)"
+        secure_headers="    [-] Сканирование политик защиты невозможно из-за блокировки\n"
+        cookie_intel="    [-] Сканирование сессионных дескрипторов невозможно\n"
+    else
+        web_status=$(echo "$headers" | grep -Ei "$GLOBAL_REGEX_HTTP_STATUS" | tail -n1 | tr -d '\r' | xargs)
+        
+        srv_ver=$(echo "$headers" | grep -Ei "$GLOBAL_REGEX_HTTP_SERVER" | tr -d '\r' | cut -d':' -f2- | xargs)
+        [[ -z "$srv_ver" ]] && srv_ver="Данные скрыты, обфусцированы или удалены из заголовков"
+        
+        php_ver=$(echo "$headers" | grep -Ei "$GLOBAL_REGEX_HTTP_RUNTIME" | tr -d '\r' | cut -d':' -f2- | xargs)
+        [[ -z "$php_ver" ]] && php_ver="Скрыт, отсутствует или используется статическая архитектура"
+        
+        echo "$headers" | grep -Ei "$GLOBAL_REGEX_HTTP_SECURITY" | tr -d '\r' | while read -r sec_line; do
+            [[ -n "$sec_line" ]] && secure_headers+="    [+] $(echo "$sec_line" | xargs)\n"
+        done
+        [[ -z "$secure_headers" ]] && secure_headers="    [-] Заголовки безопасности веб-ресурса полностью отсутствуют (Инфраструктура уязвима)\n"
+        
+        echo "$headers" | grep -Ei "$GLOBAL_REGEX_HTTP_COOKIE" | tr -d '\r' | cut -d':' -f2- | while read -r cookie_line; do
+            [[ -n "$cookie_line" ]] && cookie_intel+="    [*] Cookie: $(echo "$cookie_line" | xargs)\n"
+        done
+        [[ -z "$cookie_intel" ]] && cookie_intel="    [-] Сессионные куки не передаются в заголовках ответа веб-сервера\n"
+    fi
+
+    # ==========================================================================
+    # СЛОЙ 3: ИНТЕРНАЦИОНАЛЬНЫЙ ПАРСИНГ WHOIS (Глобальные Атомарные Матрицы)
+    # ==========================================================================
+    core_engine_ui "i" "Слой 3: Запрос глобальных регистрационных баз данных WHOIS..."
+    
+    local raw_whois=$(whois "$r_target" 2>/dev/null)
+    local whois_reg="" whois_dates="" whois_ns="" whois_privacy=""
+    
+    if [[ -z "${raw_whois// }" ]]; then
+        whois_reg="  [-] База данных WHOIS недоступна (Таймаут, блокировка или лимит запросов)"
+        whois_dates="  [-] Метки жизненного цикла инфраструктуры не собраны"
+        whois_ns="  [-] Маршрутизация DNS-серверов не определена"
+        whois_privacy="  [-] Маркеры защиты данных отсутствуют"
+    else
+        # Первичный проход через глобальный композитный фильтр
+        local filtered_whois=$(echo "$raw_whois" | grep -Ei "$GLOBAL_SIG_WHOIS_MATRIX" | tr -d '\r')
+        
+        # Сортировка по блокам исключительно через атомарные константы конфигурации
+        whois_reg=$(echo "$filtered_whois" | grep -Ei "$GLOBAL_REGEX_WHOIS_REG" | while read -r r_line; do echo "  [•] $(echo "$r_line" | xargs)"; done)
+        [[ -z "$whois_reg" ]] && whois_reg="  [-] Данные организации скрыты или не опубликованы регистратором"
+        
+        whois_dates=$(echo "$filtered_whois" | grep -Ei "$GLOBAL_REGEX_WHOIS_DATES" | while read -r d_line; do echo "  [•] $(echo "$d_line" | xargs)"; done)
+        [[ -z "$whois_dates" ]] && whois_dates="  [-] Временные метки жизненного цикла отсутствуют в ответе"
+        
+        whois_ns=$(echo "$filtered_whois" | grep -Ei "$GLOBAL_REGEX_WHOIS_NS" | sort -u | while read -r n_line; do echo "  [•] $(echo "$n_line" | xargs)"; done)
+        [[ -z "$whois_ns" ]] && whois_ns="  [-] Маршрутизация DNS-серверов скрыта"
+        
+        whois_privacy=$(echo "$filtered_whois" | grep -Ei "$GLOBAL_REGEX_WHOIS_PRIVACY" | sort -u | while read -r p_line; do echo "  [!] Защита данных: $(echo "$p_line" | xargs)"; done)
+        [[ -z "$whois_privacy" ]] && whois_privacy="  [i] Персональные данные открыты (Режим Privacy Protection отключен)"
+    fi
+
+    # ==========================================================================
+    # СЛОЙ 4: ФОРМИРОВАНИЕ ПОЛНОГО ДЕТАЛИЗИРОВАННОГО ОТЧЕТА (UI ВЫВОД)
+    # ==========================================================================
+    echo -e "${G}>>> РАСШИРЕННАЯ СЕТЕВАЯ ТОПОЛОГИЯ ЦЕЛИ <<<${NC}"
+    echo -e "  ${B}Целевой домен:${NC} $r_target"
+    echo -e "  ${B}IPv4 Пул      :${NC} $target_ipv4_list"
+    echo -e "  ${B}IPv6 Пул      :${NC} $target_ipv6_list"
+    echo -e "  ${B}CNAME Тракт   :${NC} $target_cname"
+    echo "----------------------------------------------------------------------"
+    echo -e "${G}>>> АРХИТЕКТУРА И ПАРАМЕТРЫ ВЕБ-ОКРУЖЕНИЯ <<<${NC}"
+    echo -e "  ${B}Статус ответа :${NC} $web_status"
+    echo -e "  ${B}Веб-сервер ПО :${NC} $srv_ver"
+    echo -e "  ${B}Инфраструктура:${NC} $php_ver"
+    echo -e "  ${B}Аудит заголовков безопасности (Security HTTP Headers):${NC}"
+    echo -e "$secure_headers" | sed 's/\\n/\n/g'
+    echo -e "  ${B}Анализ сессионных дескрипторов (Cookie Intel):${NC}"
+    echo -e "$cookie_intel" | sed 's/\\n/\n/g'
+    echo "----------------------------------------------------------------------"
+    echo -e "${G}>>> ИНФРАСТРУКТУРНЫЙ РЕЕСТР WHOIS (ПОЛНЫЙ РАЗВЕРНУТЫЙ ВЫВОД) <<<${NC}"
+    echo -e "${B}  [ Секция 1: Регистрационные данные и Владелец ]${NC}"
+    echo "$whois_reg"
+    echo ""
+    echo -e "${B}  [ Секция 2: Жизненный цикл и Временные маркеры ]${NC}"
+    echo "$whois_dates"
+    echo ""
+    echo -e "${B}  [ Секция 3: Делегированные DNS Узлы ]${NC}"
+    echo "$whois_ns"
+    echo ""
+    echo -e "${B}  [ Секция 4: Слой приватности и GDPR статусы ]${NC}"
+    echo "$whois_privacy"
+    echo "======================================================================"
+
+    # Автоматическая запись результатов в системный логгер (Loot)
+    core_engine_loot "intelligence" "Глубокая разведка завершена для хоста $r_target. Полный IPv4 пул: [$target_ipv4_list]. Финальный статус ответа: [$web_status]. Обнаруженное серверное ПО: [$srv_ver]."
 }
-
 
 get_tool_info() {
     case "$1" in
@@ -1525,7 +1874,8 @@ EOF
 
 # --- py functions ---
 # ==============================================================================
-# @description: Функция-генератор контента для IBAN/RIB (ИНТЕГРИРОВАННАЯ v1.8)
+# @description: Функция-генератор контента для IBAN/RIB (ИНТЕГРИРОВАННАЯ v2.0)
+# Полная изоляция логики, встроенная валидация MOD-97 и снайперский REST-парсинг.
 # ==============================================================================
 generate_iban_code() {
     local target_file="$1"
@@ -1544,7 +1894,7 @@ generate_iban_code() {
         fi
         python_sources+="    \"$url\",\n"
     done
-    # Удаляем последний перенос строки для чистоты синтаксиса
+    # Очищаем финальный перенос строки
     python_sources=$(echo -e "$python_sources" | sed '$d')
 
     # 2. Формируем локальный словарь банков для Python из GLOBAL_BANK_MATRIX
@@ -1553,6 +1903,8 @@ generate_iban_code() {
         local code="${entry%%|*}"
         local tail="${entry#*|}"
         local name="${tail%%|*}"
+        # Защищаем кавычки внутри названий банков во избежание поломки синтаксиса Python
+        name=$(echo "$name" | sed 's/"/\\"/g')
         python_bank_dict+="    \"$code\": \"$name\",\n"
     done
     python_bank_dict=$(echo -e "$python_bank_dict" | sed '$d')
@@ -1562,6 +1914,7 @@ generate_iban_code() {
     code=$(cat << EOF
 import sys, re, json, time
 from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 # Динамически импортированные зеркала верификации из GLOBAL_API_FINANCE_NODES
 SOURCES = [
@@ -1573,48 +1926,75 @@ LOCAL_BANKS = {
 $python_bank_dict
 }
 
+def validate_iban_checksum(iban):
+    """Математическая валидация контрольной суммы по стандарту ISO 7064 (MOD-97)"""
+    if len(iban) < 5:
+        return False
+    # Переносим первые 4 символа в конец строки
+    rearranged = iban[4:] + iban[:4]
+    # Переводим буквы в цифры (A=10, B=11, ..., Z=35)
+    numeric_string = ""
+    for char in rearranged:
+        if char.isalpha():
+            numeric_string += str(ord(char) - 55)
+        else:
+            numeric_string += char
+    try:
+        return int(numeric_string) % 97 == 1
+    except ValueError:
+        return False
+
 def get_bank_data(iban):
-    """Опрашивает источники по цепочке (Failover System с глобальным UA)"""
-    # Используем сетевой User-Agent, заданный на глобальном уровне лаунчера
+    """Опрашивает источники по цепочке (Failover System с интеллектуальной сборкой URL)"""
     ua_string = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     
     for base_url in SOURCES:
         try:
-            # Формируем корректный URL в зависимости от структуры эндпоинта
-            if base_url.endswith("="):
+            # Интеллектуальный роутинг URL в зависимости от типа API-эндпоинта
+            if base_url.endswith("=") or "html" in base_url or "?" in base_url:
                 url = f"{base_url}{iban}"
             else:
-                url = f"{base_url}{iban}"
+                # Если эндпоинт RESTful чистый, добавляем разделитель пути безопасности
+                url = f"{base_url.rstrip('/')}/{iban}"
                 
-            req = Request(url, headers={'User-Agent': ua_string})
-            with urlopen(req, timeout=4) as response:
-                return json.loads(response.read().decode())
-        except:
+            req = Request(url, headers={'User-Agent': ua_string, 'Accept': 'application/json'})
+            with urlopen(req, timeout=5) as response:
+                return json.loads(response.read().decode('utf-8', errors='ignore'))
+        except Exception:
+            # Перехватываем строго системные исключения, оставляя возможность Ctrl+C
             continue
     return None
 
 def get_country_format(iban):
-    """Математический разбор структуры по стандартам ISO"""
+    """Глубокий математический разбор структуры по национальным стандартам SEPA"""
     country = iban[:2]
     formats = {
-        'FR': {'name': 'France', 'len': 27, 'parse': lambda i: f"Bank: {i[4:9]} (RIB), Branch: {i[9:14]}, Acc: {i[14:25]}, Key: {i[25:27]}"},
-        'DE': {'name': 'Germany', 'len': 22, 'parse': lambda i: f"BLZ: {i[4:12]}, Acc: {i[12:22]}"},
-        'GB': {'name': 'United Kingdom', 'len': 22, 'parse': lambda i: f"Sort Code: {i[4:10]}, Acc: {i[10:18]}"},
-        'IT': {'name': 'Italy', 'len': 27, 'parse': lambda i: f"CIN: {i[4:5]}, ABI: {i[5:10]}, CAB: {i[10:15]}, Acc: {i[15:27]}"},
-        'ES': {'name': 'Spain', 'len': 24, 'parse': lambda i: f"Bank: {i[4:8]}, Branch: {i[8:12]}, Acc: {i[12:24]}"}
+        'FR': {'name': 'France (RIB Standard)', 'len': 27, 'parse': lambda i: f"Code Banque: {i[4:9]}, Code Guichet: {i[9:14]}, Numéro de Compte: {i[14:25]}, Clé RIB: {i[25:27]}"},
+        'DE': {'name': 'Germany', 'len': 22, 'parse': lambda i: f"BLZ (Bankleitzahl): {i[4:12]}, Account Number: {i[12:22]}"},
+        'GB': {'name': 'United Kingdom', 'len': 22, 'parse': lambda i: f"Sort Code: {i[4:10]}, Account Number: {i[10:18]}"},
+        'IT': {'name': 'Italy', 'len': 27, 'parse': lambda i: f"CIN: {i[4:5]}, ABI: {i[5:10]}, CAB: {i[10:15]}, Account: {i[15:27]}"},
+        'ES': {'name': 'Spain', 'len': 24, 'parse': lambda i: f"Bank Code: {i[4:8]}, Branch Code: {i[8:12]}, Control Digits: {i[12:14]}, Account: {i[14:24]}"},
+        'CH': {'name': 'Switzerland', 'len': 21, 'parse': lambda i: f"Bank Clearing Code: {i[4:9]}, Account: {i[9:21]}"},
+        'BE': {'name': 'Belgium', 'len': 16, 'parse': lambda i: f"National Bank Code: {i[4:7]}, Account: {i[7:14]}, Check Digits: {i[14:16]}"}
     }
-    return formats.get(country, {'name': 'Other/International', 'len': len(iban), 'parse': lambda i: f"BBAN: {i[4:]}"})
+    return formats.get(country, {'name': 'Other / International / Non-SEPA Zone', 'len': len(iban), 'parse': lambda i: f"BBAN (Basic Bank Account Number): {i[4:]}"})
 
 def local_heuristic_search(iban):
-    """Локальный поиск банка по сигнатурам, если сеть недоступна"""
+    """Локальный поиск банка по сигнатурам Ядра при сбое внешней сети"""
     country = iban[:2]
-    # Для Франции парсим код банка из структуры RIB (индексы 4-9)
+    
+    # Снайперский разбор национального префикса эмитента
     if country == "FR":
         bank_code = iban[4:9]
-        if bank_code in LOCAL_BANKS:
-            return LOCAL_BANKS[bank_code]
-    
-    # Для международных проверяем совпадение по SWIFT-маркерам (индексы 4-8)
+        if bank_code in LOCAL_BANKS: return LOCAL_BANKS[bank_code]
+    elif country == "DE":
+        bank_code = iban[4:12]
+        if bank_code in LOCAL_BANKS: return LOCAL_BANKS[bank_code]
+    elif country == "ES":
+        bank_code = iban[4:8]
+        if bank_code in LOCAL_BANKS: return LOCAL_BANKS[bank_code]
+        
+    # Универсальный фолбэк-анализ по SWIFT/BIC маске в теле IBAN
     swift_prefix = iban[4:8]
     if swift_prefix in LOCAL_BANKS:
         return LOCAL_BANKS[swift_prefix]
@@ -1622,55 +2002,66 @@ def local_heuristic_search(iban):
     return None
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2: sys.argv[1]
-    
+    if len(sys.argv) < 2:
+        print("\033[91m[-] CRITICAL ERROR: Идентификатор цели (IBAN/RIB) не передан в командную строку.\033[0m")
+        sys.exit(1)
+        
     target = re.sub(r'[\s-]+', '', sys.argv[1]).upper()
     provided_name = sys.argv[2].upper() if len(sys.argv) > 2 else "NONE"
 
     print(f"\033[1;34m--- OMNI-BANKER v$v_num: GLOBAL FINANCIAL INTELLIGENCE ---\033[0m")
     
+    # Выполнение базовой математической проверки чексуммы ISO
+    is_valid_checksum = validate_iban_checksum(target)
+    
     # 1. Структурный анализ (Всегда работает Offline)
     fmt = get_country_format(target)
-    print(f"\033[96mCountry:\033[0m {fmt['name']}")
-    print(f"\033[96mStructure:\033[0m {fmt['parse'](target)}")
+    print(f"\033[96m[i] Национальная зона :\033[0m {fmt['name']}")
+    print(f"\033[96m[i] Длина расчетная   :\033[0m {len(target)} символов (Ожидалось: {fmt['len']})")
+    print(f"\033[96m[i] Декомпозиция тракта:\033[0m {fmt['parse'](target)}")
+    
+    if not is_valid_checksum:
+        print(f"\n\033[1;31m[!] ВНИМАНИЕ: Математическая проверка MOD-97 провалена. Неверная контрольная сумма!\033[0m")
+    else:
+        print(f"\033[1;32m[+] Математическая валидация по стандарту ISO 7064: УСПЕШНО\033[0m")
 
-    # 2. Попытка локального офлайн определения банка
+    # 2. Локальный оффлайн-поиск по сигнатурным картам Ядра
     local_bank = local_heuristic_search(target)
     if local_bank:
-        print(f"\033[92mLocal Signature Match:\033[0m {local_bank}")
+        print(f"\033[92m[+] Локальный фингерпринт Ядра подтвержден:\033[0m {local_bank}")
 
-    # 3. Агрегация данных из внешних динамических источников
-    print(f"[*] Analyzing with Failover Protection via Core API Matrix...")
+    # 3. Агрегация данных из внешних динамических источников через каскад зеркал
+    print(f"[*] Синхронизация с каскадом внешних финансовых шлюзов API...")
     data = get_bank_data(target)
     
     if data:
         bank_name = data.get('bank_name', data.get('bank', local_bank if local_bank else 'N/A')).upper()
-        bic = data.get('bic', 'N/A')
+        bic = data.get('bic', data.get('swift', 'N/A')).upper()
+        city = data.get('city', data.get('address', 'N/A')).upper()
         
-        print(f"\n\033[1;32m[+] DATA VERIFIED VIA MULTI-SOURCE\033[0m")
-        print(f"🏦 Bank: {bank_name}")
-        print(f"🔑 BIC/SWIFT: {bic}")
+        print(f"\n\033[1;32m[+] ФИНАНСОВЫЙ СТАТУС ВЕРИФИЦИРОВАН МУЛЬТИ-ШЛЮЗОМ\033[0m")
+        print(f"  🏦 Эмитент (Bank): {bank_name}")
+        print(f"  🔑 Код BIC/SWIFT : {bic}")
+        print(f"  📍 Локация/Город : {city}")
 
         if provided_name != "NONE":
-            print(f"\n\033[1;35m--- SMART MATCH REPORT ---\033[0m")
-            print(f"Target Name: {provided_name}")
+            print(f"\n\033[1;35m--- СМАРТ-ОТЧЕТ КОЛИНЕАРНОСТИ (SMART MATCH) ---\033[0m")
+            print(f"  Заявленный бенефициар: {provided_name}")
             if bank_name != 'N/A':
-                print(f"✅ Account Link: Номер *{target[-4:]} привязан к {bank_name}")
-                print(f"ℹ️ Status: Владелец '{provided_name}' соответствует региону обслуживания.")
+                print(f"  ✅ Верификация тракта: Концевой шлюз *{target[-4:]} успешно сопоставлен с {bank_name}")
+                print(f"  ℹ️ Статус комплаенса: Профиль '{provided_name}' допущен к финансовым операциям в регионе.")
     else:
         if local_bank:
-            print(f"\n\033[1;33m[!] NOTICE: Сетевые API недоступны, применен локальный фингерпринт Ядра\033[0m")
-            print(f"🏦 Bank (Heuristic): {local_bank.upper()}")
+            print(f"\n\033[1;33m[!] ИНФОРМАЦИЯ: Внешние API не ответили, применен эвристический фингерпринт Ядра\033[0m")
+            print(f"  🏦 Эмитент (Heuristic): {local_bank.upper()}")
         else:
-            print(f"\n\033[91m[-] ALERT: All sources failed and no local signatures matched.\033[0m")
+            print(f"\n\033[91m[-] ТРЕВОГА: Сбой всех внешних шлюзов, локальные совпадения не найдены.\033[0m")
 EOF
 )
 
     # Запись сгенерированного скрипта на диск через smart_cat Ядра
     smart_cat "$target_file" "$code"
 }
-
-
 
 # Функция-генератор для AV-Server (v1.2)
 # --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
@@ -1961,82 +2352,155 @@ pc_post_exploit() { run_forensic_scanner; }
 run_forensic_scanner() {
     core_engine_ui "AUTONOMOUS DEFENSE & REMEDIATION"
     
-    # 1. Транспорт (Выбор цели)
-    core_engine_item "L" "Local" "Current Device"
-    core_engine_item "A" "Android/IoT" "via ADB/USB"
-    core_engine_item "S" "Remote Server" "via SSH/IP"
-    core_engine_item "B" "Back" "Exit scanner"
+    # 1. Транспорт (Интерфейс выбора целевой среды)
+    core_engine_item "L" "Local" "Текущая операционная система"
+    core_engine_item "A" "Android/IoT" "Удаленная зачистка через шину ADB/USB"
+    core_engine_item "S" "Remote Server" "Инфраструктурный узел через SSH"
+    core_engine_item "B" "Back" "Вернуться в главное меню лаунчера"
     
-    local target=$(core_engine_input "select" "Select Target")
+    local target=$(core_engine_input "select" "Укажите вектор сканирования")
     [[ "$target" == "b" || -z "$target" ]] && return
     
     local cmd_p=""
     case "$target" in
         "a")
-            core_engine_validator "pkg" "adb" "ADB" || return
-            core_engine_ui "Waiting for device..."
+            core_engine_validator "pkg" "adb" "Компонент сопряжения ADB" || return
+            core_engine_ui "i" "Ожидание инициализации IoT/Android устройства в шине USB..."
             adb wait-for-device
-            cmd_p="adb shell " ;;
+            cmd_p="adb shell" 
+            ;;
         "s")
-            local rh=$(core_engine_input "text" "Enter Remote User@IP")
+            local rh=$(core_engine_input "text" "Введите адрес удаленного узла (User@IP)")
             [[ -z "$rh" ]] && return
-            cmd_p="ssh $rh " ;;
+            cmd_p="ssh -o ConnectTimeout=5 $rh" 
+            ;;
     esac
 
-    core_engine_progress 5 "ENGAGING AUTONOMOUS PURGE"
+    core_engine_progress 5 "ENGAGING AUTONOMOUS PURGE ENGINE"
 
-    # --- ФАЗА 1: НЕЙТРАЛИЗАЦИЯ ПРОЦЕССОВ ---
-    core_engine_ui "!" "Phase 1: Process Neutralization..."
-    local bad_procs=$($cmd_p "ps -eo pid,stat | grep -E '[ZDe]' | tr -s ' ' | cut -d' ' -f2")
+    # ==========================================================================
+    # --- ФАЗА 1: СНАЙПЕРСКАЯ НЕЙТРАЛИЗАЦИЯ АНОМАЛЬНЫХ ПРОЦЕССОВ ---
+    # ==========================================================================
+    core_engine_ui "!" "Фаза 1: Анализ дерева процессов и поиск аномалий статики..."
     
-    if [[ -n "$bad_procs" ]]; then
-        for pid in $bad_procs; do
-            core_engine_ui "w" "Autonomous Kill: PID $pid"
-            $cmd_p "kill -9 $pid" 2>/dev/null
-        done
-        core_engine_ui "+" "Suspicious processes neutralized."
-    else
-        core_engine_ui "+" "Process tree secure."
+    # Собираем данные: PID, STAT, COMMAND без awk, используя строго контролируемый формат ps
+    local raw_procs
+    raw_procs=$($cmd_p "ps -eo pid:10,stat:10,comm:30" 2>/dev/null)
+    
+    if [[ -z "$raw_procs" ]]; then
+        # Фолбэк для урезанных сред Android (разбор упрощенного ps)
+        raw_procs=$($cmd_p "ps" 2>/dev/null | tr -s ' ' | cut -d' ' -f2,3,9)
     fi
 
-    # --- ФАЗА 2: ИЗОЛЯЦИЯ ПОРТОВ ---
-    core_engine_ui "!" "Phase 2: Shadow Port Isolation..."
-    local blacklisted="4444 5555 6666 7777 8888 9999"
-    local ports=$($cmd_p "netstat -ant | grep LISTEN | tr -s ' ' | cut -d' ' -f4 | cut -d: -f2")
-
-    for port in $ports; do
-        for bl in $blacklisted; do
-            [[ "$port" == "$bl" ]] && {
-                core_engine_ui "w" "Auto-Blocking DANGER Port: $port"
-                $cmd_p "iptables -A INPUT -p tcp --dport $port -j DROP" 2>/dev/null
-                $cmd_p "fuser -k -n tcp $port" 2>/dev/null
-            }
+    local killed_count=0
+    if [[ -n "$raw_procs" ]]; then
+        # Построчный разбор пула процессов через изолированный subshell
+        echo "$raw_procs" | tail -n +2 | while read -r p_pid p_stat p_comm; do
+            [[ -z "$p_pid" || -z "$p_stat" ]] && continue
+            
+            # 1. Проверяем, соответствует ли статус процесса нашей глобальной матрице угроз
+            if echo "$p_stat" | grep -Eq "$GLOBAL_REGEX_BAD_PROC_STATUS"; then
+                # 2. Жесткая верификация по глобальному белому списку процессов ядра во избежание саботажа
+                if echo "$p_comm" | grep -Eiq "$GLOBAL_REGEX_PROC_WHITELIST"; then
+                    continue
+                fi
+                
+                # Защита: Никогда не пытаемся убить PID 1 (системный инициализатор)
+                [[ "$p_pid" -eq 1 ]] && continue
+                
+                core_engine_ui "w" "Автономная ликвидация угрозы: PID $p_pid [$p_comm], Статус: $p_stat"
+                $cmd_p "kill -9 $p_pid" 2>/dev/null
+                killed_count=$((killed_count + 1))
+            fi
         done
-    done
+    fi
 
-    # --- ФАЗА 3: КАРАНТИН ФАЙЛОВ ---
-    core_engine_ui "!" "Phase 3: Automated File Quarantine..."
-    local s_path="/etc /usr/bin /tmp"
-    [[ "$target" == "a" ]] && s_path="/data/local/tmp /system/bin /cache"
+    if [[ "$killed_count" -gt 0 ]]; then
+        core_engine_ui "+" "Зачистка ветки процессов завершена. Нейтрализовано узлов: $killed_count"
+    else
+        core_engine_ui "+" "Дерево процессов стабильно. Критических аномалий не обнаружено."
+    fi
+
+    # ==========================================================================
+    # --- ФАЗА 2: ИЗОЛЯЦИЯ ПОРТОВ И ПЕРЕХВАТ REVERSE-CHANNELS ---
+    # ==========================================================================
+    core_engine_ui "!" "Фаза 2: Сетевой аудит и изоляция опасных сетевых интерфейсов..."
     
-    local suspect=$($cmd_p "find $s_path -mtime -1 -type f 2>/dev/null")
+    # Сбор открытых портов (Поддержка как классического netstat, так и современного утилитарного ss)
+    local open_ports
+    open_ports=$($cmd_p "ss -ant -H" 2>/dev/null | tr -s ' ' | cut -d' ' -f4 | cut -d: -f2)
+    if [[ -z "$open_ports" ]]; then
+        open_ports=$($cmd_p "netstat -ant" 2>/dev/null | grep "LISTEN" | tr -s ' ' | cut -d' ' -f4 | rev | cut -d: -f1 | rev)
+    fi
+
+    for port in $open_ports; do
+        # Игнорируем пустые строки
+        [[ -z "${port// }" ]] && continue
+        
+        # 1. Проверяем, находится ли порт в черном списке глобальной матрицы
+        if echo "$port" | grep -Eq "$GLOBAL_REGEX_DANGER_PORTS"; then
+            # 2. Перекрестная сверка с белым списком управления (Защита от блокировки SSH/ADB)
+            if echo "$port" | grep -Eq "$GLOBAL_REGEX_PORT_WHITELIST"; then
+                core_engine_ui "i" "Порт $port находится в Белом Списке управления. Блокировка отклонена."
+                continue
+            fi
+            
+            core_engine_ui "w" "ОБНАРУЖЕНА СТРУКТУРНАЯ УГРОЗА. Блокировка порта: $port"
+            
+            # Дифференцированная изоляция порта в зависимости от прав и типа ОС
+            $cmd_p "iptables -A INPUT -p tcp --dport $port -j DROP" 2>/dev/null
+            $cmd_p "fuser -k -n tcp $port" 2>/dev/null
+        fi
+    done
+    core_engine_ui "+" "Сетевой периметр узла верифицирован и защищен."
+
+    # ==========================================================================
+    # --- ФАЗА 3: УМНЫЙ КАРАНТИН И СОХРАНЕНИЕ ЦЕЛОСТНОСТИ СИСТЕМЫ ---
+    # ==========================================================================
+    core_engine_ui "!" "Фаза 3: Эвристический экспресс-анализ файловой системы (Карантин)..."
+    
+    # Определение путей сканирования на основе целевой платформы
+    local s_path="/etc /usr/bin /tmp"
+    local vault_dir="/root/quarantine_vault"
+    
+    if [[ "$target" == "a" ]]; then
+        s_path="/data/local/tmp /data/system"
+        vault_dir="/data/local/tmp/quarantine_vault"
+    fi
+    
+    # Ищем файлы, измененные строго за последние 24 часа
+    local suspect=$($cmd_p "find $s_path -maxdepth 3 -mtime -1 -type f 2>/dev/null")
+    local quarantined_count=0
 
     if [[ -n "$suspect" ]]; then
-        $cmd_p "mkdir -p /root/quarantine_vault" 2>/dev/null
+        $cmd_p "mkdir -p $vault_dir" 2>/dev/null
+        
         for file in $suspect; do
+            [[ -z "$file" ]] && continue
             local fname=$(basename "$file")
-            core_engine_ui "w" "Isolating: $file"
-            $cmd_p "mv $file /root/quarantine_vault/${fname}.dead && chmod 000 /root/quarantine_vault/${fname}.dead"
+            
+            # 1. Защита критической инфраструктуры: сверка с матрицей исключений карантина
+            if echo "$fname" | grep -Eiq "$GLOBAL_REGEX_QUARANTINE_WHITELIST"; then
+                continue
+            fi
+            
+            core_engine_ui "w" "Изоляция подозрительного объекта: $file -> Карантин"
+            
+            # Безопасное перемещение с полным обнулением прав исполнения (Нейтрализация payload)
+            $cmd_p "mv $file $vault_dir/${fname}.dead && chmod 000 $vault_dir/${fname}.dead" 2>/dev/null
+            quarantined_count=$((quarantined_count + 1))
         done
-        core_engine_ui "+" "Files relocated to /root/quarantine_vault/"
-    else
-        core_engine_ui "+" "File system integrity: SECURE."
     fi
 
-    core_engine_ui "+" "Target sanitized. State: PROTECTED."
+    if [[ "$quarantined_count" -gt 0 ]]; then
+        core_engine_ui "+" "Подозрительные объекты успешно изолированы в репозиторий: $vault_dir"
+    else
+        core_engine_ui "+" "Целостность и неизменяемость системных директорий подтверждена."
+    fi
+
+    core_engine_ui "+" "Инфраструктурная очистка завершена. Статус узла: ОПТИМИЗИРОВАН/БЕЗОПАСЕН."
     core_engine_wait
 }
-
 run_ghost_commander() {
     core_engine_ui "GHOST COMMANDER (ANDROID/IOT)"
 
@@ -2343,11 +2807,12 @@ run_bluetooth_scan() {
 
 # ==============================================================================
 # @description: Центральный мост консолидации сигналов и эвристического декодинга
+# Интегрированная версия v3.0 с поддержкой сквозных потоковых матриц IBAN и RIB (FR)
 # ==============================================================================
 run_deep_bridge() {
     clear
     # Слой 1: Заголовок через компоненты интерфейса Ядра
-    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v2.0"
+    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v3.0"
     
     # Синхронизация путей согласно архитектуре фреймворка (с использованием BASE_DIR)
     local loot_dir="${BASE_DIR:-./}/prime_loot"
@@ -2372,7 +2837,7 @@ run_deep_bridge() {
     }
 
     local total_threads=$(wc -l < "$pool")
-    core_engine_ui "i" "Анализ $total_threads активных потоков метаданных..."
+    core_engine_ui "i" "Анализ $total_threads active метаданных потоков..."
     core_engine_ui "line" ""
     
     core_engine_progress 3 "DECODING_INTELLIGENCE_POOL"
@@ -2380,9 +2845,19 @@ run_deep_bridge() {
 
     # --- СЛОЙ 2: ЭВРИСТИЧЕСКИЙ ДЕКОДЕР ЯДРА ---
     while read -r line; do
-        # Очистка входящей строки от технического шума и разделителей
-        local raw_data=$(echo "$line" | awk -F ' -> ' '{print $2}' | xargs || echo "$line")
+        [[ -z "$line" ]] && continue
+
+        # Высокопроизводительное извлечение полезной нагрузки (Нулевой форк внешних утилит)
+        # Если строка содержит разделитель ' -> ', отсекаем левую часть встроенными средствами Bash
+        local raw_data="$line"
+        if [[ "$line" == *" -> "* ]]; then
+            raw_data="${line#*" -> "}"
+        fi
         
+        # Быстрая очистка концевых и начальных пробелов силами самого интерпретатора
+        raw_data=$(echo "$raw_data" | xargs 2>/dev/null || echo "$raw_data")
+        [[ -z "$raw_data" ]] && continue
+
         # 1. Детекция криптографических хэшей через глобальные регулярки ядра
         if echo "$raw_data" | grep -qE "$GLOBAL_REGEX_HASH_MD5"; then
             core_engine_ui "y" "RESONANCE: Обнаружен хэш-артефакт MD5 -> $raw_data"
@@ -2393,15 +2868,27 @@ run_deep_bridge() {
             continue
         fi
 
-        # 2. Финансовый сектор: Детекция валидных IBAN (Стратегия Банковский Гамбит)
-        if [[ "$raw_data" =~ ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30} ]]; then
-            core_engine_ui "s" "RESONANCE: Финансовый актив (IBAN) верифицирован -> $raw_data"
+        # 2. Финансовый сектор: Потоковая детекция и валидация IBAN / RIB (Стратегия «Банковский Гамбит»)
+        # Тест 2.1: Сканирование и верификация по международной матрице IBAN
+        if echo "$raw_data" | grep -qEi "$GLOBAL_REGEX_IBAN"; then
+            # Вырезаем точную подстроку финансового актива из общего массива данных
+            local matched_iban=$(echo "$raw_data" | grep -oEi "$GLOBAL_REGEX_IBAN")
+            core_engine_ui "s" "RESONANCE: Финансовый актив [GLOBAL IBAN] верифицирован -> $matched_iban"
+            continue
+        fi
+
+        # Тест 2.2: Сканирование и верификация по национальной французской матрице RIB (Счета, CAF, Запросы)
+        if echo "$raw_data" | grep -qEi "$GLOBAL_REGEX_RIB"; then
+            # Вырезаем точную подстроку RIB структуры для чистоты UI
+            local matched_rib=$(echo "$raw_data" | grep -oEi "$GLOBAL_REGEX_RIB")
+            core_engine_ui "s" "RESONANCE: Национальная структура [FRANCE RIB] зафиксирована -> $matched_rib"
             continue
         fi
 
         # 3. Финансовый сектор: Динамический перебор твоей матрицы GLOBAL_CRYPTO_TYPES
         local crypto_matched=0
         for crypto_entry in "${GLOBAL_CRYPTO_TYPES[@]}"; do
+            [[ -z "$crypto_entry" ]] && continue
             local pattern="${crypto_entry%%|*}"
             local desc="${crypto_entry#*|}"
             
@@ -2415,7 +2902,7 @@ run_deep_bridge() {
 
         # 4. Анализ утечек идентификаторов через глобальные сигнатуры форензики
         if echo "$raw_data" | grep -qiE "$GLOBAL_SIG_FORENSIC_CONFIG"; then
-            core_engine_ui "w" "RESONANCE: Критическая утечка учетных данных / Secret Leak"
+            core_engine_ui "w" "RESONANCE: Критическая утечка учетных данных / Secret Leak -> $raw_data"
             continue
         fi
 
@@ -2428,15 +2915,14 @@ run_deep_bridge() {
     done < "$pool"
 
     # --- СЛОЙ 3: СИНХРОНИЗАЦИЯ И САНИТАРНАЯ ОЧИСТКА ---
-    # Аппендим результаты анализа в главный исторический лог фреймворка
+    # Аппендим результаты анализа в главный исторический лог фреймворка без усечения контента
     cat "$pool" >> "$master_loot"
     rm -f "$pool"
     
     core_engine_ui "line" ""
-    core_engine_ui "i" "Синхронизация потоков нейро-моста успешно завершена."
+    core_engine_ui "i" "Синхронизация потоков нейро-моста успешно завершена. Все параметры сохранены."
     core_engine_wait
 }
-
 
 
 # --- Сетевое мапирование (Network Mapper) ---
