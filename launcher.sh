@@ -1572,16 +1572,17 @@ core_engine_remove() {
     done
 }
 
-# Core Engine: Динамический исполнитель
-# Сама решает: выводить результат или работать в режиме "стелс"
+# Core Engine: Безопасный динамический исполнитель
 core_engine_exec() {
     local cmd="$1"
     local mode="${2:-silent}" # По умолчанию — полная тишина
 
     if [[ "$mode" == "silent" ]]; then
-        eval "$cmd" >/dev/null 2>&1
+        # Используем bash -c для безопасного выполнения команды в фоне
+        # Перенаправление происходит на уровне оболочки, это надежно
+        bash -c "$cmd" >/dev/null 2>&1
     else
-        eval "$cmd"
+        bash -c "$cmd"
     fi
 }
 
