@@ -44,6 +44,50 @@ export BASE_DIR MOD_DIR PRIME_LOOT PRIME_SHARE
 
 
 # ==============================================================================
+# 12. ГЛОБАЛЬНАЯ МАТРИЦА МЕНЮ (MENU REGISTRY)
+# ==============================================================================
+GLOBAL_MENU_REGISTRY=(
+    "MAIN:CYBER_OPS|menu_cyber_ops" "MAIN:INTELLIGENCE|menu_intelligence"
+    "MAIN:CRYPTO_LAB|menu_crypto_lab" "MAIN:NET_INFRA|menu_net_infra"
+    "MAIN:FIN_SHIELD|menu_financial_shield" "MAIN:STEALTH_COMMS|menu_stealth_comms"
+    "MAIN:NEXUS|menu_nexus_correlation" "MAIN:SYSTEM|menu_system_core"
+    "MAIN:CORE_LAB|menu_core_lab" "MAIN:FORENSICS|menu_forensics"
+    "MAIN:PASSWORD|run_pass_lab" "MAIN:ANTI_MALWARE|run_anti_malware_engine"
+    "MAIN:REANIMATOR|run_cross_os_reanimator" "MAIN:EXIT|exit_script"
+
+    "INTELLIGENCE:Smart_OSINT_Engine|run_smart_osint_engine" "INTELLIGENCE:Network_Intelligence|run_network_analyzer"
+    "INTELLIGENCE:Nexus_SocialScan|run_osint_custom_socialscan" "INTELLIGENCE:Nexus_Breach_Leaks|run_osint_custom_leaks"
+    "INTELLIGENCE:Telegram_Resolver|run_osint_custom_ignorant" "INTELLIGENCE:Omni_Stealth_Crawler|run_osint_omni_crawler"
+
+    "SYSTEM:System_Info|run_system_info" "SYSTEM:Sync_DNS|core_network_dns_sync"
+    "SYSTEM:Update_OS|run_sys_update" "SYSTEM:Update_Launcher|run_update_prime"
+    "SYSTEM:Clean_Logs|run_logs_cleaner" "SYSTEM:System_Pulse|run_system_pulse"
+
+    "FORENSICS:ADAPTIVE_ANALYZE|run_auto_forensics" "FORENSICS:Disk_Raw_Recovery|run_raw_recovery"
+    "FORENSICS:Document_Sanitizer|run_doc_cleaner" "FORENSICS:Forensic_Loot|run_loot_viewer"
+
+    "CYBER_OPS:Ghost_Commander|run_ghost_commander" "CYBER_OPS:PC_Control|pc_password_recovery"
+    "CYBER_OPS:Ultimate_Exploit|run_prime_exploiter_v5" "CYBER_OPS:Omega_Auditor|run_prime_auditor_v2"
+
+    "CRYPTO_LAB:Hash_Analyzer|run_hash_analyzer" "CRYPTO_LAB:File_Encryptor|run_file_cryptor"
+    "CRYPTO_LAB:Stegano_Deep_Hide|run_stegano_lab" "CRYPTO_LAB:SSH_Key_Gen|run_ssh_keygen"
+
+    "NET_INFRA:Device_Hack|run_device_hack" "NET_INFRA:Mesh_Bridge|run_mesh_bridge" "NET_INFRA:Server_Control|run_servers"
+
+    "CORE_LAB:Mem_Injection|run_mem_inject" "CORE_LAB:Packet_Forge|run_packet_forge"
+    "CORE_LAB:WiFi_Pulse|run_wifi_pulse" "CORE_LAB:Kernel_Audit|run_kernel_check"
+
+    "FIN_SHIELD:IBAN_Validator|run_iban_analyzer" "FIN_SHIELD:Gambit_Strategy|run_gambit_info"
+    "FIN_SHIELD:Transaction_Audit|run_trans_audit" "FIN_SHIELD:Secure_Wallet|run_wallet_manager"
+
+    "STEALTH_COMMS:Live_Node_AV|run_av_server" "STEALTH_COMMS:Shared_Node_Store|run_share_server"
+    "STEALTH_COMMS:Upload_Portal|run_upload_server" "STEALTH_COMMS:Node_Destroy|run_node_clean"
+
+    "NEXUS:Full_Pipeline|run_nexus_full_pipeline"
+)
+
+
+# ==============================================================================
 # 1. ГЛОБАЛЬНАЯ МАТРИЦА ПЛАТФОРМ ДЛЯ КРОСС-СПРАВОК (ULTIMATE OSINT CORE)
 # ==============================================================================
 # Формат: "URL_ПРЕФИКС|ТИП_ПРОВЕРКИ|МАРКЕР_ОШИБКИ|КАТЕГОРИЯ|НАЗВАНИЕ_СЕРВИСА"
@@ -7102,94 +7146,43 @@ run_osint_omni_crawler() {
 
 
 # --- ГЛАВНОЕ МЕНЮ (ПОЛНЫЙ КОМПЛЕКТ v13.8) ---
-
-menu_intelligence() {
-    core_engine_ui "h" "SECTOR I: INTELLIGENCE & OSINT"
-    local names="Smart_OSINT_Engine Network_Intelligence Nexus_SocialScan Nexus_Breach_Leaks Telegram_Resolver Omni_Stealth_Crawler"
-    local funcs="run_smart_osint_engine  run_network_analyzer run_osint_custom_socialscan run_osint_custom_leaks run_osint_custom_ignorant run_osint_omni_crawler"
-    prime_dynamic_controller "INTELLIGENCE" "$names" "$funcs"
-}
-
-menu_system_core() {
-    core_engine_ui "h" "SYSTEM CORE: MAINTENANCE & INFO"
-    local names="System_Info Sync_DNS Update_OS Update_Launcher Clean_Logs System_Pulse"
-    local funcs="run_system_info core_network_dns_sync run_sys_update run_update_prime run_logs_cleaner run_system_pulse"
-    prime_dynamic_controller "SYSTEM_CORE" "$names" "$funcs"
-}
-
-menu_forensics() {
-    core_engine_ui "h" "SECTOR F: DATA FORENSICS & RECOVERY"
-    local names="ADAPTIVE_ANALYZE Disk_Raw_Recovery Document_Sanitizer Forensic_Loot"
-    local funcs="run_auto_forensics run_raw_recovery run_doc_cleaner run_loot_viewer"
-    prime_dynamic_controller "DATA_FORENSICS" "$names" "$funcs"
-}
-
-menu_cyber_ops() {
-    core_engine_ui "h" "CYBER OPERATIONS SECTOR"
-    local names="Ghost_Commander PC_Control Ultimate_Exploit Omega_Auditor"
-    local funcs="run_ghost_commander pc_password_recovery run_prime_exploiter_v5  run_prime_auditor_v2"
-    prime_dynamic_controller "CYBER_OPS" "$names" "$funcs"
-}
-
-menu_crypto_lab() {
-    core_engine_ui "h" "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY"
-    local names="Hash_Analyzer File_Encryptor Stegano_Deep_Hide SSH_Key_Gen"
-    local funcs="run_hash_analyzer run_file_cryptor run_stegano_lab run_ssh_keygen"
-    prime_dynamic_controller "CRYPTO_LAB" "$names" "$funcs"
-}
-
-menu_net_infra() {
-    core_engine_ui "h" "NETWORK INFRASTRUCTURE"
-    local names="Device_Hack Mesh_Bridge Server_Control"
-    local funcs="run_device_hack run_mesh_bridge run_servers"
-    prime_dynamic_controller "NET_INFRA" "$names" "$funcs"
-}
-
-menu_core_lab() {
-    core_engine_ui "h" "CORE RESEARCH LAB"
-    local names="Mem_Injection Packet_Forge WiFi_Pulse Kernel_Audit"
-    local funcs="run_mem_inject run_packet_forge run_wifi_pulse run_kernel_check"
-    prime_dynamic_controller "CORE_LAB" "$names" "$funcs"
-}
-
-menu_financial_shield() {
-    core_engine_ui "h" "FINANCIAL SHIELD: BANKING GAMBIT"
-    local names="IBAN_Validator Gambit_Strategy Transaction_Audit Secure_Wallet"
-    local funcs="run_iban_analyzer run_gambit_info run_trans_audit run_wallet_manager"
-    prime_dynamic_controller "FIN_SHIELD" "$names" "$funcs"
-}
-
-
-menu_stealth_comms() {
-    # 1. Запуск прогресс-бара для красоты перехода
-    core_engine_progress 1 "STEALTH_COMMS"    
-    # 2. Имена для отображения в меню (красивые)
-    local names="Live_Node_AV Shared_Node_Store Upload_Portal Node_Destroy"    
-    # 3. РЕАЛЬНЫЕ имена функций из твоего кода (исправлено)
-    local funcs="run_av_server run_share_server run_upload_server run_node_clean"    
-    # 4. Запуск через контроллер
-    prime_dynamic_controller "STEALTH_COMMS" "$names" "$funcs"
-}
-
-menu_nexus_correlation() {
-    core_engine_ui "h" "SECTOR N: NEXUS ANALYSIS & CORRELATION"
+run_dynamic_menu() {
+    local target_key="$1"
+    local menu_title="$2"
     
-    # Имена для отображения
-    local names="Full_Pipeline"
-local funcs="run_nexus_full_pipeline"    
-    prime_dynamic_controller "NEXUS_CORRELATION" "$names" "$funcs"
+    # Визуальный отклик для тяжелых секторов
+    [[ "$target_key" == "STEALTH_COMMS" || "$target_key" == "NEXUS" ]] && core_engine_progress 1 "$target_key"
+    
+    core_engine_ui "h" "$menu_title"
+    
+    local -a labels=()
+    local -a actions=()
+    
+    # Поиск по матрице
+    for entry in "${GLOBAL_MENU_REGISTRY[@]}"; do
+        if [[ "$entry" == "$target_key:"* ]]; then
+            local clean_entry="${entry#*:}"
+            labels+=("${clean_entry%|*}")
+            actions+=("${clean_entry#*|}")
+        fi
+    done
+    
+    # Защита от пустого меню
+    if [ ${#labels[@]} -eq 0 ]; then
+        core_engine_ui "e" "CRITICAL: Menu sector '$target_key' is empty or invalid!"
+        core_engine_wait
+        return 1
+    fi
+    
+    # Передача в контроллер
+    prime_dynamic_controller "$menu_title" "${labels[*]}" "${actions[*]}"
 }
-
 
 run_main_menu() {
-    local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS 
-NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS PASSWORD ANTI_MALWARE CROSS_OS_REANIMATOR EXIT"
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics run_pass_lab run_anti_malware_engine run_cross_os_reanimator exit_script"
-    
-    prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
+    run_dynamic_menu "MAIN" "PRIME MASTER EXECUTIVE v35.4"
 }
-
 
 # --- ТОЧКА ЗАПУСКА ---
 clear
 run_main_menu
+
