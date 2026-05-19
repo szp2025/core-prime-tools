@@ -2919,17 +2919,27 @@ EOF
 }
 
 
-# Функция-генератор для Share-Server (v1.0)
-# --- ГЕНЕРАТОР МОДУЛЯ SHARE-SERVER (SHARE SECTOR) ---
+# ==============================================================================
+# @description: Интегрированный кросс-платформенный генератор веб-панели Share-Server v2.0
+# МОДЕРНИЗАЦИЯ: Внедрение сквозного пре-даунлоад контроля CAME с логикой TOTAL OUTBOUND PURGE
+# ФУНКЦИОНАЛ: Сканирование файлов «на лету» перед отдачей, моментальное удаление угроз с хоста
+# АРХИТЕКТУРА: Flask-интерфейс, защита сетевых клиентов от скачивания деструктивных векторов
+# ==============================================================================
 generate_share_server_code_raw() {
-    # Загружаем только базовый шаблон страницы
+    # Загружаем только базовый шаблон страницы в локальную переменную
     local template=$(generate_core_template)
 
+    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
     cat << EOF
-from flask import Flask, render_template_string, send_from_directory
+from flask import Flask, render_template_string, send_from_directory, abort
 import os
+import re
 
 app = Flask(__name__)
+
+# Проброс глобального регулярного выражения CAME из ядра Bash в Python
+GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
+
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
@@ -2958,7 +2968,7 @@ def index():
     except:
         files = []
     
-    # Формируем сетку файлов с использованием новых стилей .file-grid и .file-item
+    # Формируем сетку файлов с использованием оригинальных стилей .file-grid и .file-item
     grid_content = '<div class="file-grid">'
     for f in files:
         icon = get_file_icon(f)
@@ -2975,31 +2985,112 @@ def index():
     grid_content += '</div>'
     grid_content += f'<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 0.7rem; opacity: 0.5;">MOUNT_POINT: {SHARE_DIR}</div>'
 
-    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION", grid_content))
+    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION_v2.0", grid_content))
 
 @app.route('/get/<filename>')
 def get_file(filename):
-    return send_from_directory(SHARE_DIR, filename)
+    # Обеспечение базовой безопасности путей (предотвращение Path Traversal)
+    target_path = os.path.normpath(os.path.join(SHARE_DIR, filename))
+    if not target_path.startswith(SHARE_DIR) or not os.path.exists(target_path):
+        abort(404)
+        
+    # Игнорируем директории, если они случайно попали в запрос
+    if os.path.isdir(target_path):
+        abort(400)
+
+    is_infected = False
+    report = []
+
+    try:
+        # --- ВЕКТОР ПРЕДВАРИТЕЛЬНОГО ОУТПУТ-КОНТРОЛЯ CAME ---
+        with open(target_path, 'rb') as file_buffer:
+            raw_content = file_buffer.read()
+
+        total_bytes = len(raw_content)
+
+        # Вычисление плотности ASCII (Борьба со скрытыми крипторами / паккерами)
+        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
+        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
+
+        # Декодирование содержимого для проверки регулярными выражениями Слоев 1-4
+        text_content = raw_content.decode('utf-8', errors='ignore')
+
+        matches = []
+        try:
+            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
+            for i, line in enumerate(text_content.splitlines(), 1):
+                if compiled_regex.search(line):
+                    matches.append(f"Line {i}: {line.strip()[:100]}")
+        except Exception as regex_err:
+            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
+
+        # Анализ полученных данных
+        if total_bytes > 1000 and readable_ratio < 12:
+            is_infected = True
+            report.append("CRITICAL ANOMALY: High Entropy / Encrypted code signature detected.")
+
+        if matches:
+            is_infected = True
+            report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
+
+        # --- РУБЕЖ РЕШЕНИЯ И АННИГИЛЯЦИИ ---
+        if is_infected:
+            # Файл грязный — полное стирание с жесткого диска сервера, чтобы никто больше не смог его запросить
+            if os.path.exists(target_path):
+                os.remove(target_path)
+
+            # Вместо скачивания файла возвращаем пользователю жесткую веб-страницу с алармом
+            content = f"""
+            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
+                CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
+            </div>
+            <p style="font-size:12px; color:var(--accent-color);">The requested object <b>{filename}</b> failed outbound security compliance and was <b>permanently purged</b> from the storage node.</p>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
+            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO DISTRIBUTION ]</a></div>
+            """
+            return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
+
+        else:
+            # Файл чист — беспрепятственно отдаем клиенту
+            return send_from_directory(SHARE_DIR, filename)
+
+    except Exception as e:
+        return f"DISTRIBUTION_INTEGRITY_ERROR: {str(e)}", 500
 
 if __name__ == '__main__':
+    # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 }
 
 
-# Функция-генератор для Upload-Server (v1.0)
+
+# ==============================================================================
+# @description: Интегрированный кросс-платформенный генератор веб-панели Upload-Server v2.1
+# МОДЕРНИЗАЦИЯ: Внедрение сквозного пре-лоад контроля CAME с логикой TOTAL DESTRUCTION
+# ФУНКЦИОНАЛ: Потоковый анализ файлов в /tmp, моментальное стирание зараженных объектов
+# АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
+# ==============================================================================
 generate_upload_server_code_raw() {
+    # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
+    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
     cat << EOF
 from flask import Flask, request, render_template_string
 import os
+import re
 
 app = Flask(__name__)
+
+# Проброс глобального регулярного выражения CAME из ядра Bash в Python
+GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
+
 # Сохраняем во входящую папку внутри PRIME_LOOT
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
+# Инициализация безопасной структуры каталогов (только папка для чистых файлов)
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -3007,18 +3098,103 @@ $templates
 
 @app.route('/')
 def index():
+    # Главная страница: Интуитивная защищенная форма загрузки данных в Drop-Box
     fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
-    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE UPLOAD")
-    return render_template_string(render_prime_page("INBOUND_DROP_BOX", form_html))
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files: return "TRANSFER_ERROR", 400
+    # --- ВЕКТОР ПРОВЕРКИ И БЕССЛЕДНОГО УНИЧТОЖЕНИЯ (PRE-UPLOAD TOTAL PURGE) ---
+    if 'file' not in request.files: 
+        return "TRANSFER_ERROR", 400
+        
     f = request.files['file']
-    if f.filename == '': return "EMPTY_FILENAME", 400
+    if f.filename == '': 
+        return "EMPTY_FILENAME", 400
     
-    f.save(os.path.join(UPLOAD_DIR, f.filename))
-    return "SUCCESS: File received in secure sector."
+    # 1. Первичный прием потока данных во временную буферную зону /tmp
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    
+    is_infected = False
+    report = []
+    
+    try:
+        # 2. Чтение бинарного дампа загруженного объекта для структурного аудита CAME
+        with open(tmp_path, 'rb') as file_buffer:
+            raw_content = file_buffer.read()
+            
+        total_bytes = len(raw_content)
+        
+        # Анализ плотности ASCII (Выявление обфускации / Высокой энтропии)
+        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
+        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
+        
+        # Декодирование в текстовый стрим для сигнатурного матчинга
+        text_content = raw_content.decode('utf-8', errors='ignore')
+        
+        matches = []
+        # Запуск сканирования по Слоям 1-4
+        try:
+            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
+            for i, line in enumerate(text_content.splitlines(), 1):
+                if compiled_regex.search(line):
+                    matches.append(f"Line {i}: {line.strip()[:100]}")
+        except Exception as regex_err:
+            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
+            
+        # 3. Принятие решения на основе полученных эвристических метрик
+        if total_bytes > 1000 and readable_ratio < 12:
+            is_infected = True
+            report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
+            
+        if matches:
+            is_infected = True
+            report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
+            
+        # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
+        if is_infected:
+            # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
+            # Файл ЗАРАЖЕН — Полное удаление с диска без создания карантинных копий
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            
+            # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
+            content = f"""
+            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
+                CRITICAL DETECTION: THREAT TOTALLY DESTROYED
+            </div>
+            <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
+            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
+            """
+            return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
+            
+        else:
+            # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
+            final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
+            
+            # На случай, если файл с таким именем уже существовал, безопасно перезаписываем его
+            if os.path.exists(final_dest_path):
+                os.remove(final_dest_path)
+                
+            shutil.move(tmp_path, final_dest_path)
+            
+            content = f"""
+            <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">
+                SUCCESS: UPLOAD VERIFIED
+            </div>
+            <p style="font-size:12px;">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
+            <div style="margin-top:20px;"><a href="/" class="btn">[ UPLOAD ANOTHER FILE ]</a></div>
+            """
+            return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
+            
+    except Exception as e:
+        # Гарантированная зачистка временного буфера в случае критического сбоя выполнения
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
@@ -3028,57 +3204,125 @@ EOF
 
 
 
-
-generate_mem_inject_code_raw() {
-    cat << 'EOF'
+# ==============================================================================
+# @description: Модуль глубокого анализа виртуальной памяти процессов AV-Server Core v2.5
+# МОДЕРНИЗАЦИЯ: Преобразование инжектора в модуль глубокой криминалистической экспертизы ОЗУ
+# ФУНКЦИОНАЛ: Посегментный разбор карт памяти /proc/pid/mem на базе сигнатур CAME Слоя 5
+# АРХИТЕКТУРА: Автономный CLI-скрипт + интеграция в контур мониторинга веб-панели
+# ==============================================================================
+generate_mem_audit_code_raw() {
+    cat << EOF
 import ctypes
 import os
 import sys
+import re
 
-# Константы для доступа к памяти
+# Системные константы Linux для управления отладкой и доступом к памяти
 PTRACE_ATTACH = 16
 PTRACE_DETACH = 17
 
-def read_process_memory(pid, search_str):
-    libc = ctypes.CDLL("libc.so.6")
+# Проброс ультимативного паттерна детекции вредоносной активности в памяти (Слой 5)
+GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
+
+def audit_process_memory(pid):
+    """Выполняет посегментное сканирование оперативной памяти процесса на сигнатуры угроз."""
+    # Загружаем системную библиотеку libc для совершения ptrace вызовов
+    try:
+        libc = ctypes.CDLL("libc.so.6")
+    except:
+        try:
+            libc = ctypes.CDLL("libc.dylib") # Резерв под macOS окружение
+        except:
+            print("[!] CRITICAL: Underlaying C library (libc) is unavailable.")
+            sys.exit(1)
     
-    # Пытаемся прикрепиться к процессу (нужны права root)
+    # Проверка прав суперпользователя (root), необходимых для ptrace_attach
+    if os.getuid() != 0:
+        print("[!] WARNING: Root privileges are required to attach to external tasks.")
+
+    # Пытаемся прикрепиться к целевому процессу для стабилизации его состояния
     if libc.ptrace(PTRACE_ATTACH, pid, 0, 0) < 0:
-        print(f"[!] Failed to attach to PID {pid}")
+        print(f"[!] FAULT: Failed to attach to target PID {pid}. Access Denied or Process Terminated.")
         return
 
-    print(f"[*] Scanning PID {pid} for sensitive patterns...")
+    print(f"[*] INITIATED DEEP MEMORY INTEGRITY AUDIT FOR PID: {pid}")
+    print(f"[*] COMPILING CAME LAYER-5 SIGNATURE MATRIX...")
     
     try:
-        # Читаем карты памяти процесса
-        with open(f"/proc/{pid}/maps", "r") as maps_file:
+        compiled_regex = re.compile(GLOBAL_AV_PROC_REGEX, re.IGNORECASE)
+    except Exception as reg_err:
+        print(f"[!] SIGNATURE COMPILATION ERROR: {str(reg_err)}")
+        libc.ptrace(PTRACE_DETACH, pid, 0, 0)
+        return
+
+    matches_count = 0
+    
+    try:
+        maps_path = f"/proc/{pid}/maps"
+        mem_path = f"/proc/{pid}/mem"
+        
+        if not os.path.exists(maps_path) or not os.path.exists(mem_path):
+            print(f"[!] ERROR: Process virtualization endpoints do not exist for PID {pid}.")
+            return
+
+        # Шаг 1: Читаем карту распределения виртуальной памяти процесса
+        with open(maps_path, "r") as maps_file:
             for line in maps_file:
-                if "rw-p" not in line: continue  # Нас интересуют только сегменты с чтением/записью
+                # Нас интересуют только приватные сегменты с правами на чтение и запись (rw-p)
+                # Именно там хранятся динамические данные, переменные окружения, куча (heap) и стек
+                if "rw-p" not in line: 
+                    continue  
                 
                 parts = line.split()
+                if not parts: 
+                    continue
+                    
                 addr_range = parts[0].split("-")
                 start = int(addr_range[0], 16)
                 end = int(addr_range[1], 16)
                 size = end - start
                 
-                # Читаем данные напрямую из /proc/pid/mem
-                with open(f"/proc/{pid}/mem", "rb", 0) as mem_file:
+                # Извлекаем имя региона памяти, если оно доступно (например, [stack], [heap])
+                region_name = parts[-1] if len(parts) > 5 else "anonymous_allocation"
+                
+                # Шаг 2: Читаем сырые бинарные данные сегмента напрямую из виртуального интерфейса ядра mem
+                with open(mem_path, "rb", 0) as mem_file:
                     mem_file.seek(start)
                     try:
                         chunk = mem_file.read(size)
-                        if search_str.encode() in chunk:
-                            print(f"[MATCH] Found '{search_str}' at 0x{start:x} in PID {pid}")
+                        if not chunk: 
+                            continue
+                            
+                        # Переводим дамп памяти в текст, игнорируя нечитаемые бинарные символы
+                        decoded_chunk = chunk.decode('utf-8', errors='ignore')
+                        
+                        # Шаг 3: Построчный сигнатурный анализ сегмента ОЗУ
+                        for line_num, text_line in enumerate(decoded_chunk.splitlines(), 1):
+                            if compiled_regex.search(text_line):
+                                clean_line = text_line.strip()[:80]
+                                print(f"-> [MATCH DETECTED] Region: {region_name} | Address: 0x{start:x} | Context: {clean_line}")
+                                matches_count += 1
                     except:
+                        # Защита от динамического освобождения страниц памяти процессом в момент чтения
                         continue
     finally:
+        # Гарантированное отключение от процесса, чтобы он продолжил свою работу в ОС
         libc.ptrace(PTRACE_DETACH, pid, 0, 0)
+        print(f"[*] AUDIT COMPLETE FOR PID {pid}. Total Threats Isolated in Memory: {matches_count}")
+        print(f"[*] DETACHED PROTOCOL: SUCCESS")
 
 if __name__ == "__main__":
-    if len(sys.argv) > 2:
-        read_process_memory(int(sys.argv[1]), sys.argv[2])
+    if len(sys.argv) > 1:
+        try:
+            target_pid = int(sys.argv[1])
+            audit_process_memory(target_pid)
+        except ValueError:
+            print("[!] USAGE ERROR: PID must be a valid integer.")
+    else:
+        print("=== CAME MEMORY FORENSIC UTILITY v2.5 ===")
+        print("Usage: python3 mem_audit.py <TARGET_PID>")
 EOF
 }
-
 
 generate_packet_forge_code_raw() {
     cat << 'EOF'
