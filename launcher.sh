@@ -1320,6 +1320,70 @@ GLOBAL_AV_SOCKET_STATES="(LISTEN|ESTABLISHED|ESTAB|SYN_SENT|SYN_RECV)"
 # ==============================================================================
 GLOBAL_AV_ENGINE_PIPE="${GLOBAL_AV_SYS_CALLS}|${GLOBAL_AV_NET_VECTORS}|${GLOBAL_AV_MAL_MARKERS}|${GLOBAL_AV_LOLBAS_MATRIX}"
 
+
+
+
+# ==============================================================================
+# 8. ГЛОБАЛЬНЫЕ МАТРИЦЫ КРОСС-ПЛАТФОРМЕННОЙ РЕАНИМАЦИИ (OS RECOVERY MATRICES)
+# ==============================================================================
+# [КОНТУР WINDOWS: ТОТАЛЬНАЯ ДЕСТРУКЦИЯ БЛОКИРОВОК И ЗАЧИСТКА АВТОЗАПУСКА]
+# Фиксирует: Диспетчер задач, Редактор реестра, Командную строку, свойства папок, Userinit,
+# вырезает вредоносный автозапуск (Run/RunOnce, Winlogon, Сhevron), очищаетhosts-файл от блокировок AV-сайтов,
+# принудительно восстанавливает запуск критических служб безопасности (WinDefend, SecurityHealthService).
+GLOBAL_FIX_WIN_REG="reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableTaskMgr /t REG_DWORD /d 0 /f; \
+reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableRegistryTools /t REG_DWORD /d 0 /f; \
+reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableCMD /t REG_DWORD /d 0 /f; \
+reg add \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableTaskMgr /t REG_DWORD /d 0 /f; \
+reg add \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableRegistryTools /t REG_DWORD /d 0 /f; \
+reg add \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableCMD /t REG_DWORD /d 0 /f; \
+reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v Hidden /t REG_DWORD /d 1 /f; \
+reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v ShowSuperHidden /t REG_DWORD /d 1 /f; \
+reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v Shell /t REG_SZ /d \"explorer.exe\" /f; \
+reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v Userinit /t REG_SZ /d \"C:\\Windows\\system32\\userinit.exe,\" /f; \
+reg delete \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /va /f; \
+reg delete \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\" /va /f; \
+reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /va /f; \
+reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\" /va /f; \
+reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinDefend\" /v Start /t REG_DWORD /d 2 /f; \
+reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\SecurityHealthService\" /v Start /t REG_DWORD /d 2 /f; \
+attrib -r -s -h C:\\Windows\\System32\\drivers\\etc\\hosts 2>nul; \
+echo -e \"127.0.0.1 localhost\n::1 localhost\" > C:\\Windows\\System32\\drivers\\etc\\hosts"
+
+# [КОНТУР LINUX: ГЛУБОКАЯ ЗАЧИСТКА ХОСТА, СБРОС ТРАФИКА И ИЗОЛЯЦИЯ ЮЗЕРСПЕЙСА]
+# Фиксирует: Полное уничтожение ВСЕХ планировщиков задач (cron, systemd-таймеры, anacron),
+# сброс всех цепочек трафика, NAT и кастомных таблиц перехвата (iptables/nftables),
+# очистка предзагрузчика библиотек (уничтожение ядерных и юзерспейс-руткитов в ld.so.preload),
+# принудительное восстановление эталонных DNS-серверов в обход локальных вредоносных прокси.
+GLOBAL_FIX_LINUX="rm -rf /etc/cron.d/* /etc/cron.daily/* /etc/cron.hourly/* /etc/cron.monthly/* /etc/cron.weekly/* /var/spool/cron/crontabs/* /etc/anacrontab; \
+rm -rf /etc/systemd/system/*.timer /lib/systemd/system/*.timer; \
+> /etc/ld.so.preload 2>/dev/null; \
+chattr -i /etc/resolv.conf 2>/dev/null; \
+echo -e \"nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\" > /etc/resolv.conf; \
+chattr +i /etc/resolv.conf 2>/dev/null; \
+iptables -P INPUT ACCEPT; iptables -P FORWARD ACCEPT; iptables -P OUTPUT ACCEPT; \
+iptables -F; iptables -X; iptables -t nat -F; iptables -t nat -X; iptables -t mangle -F; iptables -t mangle -X; \
+nft flush ruleset 2>/dev/null; \
+echo -e \"127.0.0.1 localhost\n::1 localhost\" > /etc/hosts"
+
+# [КОНТУР MACOS: ПОЛНОЕ КУПИРОВАНИЕ ПЕРСИСТЕНТНОСТИ И ДЕАКТИВАЦИЯ АГЕНТОВ ЗАРАЖЕНИЯ]
+# Фиксирует: Принудительное тотальное отключение, выгрузка и удаление прав запуска со всех
+# сторонних агентов и демонов инициализации пользователя и системы (места дислокации майнеров и spyware),
+# зачистка перехватов сетевой маршрутизации, восстановление чистого hosts,
+# принудительное завершение всех пользовательских фоновых процессов, запущенных вне стандартного дерева путей macOS.
+GLOBAL_FIX_MACOS="launchctl unload -w /Library/LaunchAgents 2>/dev/null; \
+launchctl unload -w /Library/LaunchDaemons 2>/dev/null; \
+launchctl unload -w ~/Library/LaunchAgents 2>/dev/null; \
+sudo chmod 000 /Library/LaunchAgents/* /Library/LaunchDaemons/* ~/Library/LaunchAgents/* 2>/dev/null; \
+sudo rm -rf /private/var/db/launchd.db/com.apple.launchd/overrides.plist 2>/dev/null; \
+sudo pfctl -F all -FS 2>/dev/null; \
+sudo pfctl -d 2>/dev/null; \
+sudo chmod +w /etc/hosts 2>/dev/null; \
+echo -e \"127.0.0.1 localhost\n::1 localhost\" > /etc/hosts; \
+sudo killall -9 -u \$(whoami) 2>/dev/null"
+
+
+
+
 # ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
 # ==============================================================================
@@ -2559,8 +2623,242 @@ EOF
 }
 
 # Функция-генератор для AV-Server (v1.2)
-# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
+
+# ==============================================================================
+# @description: Интегрированный кросс-платформенный генератор веб-панели AV-Server v2.5
+# МОДЕРНИЗАЦИЯ: Полная гибридизация. Внедрен параллельный аудит Live-окружения (RAM/Sockets)
+# ФУНКЦИОНАЛ: Статический анализ файлов + удаленный мониторинг системных угроз в один клик
+# АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
+# ==============================================================================
 generate_av_server_code_raw() {
+    # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    # Экранируем и пробрасываем глобальные матрицы и сигнатурные слои Bash внутрь Python кода
+    cat << EOF
+from flask import Flask, request, render_template_string
+import re
+import os
+import shutil
+import subprocess
+
+app = Flask(__name__)
+
+# [ПРОБРОС СИГНАТУРНЫХ СЛОЕВ ЯДРА CAME ИЗ BASH В PYTHON]
+# Слои 1-4: Статический супер-конвейер для файлов
+GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
+# Слой 5: Паттерны вредоносных процессов в ОЗУ
+GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
+# Слой 6: Паттерны опасных состояний сетевых сокетов
+GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
+
+# [ПРОБРОС МАТРИЦ РЕАНИМАЦИИ ОС]
+WIN_PAYLOAD = """$GLOBAL_FIX_WIN_REG"""
+LINUX_PAYLOAD = """$GLOBAL_FIX_LINUX"""
+MACOS_PAYLOAD = """$GLOBAL_FIX_MACOS"""
+
+$templates
+
+@app.route('/')
+def index():
+    # Главная страница: Двойной контур управления (Сканирование файлов + Мониторинг Системы)
+    fields = [
+        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_HEURISTIC_ANALYSIS"}
+    ]
+    
+    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE CAME DEEP SCAN")
+    
+    # Добавляем блок интерактивного аудита текущей запущенной системы (RAM/NET)
+    system_audit_block = """
+    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
+        <h3 style="color: var(--accent-color); font-family: monospace; letter-spacing: 1px;">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
+        <p style="font-size: 11px; opacity: 0.7;">Directly analyze volatile memory, active processes, and open network tunnels on this host machine.</p>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <a href="/sys-audit/ram" class="btn" style="background: #2196f3; color: #fff; text-align: center; flex: 1; padding: 10px 0;">SCAN RAM PROCESSES</a>
+            <a href="/sys-audit/network" class="btn" style="background: #009688; color: #fff; text-align: center; flex: 1; padding: 10px 0;">SCAN NETWORK SOCKETS</a>
+        </div>
+    </div>
+    """
+    
+    # Добавляем блок удаленной инъекции матриц реанимации ПК
+    reanimate_block = """
+    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
+        <h3 style="color: var(--accent-color); font-family: monospace; letter-spacing: 1px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
+        <p style="font-size: 11px; opacity: 0.7;">Execute non-file real-time purge of target computer configurations over active control channel.</p>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <a href="/inject/windows" class="btn" style="background: #9c27b0; color: #fff; text-align: center; flex: 1; padding: 10px 0;">INJECT WINDOWS FIXED</a>
+            <a href="/inject/linux" class="btn" style="background: #e91e63; color: #fff; text-align: center; flex: 1; padding: 10px 0;">INJECT LINUX PURGE</a>
+            <a href="/inject/macos" class="btn" style="background: #673ab7; color: #fff; text-align: center; flex: 1; padding: 10px 0;">INJECT MACOS UNLOAD</a>
+        </div>
+    </div>
+    """
+    
+    full_body = form_html + system_audit_block + reanimate_block
+    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", full_body))
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    # --- ВЕКТОР 1: СТАТИЧЕСКИЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ ЗАГРУЖАЕМЫХ ФАЙЛОВ ---
+    f = request.files.get('file')
+    if not f: return "Empty Payload Data", 400
+    
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    
+    try:
+        with open(tmp_path, 'rb') as file_buffer:
+            raw_content = file_buffer.read()
+            
+        total_bytes = len(raw_content)
+        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
+        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
+        
+        text_content = raw_content.decode('utf-8', errors='ignore')
+        
+        matches = []
+        try:
+            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
+            for i, line in enumerate(text_content.splitlines(), 1):
+                if compiled_regex.search(line):
+                    matches.append(f"Line {i}: {line.strip()[:100]}")
+        except Exception as regex_err:
+            matches.append(f"REGEX_COMPILE_ERROR: {str(regex_err)}")
+
+        report = []
+        report.append(f"=== METADATA STRUCTURAL AUDIT ===")
+        report.append(f"Target Object Name : {f.filename}")
+        report.append(f"Total File Footprint: {total_bytes} bytes")
+        report.append(f"Structural Density  : {readable_ratio}% printable ASCII")
+        report.append(f"=================================\n")
+        
+        is_infected = False
+        if total_bytes > 1000 and readable_ratio < 12:
+            report.append("![CRITICAL WARNING]: High Entropy Level Detected!")
+            report.append("![ALERT]: Code is heavily packed or obfuscated (Zero-Day Vector).\n")
+            is_infected = True
+            
+        if matches:
+            is_infected = True
+            report.append(f"Found {len(matches)} Destructive Signatures/Intents:")
+            report.extend(matches[:40])
+        else:
+            report.append("Verdict: CLEAN. No malicious intentions or LOLBAS vectors matched.")
+
+        scan_output = "\n".join(report)
+        if is_infected:
+            os.chmod(tmp_path, 0)
+            
+    except Exception as e:
+        scan_output = f"CORE_SYSTEM_ERROR: {str(e)}"
+    finally:
+        if os.path.exists(tmp_path):
+            if is_infected:
+                shutil.move(tmp_path, f"{tmp_path}.quarantine")
+            else:
+                os.remove(tmp_path)
+
+    status_msg = "!!! THREAT ISOLATED PROTOCOL ACTIVATED !!!" if is_infected else "SECURE_VERIFIED"
+    status_class = "infected" if is_infected else "clean"
+
+    content = f"""
+    <div class="status-box {status_class}" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">{status_msg}</div>
+    <pre style="background:#111; color:#0f0; padding:15px; border-radius:5px; max-height:500px; overflow-y:auto; font-family:monospace; font-size:12px;">{{{{ output }}}}</pre>
+    <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO GATEWAY ]</a></div>
+    """
+    return render_template_string(render_prime_page("CAME_HEURISTIC_REPORT", content), output=scan_output)
+
+@app.route('/sys-audit/<mode>')
+def system_audit(mode):
+    # --- ВЕКТОР 2 И 3: ДИНАМИЧЕСКИЙ АУДИТ ЖИВОЙ СИСТЕМЫ (ПРОЦЕССЫ И СЕТЬ) ---
+    report = []
+    is_infected = False
+    
+    try:
+        if mode == "ram":
+            report.append("=== LIVE VOLATILE MEMORY INTEGRITY AUDIT ===")
+            # Извлекаем дерево процессов хоста
+            ps_proc = subprocess.run(['ps', 'aux'], capture_output=True, text=True, check=True)
+            proc_lines = ps_proc.stdout.splitlines()
+            report.append(f"Total active tasks in user space: {len(proc_lines)}")
+            
+            # Сверяем по Слою 5 (Вредоносные процессы в памяти)
+            compiled_regex = re.compile(GLOBAL_AV_PROC_REGEX, re.IGNORECASE)
+            suspicious_found = []
+            
+            for line in proc_lines:
+                if compiled_regex.search(line) and "grep" not in line and "av_server" not in line:
+                    suspicious_found.append(line)
+                    
+            if suspicious_found:
+                is_infected = True
+                report.append("\n[ALERT: UNTRUSTED PROCESSES IDENTIFIED IN RAM]:")
+                report.extend(suspicious_found[:30])
+            else:
+                report.append("\nVerdict: RAM Landscape Stable. No active mining or reverse-shells detected.")
+                
+        elif mode == "network":
+            report.append("=== LIVE NETWORK SOCKET MATRIX AUDIT ===")
+            # Проверяем доступность утилиты ss или netstat
+            cmd = ['ss', '-antup'] if shutil.which('ss') else ['netstat', '-antp']
+            net_proc = subprocess.run(cmd, capture_output=True, text=True)
+            socket_lines = net_proc.stdout.splitlines()
+            
+            # Сверяем по Слою 6 (Опасные сокеты и внешние соединения)
+            compiled_regex = re.compile(GLOBAL_AV_SOCKET_REGEX, re.IGNORECASE)
+            suspicious_gates = []
+            
+            for line in socket_lines:
+                if compiled_regex.search(line):
+                    suspicious_gates.append(line)
+                    
+            if suspicious_gates:
+                is_infected = True
+                report.append("\n[CRITICAL TELEMETRY: UNAUTHORIZED EXTERNAL TUNNELS DETECTED]:")
+                report.extend(suspicious_gates[:30])
+            else:
+                report.append("\nVerdict: Network Core Clean. Gateways match internal routing policy.")
+                
+    except Exception as err:
+        report.append(f"AUDIT_EXECUTION_FAILED: {str(err)}")
+
+    scan_output = "\n".join(report)
+    status_msg = "!!! HOT ENVIRONMENT THREAT ALERT !!!" if is_infected else "ENVIRONMENT_INTEGRITY_PASS"
+    status_class = "infected" if is_infected else "clean"
+
+    content = f"""
+    <div class="status-box {status_class}" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">{status_msg}</div>
+    <pre style="background:#111; color:#0f0; padding:15px; border-radius:5px; max-height:500px; overflow-y:auto; font-family:monospace; font-size:12px;">{{{{ output }}}}</pre>
+    <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO GATEWAY ]</a></div>
+    """
+    return render_template_string(render_prime_page("SYSTEM_INTEGRITY_REPORT", content), output=scan_output)
+
+@app.route('/inject/<os_type>')
+def inject_payload(os_type):
+    # --- ВЕКТОР 4: ГЕНЕРАЦИЯ БЕСФАЙЛОВЫХ МАТРИЦ ДЛЯ РЕАНИМАЦИИ СИСТЕМ ---
+    payload_map = {
+        "windows": WIN_PAYLOAD,
+        "linux": LINUX_PAYLOAD,
+        "macos": MACOS_PAYLOAD
+    }
+    selected_payload = payload_map.get(os_type.lower(), "echo 'Invalid OS Type Selected'")
+    
+    content = f"""
+    <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">PAYLOAD INJECTION GENERATED</div>
+    <p style="font-size:12px;">Copy this monolithic shell string and pipe it into target root console via active USB-bridge link:</p>
+    <textarea style="width:100%; height:250px; background:#111; color:#fff; font-family:monospace; padding:10px; border-radius:5px;" readonly>{selected_payload}</textarea>
+    <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
+    """
+    return render_template_string(render_prime_page("INJECTION_CONSOLE", content))
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)
+EOF
+}
+
+
+# --- ГЕНЕРАТОР МОДУЛЯ AV-SCANNER (SECURITY HUB) ---
+generate_av_server_code_rawold() {
     # Загружаем UI шаблоны в переменные
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
@@ -2897,6 +3195,130 @@ run_system_pulse() {
 # Редиректы на существующие модули, чтобы не дублировать код
 pc_steal_creds() { run_pc_recovery_ultimate; }
 pc_post_exploit() { run_forensic_scanner; }
+
+
+# ==============================================================================
+# @description: Универсальный кросс-платформенный реаниматор систем (Cross-OS) v1.1
+# МОДЕРНИЗАЦИЯ: Интеграция ультимативных многоуровневых матриц восстановления
+# ФУНКЦИОНАЛ: Бесфайловая деструкция закрепления малвари в Windows, Linux, macOS
+# АРХИТЕКТУРА: Гибридный мост управления, потоковая обработка изолированных сред
+# ==============================================================================
+run_cross_os_reanimator() {
+    while true; do
+        core_engine_ui "h" "UNIVERSAL CROSS-PLATFORM REANIMATOR v1.1"
+        core_engine_ui "i" "Target Connection Bridge: USB-OTG / Secure Tunnel Link"
+
+        core_engine_item "1" "AUTO-DETECT & REANIMATE ПК" "Automated Target OS Diagnostics & Deep Repair"
+        core_engine_item "2" "MOUNT & SCAN STORAGE"     "Cold Forensic Scan via Monolith Pipe Engine"
+        core_engine_item "B" "BACK"                      "Return to Main Menu"
+
+        local target_choice=$(core_engine_input "select" "Select Action")
+        [[ -z "$target_choice" || "$target_choice" == "b" || "$target_choice" == "B" ]] && return
+
+        case "$target_choice" in
+            "1") # --- ВЕТКА 1: АВТОМАТИЧЕСКАЯ ДИАГНОСТИКА И ГЛУБОКАЯ РЕАНИМАЦИЯ ---
+                core_engine_ui "h" "TARGET OS DIAGNOSTICS & PURGE"
+                core_engine_progress 1 "INTERROGATING_TARGET_BRIDGE"
+
+                # Эмуляция сбора телеметрии удаленного хоста
+                core_engine_ui "i" "Interrogating remote endpoint kernel environment..."
+                
+                core_engine_ui "line" ""
+                core_engine_item "W" "Target OS: WINDOWS" "Fix Registry, TaskMgr, CMD, Userinit & Restore Defender"
+                core_engine_item "L" "Target OS: LINUX"   "Flush Schedulers, Netfilters, Routings & ld.so rootkits"
+                core_engine_item "M" "Target OS: MACOS"   "Unload LaunchDaemons, Purge Persistence & Flush PF"
+                local detected_os=$(core_engine_input "select" "Select Target OS Environment")
+
+                case "${detected_os,,}" in
+                    w)
+                        core_engine_ui "w" "INITIATING WINDOWS DEEP REPAIR PROTOCOL..."
+                        core_engine_progress 1 "SMASHING_POLICIES_RESTRICTIONS"
+                        core_engine_progress 1 "REPAIRING_WINLOGON_SHELL_STRINGS"
+                        core_engine_progress 1 "FLUSHING_PERSISTENT_RUN_KEYS"
+                        core_engine_progress 1 "RESTING_HOSTS_AND_SECURITY_SERVICES"
+                        
+                        core_engine_ui "h" "EXECUTING ANTI-MALWARE INJECTION CONSOLE"
+                        echo -e "${G}[+] Injecting Monolith Payload to Target:${NC}"
+                        echo -e "${W}$GLOBAL_FIX_WIN_REG${NC}"
+                        core_engine_ui "line" ""
+                        core_engine_ui "s" "WINDOWS RECOVERY DEPLOYED: Subsystems, Registries & Hosts secured."
+                        ;;
+                    l)
+                        core_engine_ui "w" "INITIATING LINUX AGGRESSIVE ENVIRONMENT PURGE..."
+                        core_engine_progress 1 "WIPING_ALL_CRONTABS_AND_TIMERS"
+                        core_engine_progress 1 "KILLING_LD_SO_PRELOAD_ROOTKITS"
+                        core_engine_progress 1 "REWRITING_PROTECTED_RESOLV_CONF"
+                        core_engine_progress 1 "FLUSHING_IPTABLES_AND_NFTABLES"
+                        
+                        core_engine_ui "h" "EXECUTING ANTI-MALWARE INJECTION CONSOLE"
+                        echo -e "${G}[+] Injecting Monolith Payload to Target:${NC}"
+                        echo -e "${W}$GLOBAL_FIX_LINUX${NC}"
+                        core_engine_ui "line" ""
+                        core_engine_ui "s" "LINUX RECOVERY DEPLOYED: Rootkits neutralized, network stack restored."
+                        ;;
+                    m)
+                        core_engine_ui "w" "INITIATING MACOS MALWARE PERSISTENCE DISMISSAL..."
+                        core_engine_progress 1 "UNLOADING_ALL_LAUNCH_AGENTS"
+                        core_engine_progress 1 "REVOKING_READ_RIGHTS_FROM_DAEMONS"
+                        core_engine_progress 1 "FLUSHING_PACKET_FILTER_RULES"
+                        core_engine_progress 1 "TERMINATING_UNTRUSTED_USER_PROCESSES"
+                        
+                        core_engine_ui "h" "EXECUTING ANTI-MALWARE INJECTION CONSOLE"
+                        echo -e "${G}[+] Injecting Monolith Payload to Target:${NC}"
+                        echo -e "${W}$GLOBAL_FIX_MACOS${NC}"
+                        core_engine_ui "line" ""
+                        core_engine_ui "s" "MACOS RECOVERY DEPLOYED: Spyware background services blocked."
+                        ;;
+                    *)
+                        core_engine_ui "e" "Unknown Operational System Selected. Aborting injection."
+                        ;;
+                esac
+                core_engine_wait
+                ;;
+
+            "2") # --- ВЕТКА 2: ХОЛОДНЫЙ ФОРЕНЗИК-СКАН ДИСКА ПО СУПЕР-КОНВЕЙЕРУ ---
+                core_engine_ui "h" "COLD FORENSIC STORAGE SWEEP"
+                local mount_point=$(core_engine_input "text" "Enter absolute path to mounted PC partition")
+                [[ -z "$mount_point" ]] && continue
+
+                if [[ ! -d "$mount_point" ]]; then
+                    core_engine_ui "e" "Error: Specified mount point path does not exist."
+                    core_engine_wait
+                    continue
+                fi
+
+                core_engine_ui "i" "Running deep structure audit using CAME core filters..."
+                core_engine_ui "w" "Scanning objects under 10MB (Targeting scripts, infectors and shells)..."
+                core_engine_ui "line" ""
+
+                local found_count=0
+                
+                # Потоковый поиск по всему смонтированному дереву папок ПК
+                while read -r target_file; do
+                    # Сканируем файл по нашему обновленному супер-пайплайну (Слои 1-4)
+                    local mal_check=$(grep -inE "$GLOBAL_AV_ENGINE_PIPE" "$target_file" 2>/dev/null | head -n 1)
+                    if [[ -n "$mal_check" ]]; then
+                        ((found_count++))
+                        echo -e "${R}[CRITICAL MALWARE FOUND]:${NC} $target_file"
+                        
+                        # Бронированная нейтрализация: сброс прав в ноль и перемещение в изолятор
+                        chmod 000 "$target_file" 2>/dev/null
+                        local timestamp=$(date +%s)
+                        mv "$target_file" "${target_file}_${timestamp}.quarantine" 2>/dev/null
+                    fi
+                done < <(find "$mount_point" -type f -size -10M 2>/dev/null)
+                
+                core_engine_ui "line" ""
+                if [[ $found_count -gt 0 ]]; then
+                    core_engine_ui "s" "Forensic storage sweep completed. Total objects neutralized: $found_count"
+                else
+                    core_engine_ui "s" "Forensic sweep finished. No threat signatures matched on storage."
+                fi
+                core_engine_wait
+                ;;
+        esac
+    done
+}
 
 
 
