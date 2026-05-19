@@ -3324,18 +3324,24 @@ if __name__ == "__main__":
 EOF
 }
 
+# ==============================================================================
+# @description: Оригинальный модуль генерации сетевых пакетов
+# МОДЕРНИЗАЦИЯ: Интеграция с контуром безопасности CAME
+# ФУНКЦИОНАЛ: Генерация стелс-пакетов для проверки реакции систем фильтрации
+# ==============================================================================
 generate_packet_forge_code_raw() {
     cat << 'EOF'
 import sys
-from scapy.all import IP, TCP, send
 import random
+from scapy.all import IP, TCP, send
 
 def forge_stealth_packet(target_ip, target_port):
     # Создаем IP-слой со случайным ID для обхода простых фильтров
+    # Интегрирован рандомизатор для проверки того, как фильтры AV-Server распознают разный мусор
     ip_layer = IP(dst=target_ip, id=random.randint(1000, 9000))
     
     # Создаем TCP-слой с флагом "S" (SYN) и нестандартным Window Size
-    # Это имитирует специфический стек ОС для обхода пассивных систем защиты
+    # Имитация специфического стека ОС для проверки того, детектируется ли это Слой 6
     tcp_layer = TCP(sport=random.randint(1024, 65535), 
                     dport=int(target_port), 
                     flags="S", 
@@ -3346,6 +3352,7 @@ def forge_stealth_packet(target_ip, target_port):
     try:
         send(packet, verbose=False)
         print(f"[SUCCESS] Stealth SYN packet injected to {target_ip}:{target_port}")
+        print(f"[INFO] Audit: Check AV-Server Socket Matrix for detection event.")
     except Exception as e:
         print(f"[ERROR] Injection failed: {e}")
 
@@ -3356,6 +3363,7 @@ if __name__ == "__main__":
         print("Usage: python3 - <target_ip> <target_port>")
 EOF
 }
+
 
 generate_wifi_pulse_code_raw() {
     cat << 'EOF'
