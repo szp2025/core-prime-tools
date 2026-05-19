@@ -2103,9 +2103,12 @@ core_engine_progress() {
 
 # --- Универсальный динамический контроллер ---
 
+# ==============================================================================
+# ОБНОВЛЕННЫЙ УНИВЕРСАЛЬНЫЙ ДИНАМИЧЕСКИЙ КОНТРОЛЛЕР (v35.4)
+# ==============================================================================
 prime_dynamic_controller() {
     local title="$1"
-    # Читаем массивы из переданных аргументов
+    # Читаем массивы из аргументов
     local -a labels=($2)
     local -a actions=($3)
     
@@ -2113,35 +2116,50 @@ prime_dynamic_controller() {
         core_engine_info
         core_engine_ui "h" "$title"
         
+        # Отрисовка пунктов меню
         for ((i=0; i<${#labels[@]}; i++)); do
-            # Убираем подчеркивания для красоты вывода
-            core_engine_item "$((i+1))" "${labels[$i]//_/ }" "Execute"
+            # Убираем подчеркивания для красивого отображения
+            local display_name="${labels[$i]//_/ }"
+            core_engine_item "$((i+1))" "$display_name" "Execute"
         done
         
         echo -e "\n${Y} B) BACK / EXIT${NC}"
         core_engine_ui "line" ""
         
+        # Ввод пользователя
         local choice=$(core_engine_input "select" "Input")
         
-        [[ "$choice" == "b" || "$choice" == "B" ]] && return 0
+        # Обработка выхода
+        if [[ "$choice" == "b" || "$choice" == "B" ]]; then
+            return 0
+        fi
         
-        if [[ -n "$choice" && "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]:-0}" ]; then
-            local idx=$((choice-1))
-            local target_action="${actions[$idx]}"
+        # Безопасная обработка выбора (совместима с любой версией Bash)
+        if [[ "$choice" =~ ^[0-9]+$ ]]; then
+            local count=${#labels[@]}
             
-            # ПРОВЕРКА: существует ли функция перед выполнением
-            if declare -f "$target_action" > /dev/null; then
-                $target_action
+            if [ "$choice" -ge 1 ] && [ "$choice" -le "$count" ]; then
+                local idx=$((choice-1))
+                local target_action="${actions[$idx]}"
+                
+                # Проверка: существует ли функция перед вызовом
+                if declare -f "$target_action" > /dev/null; then
+                    $target_action
+                else
+                    core_engine_ui "e" "Error: Function '$target_action' not found!"
+                    sleep 2
+                fi
             else
-                core_engine_ui "e" "Error: Function '$target_action' not found!"
-                sleep 2
+                core_engine_ui "e" "Invalid selection (Range: 1-$count)"
+                sleep 1
             fi
         else
-            core_engine_ui "e" "Invalid selection"
+            core_engine_ui "e" "Invalid input: Not a number"
             sleep 1
         fi
     done
 }
+
 
 
 prime_dynamic_controllerold() {
