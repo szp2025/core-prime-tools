@@ -4747,7 +4747,8 @@ run_smart_osint_engine() {
     fi
 
     # --- 2. PHONE INTEL (Если ввод — мобильный номер) ---
-    if is_valid "$INPUT" "GLOBAL_REGEX_PHONE"; then
+    if is_valid "$INPUT" "GLOBAL_REGEX_PHONE";
+    then
         core_engine_ui "i" "Deep-Querying Global Phone Databases..."
         
         local active_phone_api="${GLOBAL_API_PHONE_NODES[0]%%|*}"
