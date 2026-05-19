@@ -4,15 +4,10 @@ CURRENT_VERSION="35.4"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
-# Вставь это в начало скрипта
-check_global_regex() {
+# Функция для вызова (один раз в начале файла)
+is_valid() {
     local input_val="$1"
-    local regex_var_name="$2"
-    
-    # Получаем значение переменной по её имени (косвенная ссылка)
-    local regex_pattern="${!regex_var_name}"
-    
-    # Проверяем через perl, который понимает любые сложные конструкции
+    local regex_pattern="${!2}"
     perl -e 'exit 0 if $ARGV[0] =~ m|'"$regex_pattern"'|; exit 1' "$input_val" 2>/dev/null
     return $?
 }
@@ -4752,7 +4747,8 @@ run_smart_osint_engine() {
     fi
 
     # --- 2. PHONE INTEL (Если ввод — мобильный номер) ---
-    if [[ "$INPUT" =~ $GLOBAL_REGEX_PHONE ]]; then
+    if is_valid "$INPUT" "GLOBAL_REGEX_PHONE"; then
+; then
         core_engine_ui "i" "Deep-Querying Global Phone Databases..."
         
         local active_phone_api="${GLOBAL_API_PHONE_NODES[0]%%|*}"
@@ -4763,7 +4759,8 @@ run_smart_osint_engine() {
     fi
 
     # --- 3. DATA BREACH ANALYZER (Если ввод — email) ---
-    if [[ "$INPUT" =~ $GLOBAL_REGEX_EMAIL ]]; then
+    if is_valid "$INPUT" "GLOBAL_REGEX_EMAIL"; then
+
         core_engine_ui "i" "Cross-referencing Leak Databases..."
         
         local active_breach_api="${GLOBAL_API_BREACH_NODES[0]%%|*}"
@@ -4776,7 +4773,8 @@ run_smart_osint_engine() {
     fi
 
     # --- 4. NETWORK & IP ANALYZER (Если ввод — IP адрес) ---
-    if [[ "$INPUT" =~ $GLOBAL_REGEX_IP ]]; then
+    if is_valid "$INPUT" "GLOBAL_REGEX_IP"; then
+
         core_engine_ui "i" "Analyzing Network Infrastructure & GeoIP..."
         
         local active_net_api="${GLOBAL_API_NETWORK_NODES[0]%%|*}"
@@ -4787,7 +4785,8 @@ run_smart_osint_engine() {
     fi
 
     # --- 5. DOMAIN & DNS CORE (Если ввод — сайт или домен) ---
-    if [[ "$INPUT" =~ $GLOBAL_REGEX_DOMAIN && ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL ]]; then
+    if is_valid "$INPUT" "GLOBAL_REGEX_DOMAIN" && ! is_valid "$INPUT" "GLOBAL_REGEX_EMAIL"; then
+
         core_engine_ui "i" "Resolving Domain DNS Records & Whois Registry..."
         
         local active_dns_api="${GLOBAL_API_DOMAIN_NODES[2]%%|*}"
@@ -4809,7 +4808,8 @@ run_smart_osint_engine() {
     echo -e "\n${G}--- DETAILED FINDINGS ---${NC}"
     if [ -f "$raw_log" ]; then
         grep -E "FOUND|oper|name|location|WARNING|org|country_name|city" "$raw_log" | sort -u
-        if [[ "$INPUT" =~ $GLOBAL_REGEX_DOMAIN ]]; then
+        if is_valid "$INPUT" "GLOBAL_REGEX_DOMAIN"; then
+
             head -n 15 "$raw_log" 2>/dev/null
         fi
     else
