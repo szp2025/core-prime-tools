@@ -4,10 +4,12 @@ CURRENT_VERSION="35.4"
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; NC='\033[0m'
 set +o history
 
-# Функция для вызова (один раз в начале файла)
+# Эта функция изолирует регулярку от Bash
 is_valid() {
     local input_val="$1"
     local regex_pattern="${!2}"
+    
+    # Perl понимает твою регулярку как есть, без ошибок grep
     perl -e 'exit 0 if $ARGV[0] =~ m|'"$regex_pattern"'|; exit 1' "$input_val" 2>/dev/null
     return $?
 }
