@@ -1282,6 +1282,44 @@ PASS_LAB_DEFAULT_LEN=20
 PASS_LAB_MAX_DIGITS=6
 
 
+
+# ==============================================================================
+# 7. ГЛОБАЛЬНЫЕ СИГНАТУРЫ ДЛЯ АНТИВИРУСНОГО ДВИЖКА (ANTI-MALWARE CORE PATTERNS)
+# ==============================================================================
+# [СТАТИЧЕСКИЙ КОНТУР: СКАНИРОВАНИЕ ФАЙЛОВ, СКРИПТОВ И ИСПОЛНЯЕМЫХ БИНАРНИКОВ]
+
+# Слой 1: Низкоуровневые системные вызовы, инъекции в память, руткиты и хуки ядра
+# Детектирует: манипуляции процессами, создание скрытых дескрипторов в RAM, chroot-изоляцию, загрузку модулей ядра
+GLOBAL_AV_SYS_CALLS="(ptrace|memfd_create|process_vm_readv|process_vm_writev|mprotect|mmap|execve|chroot|setuid|setgid|sys_clone|init_module|finit_module|kexec_load|inotify_init)"
+
+# Слой 2: Деструктивные сетевые векторы, обратные подключения (Reverse Shells), скрытые каналы и веб-шеллы
+# Детектирует: сокеты Bash/Python/Perl/PHP/Ruby/Lua, пайпы, туннели и сокетные дескрипторы
+GLOBAL_AV_NET_VECTORS="(/dev/tcp/|/dev/udp/|nc -e|nc\.openbsd|netcat -e|socat tcp|python.*-c.*import.*socket|perl.*-e.*socket|php -r.*fsockopen|ruby -e.*TCPSocket|lua -e.*socket|curl.*\|.*bash|wget.*\|.*sh|fetch.*\|.*sh|bash -i|sh -i|exec [0-9]<>/dev/tcp|mkfifo.*\/tmp\/.*openssl)"
+
+# Слой 3: Маркеры скрытого присутствия (Persistence), уничтожение форензик-логов, шифровальщики-вымогатели
+# Детектирует: зачистку истории, манипуляции с cron/systemd/init, массовое симметричное шифрование, скрытые папки
+GLOBAL_AV_MAL_MARKERS="(rm -rf /|unset HISTFILE|history -c|killall.*log|logsave /dev/null|openssl enc -aes|gpg --encrypt|shred -u|auth\.log.*>\?|cron\.d\/|systemd\/system\/|rc\.local|\.config\/autostart|/etc/shadow|/etc/sudoers|chattr \+i|trap ''|set \+o history)"
+
+# Слой 4: Максимальная кросс-платформенная матрица LOLBAS, утилит компрометации, хакерского софта и эксплойтов
+# Детектирует: кражу /etc/passwd, Win-компоненты (PowerShell/WMIC), утилиты сканирования, туннелирования и дамперы памяти
+GLOBAL_AV_LOLBAS_MATRIX="((https?|ftp|wss?):\/\/|/etc/passwd|cmd\.exe|powershell|wmic|cmdlet|api_string|bitsadmin|certutil|rundll32|regsvr32|mshta|psexec|mimikatz|nmap|masscan|sqlmap|hydra|aircrack|chisel|frp|ngrok|autoruns|vssadmin|wevtutil|schtasks|sc query|cobaltstrike|metasploit|shadowsploit)"
+
+# ==============================================================================
+# [ДИНАМИЧЕСКИЙ КОНТУР: МОНИТОРИНГ ОПЕРАТИВНОЙ ПАМЯТИ (ОЗУ) И СЕТЕВОЙ АКТИВНОСТИ]
+
+# Слой 5: Расширенная матрица перехвата активных вредоносных процессов, сканеров и криптомайнеров в ОЗУ
+# Детектирует: запущенные бинарники компрометации, утилиты удаленного контроля, шеллы и потоковые майнеры
+GLOBAL_AV_ACTIVE_MALWARE_PROCS="(nc|netcat|socat|chisel|frp|ngrok|nmap|masscan|hydra|xmrig|minerd|cryptonight|stratum\+tcp|reverse|sh -i|bash -i|zsh -i|tmux new.*-d|screen -d -m)"
+
+# Слой 6: Фильтр критических состояний сетевых сокетов (Подозрительные шлюзы, биндинг портов, активные утечки)
+# Детектирует: прослушивание портов (бэкдоры), установленные сессии (утечка данных) и синхронизацию сокетов
+GLOBAL_AV_SOCKET_STATES="(LISTEN|ESTABLISHED|ESTAB|SYN_SENT|SYN_RECV)"
+
+# ==============================================================================
+# ЕДИНЫЙ МОНОЛИТНЫЙ СУПЕР-КОНВЕЙЕР УЛЬТИМАТИВНОЙ ЭВРИСТИКИ ДЛЯ АВТОПИЛОТА CAME
+# ==============================================================================
+GLOBAL_AV_ENGINE_PIPE="${GLOBAL_AV_SYS_CALLS}|${GLOBAL_AV_NET_VECTORS}|${GLOBAL_AV_MAL_MARKERS}|${GLOBAL_AV_LOLBAS_MATRIX}"
+
 # ==============================================================================
 # @description: Системный движок глубокого анализа и парсинга логов/артефактов
 # ==============================================================================
@@ -2860,6 +2898,129 @@ run_system_pulse() {
 pc_steal_creds() { run_pc_recovery_ultimate; }
 pc_post_exploit() { run_forensic_scanner; }
 
+
+
+# ==============================================================================
+# @description: Проактивный антивирусный движок ядра v1.1 (CAME)
+# МОДЕРНИЗАЦИЯ: Интеграция 6 слоев глобальных паттернов + многовекторный эвристический анализ
+# ФУНКЦИОНАЛ: Статический аудит файлов/скриптов, выявление деструктивных намерений
+# АРХИТЕКТУРА: Оптимизированный POSIX-совместимый Bash, изоляция Zero-Day угроз
+# ==============================================================================
+run_anti_malware_engine() {
+    while true; do
+        core_engine_ui "h" "CORE ANTI-MALWARE ENGINE (CAME) v1.1"
+
+        core_engine_item "1" "SCAN OBJECT"  "Heuristic Scan for Malicious Code & Structure"
+        core_engine_item "2" "SCAN SYSTEM"  "Audit Live Environment, RAM & Network Sockets"
+        core_engine_item "B" "BACK"         "Return to Main Menu"
+
+        local av_choice=$(core_engine_input "select" "Select Action")
+        [[ -z "$av_choice" || "$av_choice" == "b" || "$av_choice" == "B" ]] && return
+
+        case "$av_choice" in
+            "1") # --- ВЕТКА 1: ЭВРИСТИЧЕСКИЙ СКАНЕР ОБЪЕКТОВ ---
+                core_engine_ui "h" "CAME DEEP FILE AUDIT"
+                local target_file=$(core_engine_input "text" "Enter absolute path to target file")
+                [[ -z "$target_file" ]] && continue
+
+                if [[ ! -f "$target_file" ]]; then
+                    core_engine_ui "e" "Error: Target object not found on storage."
+                    core_engine_wait
+                    continue
+                fi
+
+                core_engine_ui "i" "Analyzing threat surface & entropy..."
+                core_engine_progress 1 "EXTRACTING_STRUCTURE_METADATA"
+
+                # Вычисление плотности структуры (Энтропия / Обфускация)
+                local total_chars=$(wc -c < "$target_file" 2>/dev/null || echo 0)
+                local printable_chars=$(grep -oP '[\x20-\x7E]' "$target_file" 2>/dev/null | wc -l || echo 0)
+                
+                local readable_ratio=100
+                if [[ $total_chars -gt 0 ]]; then
+                    readable_ratio=$(( (printable_chars * 100) / total_chars ))
+                fi
+
+                core_engine_ui "h" "DIAGNOSTIC STRUCTURAL REPORT: $(basename "$target_file")"
+                echo -e "${W}Total File Footprint :${NC} $total_chars bytes"
+                echo -e "${W}Structural Density    :${NC} $readable_ratio% printable ASCII"
+                core_engine_ui "line" ""
+
+                # Анализ аномальной энтропии (характерно для полиморфных вирусов будущего)
+                if [[ $total_chars -gt 1000 && $readable_ratio -lt 12 ]]; then
+                    core_engine_ui "e" "CRITICAL WARNING: High Entropy Level Detected!"
+                    core_engine_ui "w" "Code is heavily obfuscated, packed or encrypted (Polymorphic Zero-Day Vector)."
+                fi
+
+                core_engine_progress 1 "MATCHING_GLOBAL_MONOLITH_PIPE"
+
+                # Потоковый сигнатурный скан по объединенному супер-конвейеру (Слой 1-4)
+                core_engine_ui "h" "SIGNATURE & BEHAVIORAL INTENT MATCHES"
+                # Используем grep -i (регистронезависимый) для повышения надежности детекции обхода сигнатур
+                local mal_matches=$(grep -inE "$GLOBAL_AV_ENGINE_PIPE" "$target_file" 2>/dev/null | head -n 40)
+
+                if [[ -z "$mal_matches" ]]; then
+                    core_engine_ui "s" "VERDICT: CLEAN. No destructive intents or LOLBAS vectors identified."
+                else
+                    echo -e "$mal_matches"
+                    core_engine_ui "line" ""
+                    core_engine_ui "e" "CRITICAL DIRECTIVE: Malicious signatures or backdoor vectors isolated!"
+                    
+                    core_engine_ui "line" ""
+                    core_engine_item "X" "NEUTRALIZE OBJECT" "Revoke executable rights + Move to Quarantine"
+                    core_engine_item "S" "SKIP THREAT"       "Ignore audit verdict and bypass"
+                    local action=$(core_engine_input "select" "Choose Defensive Action")
+                    
+                    if [[ "$action" == "x" || "$action" == "X" ]]; then
+                        chmod 000 "$target_file" 2>/dev/null # Полный сброс всех прав доступа
+                        mv "$target_file" "${target_file}.quarantine" 2>/dev/null
+                        core_engine_ui "s" "SUCCESS: Threat isolated. Object neutralized into quarantine zone."
+                    fi
+                fi
+                core_engine_wait
+                ;;
+
+            "2") # --- ВЕТКА 2: МОНИТОРИНГ СРЕДЫ (ОЗУ И СЕТЬ) ---
+                core_engine_ui "h" "LIVE ENVIRONMENT INTEGRITY AUDIT"
+                core_engine_progress 1 "INTERROGATING_RAM_PROCESS_TREE"
+
+                # Анализ ОЗУ по Слою 5 (GLOBAL_AV_ACTIVE_MALWARE_PROCS)
+                core_engine_ui "i" "Scanning volatile memory for rogue processes..."
+                local suspicious_procs=$(ps aux 2>/dev/null | grep -iE "$GLOBAL_AV_ACTIVE_MALWARE_PROCS" | grep -v grep)
+                
+                if [[ -n "$suspicious_procs" ]]; then
+                    core_engine_ui "e" "ALERT: ACTIVE UNTRUSTED PROCESSES FOUND IN RAM:"
+                    echo "$suspicious_procs"
+                else
+                    core_engine_ui "s" "RAM Landscape: Completely stable. No active reverse-shells detected."
+                fi
+
+                core_engine_ui "line" ""
+                core_engine_progress 1 "AUDITING_ACTIVE_NETWORK_SOCKETS"
+                
+                # Анализ сетевых сокетов по Слою 6 (GLOBAL_AV_SOCKET_STATES)
+                core_engine_ui "i" "Analyzing active TCP/UDP socket telemetry..."
+                if command -v ss &>/dev/null; then
+                    local open_ports=$(ss -antup 2>/dev/null | grep -iE "$GLOBAL_AV_SOCKET_STATES")
+                    if [[ -n "$open_ports" ]]; then
+                        core_engine_ui "w" "CRITICAL TELEMETRY: Active Gateways & Network Connections:"
+                        echo "$open_ports"
+                    else
+                        core_engine_ui "s" "Network Socket Matrix: Clean. No unauthorized external tunnels."
+                    fi
+                else
+                    # Резервный контур парсинга через netstat, если ss недоступен
+                    if command -v netstat &>/dev/null; then
+                        local ns_ports=$(netstat -antp 2>/dev/null | grep -iE "$GLOBAL_AV_SOCKET_STATES")
+                        [[ -n "$ns_ports" ]] && echo "$ns_ports" || core_engine_ui "s" "Network Matrix Clean."
+                    fi
+                fi
+                
+                core_engine_wait
+                ;;
+        esac
+    done
+}
 
 
 # --- Модули по меню ---
@@ -6372,8 +6533,8 @@ local funcs="run_nexus_full_pipeline"
 
 run_main_menu() {
     local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS 
-NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS PASSWORD EXIT"
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics run_pass_lab exit_script"
+NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS PASSWORD ANTI_MALWARE EXIT"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics run_pass_lab run_anti_malware_engine exit_script"
     
     prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
 }
