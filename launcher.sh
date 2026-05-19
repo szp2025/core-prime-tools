@@ -2102,7 +2102,49 @@ core_engine_progress() {
 
 
 # --- Универсальный динамический контроллер ---
+
 prime_dynamic_controller() {
+    local title="$1"
+    # Читаем массивы из переданных аргументов
+    local -a labels=($2)
+    local -a actions=($3)
+    
+    while true; do
+        core_engine_info
+        core_engine_ui "h" "$title"
+        
+        for ((i=0; i<${#labels[@]}; i++)); do
+            # Убираем подчеркивания для красоты вывода
+            core_engine_item "$((i+1))" "${labels[$i]//_/ }" "Execute"
+        done
+        
+        echo -e "\n${Y} B) BACK / EXIT${NC}"
+        core_engine_ui "line" ""
+        
+        local choice=$(core_engine_input "select" "Input")
+        
+        [[ "$choice" == "b" || "$choice" == "B" ]] && return 0
+        
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]]; then
+            local idx=$((choice-1))
+            local target_action="${actions[$idx]}"
+            
+            # ПРОВЕРКА: существует ли функция перед выполнением
+            if declare -f "$target_action" > /dev/null; then
+                $target_action
+            else
+                core_engine_ui "e" "Error: Function '$target_action' not found!"
+                sleep 2
+            fi
+        else
+            core_engine_ui "e" "Invalid selection"
+            sleep 1
+        fi
+    done
+}
+
+
+prime_dynamic_controllerold() {
     local title="$1"
     local -a labels=($2)
     local -a actions=($3)
