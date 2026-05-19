@@ -2125,7 +2125,7 @@ prime_dynamic_controller() {
         
         [[ "$choice" == "b" || "$choice" == "B" ]] && return 0
         
-        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]}" ]]; then
+        if [[ -n "$choice" && "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#labels[@]:-0}" ]; then
             local idx=$((choice-1))
             local target_action="${actions[$idx]}"
             
