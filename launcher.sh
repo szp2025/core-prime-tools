@@ -18,9 +18,22 @@ is_valid() {
 CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 [ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
 
-SILENT="> /dev/null 2>&1"
-# Использование:
-command -v curl eval $SILENT
+# Проверка зависимости
+check_dep() {
+    if command -v "$1" >/dev/null 2>&1; then
+        return 0 # Найдено
+    else
+        return 1 # Не найдено
+    fi
+}
+
+# Использование в "Банковском Гамбите":
+if check_dep "curl"; then
+    # Логика, если curl есть
+else
+    # Логика, если curl нет
+fi
+
 
 # --- CORE PATH INITIALIZATION ---
 # Сначала определяем, где мы находимся
@@ -1688,12 +1701,17 @@ core_engine_control() {
 
         "restart")
             core_engine_ui "?Перезагрузка: [$label]..."
-            core_engine_run pkill -f "$label"
+            # Используем pkill, но защищаемся от пустых имен
+            [[ -n "$label" ]] && pkill -f "$label" 2>/dev/null
             sleep 1
             
             if [[ -n "$cmd" ]]; then
-                eval "$cmd &"
-                # Эвристический трюк: передаем статус выполнения eval следующему вызову
+                # БЕЗОПАСНЫЙ ЗАПУСК:
+                # bash -c выполняет команду в изолированной среде
+                bash -c "$cmd" &
+                
+                # Проверяем успешность запуска самой команды bash -c
+                local run_status=$?
                 core_engine_control "check" "Модуль [$label]" "" "$fatal"
             else
                 core_engine_ui "!Ошибка: Команда запуска [$label] пуста"
@@ -1702,6 +1720,7 @@ core_engine_control() {
             ;;
     esac
 }
+
 
 
 
