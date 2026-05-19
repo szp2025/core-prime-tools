@@ -7178,9 +7178,50 @@ run_dynamic_menu() {
     prime_dynamic_controller "$menu_title" "${labels[*]}" "${actions[*]}"
 }
 
-run_main_menu() {
-    run_dynamic_menu "MAIN" "PRIME MASTER EXECUTIVE v35.4"
+# --- УНИВЕРСАЛЬНЫЙ РЕНДЕРЕР МЕНЮ ---
+run_dynamic_menu() {
+    local target_key="$1"
+    local menu_title="$2"
+    
+    # Визуальный отклик для тяжелых секторов
+    [[ "$target_key" == "STEALTH_COMMS" || "$target_key" == "NEXUS" ]] && core_engine_progress 1 "$target_key"
+    
+    core_engine_ui "h" "$menu_title"
+    
+    local -a labels=()
+    local -a actions=()
+    
+    # Парсинг матрицы
+    for entry in "${GLOBAL_MENU_REGISTRY[@]}"; do
+        if [[ "$entry" == "$target_key:"* ]]; then
+            local clean_entry="${entry#*:}"
+            labels+=("${clean_entry%|*}")
+            actions+=("${clean_entry#*|}")
+        fi
+    done
+    
+    # Защита от ошибок
+    if [ ${#labels[@]} -eq 0 ]; then
+        core_engine_ui "e" "CRITICAL: Menu sector '$target_key' is empty!"
+        core_engine_wait
+        return 1
+    fi
+    
+    prime_dynamic_controller "$menu_title" "${labels[*]}" "${actions[*]}"
 }
+
+# --- ЛЕГКИЕ ОБЕРТКИ ---
+menu_intelligence()    { run_dynamic_menu "INTELLIGENCE" "SECTOR I: INTELLIGENCE & OSINT"; }
+menu_system_core()     { run_dynamic_menu "SYSTEM" "SYSTEM CORE: MAINTENANCE & INFO"; }
+menu_forensics()       { run_dynamic_menu "FORENSICS" "SECTOR F: DATA FORENSICS & RECOVERY"; }
+menu_cyber_ops()       { run_dynamic_menu "CYBER_OPS" "CYBER OPERATIONS SECTOR"; }
+menu_crypto_lab()      { run_dynamic_menu "CRYPTO_LAB" "SECTOR C: CRYPTOGRAPHY & STEGANOGRAPHY"; }
+menu_net_infra()       { run_dynamic_menu "NET_INFRA" "NETWORK INFRASTRUCTURE"; }
+menu_core_lab()        { run_dynamic_menu "CORE_LAB" "CORE RESEARCH LAB"; }
+menu_financial_shield(){ run_dynamic_menu "FIN_SHIELD" "FINANCIAL SHIELD: BANKING GAMBIT"; }
+menu_stealth_comms()   { run_dynamic_menu "STEALTH_COMMS" "STEALTH COMMS HUB"; }
+menu_nexus_correlation(){ run_dynamic_menu "NEXUS" "SECTOR N: NEXUS ANALYSIS & CORRELATION"; }
+run_main_menu()        { run_dynamic_menu "MAIN" "PRIME MASTER EXECUTIVE v$CURRENT_VERSION"; }
 
 # --- ТОЧКА ЗАПУСКА ---
 clear
