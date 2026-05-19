@@ -4704,7 +4704,8 @@ run_smart_osint_engine() {
     core_engine_progress 2 "OSINT_SCAN_INIT"
 
     # --- 1. SOCIAL SCAN (Если ввод — это никнейм) ---
-    if [[ ! "$INPUT" =~ $GLOBAL_REGEX_EMAIL && ! "$INPUT" =~ $GLOBAL_REGEX_PHONE && ! "$INPUT" =~ $GLOBAL_REGEX_IP && ! "$INPUT" =~ $GLOBAL_REGEX_DOMAIN ]]; then
+    if ! echo "$INPUT" | grep -Eq "$GLOBAL_REGEX_EMAIL|$GLOBAL_REGEX_PHONE|$GLOBAL_REGEX_IP|$GLOBAL_REGEX_DOMAIN"; then
+        # Твой код ошибки здесь
         core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
         
         local sites=("${GLOBAL_OSINT_SITES[@]}")
