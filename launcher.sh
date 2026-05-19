@@ -19,9 +19,6 @@ CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 [ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
 
 
-
-
-
 # --- CORE PATH INITIALIZATION ---
 # Сначала определяем, где мы находимся
 if [[ -n "$TERMUX_VERSION" ]]; then
