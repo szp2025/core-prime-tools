@@ -18,21 +18,7 @@ is_valid() {
 CURRENT_IP=$(ip route get 1 2>/dev/null | awk '{print $7}')
 [ -z "$CURRENT_IP" ] && CURRENT_IP="127.0.0.1"
 
-# 1. Сначала функция (объявление)
-check_dep() {
-    if command -v "$1" >/dev/null 2>&1; then
-        return 0
-    else
-        return 1
-    fi
-}
 
-# 2. Потом использование (в основном теле скрипта)
-if check_dep "curl"; then
-    echo "Curl найден"
-else
-    echo "Curl отсутствует"
-fi
 
 
 
