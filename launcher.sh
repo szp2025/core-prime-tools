@@ -1742,7 +1742,8 @@ core_engine_validator() {
         "url"|"host")
             # Снайперская проверка через наш ультимативный объединенный сетевой стек
             # Проверяет IPv4, IPv6, MAC и Домены одновременно на основе шапки конфигурации
-            if [[ ! "$target" =~ $GLOBAL_SUPER_REGEX_INFRA ]]; then
+            if ! is_valid "$target" "GLOBAL_SUPER_REGEX_INFRA"; then
+
                 failed=1; err_msg="Недопустимый сетевой формат цели: [$target]. Не соответствует RFC."; fi
             ;;
 
