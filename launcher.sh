@@ -1798,7 +1798,8 @@ core_engine_validator() {
         # ======================================================================
         "crypto")
             # Новая валидация: проверка на то, является ли объект хэшем (MD5/SHA256)
-            if [[ ! "$target" =~ $GLOBAL_SUPER_REGEX_CRYPTO ]]; then
+            if ! is_valid "$target" "GLOBAL_SUPER_REGEX_CRYPTO"; then
+
                 failed=1; err_msg="Объект [$target] не является валидным криптографическим хэшем."; fi
             ;;
 
@@ -1810,8 +1811,16 @@ core_engine_validator() {
             local max_boundary="${extra:-$GLOBAL_CORE_MENU_MAX_LIMIT}"
             
             # Проверка типа данных и вхождения в диапазон через глобальные константы
-            if [[ ! "$target" =~ $GLOBAL_REGEX_DIGIT ]] || (( target < 1 || target > max_boundary )); then
-                failed=1; err_msg="Числовое значение [$target] вышло за допустимые лимиты (1-$max_boundary)"; fi
+            # 1. Сначала валидация формата (безопасно, через Perl)
+if ! is_valid "$target" "GLOBAL_REGEX_DIGIT"; then
+    failed=1
+    err_msg="Ошибка формата: [$target] не является числом"
+# 2. Затем проверка границ (безопасно, через арифметику)
+elif (( target < 1 || target > max_boundary )); then
+    failed=1
+    err_msg="Числовое значение [$target] вышло за допустимые лимиты (1-$max_boundary)"
+fi
+
             ;;
 
         "list"|"empty")
