@@ -5457,7 +5457,7 @@ run_nexus_full_pipeline() {
     # Линейный вывод дерева топологии на экран и логгирование в файл без ANSI-кодов
     local node_str=""
 
-    node_str="       [ ЯДРО ОБЪЕКТА ] ══════> (Идентификатор: ${G}$current_target${NC})"
+    node_str="       [ ЯДРО ОБЪЕКТА ] ══════> \(Идентификатор: ${G}$current_target${NC})"
     echo -e "$node_str" && echo "$node_str" | sed 's/\x1b\[[0-9;]*m//g' >> "$target_report"
     
     node_str="              ║"
