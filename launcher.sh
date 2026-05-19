@@ -2273,38 +2273,35 @@ core_intelligence_gather() {
 get_tool_info() {
     case "$1" in
         # --- Главное меню (Main Menu) ---
-        "run_ghost_commander")      echo "ADB-контроль Android: зеркало, биометрия, Shell, управление файлами." ;;
-        "run_phantom_engine")       echo "Social Engineering Framework: создание фишинг-страниц и сбор сессий." ;;
-        "run_device_hack")          echo "Комплексный анализ: сетевая разведка, Bluetooth и глубокий аудит." ;;
-        "run_smart_osint_engine")   echo "OSINT-движок: поиск по IP, почте, телефонам и доменам." ;;
-        "run_iban_analyzer")        echo "Финансовый анализ: проверка IBAN, банковских кодов и транзакций." ;;
-        "run_pass_lab")             echo "Лаборатория паролей: генерация словарей и анализ стойкости хэшей." ;;
-        "run_crypto_forge")         echo "Криптографический модуль: шифрование, расшифровка и работа с ключами." ;;
-        "run_vulnerability_scanner") echo "Ghost Engine: сканер уязвимостей и поиск векторов для проникновения." ;;
-        "run_prime_exploiter_v5")   echo "Ultimate Exploiter: база эксплойтов для известных CVE и 0-day." ;;
-        "pc_password_recovery")     echo "Хаб управления ПК: эксплойты, сброс паролей и форензика." ;;
-        "run_view_loot")            echo "Просмотр добычи (Intelligence Center): логи, пароли, дампы." ;;
-        "run_system_info")          echo "Мониторинг системы: параметры CPU, RAM, Network и статус защиты." ;;
-        "run_servers")              echo "Service Hub: запуск локальных серверов для обмена файлами и скана." ;;
-        "run_repair")               echo "Инструменты самовосстановления и очистки мусора в ядре Prime." ;;
-        "update_prime")             echo "Обновление ядра до последней версии с GitHub репозитория." ;;
-        "exit_script")              echo "Безопасное завершение работы и очистка временных сессий." ;;
+        "run_cyber_ops")          echo "Cyber Operations: управление активными сетевыми атаками и тестами." ;;
+        "run_intelligence")       echo "Intelligence Center: сбор данных, OSINT-аналитика и поиск связей." ;;
+        "run_crypto_lab")         echo "Crypto Lab: шифрование, генерация ключей и работа с хэшами." ;;
+        "run_net_infra")          echo "Net Infrastructure: анализ сетевых протоколов и скрытых туннелей." ;;
+        "run_financial_shield")   echo "Financial Shield: аудит транзакций и банковских активов." ;;
+        "run_stealth_comms")      echo "Stealth Comms: управление защищенными серверами (AV, Share, Upload)." ;;
+        "run_nexus_correlation")  echo "Nexus Correlation: корреляционный анализ данных из всех модулей." ;;
+        "run_system_core")        echo "System Core: низкоуровневые настройки лаунчера и параметров среды." ;;
+        "run_core_lab")           echo "Core Lab: разработка и тестирование новых модулей ядра." ;;
+        "run_forensics")          echo "Data Forensics: анализ дисков, оперативной памяти (RAM) и логов." ;;
+        "run_pass_lab")           echo "Password Lab: восстановление, генерация и брутфорс-анализ." ;;
+        "run_anti_malware_engine") echo "Anti-Malware CAME: проактивное сканирование, изоляция и деструкция угроз." ;;
+        "run_cross_os_reanimator") echo "Cross-OS Reanimator: глубокое восстановление систем (Win/Lin/Mac) и удаление руткитов." ;;
+        "exit_script")            echo "Безопасное завершение работы и очистка сессии." ;;
 
-        # --- Подменю: DEVICE_HACK ---
-        "run_network_analyzer")     echo "Network Intelligence: анализ трафика и обнаружение устройств в сети." ;;
-        "scan_bluetooth_devices")   echo "Bluetooth Scan: перехват ID и анализ уязвимостей BT-протоколов." ;;
-        "run_deep_audit")           echo "Smart Audit: глубокая проверка безопасности текущей системы." ;;
+        # --- Подменю: STEALTH_COMMS (Серверы) ---
+        "run_av_server")          echo "AV-Server 2.5: сканирование файлов и RAM на базе сигнатур CAME." ;;
+        "run_share_server")       echo "Share-Server 2.0: защищенная раздача файлов с проверкой Outbound-трафика." ;;
+        "run_upload_server")      echo "Upload-Server 2.1: входной шлюз с моментальным уничтожением вредоносного контента." ;;
+        "run_node_clean")         echo "Node Cleanup: принудительная очистка и остановка всех активных серверов." ;;
 
-        # --- Подменю: PC_RECOVERY & EXPLOIT (уже были) ---
-        "run_pc_recovery_ultimate") echo "Сброс паролей Win/Lin/Mac и извлечение данных (LaZagne)." ;;
-        "run_forensic_scanner")     echo "Автономная защита: килл-процессов, блок портов, карантин." ;;
+        # --- Подменю: DATA_FORENSICS ---
+        "run_mem_audit")          echo "RAM Forensic: посегментный анализ памяти процессов через ptrace." ;;
+        "run_packet_forge")       echo "Packet Forge: генерация стелс-пакетов для проверки устойчивости сетевых фильтров." ;;
+        
+        # --- Подменю: Общие ---
+        "update_prime")           echo "Обновление ядра системы с GitHub репозитория." ;;
 
-        # --- Подменю: SERVICE_HUB (run_servers) ---
-        "run_av_srv")               echo "AV-Scanner Server: удаленная проверка файлов на сигнатуры вирусов." ;;
-        "run_share_srv")            echo "Share-File: быстрый HTTP-сервер для раздачи файлов в локальной сети." ;;
-        "run_upload_srv")           echo "Upload-Inbound: защищенный приемник для входящих файлов." ;;
-
-        *)                          echo "Описание функционала находится в стадии разработки..." ;;
+        *)                        echo "Описание функционала находится в стадии разработки или недоступно..." ;;
     esac
 }
 
