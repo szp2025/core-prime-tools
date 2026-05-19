@@ -7186,8 +7186,8 @@ local funcs="run_nexus_full_pipeline"
 
 run_main_menu() {
     local main_names="CYBER_OPS INTELLIGENCE CRYPTO_LAB NET_INFRA FIN_SHIELD STEALTH_COMMS 
-NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS PASSWORD ANTI_MALWARE EXIT"
-    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics run_pass_lab run_anti_malware_engine exit_script"
+NEXUS_CORRELATION SYSTEM_CORE CORE_LAB DATA_FORENSICS PASSWORD ANTI_MALWARE CROSS_OS_REANIMATOR EXIT"
+    local main_funcs="menu_cyber_ops menu_intelligence menu_crypto_lab menu_net_infra menu_financial_shield menu_stealth_comms menu_nexus_correlation menu_system_core menu_core_lab menu_forensics run_pass_lab run_anti_malware_engine run_cross_os_reanimator exit_script"
     
     prime_dynamic_controller "PRIME MASTER EXECUTIVE" "$main_names" "$main_funcs"
 }
