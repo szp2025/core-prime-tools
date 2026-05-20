@@ -6995,6 +6995,7 @@ if [[ -z "$raw_data" ]] || echo "$raw_data" | grep -qE "$GLOBAL_SEARCH_ANTI_FLOO
     continue
 fi
 
+
             # РЕКУРСИВНАЯ ЭКСТРАКЦИЯ В БУФЕРЫ NEXUS
             # 1. Телефоны
             echo "$raw_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
@@ -7007,7 +7008,7 @@ fi
             # Умная задержка (защита от антифрода)
             sleep 1
         done
-    
+    done
 
     core_engine_ui "s" "[+] OmniCrawler: Scan cycle completed. Data cached in Nexus memory."
 }
