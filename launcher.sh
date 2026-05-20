@@ -6703,22 +6703,73 @@ run_raw_recovery() {
 }
 
 
+# ==============================================================================
+# @description: OSINT NEXUS v22.9 - HARDWARE PARTITION REPAIR MONOLITH
+# @status: ISOLATED LOGGING & PRE-AUDIT AUTOMATION | PRODUCTION READY
+# ==============================================================================
 recover_partition_logic() {
-    # Слой 1: Валидация фундамента через Мозг [5]
+    # 1. Защита ввода: верификация целевого устройства
+    if [[ -z "$dev_path" || ! -b "$dev_path" ]]; then
+        core_engine_ui "e" "Repair aborted: Target device [$dev_path] is not a valid block device."
+        core_engine_wait
+        return 1
+    fi
+
+    # 2. Валидация зависимости через Мозг [5]
     core_engine_validator "pkg" "testdisk" "TestDisk Recovery Tool" || return
 
-    core_engine_ui "!" "Launching Partition Repair Engine..."
-    core_engine_ui "i" "Instruction: [Analyze] -> [Quick Search] -> [Write] to fix tables."
+    # 3. Подготовка изолированного криминалистического лога в LOOT [11]
+    local timestamp=$(date +%s)
+    local session_log="${LOOT_DIR}/testdisk_analysis_${timestamp}.log"
     
-    # Слой 2: Синхронизация [13] — пауза перед запуском интерактивной утилиты
-    sleep 2
+    core_engine_ui "!" "Launching Partition Repair Engine for [$dev_path]..."
+    core_engine_ui "i" "Session Log will be isolated in: $(basename "$session_log")"
+    core_engine_ui "i" "Recommended Strategy: [Analyze] -> [Quick Search] -> [Write]"
+
+    # Переходим во временную папку, чтобы контролировать файлы, генерируемые утилитой
+    local current_pwd=$(pwd)
+    cd "/tmp" 2>/dev/null
+
+    # 4. Слой автоматического пред-анализа структуры (Офлайн-снимок разметки)
+    # Запускаем testdisk в неинтерактивном командном режиме для фиксации исходного состояния
+    core_engine_ui "i" "Gathering initial partition architecture snapshot..."
+    sudo testdisk /cmd "$dev_path" analyze 2>/dev/null
     
-    # Слой 3: Прямое взаимодействие с оборудованием
-    # Работает с TARGET_DEV, выбранным в run_storage_selector [27]
-    sudo testdisk "$dev_path"
+    if [[ -f "/tmp/testdisk.log" ]]; then
+        echo "=== INITIAL SECTOR ARCHITECTURE SNAPSHOT ===" > "$session_log"
+        cat "/tmp/testdisk.log" >> "$session_log"
+        rm -f "/tmp/testdisk.log"
+    fi
+
+    # Слой 5: Прямое интерактивное взаимодействие с оборудованием
+    sleep 1
+    core_engine_ui "!" "Opening Interactive Hardware Session. Focus console..."
+    
+    # Запуск TestDisk. Флаг /log заставляет его писать текущие действия в новый файл
+    sudo testdisk /log "$dev_path"
+
+    # 6. Пост-обработка и Сбор трофеев [11]
+    if [[ -f "/tmp/testdisk.log" ]]; then
+        echo -e "\n=== INTERACTIVE REPAIR SESSION LOG ===" >> "$session_log"
+        cat "/tmp/testdisk.log" >> "$session_log"
+        rm -f "/tmp/testdisk.log"
+    fi
+
+    # Возвращаем рабочую директорию на место
+    cd "$current_pwd" 2>/dev/null
+
+    if [[ -s "$session_log" ]]; then
+        core_engine_ui "s" "[+] Partition Repair Session closed. Comprehensive audit log secured."
+        # Регистрация в Сборщике трофеев [11]
+        core_engine_loot "forensics" "Partition table audit/repair completed for $dev_path. Log: $session_log"
+    else
+        core_engine_ui "w" "Session closed, but no audit data was generated."
+        rm -f "$session_log"
+    fi
 
     core_engine_wait
 }
+
 
 
 
