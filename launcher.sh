@@ -4003,6 +4003,166 @@ run_ghost_commander() {
 }
 
 
+# ==============================================================================
+# @description: Универсальный модуль горячей перезагрузки ядра платформы v27.0
+# МОДЕРНИЗАЦИЯ: Форсированный обход SSL/TLS проверок (ca-certificates bypass)
+# БЕЗОПАСНОСТЬ: Ротация User-Agent (GLOBAL_NETWORK_UA) для бесшовного обхода WAF/DPI
+# АРХИТЕКТУРА: Открытый стрим ошибок сетевых харвестеров для Termux non-root
+# ==============================================================================
+run_update_prime() {
+    # Слой 1: Заголовок через Голос [1]
+    core_engine_ui "h" "SYSTEM UPDATE & SYNC v27.0"
+    
+    # --- СТАБИЛИЗАЦИЯ И ХАРДЕНИНГ ОКРУЖЕНИЯ $PATH ---
+    if [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
+        [[ ! "$PATH" =~ "$PREFIX/bin" ]] && export PATH="${PREFIX}/bin:${PATH}"
+    fi
+    [[ ! "$PATH" =~ "/usr/local/bin" ]] && export PATH="${PATH}:/usr/local/bin:/usr/bin:/bin"
+    
+    # --- ЭВРИСТИКА ОКРУЖЕНИЯ (Вычисление рабочей зоны) ---
+    local base_work_dir
+    if [[ $EUID -eq 0 ]]; then
+        base_work_dir="/root"
+    else
+        base_work_dir="$HOME"
+    fi
+    
+    local target="${base_work_dir}/launcher.sh"
+    local repo="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
+    local tmp="${target}.tmp"
+
+    # --- ИНТЕЛЛЕКТУАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ БИНАРНИКОВ ---
+    local exe_cmd=""
+
+    if command -v curl >/dev/null 2>&1; then
+        exe_cmd="curl"
+    elif [[ -x "${PREFIX}/bin/curl" ]]; then
+        exe_cmd="${PREFIX}/bin/curl"
+    fi
+
+    if [[ -n "$exe_cmd" ]]; then
+        core_engine_ui "i" "Network harvester verified: cURL Engine active."
+    else
+        if command -v wget >/dev/null 2>&1; then
+            exe_cmd="wget"
+        elif [[ -x "${PREFIX}/bin/wget" ]]; then
+            exe_cmd="${PREFIX}/bin/wget"
+        fi
+        [[ -n "$exe_cmd" ]] && core_engine_ui "i" "Network harvester verified: Wget Engine active."
+    fi
+
+    if [[ -z "$exe_cmd" ]]; then
+        core_engine_ui "w" "Internal verification failed. Using Termux fallback paths..."
+        if [[ -x "${PREFIX}/bin/curl" ]]; then
+            exe_cmd="${PREFIX}/bin/curl"
+        elif [[ -x "${PREFIX}/bin/wget" ]]; then
+            exe_cmd="${PREFIX}/bin/wget"
+        else
+            core_engine_ui "e" "CRITICAL: cURL/Wget binaries completely inaccessible!"
+            core_engine_wait
+            return 1
+        fi
+    fi
+
+    # --- ДИНАМИЧЕСКИЙ РОТАТОР USER-AGENT ---
+    local selected_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    if [[ -n "${GLOBAL_NETWORK_UA[*]}" ]]; then
+        local ua_size=${#GLOBAL_NETWORK_UA[@]}
+        local rand_idx=$(( RANDOM % ua_size ))
+        selected_ua="${GLOBAL_NETWORK_UA[$rand_idx]}"
+    fi
+
+    core_engine_ui "i" "Connecting to GitHub Repository..."
+    core_engine_ui "d" "Active UA: $selected_ua"
+
+    # Слой 2: Безопасный стрим с обходом валидации SSL-сертификатов
+    rm -f "$tmp"
+    
+    if [[ "$exe_cmd" =~ "curl" ]]; then
+        core_engine_ui "i" "Executing cURL SSL-Bypass stream..."
+        # Добавлен флаг -k (--insecure) для обхода проблем с ca-certificates в Android
+        $exe_cmd -k -L -A "$selected_ua" --connect-timeout 15 "$repo" -o "$tmp"
+    else
+        core_engine_ui "i" "Executing Wget SSL-Bypass stream..."
+        # Добавлен флаг --no-check-certificate
+        $exe_cmd --no-check-certificate -q --user-agent="$selected_ua" --timeout=15 "$repo" -O "$tmp"
+    fi
+    
+    # Слой 3: АВТОНОМНАЯ ВАЛИДАЦИЯ ДАННЫХ
+    if [[ ! -f "$tmp" || ! -s "$tmp" ]]; then
+        core_engine_ui "e" "CRITICAL: Download failed (Empty or missing payload)!"
+        core_engine_ui "!" "Network handshake drop or DNS restriction detected."
+        [[ -f "$tmp" ]] && rm -f "$tmp"
+        core_engine_wait
+        return 1
+    fi
+
+    # Проверка сигнатуры (Защита от заглушек WAF / Ошибок 404)
+    if ! head -n 5 "$tmp" | grep -qE '^#!/bin/|^#!/usr/bin/|^#'; then
+        core_engine_ui "e" "CRITICAL: Target source signature is corrupted (Not a script)!"
+        rm -f "$tmp"
+        core_engine_wait
+        return 1
+    fi
+
+    # --- Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (С диагностикой ошибок) ---
+    if ! bash -n "$tmp" 2>/dev/null; then
+        core_engine_ui "e" "CRITICAL: Remote code has broken Bash syntax!"
+        
+        # Вывод ошибки, чтобы знать ГДЕ именно поломка
+        echo -e "\n${R}[!] SYNTAX ERROR LOG:${NC}"
+        bash -n "$tmp"
+        echo -e "\n${Y}Check the lines above to fix the remote repository script.${NC}"
+        
+        rm -f "$tmp"
+        core_engine_wait
+        return 1
+    fi
+
+    # Слой 5: Атомарная замена и права
+    core_engine_ui "i" "Applying code synchronization..."
+    if [[ $EUID -eq 0 ]]; then
+        mv "$tmp" "$target" && chmod 755 "$target" && chown root:root "$target" 2>/dev/null
+    else
+        mv "$tmp" "$target" && chmod 755 "$target"
+    fi
+
+    # Слой 6: Восстановление среды (Alias & Symlink)
+    local bashrc_path="${HOME}/.bashrc"
+    [[ -f "${HOME}/.bash_profile" ]] && bashrc_path="${HOME}/.bash_profile"
+
+    if [[ -f "$bashrc_path" ]]; then
+        if ! grep -q "alias launcher=" "$bashrc_path"; then
+            echo "alias launcher='bash $target'" >> "$bashrc_path"
+            core_engine_ui "s" "Alias 'launcher' injected into $(basename "$bashrc_path")"
+        fi
+    else
+        echo "alias launcher='bash $target'" > "$bashrc_path"
+        core_engine_ui "s" "Configuration profile created with 'launcher' alias."
+    fi
+    
+    # Создаем системную ссылку
+    if [[ $EUID -eq 0 ]]; then
+        ln -sf "$target" /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher
+    elif [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
+        ln -sf "$target" "$PREFIX/bin/launcher" && chmod +x "$PREFIX/bin/launcher"
+    fi
+
+    core_engine_ui "s" "Code updated successfully, permissions aligned!"
+    
+    # Слой 7: Синхронизация и перезапуск [13]
+    if command -v core_engine_progress >/dev/null 2>&1; then
+        core_engine_progress 1 "Rebooting Matrix Launcher Core"
+    fi
+    
+    # Полная очистка перед перезапуском [10]
+    if command -v core_engine_clean_env >/dev/null 2>&1; then
+        core_engine_clean_env
+    fi
+    
+    # Мгновенный бесшовный перехват управления дескриптора нового кода
+    exec bash "$target"
+}
 
 
 # ==============================================================================
@@ -4011,7 +4171,7 @@ run_ghost_commander() {
 # БЕЗОПАСНОСТЬ: Ротация User-Agent (GLOBAL_NETWORK_UA) для бесшовного обхода WAF/DPI
 # АРХИТЕКТУРА: Открытый стрим ошибок сетевых харвестеров для Termux non-root
 # ==============================================================================
-run_update_prime() {
+run_update_primeold() {
     # Слой 1: Заголовок через Голос [1]
     core_engine_ui "h" "SYSTEM UPDATE & SYNC v27.0"
     
