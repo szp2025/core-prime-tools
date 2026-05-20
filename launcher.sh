@@ -6597,56 +6597,82 @@ run_doc_cleaner() {
 
 
 
-# --- Вспомогательный селектор устройств ---
-
+# ==============================================================================
+# @description: OSINT NEXUS v23.0 - ROBUST HARDWARE STORAGE SELECTOR
+# @status: REVISED INFRASTRUCTURE & SPACE-SAFE PARSING | PRODUCTION READY
+# ==============================================================================
 run_storage_selector() {
     # Слой 1: Визуальный заголовок через Голос [1]
     core_engine_ui "h" "HARDWARE: STORAGE SELECTOR"
-    core_engine_ui "i" "Searching for connected mass storage devices..."
+    core_engine_ui "i" "Scanning hardware buses for block devices..."
     
-    # Слой 2: Сбор данных через Санитара [8]
-    # lsblk используется для получения имен, размеров и моделей без монтирования
-    local devices=$(lsblk -dno NAME,SIZE,MODEL,SERIAL,TRAN | grep -E "usb|sata|nvme")
+    # Слой 2: Сбор данных с использованием безопасных разделителей (защита от пробелов в MODEL/SERIAL)
+    # Исключаем loop, ram, zram и отображаем только корневые диски (-d)
+    local raw_devices=$(lsblk -dno NAME,SIZE,MODEL,SERIAL,TRAN 2>/dev/null | grep -vE "^loop|^ram|^zram")
     
-    # Слой 3: Валидация списка через Мозг [5]
-    if [[ -z "$devices" ]]; then
-        core_engine_ui "e" "No external storage media (USB/SATA/NVME) detected."
+    # Слой 3: Валидация списка
+    if [[ -z "$raw_devices" ]]; then
+        core_engine_ui "e" "No external or block storage media detected."
         core_engine_wait
         return 1
     fi
 
     # Слой 4: Отрисовка через Архитектор [2]
-    core_engine_ui "i" "Available External Media:"
+    core_engine_ui "i" "Available Mass Storage Media:"
     
     local i=1
     local dev_list=()
     
-    # Парсинг вывода lsblk
-    while read -r name size model serial tran; do
-        local desc="${model:-Generic} [${serial:-ID_UNKNOWN}] (${tran^^})"
-        # Слой 3: Органы чувств — Формирование списка выбора
+    # Используем контролируемый построчный разбор, чтобы избежать смещения переменных при пустых полях
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        
+        # Получаем данные изолированно для каждой строки через встроенный lsblk парсинг
+        local name=$(echo "$line" | awk '{print $1}')
+        local size=$(echo "$line" | awk '{print $2}')
+        
+        # Безопасно вытягиваем модель, серийник и транспорт, даже если там пробелы
+        local model=$(lsblk -dno MODEL "/dev/$name" 2>/dev/null | xargs)
+        local serial=$(lsblk -dno SERIAL "/dev/$name" 2>/dev/null | xargs)
+        local tran=$(lsblk -dno TRAN "/dev/$name" 2>/dev/null | xargs)
+        
+        # Санитизация пустых значений
+        [[ -z "$model" ]] && model="Generic Device"
+        [[ -z "$serial" ]] && serial="ID_UNKNOWN"
+        [[ -z "$tran" ]] && tran="UNKNOWN_BUS"
+        
+        local desc="$model [$serial] (${tran^^})"
+        
+        # Отрисовка элемента в UI фреймворка
         core_engine_item "$i" "/dev/$name ($size)" "$desc"
         dev_list+=("/dev/$name")
         ((i++))
-    done <<< "$devices"
+    done <<< "$raw_devices"
     
     # Слой 5: Получение выбора через Органы чувств [3]
     local max_idx=${#dev_list[@]}
     local choice=$(core_engine_input "text" "Enter device number (1-$max_idx)")
 
-    # Слой 6: Комплексная валидация (Валидатор [5])
+    # Слой 6: Комплексная валидация индекса
     if [[ -z "$choice" ]] || ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > max_idx )); then
-        core_engine_ui "e" "Invalid Selection. Index out of range."
+        core_engine_ui "e" "Selection Aborted: Index out of range or empty input."
         core_engine_wait
         return 1
     fi
 
-    # Слой 7: Установка глобального состояния и регистрация (Loot [11])
+    # Слой 7: Установка глобального состояния и фиксация в системе
     TARGET_DEV="${dev_list[$((choice-1))]}"
+    
+    # Дополнительная проверка: доступен ли девайс на чтение прямо сейчас
+    if [ ! -r "$TARGET_DEV" ] && ! command -v sudo >/dev/null; then
+        core_engine_ui "w" "Warning: Device locked. Permissions might be required for raw I/O operational layer."
+    fi
+
     core_engine_ui "s" "Target Device Locked: $TARGET_DEV"
     
-    # Фиксация выбора в системном журнале
-    core_engine_loot "hardware" "Storage selected: $TARGET_DEV | Size: $(lsblk -dno SIZE "$TARGET_DEV")"
+    # Фиксация выбора в системном журнале (Loot [11])
+    local target_size=$(lsblk -dno SIZE "$TARGET_DEV" 2>/dev/null | xargs)
+    core_engine_loot "hardware" "Storage selected: $TARGET_DEV | Size: ${target_size:-UNKNOWN}"
     
     core_engine_wait
     return 0
