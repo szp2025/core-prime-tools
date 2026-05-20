@@ -4714,105 +4714,77 @@ osint_nexus_router() {
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v15.4 - FULL SPECTRUM FORENSIC ENGINE (MONOLITH)
-# @status: NO CUTS, FULL PATTERN INTEGRATION, MAXIMUM FORENSIC DATA
+# @description: OSINT NEXUS v16.1 - FULL RECURSIVE DEEP-HUNT (NO CUTS)
+# @status: INTEGRATED MONOLITH - RECURSIVE ENGINE & STRUCTURED DOSSIER
 # ==============================================================================
 run_smart_osint_engine() {
     clear
-    core_engine_ui "h" "PRIME RECON: FULL-SPECTRUM NEXUS v15.4 (MONOLITH MODE)"
+    core_engine_ui "h" "PRIME RECON: NEXUS v16.1 (FULL RECURSIVE MONOLITH)"
 
-    local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, Email, IP, or Domain)")
-    [[ -z "$INPUT" ]] && return
+    local TARGET=$(core_engine_input "text" "TARGET (Nick, Name, Phone, Email, IP, or Domain)")
+    [[ -z "$TARGET" ]] && return
 
-    # Инициализация лога (никаких удалений, всё для архива)
     local timestamp=$(date +%Y%m%d_%H%M%S)
-    local raw_log="$PRIME_LOOT/forensic_${INPUT//[^a-zA-Z0-9]/_}_$timestamp.log"
-    echo "[*] SCAN SESSION STARTED: $INPUT | TIMESTAMP: $(date)" > "$raw_log"
-    core_engine_progress 2 "OSINT_SCAN_INIT"
+    local raw_log="$PRIME_LOOT/forensic_${TARGET//[^a-zA-Z0-9]/_}_$timestamp.log"
+    echo "[*] RECURSIVE SCAN STARTED: $TARGET | TIMESTAMP: $(date)" > "$raw_log"
 
-    # --- 0. АВТО-ПРОФИЛИРОВАНИЕ (NEXUS ROUTER НА GLOBAL_REGEX) ---
-    local mode="GENERAL"
-    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_PHONE")" == "0" ]] && mode="PHONE_INTEL"
-    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_EMAIL")" == "0" ]] && mode="BREACH_INTEL"
-    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_IP")" == "0" ]] && mode="NETWORK_INTEL"
-    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_DOMAIN")" == "0" ]] && mode="DOMAIN_INTEL"
-    echo "[*] TARGET TYPE DETECTED: $mode" >> "$raw_log"
-
-    # --- 1. SOCIAL SCAN (Ghost Mode - Полный цикл из v14.2) ---
-    core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
-    local sites=("${GLOBAL_OSINT_SITES[@]}")
-    local total_sites=${#sites[@]}
-    local current_index=0
-
-    for entry in "${sites[@]}"; do
-        ((current_index++))
-        local url="${entry%%|*}"
-        local name="${entry#*|}"
-        local progress=$(printf "[%02d/%02d]" "$current_index" "$total_sites")
-        
-        # Полный curl для получения кода ответа и содержания
-        local response=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "${url}${INPUT}" --connect-timeout 4 -D -)
-        
-        if echo "$response" | grep -q "200 OK"; then
-            echo "[MATCH] $name -> ${url}${INPUT}" >> "$raw_log"
-            echo "HEADERS: $(echo "$response" | head -n 3)" >> "$raw_log"
-            core_engine_ui "s" "$progress Match confirmed: $name"
-        else
-            echo -ne " [.] Проверка: $progress $name...\r"
+    # --- 1. ПЕРВИЧНЫЙ СБОР (Матрица v14.7) ---
+    core_engine_ui "i" "Running primary discovery pipeline..."
+    
+    # 1.1 Social Scan
+    for entry in "${GLOBAL_OSINT_SITES[@]}"; do
+        local url="${entry%%|*}"; local name="${entry#*|}"
+        local resp=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "${url}${TARGET}" --connect-timeout 4 -D -)
+        if echo "$resp" | grep -q "200 OK"; then
+            echo "[MATCH] $name -> ${url}${TARGET}" >> "$raw_log"
+            echo "HEADERS: $(echo "$resp" | head -n 3)" >> "$raw_log"
         fi
         sleep 0.4
     done
+
+    # 1.2 Deep Intel (Phone/Breach/Network/Domain)
+    [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_PHONE")" == "0" ]] && \
+        echo "[PHONE_DATA]" >> "$raw_log" && curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_PHONE_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
+    [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_EMAIL")" == "0" ]] && \
+        echo "[BREACH_DATA]" >> "$raw_log" && curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
+    [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_IP")" == "0" ]] && \
+        echo "[NET_DATA]" >> "$raw_log" && curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$TARGET/json" >> "$raw_log" 2>&1
+    if is_valid "$TARGET" "GLOBAL_REGEX_DOMAIN"; then
+        echo "[DNS_DATA]" >> "$raw_log" && dig +noall +answer "$TARGET" >> "$raw_log"
+        echo "[SSL_DATA]" >> "$raw_log" && echo | openssl s_client -servername "$TARGET" -connect "$TARGET:443" 2>/dev/null | openssl x509 -noout -subject -dates >> "$raw_log" 2>&1
+    fi
+
+    # --- 2. РЕКУРСИВНЫЙ ЦИКЛ (Nexus Deep-Hunt) ---
+    core_engine_ui "i" "Nexus: Launching recursive search on extracted entities..."
     
-    # Рекурсивный поиск личности
-    local gh_api="${GLOBAL_API_IDENTITY_NODES[0]%%|*}"
-    echo "[IDENTITY_DATA]" >> "$raw_log"
-    curl -s -A "$GLOBAL_NETWORK_UA" "${gh_api}${INPUT}" >> "$raw_log" 2>/dev/null
+    # Рекурсивный поиск Email
+    local extracted_emails=$(grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$raw_log" | sort -u)
+    for email in $extracted_emails; do
+        echo "[RECURSIVE_BREACH_CHECK] $email" >> "$raw_log"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$email" >> "$raw_log" 2>&1
+    done
 
-    # --- 2. PHONE INTEL ---
-    if [[ "$mode" == "PHONE_INTEL" || "$mode" == "GENERAL" ]]; then
-        core_engine_ui "i" "Querying Phone Databases..."
-        echo "[PHONE_DATA]" >> "$raw_log"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_PHONE_NODES[0]%%|*}$INPUT" >> "$raw_log" 2>/dev/null
-        local phone_info=$(grep -oE '"name":"[^"]+"|"oper":"[^"]+"' "$raw_log" | sed 's/"//g')
-        [[ -n "$phone_info" ]] && core_engine_ui "s" "Operator Data: $phone_info"
-    fi
+    # Рекурсивный поиск IP
+    local extracted_ips=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$raw_log" | sort -u)
+    for ip in $extracted_ips; do
+        echo "[RECURSIVE_NET_CHECK] $ip" >> "$raw_log"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$ip/json" >> "$raw_log" 2>&1
+    done
 
-    # --- 3. BREACH ANALYZER ---
-    if [[ "$mode" == "BREACH_INTEL" || "$mode" == "GENERAL" ]]; then
-        core_engine_ui "i" "Cross-referencing Leak Databases..."
-        echo "[BREACH_DATA]" >> "$raw_log"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$INPUT" >> "$raw_log" 2>/dev/null
-        if grep -q "results" "$raw_log"; then
-            core_engine_ui "w" "Breach Detected."
-            echo "[!] WARNING: Data leak detected" >> "$raw_log"
-        fi
-    fi
-
-    # --- 4. NETWORK & IP ANALYZER ---
-    if [[ "$mode" == "NETWORK_INTEL" || "$mode" == "GENERAL" ]]; then
-        core_engine_ui "i" "Analyzing Infrastructure..."
-        echo "[NET_DATA]" >> "$raw_log"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$INPUT/json" >> "$raw_log" 2>/dev/null
-        local net_info=$(grep -oE '"org":"[^"]+"|"country_name":"[^"]+"' "$raw_log" | sed 's/"//g')
-        [[ -n "$net_info" ]] && core_engine_ui "s" "Net Data: $net_info"
-    fi
-
-    # --- 5. DOMAIN & DNS CORE ---
-    if [[ "$mode" == "DOMAIN_INTEL" || "$mode" == "GENERAL" ]]; then
-        core_engine_ui "i" "Resolving DNS & SSL..."
-        echo "[DNS_DATA]" >> "$raw_log" && dig +noall +answer "$INPUT" >> "$raw_log"
-        echo "[SSL_DATA]" >> "$raw_log" && echo | openssl s_client -servername "$INPUT" -connect "$INPUT:443" 2>/dev/null | openssl x509 -noout -subject -dates >> "$raw_log" 2>&1
-    fi
-
-    # --- 6. ФИНАЛЬНЫЙ СБОР И АРХИВАЦИЯ ---
-    core_engine_ui "line" ""
-    core_engine_ui "s" "INTELLIGENCE DOSSIER GENERATED"
+    # --- 3. СТРУКТУРИРОВАНИЕ ДОСЬЕ ---
+    core_engine_ui "s" "Finalizing intelligence dossier..."
     
-    # Полный вывод для анализа
-    grep -E "MATCH|FOUND|oper|org|country_name|WARNING|subject|issuer" "$raw_log" | sort -u
-    
-    core_engine_loot "osint" "Dossier for $INPUT saved to $raw_log"
-    core_engine_ui "line" ""
+    # Финальная агрегация (всё в один лог, но структурировано)
+    local final_report="$PRIME_LOOT/dossier_${TARGET//[^a-zA-Z0-9]/_}_$timestamp.txt"
+    {
+        echo "--- OSINT NEXUS FINAL DOSSIER ---"
+        echo "TARGET: $TARGET"
+        echo "DATE: $(date)"
+        echo "---------------------------------"
+        grep -E "MATCH|FOUND|BREACH|PHONE|OPER|ORG|DNS|SSL|RECURSIVE" "$raw_log" | sort -u
+    } > "$final_report"
+
+    core_engine_ui "s" "Dossier complete: $final_report"
     core_engine_wait
 }
 
