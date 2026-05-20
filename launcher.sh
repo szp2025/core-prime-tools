@@ -6778,9 +6778,15 @@ run_osint_custom_socialscan() {
     local input_target="$1"
     local raw_log="$2"
 
-    # Приоритет ввода: аргумент -> сессионный таргет
+       # 1. Приоритет ввода: аргумент -> сессионный таргет
     [[ -z "$input_target" ]] && input_target="$target_user"
     [[ -z "$input_target" ]] && return 1
+
+    # 2. Фильтрация системных маршрутов (Nexus Bypass Protection)
+    if is_valid "$input_target" "GLOBAL_PLATFORM_SYSTEM_ROUTES"; then
+        return 1
+    fi
+
 
     # Определение режима: если это ник — Ghost Mode, если данные — API-валидация
     local is_nick=1
@@ -6885,9 +6891,14 @@ run_osint_custom_ignorant() {
     local phone="$1"
     local raw_log="$2" # Принимает путь к логу для записи результатов
 
-    # Автоматизация сессионного таргета
+     # 1. Автономная инициализация сессионного таргета
     [[ -z "$phone" ]] && phone="$target_user"
     [[ -z "$phone" ]] && return 1
+
+    # 2. Валидация формата через нативный PCRE-валидатор Perl (Защита от сбоев Bash)
+    if ! is_valid "$phone" "GLOBAL_REGEX_PHONE_VALID"; then
+        return 1
+    fi
 
     # Санитарная очистка (нормализация номера)
     phone="${phone//+/}"; phone="${phone// /}"; phone="${phone//-/}"
