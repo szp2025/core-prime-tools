@@ -4714,8 +4714,71 @@ osint_nexus_router() {
 
 
 # ==============================================================================
+# @description: OSINT NEXUS v20.0 - FULL RECURSIVE INTEGRATED MONOLITH
+# @status: NO CUTS, ALL MODULES EMBEDDED, FULL FORENSIC DATA PRESERVATION
+# ==============================================================================
+
+# --- ИНТЕГРИРОВАННЫЙ МОДУЛЬ: SOCIALSCAN ---
+run_osint_custom_socialscan_internal() {
+    local scan_target="$1"
+    # [ВСЯ ЛОГИКА SOCIALSCAN ЗДЕСЬ - ПОЛНОСТЬЮ]
+    for site_entry in "${GLOBAL_OSINT_SITES[@]}"; do
+        [[ "$site_entry" != *"|"* ]] && continue
+        local base_url="${site_entry%%|*}"
+        local remaining="${site_entry#*|}"
+        local check_type="${remaining%%|*}"
+        local error_marker="${remaining%%|*}"
+        local category="${remaining%%|*}"
+        local site_name="${remaining#*|}"
+        local full_url="${base_url}${scan_target}"
+        
+        if [[ "$check_type" == "HTTP_CODE" ]]; then
+            local http_code=$(curl -s -o /dev/null -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 5 -w "%{http_code}" "$full_url")
+            [[ "$http_code" == "200" ]] && echo "[MATCH] $site_name -> $full_url"
+        elif [[ "$check_type" == "TEXT_ABSENT" ]]; then
+            local page_body=$(curl -s -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 6 "$full_url" 2>/dev/null)
+            if [[ -n "$page_body" ]] && ! echo "$page_body" | grep -qF "$error_marker"; then
+                echo "[MATCH] $site_name -> $full_url"
+            fi
+        fi
+        sleep 0.2
+    done
+}
+
+# --- ИНТЕГРИРОВАННЫЙ МОДУЛЬ: BREACH LEAKS ---
+run_osint_custom_leaks_internal() {
+    local clean_target="$1"
+    local search_dirs=("$HOME/arsenal_loot" "$HOME/prime_loot" "$HOME/reports")
+    for dir in "${search_dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+            grep -rih "$clean_target" "$dir" 2>/dev/null | grep -v "LOCAL BREACH SEARCH REPORT" | head -n 50
+        fi
+    done
+}
+
+# --- ИНТЕГРИРОВАННЫЙ МОДУЛЬ: OMNI-CRAWLER ---
+run_osint_omni_crawler_internal() {
+    local target_user="$1"
+    local query_vectors=("${target_user}+phone" "${target_user}+contact" "${target_user}+gmail")
+    
+    for vector in "${query_vectors[@]}"; do
+        for engine_entry in "${GLOBAL_SEARCH_ENGINES[@]}"; do
+            local engine_name="${engine_entry%%|*}"
+            local request_url="${engine_entry#*|}"
+            request_url="${request_url//%VECTOR%/$vector}"
+            
+            local raw_data=$(curl -s -A "$GLOBAL_NETWORK_UA" --connect-timeout 5 "$request_url" 2>/dev/null)
+            # Извлекаем все артефакты
+            echo "$raw_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" >> "/tmp/nexus_found_phones.tmp"
+            echo "$raw_data" | grep -oP "$GLOBAL_REGEX_EMAIL" >> "/tmp/nexus_found_emails.tmp"
+        done
+    done
+}
+
+
+# ==============================================================================
 # @description: OSINT NEXUS v16.2 - FULL RECURSIVE MONOLITH (PATTERN-SAFE)
-# @status: INTEGRATED MONOLITH - RECURSIVE ENGINE & CRITICAL FILTERS
+# @status: STABLE INTEGRATED MONOLITH - RECURSIVE ENGINE & CRITICAL FILTERS
 # ==============================================================================
 run_smart_osint_engine() {
     clear
@@ -4729,7 +4792,6 @@ run_smart_osint_engine() {
     echo "[*] RECURSIVE SCAN STARTED: $TARGET | TIMESTAMP: $(date)" > "$raw_log"
 
     # --- 0. КРИТИЧЕСКИЙ ФИЛЬТР (SOCIAL SCAN SWITCH) ---
-    # Если это никнейм, то запускаем глубокий социальный поиск
     if ! echo "$TARGET" | grep -Eq "$GLOBAL_REGEX_EMAIL|$GLOBAL_REGEX_PHONE|$GLOBAL_REGEX_IP|$GLOBAL_REGEX_DOMAIN"; then
         core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
         for entry in "${GLOBAL_OSINT_SITES[@]}"; do
@@ -4750,10 +4812,13 @@ run_smart_osint_engine() {
     
     [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_PHONE")" == "0" ]] && \
         echo "[PHONE_DATA]" >> "$raw_log" && curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_PHONE_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
+    
     [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_EMAIL")" == "0" ]] && \
         echo "[BREACH_DATA]" >> "$raw_log" && curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
+    
     [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_IP")" == "0" ]] && \
         echo "[NET_DATA]" >> "$raw_log" && curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$TARGET/json" >> "$raw_log" 2>&1
+    
     if is_valid "$TARGET" "GLOBAL_REGEX_DOMAIN"; then
         echo "[DNS_DATA]" >> "$raw_log" && dig +noall +answer "$TARGET" >> "$raw_log"
         echo "[SSL_DATA]" >> "$raw_log" && echo | openssl s_client -servername "$TARGET" -connect "$TARGET:443" 2>/dev/null | openssl x509 -noout -subject -dates >> "$raw_log" 2>&1
@@ -4762,12 +4827,13 @@ run_smart_osint_engine() {
     # --- 2. РЕКУРСИВНЫЙ ЦИКЛ (Nexus Deep-Hunt) ---
     core_engine_ui "i" "Nexus: Launching recursive search on extracted entities..."
     
-    # Рекурсивный поиск Email и IP, извлеченных в ходе первичного скана
+    # 2.1 Рекурсия по Email
     grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$raw_log" | sort -u | while read -r email; do
         echo "[RECURSIVE_BREACH_CHECK] $email" >> "$raw_log"
         curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$email" >> "$raw_log" 2>&1
     done
 
+    # 2.2 Рекурсия по IP
     grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$raw_log" | sort -u | while read -r ip; do
         echo "[RECURSIVE_NET_CHECK] $ip" >> "$raw_log"
         curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$ip/json" >> "$raw_log" 2>&1
@@ -4788,132 +4854,6 @@ run_smart_osint_engine() {
     core_engine_ui "s" "Dossier complete: $final_report"
     core_engine_wait
 }
-
-# ==============================================================================
-# @description: Высокоскоростной движок OSINT с каскадными API-матрицами v14.2
-# ==============================================================================
-run_smart_osint_engineold() {
-    clear
-    core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v14.2"
-
-    # Ввод через стандартный input Ядра
-    local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, Email, IP, or Domain)")
-    [[ -z "$INPUT" ]] && return
-
-    local raw_log="/tmp/prime_recon_$RANDOM.log"
-    
-    core_engine_progress 2 "OSINT_SCAN_INIT"
-
-    # --- 1. SOCIAL SCAN (Если ввод — это никнейм) ---
-    if ! echo "$INPUT" | grep -Eq "$GLOBAL_REGEX_EMAIL|$GLOBAL_REGEX_PHONE|$GLOBAL_REGEX_IP|$GLOBAL_REGEX_DOMAIN"; then
-        # Твой код ошибки здесь
-        core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
-        
-        local sites=("${GLOBAL_OSINT_SITES[@]}")
-        local total_sites=${#sites[@]}
-        local current_index=0
-
-        for entry in "${sites[@]}"; do
-            ((current_index++))
-            local url="${entry%%|*}"
-            local name="${entry#*|}"
-            
-            local progress
-            progress=$(printf "[%02d/%02d]" "$current_index" "$total_sites")
-
-            local status
-            status=$(curl -s -o /dev/null -L -w "%{http_code}" -A "$GLOBAL_NETWORK_UA" "${url}${INPUT}" --connect-timeout 4)
-            
-            if [ "$status" == "200" ]; then
-                echo "[+] FOUND on $name: ${url}${INPUT}" >> "$raw_log"
-                core_engine_ui "s" "$progress Match confirmed: $name"
-            else
-                echo -ne " [.] Проверка: $progress $name...\r"
-            fi
-        done
-        echo -ne "                                                       \r"
-        
-        local gh_api="${GLOBAL_API_IDENTITY_NODES[0]%%|*}"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${gh_api}${INPUT}" >> "$raw_log" 2>/dev/null
-    fi
-
-    # --- 2. PHONE INTEL (Если ввод — мобильный номер) ---
-    if is_valid "$INPUT" "GLOBAL_REGEX_PHONE";
-    then
-        core_engine_ui "i" "Deep-Querying Global Phone Databases..."
-        
-        local active_phone_api="${GLOBAL_API_PHONE_NODES[0]%%|*}"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${active_phone_api}${INPUT}" >> "$raw_log" 2>/dev/null
-        
-        local phone_info=$(grep -oE '"name":"[^"]+"|"oper":"[^"]+"' "$raw_log" | sed 's/"//g')
-        [[ -n "$phone_info" ]] && core_engine_ui "s" "Operator Data: $phone_info"
-    fi
-
-    # --- 3. DATA BREACH ANALYZER (Если ввод — email) ---
-    if is_valid "$INPUT" "GLOBAL_REGEX_EMAIL"; then
-
-        core_engine_ui "i" "Cross-referencing Leak Databases..."
-        
-        local active_breach_api="${GLOBAL_API_BREACH_NODES[0]%%|*}"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${active_breach_api}${INPUT}" >> "$raw_log" 2>/dev/null
-        
-        if grep -q "results" "$raw_log"; then
-            core_engine_ui "w" "Breach Detected: Target found in global COMB leak."
-            echo "[!] WARNING: Data leak detected for $INPUT" >> "$raw_log"
-        fi
-    fi
-
-    # --- 4. NETWORK & IP ANALYZER (Если ввод — IP адрес) ---
-    if is_valid "$INPUT" "GLOBAL_REGEX_IP"; then
-
-        core_engine_ui "i" "Analyzing Network Infrastructure & GeoIP..."
-        
-        local active_net_api="${GLOBAL_API_NETWORK_NODES[0]%%|*}"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${active_net_api}${INPUT}/json" >> "$raw_log" 2>/dev/null
-        
-        local net_info=$(grep -oE '"org":"[^"]+"|"country_name":"[^"]+"|"city":"[^"]+"' "$raw_log" | sed 's/"//g')
-        [[ -n "$net_info" ]] && core_engine_ui "s" "Network Route Found:\n$net_info"
-    fi
-
-    # --- 5. DOMAIN & DNS CORE (Если ввод — сайт или домен) ---
-    if is_valid "$INPUT" "GLOBAL_REGEX_DOMAIN" && ! is_valid "$INPUT" "GLOBAL_REGEX_EMAIL"; then
-
-        core_engine_ui "i" "Resolving Domain DNS Records & Whois Registry..."
-        
-        local active_dns_api="${GLOBAL_API_DOMAIN_NODES[2]%%|*}"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${active_dns_api}${INPUT}" >> "$raw_log" 2>/dev/null
-        
-        local active_whois_api="${GLOBAL_API_DOMAIN_NODES[3]%%|*}"
-        curl -s -A "$GLOBAL_NETWORK_UA" "${active_whois_api}${INPUT}" >> "$raw_log" 2>/dev/null
-    fi
-
-    # --- 6. ГЕНЕРАЦИЯ ФИНАЛЬНОГО ДОСЬЕ ---
-    core_engine_ui "line" ""
-    core_engine_ui "s" "INTELLIGENCE DOSSIER GENERATED"
-    core_engine_ui "line" ""
-    
-    local hits=$(grep -cE "FOUND|!|oper|org|country_name|login" "$raw_log" 2>/dev/null || echo 0)
-    echo -e "${B}Target Identification:${NC} $INPUT"
-    echo -e "${Y}Correlation Level:${NC} $hits matches found."
-    
-    echo -e "\n${G}--- DETAILED FINDINGS ---${NC}"
-    if [ -f "$raw_log" ]; then
-        grep -E "FOUND|oper|name|location|WARNING|org|country_name|city" "$raw_log" | sort -u
-        if is_valid "$INPUT" "GLOBAL_REGEX_DOMAIN"; then
-
-            head -n 15 "$raw_log" 2>/dev/null
-        fi
-    else
-        echo -e "${R}No data collected.${NC}"
-    fi
-    
-    core_engine_loot "osint" "Dossier for $INPUT created. Hits: $hits"
-    rm -f "$raw_log"
-    core_engine_ui "line" ""
-
-    core_engine_wait
-}
-
 
 
 # ==============================================================================
