@@ -4474,180 +4474,130 @@ run_bluetooth_scan() {
 
 
 
-# --- Сетевое мапирование (Network Mapper) ---
-# ==============================================================================
-# @description: Модуль комплексного сетевого аудита, маппинга и захвата пакетов
-# Интегрирован под ультимативные матрицы сканирования периметра (Linux / Termux)
-# ПОЛНАЯ АВТОНОМИЯ: Безбарьерный линейный запуск без интерактивного меню
-# ==============================================================================
 run_network_analyzer() {
     clear
-    # Слой 1: Заголовок через компоненты интерфейса Ядра
-    core_engine_ui "h" "NETWORK INTELLIGENCE & TOPOLOGY v5.0 (AUTONOMOUS)"
-    core_engine_ui "!" "Инициализация автоматического сетевого контура..."
-
-    # Бронированный многоуровневый парсинг локального IP адреса подсети
-    # Исключаем петлю локального хоста на базе глобального регулярного выражения ядра
-    local local_ip=""
-    local_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+')
+    core_engine_ui "h" "NETWORK INTELLIGENCE & TOPOLOGY v6.0 (SELF-HEALING)"
     
-    if [[ -z "$local_ip" ]]; then
-        # Фолбэк-вариант 2: извлечение через ip addr (актуально для Termux/Android)
-        local_ip=$(ip addr show 2>/dev/null | grep -w "inet" | grep -vE "$GLOBAL_REGEX_NET_LOOPBACK" | head -n 1 | awk '{print $2}' | cut -d/ -f1)
-    fi
-    if [[ -z "$local_ip" ]]; then
-        # Фолбэк-вариант 3: старый добрый ifconfig
-        local_ip=$(ifconfig 2>/dev/null | grep -w "inet" | grep -vE "$GLOBAL_REGEX_NET_LOOPBACK" | head -n 1 | tr -s ' ' | cut -d' ' -f3)
+    # Слой 0: Валидация экосистемы
+    if ! core_engine_validator "pkg" "nmap" "Nmap Engine"; then
+        core_engine_ui "e" "CRITICAL: Nmap missing."
+        return 1
     fi
 
-    # Формируем целевой диапазон /24 на основе полученного IP
-    local range=""
-    if [[ -n "$local_ip" ]]; then
-        range=$(echo "$local_ip" | cut -d. -f1-3)".0/24"
-    else
-        # Если сеть изолирована или девайс в офлайне — берем глобальный дефолт
-        range="$GLOBAL_NET_FALLBACK_RANGE"
-    fi
+    local local_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+')
+    [[ -z "$local_ip" ]] && local_ip=$(ip addr show 2>/dev/null | grep -w "inet" | grep -vE "$GLOBAL_REGEX_NET_LOOPBACK" | head -n 1 | awk '{print $2}' | cut -d/ -f1)
     
-    core_engine_ui "s" "Определен целевой диапазон сканирования: $range"
-    core_engine_progress 2 "AUTONOMOUS MAPPING INITIALIZATION"
+    local range=$( [[ -n "$local_ip" ]] && echo "$(echo "$local_ip" | cut -d. -f1-3).0/24" || echo "$GLOBAL_NET_FALLBACK_RANGE" )
+    
+    core_engine_ui "s" "Range: $range"
+    local state_file="/tmp/nexus_net_state.tmp"
 
-    # Бесконечный цикл автономного сканирования периметра
+    # Основной цикл с Watchdog
     while true; do
-        local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-        core_engine_ui "line" ""
-        core_engine_ui "i" "[$timestamp] Запуск цикла разведки периметра..."
-        core_engine_ui "w" "Режим: Автопилот. Для принудительной остановки нажмите [CTRL+C]"
-        core_engine_ui "line" ""
-        
-        # Гибридный движок: интеллектуальная подстановка мощных глобальных матриц аргументов
-        local nmap_cmd="nmap"
-        if [[ $(id -u) -eq 0 ]]; then
-            nmap_cmd+=" $GLOBAL_NMAP_ROOT_ARGS"
-        else
-            # Режим Non-Root: безопасный TCP-Connect без вызова Raw Sockets во избежание Kernel Lock
-            nmap_cmd+=" $GLOBAL_NMAP_NON_ROOT_ARGS"
-        fi
-        
-        # Выполнение сканирования с перехватом сырого текстового потока
-        local raw_scan=""
-        raw_scan=$($nmap_cmd "$range" 2>/dev/null)
-        
-        if [[ -n "$raw_scan" ]]; then
-            local current_host=""
-            local host_detected_flag=0
+        core_engine_ui "i" "[WATCHDOG] Monitoring perimeter..."
 
-            # Построчный эвристический разбор вывода nmap через глобальные паттерны-фильтры
-            while read -r line; do
-                [[ -z "$line" ]] && continue
-                
-                # Триггер 1: Обнаружение заголовка нового хоста в потоке через внешнюю матрицу
-                if echo "$line" | grep -qEi "$GLOBAL_REGEX_NET_REPORT"; then
-                    current_host=$(echo "$line" | awk '{print $NF}' | tr -d '()')
-                    core_engine_ui "s" "HOST TARGET: [ONLINE] -> $current_host"
-                    host_detected_flag=1
-                    continue
-                fi
-                
-                # Триггер 2: Перехват строк с открытыми портами и сигнатурами запущенных служб
-                if echo "$line" | grep -qEi "$GLOBAL_REGEX_NET_PORT_LINE"; then
-                    core_engine_ui "y" "   └── SERVICE: $line"
-                fi
-            done <<< "$raw_scan"
+        # Запуск сканирования в фоне для контроля времени
+        (
+            local nmap_cmd="nmap"
+            [[ $(id -u) -eq 0 ]] && nmap_cmd+=" $GLOBAL_NMAP_ROOT_ARGS" || nmap_cmd+=" $GLOBAL_NMAP_NON_ROOT_ARGS"
             
-            [[ "$host_detected_flag" -eq 0 ]] && core_engine_ui "w" "Активные узлы в диапазоне $range не ответили на сетевые маркеры."
-        else
-            core_engine_ui "e" "Критический сбой выполнения бинарного файла nmap. Проверка окружения..."
-        fi
+            # Запускаем, перехватываем вывод
+            local raw_scan=$($nmap_cmd "$range" 2>/dev/null)
+            
+            if [[ -n "$raw_scan" ]]; then
+                while read -r line; do
+                    [[ -z "$line" ]] && continue
+                    if echo "$line" | grep -qEi "$GLOBAL_REGEX_NET_REPORT"; then
+                        local host=$(echo "$line" | awk '{print $NF}' | tr -d '()')
+                        if ! grep -q "$host" "$state_file" 2>/dev/null; then
+                            core_engine_ui "s" "NEW HOST: $host"
+                            echo "$host" >> "$state_file"
+                        fi
+                    fi
+                done <<< "$raw_scan"
+            fi
+        ) &
         
-        # Интервал между циклами сканирования (60 секунд), чтобы не перегружать стек сети
-        sleep 60
+        local scan_pid=$!
+        
+        # Watchdog: Ждем завершения или убиваем, если завис (таймаут 120 сек)
+        local count=0
+        while kill -0 $scan_pid 2>/dev/null; do
+            sleep 1
+            ((count++))
+            if [[ $count -ge 120 ]]; then
+                core_engine_ui "e" "[WATCHDOG] Scan timeout! Killing zombie process..."
+                kill -9 $scan_pid 2>/dev/null
+                break
+            fi
+        done
+        
+        sleep 30
     done
 }
 
 
-# ==============================================================================
-# @description: Модуль автоматического сбора сетевых данных и анализа трафика
-# Интегрирован под ультимативные матрицы ядра фреймворка
-# ПОЛНАЯ АВТОНОМИЯ: Динамический расчет таймингов + Фильтрация целевого трафика
-# ==============================================================================
+
 run_network_intelligence() {
     clear
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "h" "NETWORK INTELLIGENCE: TRAFFIC ANALYZER v6.0 (TARGETED AUTO)"
+    core_engine_ui "h" "NETWORK INTELLIGENCE: TRAFFIC ANALYZER v6.1 (SELF-HEALING)"
     
-    # Слой 2: Проверка TShark через Мозг [5]
-    if ! core_engine_validator "pkg" "tshark" "TShark Core"; then
-        core_engine_ui "e" "Критический компонент TShark не найден. Выход."
-        return
-    fi
+    # 1. Валидация всей экосистемы
+    for cmd in tshark stdbuf awk; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            core_engine_ui "e" "CRITICAL: Dependency '$cmd' missing. Aborting."
+            return 1
+        fi
+    done
 
-    # Слой 3: Авто-определение интерфейса через Метрики [12]
     local iface=$(ip route | grep default | grep -oP 'dev \K\S+' || echo "eth0")
-    core_engine_ui "s" "Active interface detected: $iface"
-    core_engine_ui "!" "Запуск параллельных контуров перехвата на автопилоте..."
-    core_engine_ui "w" "Для завершения работы модулей зажмите [CTRL+C]"
-    core_engine_ui "line" ""
+    core_engine_ui "s" "Active interface: $iface"
+    core_engine_ui "!" "Initializing autonomous capture loops..."
 
-    # Глобальный BPF-фильтр для TShark: пишем только сигналы, управляющие протоколы и сессии.
-    # Отсекаем: весь потоковый DATA-трафик, видео, музыку, торренты, тяжелый TLS-содержимое.
+    # 2. Модернизированный фоновый сниффер с защитой
+    local sniffer_pid=0
+    launch_sniffer() {
+        {
+            tshark -i "$iface" -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null \
+            | stdbuf -oL awk NF | stdbuf -oL uniq | while read -r line; do
+                core_engine_loot "traffic_leads" "IFACE: $iface | LEAD: $line"
+            done
+        } &
+        echo $!
+    }
+    sniffer_pid=$(launch_sniffer)
+
     local targeted_bpf_filter="port 53 or port 80 or port 21 or port 23 or port 25 or port 110 or port 143 or (tcp[tcpflags] & (tcp-syn|tcp-fin|tcp-rst) != 0)"
 
-    # Слой 4: Потоковый Sniffer — запуск в изолированном фоне
-    {
-        tshark -i "$iface" -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null \
-        | stdbuf -oL awk NF | stdbuf -oL uniq | while read -r line; do
-            core_engine_loot "traffic_leads" "IFACE: $iface | LEAD: $line"
-        done
-    } &
-    local sniffer_pid=$!
-
-    # Слой 5: Автономный цикл Traffic Record с динамической эвристикой и фильтрацией
+    # 3. Основной цикл с Адаптивным управлением
     while true; do
         local timestamp=$(date "+%H%M")
         local date_stamp=$(date "+%Y-%m-%d %H:%M:%S")
-        local filename="${BASE_DIR:-./}/prime_loot/capture_${timestamp}.pcap"
+        local loot_dir="${BASE_DIR:-.}/prime_loot"
+        local filename="${loot_dir}/capture_${timestamp}.pcap"
         
-        # --- БЛОК ЭВРИСТИКИ (Интеллектуальный расчет нагрузки) ---
-        core_engine_ui "i" "Анализ плотности целевого трафика..."
-        
-        # Считаем количество только целевых пакетов за 3 секунды тест-драйва
+        # Эвристика нагрузки
         local packet_count=$(tshark -i "$iface" -f "$targeted_bpf_filter" -a duration:3 -T fields -e frame.number 2>/dev/null | wc -l)
-        local duration=300 # Дефолт-баланс
-        local load_status="MEDIUM"
+        local duration=300
+        [[ "$packet_count" -gt 100 ]] && duration=60 && load_status="HIGH" || duration=900 && load_status="LOW"
 
-        if [[ "$packet_count" -gt 100 ]]; then
-            duration=60
-            load_status="HIGH (STORM)"
-        elif [[ "$packet_count" -lt 15 ]]; then
-            duration=900
-            load_status="LOW (IDLE)"
-        fi
-
-        core_engine_ui "+" "Эвристика: Целевой трафик зафиксирован как $load_status ($packet_count пак/3сек)"
-        core_engine_ui "i" "[$date_stamp] Запись отфильтрованной сессии в $(basename "$filename") на $duration сек..."
+        core_engine_ui "+" "Traffic Load: $load_status ($packet_count pkts/3s). Duration: ${duration}s"
         
-        # --- Исполнение целевой записи ---
-        # Флаг -f применяет наш фильтр на уровне ядра захвата пакетов
+        # Захват
         tshark -i "$iface" -f "$targeted_bpf_filter" -a duration:"$duration" -w "$filename" 2>/dev/null
         
-        # Валидация результата через Мозг [5]
-        if core_engine_validator "file" "$filename" "PCAP Archive"; then
-            core_engine_ui "+" "Сессия целевого захвата сохранена и очищена от мусора."
-            echo "[$date_stamp] SRC: run_network_intelligence | CAPTURE: $(basename "$filename") | DUR: ${duration}s | LOAD: $load_status | FILTER: TRUE" >> "${BASE_DIR:-./}/prime_loot/bridge_signals.log"
-        else
-            core_engine_ui "e" "Ошибка или пустой целевой поток при записи сессии."
+        # Самоочистка старых данных (не более 10 последних дампов)
+        [[ $(ls -1 ${loot_dir}/capture_*.pcap 2>/dev/null | wc -l) -gt 10 ]] && rm -f $(ls -1tr ${loot_dir}/capture_*.pcap | head -n 1)
+
+        # Валидация и логирование
+        if core_engine_validator "file" "$filename" "PCAP"; then
+            echo "[$date_stamp] CAPTURE SUCCESS: $(basename "$filename") | LOAD: $load_status" >> "${loot_dir}/bridge_signals.log"
         fi
         
-        # Контроль жизнеспособности фонового потока
-        if ! kill -0 $sniffer_pid 2>/dev/null; then
-            {
-                tshark -i "$iface" -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null \
-                | stdbuf -oL awk NF | stdbuf -oL uniq | while read -r line; do
-                    core_engine_loot "traffic_leads" "IFACE: $iface | LEAD: $line"
-                done
-            } &
-            sniffer_pid=$!
+        # Watchdog: Перезапуск фонового сниффера при сбое
+        if ! kill -0 "$sniffer_pid" 2>/dev/null; then
+            core_engine_ui "w" "Sniffer process lost. Re-spawning..."
+            sniffer_pid=$(launch_sniffer)
         fi
     done
 }
