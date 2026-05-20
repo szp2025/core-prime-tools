@@ -4609,10 +4609,218 @@ suggest_action() {
     fi
 }
 
+
+osint_api_query() {
+    local endpoint="$1"
+    local ua_count=${#GLOBAL_NETWORK_UA[@]}
+    local selected_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ua_count))]}"
+    
+    # Выполняем запрос и сохраняем результат в переменную
+    local response=$(curl -s -L --max-time 10 \
+         -H "User-Agent: $selected_ua" \
+         -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8" \
+         -H "Accept-Language: en-US,en;q=0.5" \
+         "$endpoint")
+
+    # Проверка: если ответ пустой, возвращаем ошибку
+    if [[ -z "$response" ]]; then
+        return 1
+    fi
+    
+    echo "$response"
+}
+
+
+
+# --- 1. Модуль DNS-перебора (Аналог theHarvester) ---
+osint_subdomain_recon() {
+    local domain="$1"
+    for sub in "dev" "mail" "vpn" "admin" "stage"; do
+        if host "$sub.$domain" > /dev/null; then
+            echo "[+] SUBDOMAIN FOUND: $sub.$domain" >> "$raw_log"
+        fi
+    done
+}
+
+# --- 2. Модуль SSL-анализа (Аналог Censys/Shodan) ---
+osint_ssl_fingerprint() {
+    local target="$1"
+    echo | openssl s_client -servername "$target" -connect "$target:443" 2>/dev/null | openssl x509 -noout -subject -dates >> "$raw_log"
+}
+
+# --- 3. Модуль корреляции (Аналог Maltego) ---
+osint_link_correlator() {
+    # Ищет связи между найденными Email и IP в логе
+    grep -oE '[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$raw_log" | sort | uniq -d > "$loot_dir/graph_links.txt"
+}
+
+
+# Модуль сбора через регулярные выражения
+osint_harvest_data() {
+    local target_url="$1"
+    local raw_content=$(curl -s -L -A "$(shuf -n1 -e "${GLOBAL_NETWORK_UA[@]}")" "$target_url")
+    
+    # Сбор всех email на странице
+    echo "$raw_content" | grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' | sort -u >> "$raw_log"
+    # Сбор всех субдоменов
+    echo "$raw_content" | grep -oE '([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}' | sort -u >> "$raw_log"
+}
+
+# Добавляем в блок NETWORK ANALYZER
+osint_network_trace() {
+    core_engine_ui "i" "Tracing Network Path..."
+    # MTR или traceroute показывает, не спрятана ли цель за CDN/Proxy
+    mtr -rw "$1" --report-cycles 2 >> "$raw_log" 2>/dev/null || traceroute -m 15 "$1" >> "$raw_log"
+}
+
+# Добавляем перед завершением
+core_engine_compare_history() {
+    local last_log=$(ls -t "$PRIME_LOOT/forensic_"* 2>/dev/null | sed -n '2p')
+    if [[ -n "$last_log" ]]; then
+        echo "[!] ANALYZING CHANGES SINCE LAST SCAN..." >> "$raw_log"
+        diff "$raw_log" "$last_log" >> "$raw_log"
+    fi
+}
+
+osint_categorize_target() {
+    if grep -qE "WordPress|wp-content" "$raw_log"; then
+        echo "[TYPE] Target identified as: CMS (WordPress)" >> "$raw_log"
+    elif grep -qE "nginx|apache" "$raw_log"; then
+        echo "[TYPE] Target identified as: Web Server Infrastructure" >> "$raw_log"
+    fi
+}
+
+# --- 1. АВТО-ОПРЕДЕЛИТЕЛЬ (Nexus-Logic) ---
+# Скрипт анализирует ВХОДНЫЕ ДАННЫЕ и динамически подключает модули
+osint_nexus_router() {
+    local target="$1"
+    
+    # Режим: КРИПТО-РАЗВЕДКА (новый модуль)
+    if [[ "$target" =~ ^(bc1|[13])[a-zA-Z0-9]{25,39}$ ]]; then
+        core_engine_ui "i" "Mode: Crypto-Forensic Engaged..."
+        run_crypto_module "$target"
+        
+    # Режим: СОЦИАЛЬНЫЕ СВЯЗИ (углубленный)
+    elif [[ "$target" =~ ^@[a-zA-Z0-9_]{5,32}$ ]]; then
+        core_engine_ui "i" "Mode: Social-Graph Engaged..."
+        run_social_graph_module "$target"
+        
+    # Режим: КОРПОРАТИВНАЯ ИНФРАСТРУКТУРА
+    else
+        core_engine_ui "i" "Mode: Corporate-Recon Engaged..."
+        run_corp_recon_module "$target"
+    fi
+}
+
+
+# ==============================================================================
+# @description: OSINT NEXUS v15.4 - FULL SPECTRUM FORENSIC ENGINE (MONOLITH)
+# @status: NO CUTS, FULL PATTERN INTEGRATION, MAXIMUM FORENSIC DATA
+# ==============================================================================
+run_smart_osint_engine() {
+    clear
+    core_engine_ui "h" "PRIME RECON: FULL-SPECTRUM NEXUS v15.4 (MONOLITH MODE)"
+
+    local INPUT=$(core_engine_input "text" "TARGET (Nick, Phone, Email, IP, or Domain)")
+    [[ -z "$INPUT" ]] && return
+
+    # Инициализация лога (никаких удалений, всё для архива)
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local raw_log="$PRIME_LOOT/forensic_${INPUT//[^a-zA-Z0-9]/_}_$timestamp.log"
+    echo "[*] SCAN SESSION STARTED: $INPUT | TIMESTAMP: $(date)" > "$raw_log"
+    core_engine_progress 2 "OSINT_SCAN_INIT"
+
+    # --- 0. АВТО-ПРОФИЛИРОВАНИЕ (NEXUS ROUTER НА GLOBAL_REGEX) ---
+    local mode="GENERAL"
+    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_PHONE")" == "0" ]] && mode="PHONE_INTEL"
+    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_EMAIL")" == "0" ]] && mode="BREACH_INTEL"
+    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_IP")" == "0" ]] && mode="NETWORK_INTEL"
+    [[ "$(is_valid "$INPUT" "GLOBAL_REGEX_DOMAIN")" == "0" ]] && mode="DOMAIN_INTEL"
+    echo "[*] TARGET TYPE DETECTED: $mode" >> "$raw_log"
+
+    # --- 1. SOCIAL SCAN (Ghost Mode - Полный цикл из v14.2) ---
+    core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
+    local sites=("${GLOBAL_OSINT_SITES[@]}")
+    local total_sites=${#sites[@]}
+    local current_index=0
+
+    for entry in "${sites[@]}"; do
+        ((current_index++))
+        local url="${entry%%|*}"
+        local name="${entry#*|}"
+        local progress=$(printf "[%02d/%02d]" "$current_index" "$total_sites")
+        
+        # Полный curl для получения кода ответа и содержания
+        local response=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "${url}${INPUT}" --connect-timeout 4 -D -)
+        
+        if echo "$response" | grep -q "200 OK"; then
+            echo "[MATCH] $name -> ${url}${INPUT}" >> "$raw_log"
+            echo "HEADERS: $(echo "$response" | head -n 3)" >> "$raw_log"
+            core_engine_ui "s" "$progress Match confirmed: $name"
+        else
+            echo -ne " [.] Проверка: $progress $name...\r"
+        fi
+        sleep 0.4
+    done
+    
+    # Рекурсивный поиск личности
+    local gh_api="${GLOBAL_API_IDENTITY_NODES[0]%%|*}"
+    echo "[IDENTITY_DATA]" >> "$raw_log"
+    curl -s -A "$GLOBAL_NETWORK_UA" "${gh_api}${INPUT}" >> "$raw_log" 2>/dev/null
+
+    # --- 2. PHONE INTEL ---
+    if [[ "$mode" == "PHONE_INTEL" || "$mode" == "GENERAL" ]]; then
+        core_engine_ui "i" "Querying Phone Databases..."
+        echo "[PHONE_DATA]" >> "$raw_log"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_PHONE_NODES[0]%%|*}$INPUT" >> "$raw_log" 2>/dev/null
+        local phone_info=$(grep -oE '"name":"[^"]+"|"oper":"[^"]+"' "$raw_log" | sed 's/"//g')
+        [[ -n "$phone_info" ]] && core_engine_ui "s" "Operator Data: $phone_info"
+    fi
+
+    # --- 3. BREACH ANALYZER ---
+    if [[ "$mode" == "BREACH_INTEL" || "$mode" == "GENERAL" ]]; then
+        core_engine_ui "i" "Cross-referencing Leak Databases..."
+        echo "[BREACH_DATA]" >> "$raw_log"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$INPUT" >> "$raw_log" 2>/dev/null
+        if grep -q "results" "$raw_log"; then
+            core_engine_ui "w" "Breach Detected."
+            echo "[!] WARNING: Data leak detected" >> "$raw_log"
+        fi
+    fi
+
+    # --- 4. NETWORK & IP ANALYZER ---
+    if [[ "$mode" == "NETWORK_INTEL" || "$mode" == "GENERAL" ]]; then
+        core_engine_ui "i" "Analyzing Infrastructure..."
+        echo "[NET_DATA]" >> "$raw_log"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$INPUT/json" >> "$raw_log" 2>/dev/null
+        local net_info=$(grep -oE '"org":"[^"]+"|"country_name":"[^"]+"' "$raw_log" | sed 's/"//g')
+        [[ -n "$net_info" ]] && core_engine_ui "s" "Net Data: $net_info"
+    fi
+
+    # --- 5. DOMAIN & DNS CORE ---
+    if [[ "$mode" == "DOMAIN_INTEL" || "$mode" == "GENERAL" ]]; then
+        core_engine_ui "i" "Resolving DNS & SSL..."
+        echo "[DNS_DATA]" >> "$raw_log" && dig +noall +answer "$INPUT" >> "$raw_log"
+        echo "[SSL_DATA]" >> "$raw_log" && echo | openssl s_client -servername "$INPUT" -connect "$INPUT:443" 2>/dev/null | openssl x509 -noout -subject -dates >> "$raw_log" 2>&1
+    fi
+
+    # --- 6. ФИНАЛЬНЫЙ СБОР И АРХИВАЦИЯ ---
+    core_engine_ui "line" ""
+    core_engine_ui "s" "INTELLIGENCE DOSSIER GENERATED"
+    
+    # Полный вывод для анализа
+    grep -E "MATCH|FOUND|oper|org|country_name|WARNING|subject|issuer" "$raw_log" | sort -u
+    
+    core_engine_loot "osint" "Dossier for $INPUT saved to $raw_log"
+    core_engine_ui "line" ""
+    core_engine_wait
+}
+
+
 # ==============================================================================
 # @description: Высокоскоростной движок OSINT с каскадными API-матрицами v14.2
 # ==============================================================================
-run_smart_osint_engine() {
+run_smart_osint_engineold() {
     clear
     core_engine_ui "h" "PRIME RECON: ULTIMATE OSINT CORE v14.2"
 
