@@ -6989,7 +6989,6 @@ if [[ -z "$target_user" ]] || echo "$target_user" | grep -qE "$GLOBAL_PLATFORM_S
             
    
 
-
             # РЕКУРСИВНАЯ ЭКСТРАКЦИЯ В БУФЕРЫ NEXUS
             # 1. Телефоны
             echo "$raw_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
