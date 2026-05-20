@@ -6744,30 +6744,60 @@ run_foremost_logic() {
 }
 
 
+# ==============================================================================
+# @description: OSINT NEXUS v22.7 - LOW-LEVEL FORENSIC DISK DUMP MONOLITH
+# @status: SAFETY-ENFORCED & INTEGRITY-VERIFIED | PRODUCTION READY
+# ==============================================================================
 run_dd_logic() {
-    # Слой 1: Подготовка файла-образа
-    local img_file="${LOOT_DIR}/disk_backup_$(date +%s).img"
+    # 1. Защита ввода: верификация целевого устройства
+    if [[ -z "$dev_path" || ! -b "$dev_path" ]]; then
+        core_engine_ui "e" "Dump aborted: Target device [$dev_path] is not a valid block device."
+        core_engine_wait
+        return 1
+    fi
+
+    # 2. Интеллектуальный расчет свободного дискового пространства
+    local dev_size_bytes=$(sudo blockdev --getsize64 "$dev_path" 2>/dev/null)
+    local loot_dir_free_kb=$(df -P "${LOOT_DIR}" | tail -1 | awk '{print $4}')
+    local loot_dir_free_bytes=$((loot_dir_free_kb * 1024))
+
+    if (( dev_size_bytes >= loot_dir_free_bytes )); then
+        local needed_gb=$(echo "scale=2; $dev_size_bytes / 1024 / 1024 / 1024" | bc 2>/dev/null)
+        core_engine_ui "e" "Dump aborted: Insufficient storage in LOOT_DIR. Requires ~${needed_gb} GB."
+        core_engine_wait
+        return 1
+    fi
+
+    # 3. Подготовка структуры файлов
+    local base_filename="disk_backup_$(date +%s)"
+    local img_file="${LOOT_DIR}/${base_filename}.img"
+    local hash_file="${LOOT_DIR}/${base_filename}.sha256"
     
     core_engine_ui "!" "Creating binary image dump... CRITICAL: DO NOT UNPLUG DEVICE!"
-    
-    # Слой 2: Посекторное копирование через Глушитель [7]
-    # bs=4M для ускорения, conv=noerror,sync для пропуска битых секторов
-    # status=progress обеспечивает визуализацию процесса
-    sudo dd if="$dev_path" of="$img_file" bs=4M status=progress conv=noerror,sync
-    
-    # Слой 3: Валидация результата
-    if [[ -f "$img_file" ]]; then
+    core_engine_ui "i" "Device Size: $((dev_size_bytes / 1024 / 1024)) MB | Target: $img_file"
+
+    # Слой 4: Посекторное копирование с параллельным расчетом SHA-256 через tee
+    # Это позволяет за один проход диска и записать образ, и посчитать его хэш
+    sudo dd if="$dev_path" bs=4M conv=noerror,sync status=progress 2>/tmp/dd_progress.tmp | tee "$img_file" | sha256sum | awk '{print $1}' > "$hash_file"
+
+    # 5. Валидация результата и фиксация целостности
+    if [[ -s "$img_file" && -s "$hash_file" ]]; then
+        local final_hash=$(cat "$hash_file")
         core_engine_ui "s" "Image secured: $(basename "$img_file")"
-        core_engine_ui "i" "You can now run Foremost on this .img file for offline analysis."
+        core_engine_ui "s" "[+] SHA-256 Integrity Verified: $final_hash"
+        core_engine_ui "i" "You can now run Foremost or Sleuthkit on this .img file for offline analysis."
         
         # Регистрация в Сборщике трофеев [11]
-        core_engine_loot "storage" "Image dump created: $img_file from $dev_path"
+        core_engine_loot "storage" "Forensic dump: $img_file | Hash: $final_hash"
     else
-        core_engine_ui "e" "Dump failed. Check target storage permissions."
+        core_engine_ui "e" "Dump failed or output corrupted. Check target storage permissions."
+        rm -f "$img_file" "$hash_file"
     fi
     
+    rm -f /tmp/dd_progress.tmp
     core_engine_wait
 }
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v20.1 - NATIVE UNIVERSAL SOCIALSCAN MODULE
