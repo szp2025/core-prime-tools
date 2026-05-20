@@ -4107,14 +4107,21 @@ run_update_prime() {
         return 1
     fi
 
-    # Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (Защита синтаксиса ядра)
-    if ! bash -n "$tmp" 2>/dev/null; then
+   # --- Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (С диагностикой ошибок) ---
+    if ! bash -n "$tmp"; then
         core_engine_ui "e" "CRITICAL: Remote code has broken Bash syntax!"
+        
+        # ДОБАВЛЕНО: Принудительный вывод ошибки в лог, чтобы увидеть место поломки
+        echo -e "\n${R}[!] SYNTAX ERROR LOG:${NC}"
+        bash -n "$tmp" 
+        echo -e "\n${Y}Check the lines above to fix the remote repository script.${NC}"
+        
         rm -f "$tmp"
         core_engine_wait
         return 1
     fi
 
+    
     # Слой 5: Атомарная замена и права
     core_engine_ui "i" "Applying code synchronization..."
     if [[ $EUID -eq 0 ]]; then
