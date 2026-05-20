@@ -64,8 +64,7 @@ GLOBAL_MENU_REGISTRY=(
     "MAIN:REANIMATOR|run_cross_os_reanimator" "MAIN:EXIT|exit_script"
 
     "INTELLIGENCE:Smart_OSINT_Engine|run_smart_osint_engine" "INTELLIGENCE:Network_Intelligence|run_network_analyzer"
-    "INTELLIGENCE:Nexus_SocialScan|run_osint_custom_socialscan" "INTELLIGENCE:Nexus_Breach_Leaks|run_osint_custom_leaks"
-    "INTELLIGENCE:Telegram_Resolver|run_osint_custom_ignorant" "INTELLIGENCE:Omni_Stealth_Crawler|run_osint_omni_crawler"
+ 
 
     "SYSTEM:System_Info|run_system_info" "SYSTEM:Sync_DNS|core_network_dns_sync"
     "SYSTEM:Update_OS|run_sys_update" "SYSTEM:Update_Launcher|run_update_prime"
