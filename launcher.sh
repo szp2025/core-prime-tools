@@ -6883,79 +6883,110 @@ run_osint_custom_leaks() {
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.1 - NATIVE PHONE RESOLVER MODULE
-# @status: FULLY RECURSIVE & FEEDBACK-ENABLED (NO INTERACTIVE I/O)
+# @description: OSINT NEXUS v22.5 - HIGH-PERFORMANCE PHONE RESOLVER (ASYNC)
+# @status: ASYNCHRONOUS MULTI-THREADING | PRODUCTION READY
 # ==============================================================================
 run_osint_custom_ignorant() {
     local phone="$1"
     local raw_log="$2" # Принимает путь к логу для записи результатов
 
-     # 1. Автономная инициализация сессионного таргета
+    # 1. Автономная инициализация сессионного таргета
     [[ -z "$phone" ]] && phone="$target_user"
     [[ -z "$phone" ]] && return 1
 
-    # 2. Валидация формата через нативный PCRE-валидатор Perl (Защита от сбоев Bash)
+    # 2. Первичная валидация исходного формата
     if ! is_valid "$phone" "GLOBAL_REGEX_PHONE_VALID"; then
         return 1
     fi
 
-    # Санитарная очистка (нормализация номера)
+    # 3. Санитарная нормализация номера (приведение к чистому цифровому вектору)
     phone="${phone//+/}"; phone="${phone// /}"; phone="${phone//-/}"
     phone="${phone//(/}"; phone="${phone//)/}"; phone="${phone//./}"
+    phone=$(echo "$phone" | tr -d '[:space:]')
 
-    # --- Валидация формата через нативный PCRE-валидатор Perl (Защита от сбоев Bash) ---
-    if ! is_valid "$phone" "GLOBAL_REGEX_PHONE_VALID"; then
-        return 1
-    fi
+    core_engine_ui "i" "Nexus PhoneResolver: Launching Parallel Multi-Vector Audit for [+$phone]..."
 
+    # Создание изолированной песочницы для параллельных потоков
+    local sandbox_dir="/tmp/nexus_resolver_$$"
+    mkdir -p "$sandbox_dir"
 
-    core_engine_ui "i" "Nexus PhoneResolver: Multi-Vector Audit Initiated for [+$phone]"
-
+    # --- ЗАПУСК ПАРАЛЛЕЛЬНОГО СКАНИРОВАНИЯ МАТРИЦЫ ---
     for service_entry in "${GLOBAL_PHONE_SERVICES[@]}"; do
         [[ "$service_entry" != *"|"* ]] && continue
         
-        # Парсинг пятислойной матрицы
-        local base_url="${service_entry%%|*}"; local remaining="${service_entry#*|}"
-        local check_type="${remaining%%|*}"; remaining="${remaining#*|}"
-        local criteria="${remaining%%|*}"; remaining="${remaining#*|}"
-        local category="${remaining%%|*}"; local service_name="${remaining#*|}"
-        local full_url="${base_url}${phone}"
-        
-        local service_confirmed=0
-        local random_index=$(( RANDOM % ${#GLOBAL_NETWORK_UA[@]} ))
-        local selected_ua="${GLOBAL_NETWORK_UA[$random_index]}"
-
-        # Диспетчеризация векторов верификации
-        if [[ "$check_type" == "HTTP_CODE" ]]; then
-            local http_code=$(curl -s -o /dev/null -I -L -A "$selected_ua" --connect-timeout 4 -w "%{http_code}" "$full_url")
-            [[ "$http_code" == "$criteria" ]] && service_confirmed=1
-        elif [[ "$check_type" == "DOM_MATCH" ]]; then
-            local page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 6 "$full_url" 2>/dev/null)
-            [[ -n "$page_body" && "$page_body" == *"$criteria"* ]] && service_confirmed=1
-        elif [[ "$check_type" == "DOM_ABSENT" ]]; then
-            local page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 6 "$full_url" 2>/dev/null)
-            [[ -n "$page_body" && ! "$page_body" == *"$criteria"* ]] && service_confirmed=1
-        fi
-
-        # РЕКУРСИВНЫЙ ВЫХЛОП И ЭКСТРАКЦИЯ
-        if (( service_confirmed == 1 )); then
-            echo "[MATCH_PHONE] $service_name -> $full_url" >> "$raw_log"
-            core_engine_ui "s" "[+] Linked: $service_name (Artifacts extraction...)"
+        # Асинхронный подпроцесс для каждого сервиса
+        (
+            # Развертывание пятислойной матрицы
+            local base_url="${service_entry%%|*}"; local remaining="${service_entry#*|}"
+            local check_type="${remaining%%|*}"; remaining="${remaining#*|}"
+            local criteria="${remaining%%|*}"; remaining="${remaining#*|}"
+            local category="${remaining%%|*}"; local service_name="${remaining#*|}"
+            local full_url="${base_url}${phone}"
             
-            # Парсинг Telegram мета-данных (глубокий анализ)
-            if [[ "$service_name" == "Telegram" ]]; then
-                local page_data=$(curl -s -L -A "$selected_ua" "$full_url" 2>/dev/null)
-                local meta_name=$(echo "$page_data" | grep -oP "meta property=\"og:title\" content=\"\K[^\"]+" 2>/dev/null)
-                if [[ -n "$meta_name" ]]; then
-                    echo "[PHONE_META] Telegram_Name -> $meta_name" >> "$raw_log"
+            local service_confirmed=0
+            local selected_ua="${GLOBAL_NETWORK_UA[$(( RANDOM % ${#GLOBAL_NETWORK_UA[@]} ))]}"
+
+            # Диспетчеризация векторов верификации
+            if [[ "$check_type" == "HTTP_CODE" ]]; then
+                local http_code=$(curl -s -o /dev/null -I -L -A "$selected_ua" --connect-timeout 4 -w "%{http_code}" "$full_url" 2>/dev/null)
+                [[ "$http_code" == "$criteria" ]] && service_confirmed=1
+            
+            elif [[ "$check_type" == "DOM_MATCH" ]]; then
+                local page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 5 "$full_url" 2>/dev/null)
+                # Проверка, что это не WAF-экран и текст присутствует
+                if [[ -n "$page_body" ]] && ! is_valid "$page_body" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
+                    [[ "$page_body" == *"$criteria"* ]] && service_confirmed=1
                 fi
-                # Передача найденных данных в стек для Omni-Crawler
-                echo "$page_data" | grep -oE "$GLOBAL_REGEX_EMAIL" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
+            
+            elif [[ "$check_type" == "DOM_ABSENT" ]]; then
+                local page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 5 "$full_url" 2>/dev/null)
+                if [[ -n "$page_body" ]] && ! is_valid "$page_body" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
+                    [[ ! "$page_body" == *"$criteria"* ]] && service_confirmed=1
+                fi
             fi
-        fi
-        sleep 0.2
+
+            # Обработка успешного нахождения связи
+            if (( service_confirmed == 1 )); then
+                echo "[MATCH_PHONE] $service_name -> $full_url" >> "$sandbox_dir/results.log"
+                
+                # Глубокий рекурсивный анализ метаданных Telegram
+                if [[ "$service_name" == "Telegram" ]]; then
+                    local page_data=$(curl -s -L -A "$selected_ua" "$full_url" 2>/dev/null)
+                    if [[ -n "$page_data" ]] && ! is_valid "$page_data" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
+                        local meta_name=$(echo "$page_data" | grep -oP "meta property=\"og:title\" content=\"\K[^\"]+" 2>/dev/null)
+                        if [[ -n "$meta_name" ]]; then
+                            echo "[PHONE_META] Telegram_Name -> $meta_name" >> "$sandbox_dir/results.log"
+                        fi
+                        # Экстракция почт во временный системный кэш
+                        echo "$page_data" | grep -oE "$GLOBAL_REGEX_EMAIL" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
+                    fi
+                fi
+            fi
+        ) & # Фоновый режим
     done
+
+    # Ожидание завершения всех сетевых потоков
+    wait
+
+    # --- СБОР РЕЗУЛЬТАТОВ И ВЫВОД ИНТЕРФЕЙСА ---
+    if [[ -f "$sandbox_dir/results.log" ]]; then
+        # Переносим всё в глобальный лог
+        cat "$sandbox_dir/results.log" >> "$raw_log"
+        
+        # Красивый вывод в UI найденных связей
+        while IFS= read -r line; do
+            if [[ "$line" == *"[MATCH_PHONE]"* ]]; then
+                local s_name=$(echo "$line" | awk '{print $2}')
+                core_engine_ui "s" "[+] Linked: $s_name (Artifacts saved)"
+            fi
+        done < "$sandbox_dir/results.log"
+    fi
+
+    # Зачистка временной песочницы
+    rm -rf "$sandbox_dir"
+    core_engine_ui "s" "[+] PhoneResolver: Multi-vector audit cycle finished."
 }
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v22.4 - HIGH-PERFORMANCE ASYNC OMNI-CRAWLER
