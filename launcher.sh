@@ -4714,12 +4714,12 @@ osint_nexus_router() {
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v16.1 - FULL RECURSIVE DEEP-HUNT (NO CUTS)
-# @status: INTEGRATED MONOLITH - RECURSIVE ENGINE & STRUCTURED DOSSIER
+# @description: OSINT NEXUS v16.2 - FULL RECURSIVE MONOLITH (PATTERN-SAFE)
+# @status: INTEGRATED MONOLITH - RECURSIVE ENGINE & CRITICAL FILTERS
 # ==============================================================================
 run_smart_osint_engine() {
     clear
-    core_engine_ui "h" "PRIME RECON: NEXUS v16.1 (FULL RECURSIVE MONOLITH)"
+    core_engine_ui "h" "PRIME RECON: NEXUS v16.2 (RECURSIVE MONOLITH)"
 
     local TARGET=$(core_engine_input "text" "TARGET (Nick, Name, Phone, Email, IP, or Domain)")
     [[ -z "$TARGET" ]] && return
@@ -4728,21 +4728,26 @@ run_smart_osint_engine() {
     local raw_log="$PRIME_LOOT/forensic_${TARGET//[^a-zA-Z0-9]/_}_$timestamp.log"
     echo "[*] RECURSIVE SCAN STARTED: $TARGET | TIMESTAMP: $(date)" > "$raw_log"
 
-    # --- 1. ПЕРВИЧНЫЙ СБОР (Матрица v14.7) ---
-    core_engine_ui "i" "Running primary discovery pipeline..."
-    
-    # 1.1 Social Scan
-    for entry in "${GLOBAL_OSINT_SITES[@]}"; do
-        local url="${entry%%|*}"; local name="${entry#*|}"
-        local resp=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "${url}${TARGET}" --connect-timeout 4 -D -)
-        if echo "$resp" | grep -q "200 OK"; then
-            echo "[MATCH] $name -> ${url}${TARGET}" >> "$raw_log"
-            echo "HEADERS: $(echo "$resp" | head -n 3)" >> "$raw_log"
-        fi
-        sleep 0.4
-    done
+    # --- 0. КРИТИЧЕСКИЙ ФИЛЬТР (SOCIAL SCAN SWITCH) ---
+    # Если это никнейм, то запускаем глубокий социальный поиск
+    if ! echo "$TARGET" | grep -Eq "$GLOBAL_REGEX_EMAIL|$GLOBAL_REGEX_PHONE|$GLOBAL_REGEX_IP|$GLOBAL_REGEX_DOMAIN"; then
+        core_engine_ui "i" "Scanning Social Signatures (Ghost Mode)..."
+        for entry in "${GLOBAL_OSINT_SITES[@]}"; do
+            local url="${entry%%|*}"; local name="${entry#*|}"
+            local resp=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "${url}${TARGET}" --connect-timeout 4 -D -)
+            if echo "$resp" | grep -q "200 OK"; then
+                echo "[MATCH] $name -> ${url}${TARGET}" >> "$raw_log"
+                echo "HEADERS: $(echo "$resp" | head -n 3)" >> "$raw_log"
+            fi
+            sleep 0.4
+        done
+        local gh_api="${GLOBAL_API_IDENTITY_NODES[0]%%|*}"
+        curl -s -A "$GLOBAL_NETWORK_UA" "${gh_api}${TARGET}" >> "$raw_log" 2>/dev/null
+    fi
 
-    # 1.2 Deep Intel (Phone/Breach/Network/Domain)
+    # --- 1. ТЕХНИЧЕСКИЙ ПИПЛАЙН (Deep Intel) ---
+    core_engine_ui "i" "Running primary technical pipeline..."
+    
     [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_PHONE")" == "0" ]] && \
         echo "[PHONE_DATA]" >> "$raw_log" && curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_PHONE_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
     [[ "$(is_valid "$TARGET" "GLOBAL_REGEX_EMAIL")" == "0" ]] && \
@@ -4757,16 +4762,13 @@ run_smart_osint_engine() {
     # --- 2. РЕКУРСИВНЫЙ ЦИКЛ (Nexus Deep-Hunt) ---
     core_engine_ui "i" "Nexus: Launching recursive search on extracted entities..."
     
-    # Рекурсивный поиск Email
-    local extracted_emails=$(grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$raw_log" | sort -u)
-    for email in $extracted_emails; do
+    # Рекурсивный поиск Email и IP, извлеченных в ходе первичного скана
+    grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$raw_log" | sort -u | while read -r email; do
         echo "[RECURSIVE_BREACH_CHECK] $email" >> "$raw_log"
         curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$email" >> "$raw_log" 2>&1
     done
 
-    # Рекурсивный поиск IP
-    local extracted_ips=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$raw_log" | sort -u)
-    for ip in $extracted_ips; do
+    grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$raw_log" | sort -u | while read -r ip; do
         echo "[RECURSIVE_NET_CHECK] $ip" >> "$raw_log"
         curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$ip/json" >> "$raw_log" 2>&1
     done
@@ -4774,7 +4776,6 @@ run_smart_osint_engine() {
     # --- 3. СТРУКТУРИРОВАНИЕ ДОСЬЕ ---
     core_engine_ui "s" "Finalizing intelligence dossier..."
     
-    # Финальная агрегация (всё в один лог, но структурировано)
     local final_report="$PRIME_LOOT/dossier_${TARGET//[^a-zA-Z0-9]/_}_$timestamp.txt"
     {
         echo "--- OSINT NEXUS FINAL DOSSIER ---"
@@ -4787,7 +4788,6 @@ run_smart_osint_engine() {
     core_engine_ui "s" "Dossier complete: $final_report"
     core_engine_wait
 }
-
 
 # ==============================================================================
 # @description: Высокоскоростной движок OSINT с каскадными API-матрицами v14.2
