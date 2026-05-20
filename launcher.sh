@@ -7007,7 +7007,7 @@ fi
             # Умная задержка (защита от антифрода)
             sleep 1
         done
-    done
+    
 
     core_engine_ui "s" "[+] OmniCrawler: Scan cycle completed. Data cached in Nexus memory."
 }
