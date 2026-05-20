@@ -6721,25 +6721,70 @@ recover_partition_logic() {
 }
 
 
+
+# ==============================================================================
+# @description: OSINT NEXUS v22.8 - FORENSIC DATA CARVING MONOLITH (FOREMOST)
+# @status: ADVANCED ANALYTICS & UNIVERSAL INPUT | PRODUCTION READY
+# ==============================================================================
 run_foremost_logic() {
-    # Слой 1: Валидация через Мозг [5]
+    local target_source="$1"
+    
+    # 1. Автоматический выбор источника (Аргумент -> Глобальный dev_path -> Падение)
+    [[ -z "$target_source" ]] && target_source="$dev_path"
+    if [[ -z "$target_source" || (! -b "$target_source" && ! -f "$target_source") ]]; then
+        core_engine_ui "e" "Carving aborted: Target [$target_source] is not a valid block device or .img file."
+        core_engine_wait
+        return 1
+    fi
+
+    # 2. Валидация зависимости
     core_engine_validator "pkg" "foremost" "Foremost Carving Tool" || return
 
-    # Слой 2: Подготовка стерильного сектора в LOOT [11]
+    # 3. Подготовка стерильного сектора в LOOT
     local rec_dir="${LOOT_DIR}/recovered_$(date +%s)"
     mkdir -p "$rec_dir"
     
-    core_engine_ui "!" "Starting Deep Carving. RAW Sector Analysis initiated."
-    core_engine_ui "i" "Output directory: $rec_dir"
+    core_engine_ui "i" "Nexus Foremost: Launching Deep RAW Sector Analysis..."
+    core_engine_ui "!" "Analyzing: $target_source -> Target Sandbox: $rec_dir"
     
-    # Слой 3: Процесс извлечения (Сигнатуры: изображения, документы, архивы, бинарники)
-    # Используем вербальный режим (-v) для мониторинга в реальном времени
-    sudo foremost -v -t jpg,pdf,exe,zip,doc,png,mp4 -i "$dev_path" -o "$rec_dir"
+    # Слой 4: Процесс извлечения (Режим 'all' для извлечения всех доступных сигнатур)
+    # Использование ключа -q (Quick) ускоряет поиск по известным границам секторов
+    sudo foremost -v -q -t all -i "$target_source" -o "$rec_dir" 2>/tmp/foremost_exec.log
+
+    # 5. ИНТЕЛЛЕКТУАЛЬНЫЙ АНАЛИЗ РЕЗУЛЬТАТОВ (Пост-обработка)
+    if [[ -d "$rec_dir" ]]; then
+        # Удаляем пустые папки, которые foremost создает по умолчанию, чтобы не путаться
+        find "$rec_dir" -type d -empty -delete 2>/dev/null
+        
+        # Подсчет общего количества восстановленных файлов
+        local total_files=$(find "$rec_dir" -type f | wc -l)
+        
+        if (( total_files > 0 )); then
+            core_engine_ui "s" "[+] Deep Carving Complete! Successfully recovered $total_files artifacts."
+            
+            # Генерация красивой сводной таблицы на экран
+            echo -e "\n--- RECOVERED ARTIFACTS MANIFEST ---"
+            local ext_dir
+            for ext_dir in "$rec_dir"/*/; do
+                if [[ -d "$ext_dir" ]]; then
+                    local type_name=$(basename "$ext_dir")
+                    local count=$(find "$ext_dir" -type f | wc -l)
+                    echo -e "  * [Category: ${type_name^^}] -> Extracted: $count files"
+                fi
+            done
+            echo -e "-------------------------------------\n"
+            
+            # Регистрация результатов в Сборщике трофеев [11]
+            core_engine_loot "forensics" "Deep Carving complete for $target_source. Total items: $total_files -> Path: $rec_dir"
+        else
+            core_engine_ui "w" "Carving finished, but zero signatures were matched. Target sectors might be zeroed or encrypted."
+            rm -rf "$rec_dir"
+        fi
+    else
+        core_engine_ui "e" "Foremost execution failed. Check system logs."
+    fi
     
-    # Слой 4: Регистрация результатов в Сборщике трофеев [11]
-    core_engine_loot "forensics" "Deep Carving complete for $dev_path. Results: $rec_dir"
-    
-    core_engine_ui "s" "Extraction complete. Data secured in Prime Loot."
+    rm -f /tmp/foremost_exec.log
     core_engine_wait
 }
 
