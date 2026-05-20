@@ -6893,10 +6893,11 @@ run_osint_custom_ignorant() {
     phone="${phone//+/}"; phone="${phone// /}"; phone="${phone//-/}"
     phone="${phone//(/}"; phone="${phone//)/}"; phone="${phone//./}"
 
-    # Валидация формата (останавливаем, если номер не соответствует глобальной маске)
-    if ! [[ "$phone" =~ $GLOBAL_REGEX_PHONE_VALID ]]; then
+    # --- Валидация формата через нативный PCRE-валидатор Perl (Защита от сбоев Bash) ---
+    if ! is_valid "$phone" "GLOBAL_REGEX_PHONE_VALID"; then
         return 1
     fi
+
 
     core_engine_ui "i" "Nexus PhoneResolver: Multi-Vector Audit Initiated for [+$phone]"
 
