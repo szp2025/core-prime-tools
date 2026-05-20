@@ -6965,6 +6965,7 @@ run_osint_omni_crawler() {
 
     # 3. Изоляция ID (очистка от системных маршрутов)
     local target_user=$(echo "$user_input" | cut -d'?' -f1 | cut -d'/' -f1 | tr -d '[:space:]@')
+    
 # --- Безопасная валидация системных маршрутов (Nexus Bypass Protection) ---
 if [[ -z "$target_user" ]] || echo "$target_user" | grep -qE "$GLOBAL_PLATFORM_SYSTEM_ROUTES" 2>/dev/null; then
 
