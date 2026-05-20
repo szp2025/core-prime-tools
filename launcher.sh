@@ -6958,69 +6958,86 @@ run_osint_custom_ignorant() {
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v22.3 - NATIVE OMNI-CRAWLER MONOLITH
-# @status: FULLY RECURSIVE & PIPELINE-READY (NO INTERACTIVE I/O)
+# @description: OSINT NEXUS v22.4 - HIGH-PERFORMANCE ASYNC OMNI-CRAWLER
+# @status: ASYNCHRONOUS MULTI-THREADING | PRODUCTION READY
 # ==============================================================================
 run_osint_omni_crawler() {
     local user_input="$1"
-    local raw_log="$2" # Принимает путь к логу для накопления данных
+    local raw_log="$2"
 
-    # 1. Автономная инициализация цели
+    # 1. Инициализация цели
     [[ -z "$user_input" ]] && user_input="$target_user"
     [[ -z "$user_input" ]] && return 1
 
-    # 2. RESOLVER: Авто-раскрытие коротких ссылок (био, редиректы)
-    if echo "$user_input" | grep -qP "$GLOBAL_SHORT_LINK_REDIRECT_REGEX"; then
-        user_input=$(curl -s -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 "$user_input" | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
+    # 2. RESOLVER: Авто-раскрытие коротких ссылок
+    if echo "$user_input" | grep -qP "$GLOBAL_SHORT_LINK_REDIRECT_REGEX" 2>/dev/null; then
+        user_input=$(curl -s -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 "$user_input" 2>/dev/null | grep -i "^location:" 2>/dev/null | tail -n 1 | awk '{print $2}' | tr -d '\r')
     fi
 
-    # 3. Изоляция ID (очистка от системных маршрутов)
+    # 3. Изоляция ID
     local target_user=$(echo "$user_input" | cut -d'?' -f1 | cut -d'/' -f1 | tr -d '[:space:]@')
     
-    # --- Безопасная валидация системных маршрутов (Nexus Bypass Protection) ---
-    # --- Безопасная валидация системных маршрутов через Perl-контур ---
-if [[ -z "$target_user" ]] || is_valid "$target_user" "GLOBAL_PLATFORM_SYSTEM_ROUTES"; then
-    return 1
-fi
+    if [[ -z "$target_user" ]] || is_valid "$target_user" "GLOBAL_PLATFORM_SYSTEM_ROUTES"; then
+        return 1
+    fi
 
+    core_engine_ui "i" "Nexus OmniCrawler: Launching Parallel Multithreaded Scan..."
 
-    core_engine_ui "i" "Nexus OmniCrawler: Deep Recursive Scan initiated for [$target_user]"
-
-    # Семантические векторы (база для поиска)
     local query_vectors=("${target_user}+phone" "${target_user}+contact" "${target_user}+gmail" "site:facebook.com+${target_user}")
+    
+    # Создание изолированной песочницы для потоков
+    local sandbox_dir="/tmp/nexus_threads_$$"
+    mkdir -p "$sandbox_dir"
 
+    # --- ЗАПУСК ПАРАЛЛЕЛЬНЫХ ПОТОКОВ ---
     for vector in "${query_vectors[@]}"; do
         for engine_entry in "${GLOBAL_SEARCH_ENGINES[@]}"; do
             [[ "$engine_entry" != *"|"* ]] && continue
             
-            local engine_name="${engine_entry%%|*}"
-            local request_url="${engine_entry#*|}"
-            request_url="${request_url//%VECTOR%/$vector}"
-            
-            # Парсинг данных
-            local raw_data=$(curl -s -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 "$request_url" 2>/dev/null)
-            
-           # --- Аварийное переключение через нативный PCRE-валидатор Perl ---
-if [[ -z "$raw_data" ]] || is_valid "$raw_data" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
-    core_engine_ui "w" "Engine $engine_name hit anti-flood or null payload. Skipping vector..."
-    continue
-fi
-
-            # РЕКУРСИВНАЯ ЭКСТРАКЦИЯ В БУФЕРЫ NEXUS
-            # 1. Телефоны
-            echo "$raw_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
-            # 2. Emails
-            echo "$raw_data" | grep -oP "$GLOBAL_REGEX_EMAIL" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
-            
-            # 3. Регистрация связей в RAW_LOG
-            echo "[MATCH_CRAWLER] Engine:$engine_name -> Found in vector:$vector" >> "$raw_log"
-            
-            # Умная задержка (защита от антифрода)
-            sleep 1
+            # Запускаем каждый движок в отдельном фоновом процессе (Асинхронный контур)
+            (
+                local engine_name="${engine_entry%%|*}"
+                local request_url="${engine_entry#*|}"
+                request_url="${request_url//%VECTOR%/$vector}"
+                
+                # Имитация живого профиля сети
+                local raw_data=$(curl -s -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 "$request_url" 2>/dev/null)
+                
+                # Валидация через Perl-контур
+                if [[ -n "$raw_data" ]] && ! is_valid "$raw_data" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
+                    # Экстракция во временные файлы конкретного потока
+                    echo "$raw_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" >> "$sandbox_dir/phones.raw" 2>/dev/null
+                    echo "$raw_data" | grep -oP "$GLOBAL_REGEX_EMAIL" >> "$sandbox_dir/emails.raw" 2>/dev/null
+                    
+                    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+                    echo "[$timestamp] [MATCH_CRAWLER] Engine:$engine_name -> Found in vector:$vector" >> "$raw_log"
+                fi
+            ) & # <--- Символ '&' отправляет этот контур выполняться параллельно
         done
     done
 
-    core_engine_ui "s" "[+] OmniCrawler: Scan cycle completed. Data cached in Nexus memory."
+    # Ожидание завершения работы ВСЕХ параллельных движков
+    wait
+    
+    # --- СБОР, САНАТИЗАЦИЯ И ПОДЧЕТ АНАЛИТИКИ ---
+    local unique_phones=0
+    local unique_emails=0
+
+    if [[ -f "$sandbox_dir/phones.raw" ]]; then
+        sort -u "$sandbox_dir/phones.raw" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
+        unique_phones=$(sort -u "$sandbox_dir/phones.raw" | wc -l)
+    fi
+
+    if [[ -f "$sandbox_dir/emails.raw" ]]; then
+        sort -u "$sandbox_dir/emails.raw" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
+        unique_emails=$(sort -u "$sandbox_dir/emails.raw" | wc -l)
+    fi
+
+    # Полная очистка песочницы
+    rm -rf "$sandbox_dir"
+
+    # Вывод финального статуса с метриками эффективности
+    core_engine_ui "s" "[+] OmniCrawler: Parallel scan complete. Extracted: $unique_phones phones, $unique_emails emails."
 }
 
 
