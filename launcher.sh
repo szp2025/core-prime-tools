@@ -4789,6 +4789,7 @@ run_smart_osint_engine() {
 
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local raw_log="$PRIME_LOOT/forensic_${TARGET//[^a-zA-Z0-9]/_}_$timestamp.log"
+    export target_user="$TARGET" # Передаем цель в наши новые модули
     echo "[*] RECURSIVE SCAN STARTED: $TARGET | TIMESTAMP: $(date)" > "$raw_log"
 
     # --- 0. КРИТИЧЕСКИЙ ФИЛЬТР (SOCIAL SCAN SWITCH) ---
@@ -4824,10 +4825,19 @@ run_smart_osint_engine() {
         echo "[SSL_DATA]" >> "$raw_log" && echo | openssl s_client -servername "$TARGET" -connect "$TARGET:443" 2>/dev/null | openssl x509 -noout -subject -dates >> "$raw_log" 2>&1
     fi
 
+    # --- 1.5 АВТОМАТИЗИРОВАННОЕ РАСШИРЕНИЕ (Интеграция v22.3) ---
+    core_engine_ui "i" "Nexus: Running Automated Pipeline Extensions..."
+    run_osint_omni_crawler "$TARGET" "$raw_log"
+    run_osint_custom_socialscan "$TARGET" "$raw_log"
+    run_osint_custom_leaks "$TARGET" "$raw_log"
+    if [[ "$TARGET" =~ $GLOBAL_REGEX_PHONE_VALID ]]; then
+        run_osint_custom_ignorant "$TARGET" "$raw_log"
+    fi
+
     # --- 2. РЕКУРСИВНЫЙ ЦИКЛ (Nexus Deep-Hunt) ---
     core_engine_ui "i" "Nexus: Launching recursive search on extracted entities..."
     
-    # 2.1 Рекурсия по Email
+    # 2.1 Рекурсия по Email (из лога v16.2 и модулей v22.3)
     grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$raw_log" | sort -u | while read -r email; do
         echo "[RECURSIVE_BREACH_CHECK] $email" >> "$raw_log"
         curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$email" >> "$raw_log" 2>&1
@@ -4848,7 +4858,7 @@ run_smart_osint_engine() {
         echo "TARGET: $TARGET"
         echo "DATE: $(date)"
         echo "---------------------------------"
-        grep -E "MATCH|FOUND|BREACH|PHONE|OPER|ORG|DNS|SSL|RECURSIVE" "$raw_log" | sort -u
+        grep -E "MATCH|FOUND|BREACH|PHONE|OPER|ORG|DNS|SSL|RECURSIVE|Extracted" "$raw_log" | sort -u
     } > "$final_report"
 
     core_engine_ui "s" "Dossier complete: $final_report"
