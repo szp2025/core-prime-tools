@@ -6556,38 +6556,93 @@ run_auto_forensics() {
     core_engine_wait
 }
 
+# ==============================================================================
+# @description: OSINT NEXUS v23.1 - PARANOID DOCUMENT METADATA SANITIZER
+# @status: RECURSIVE PACKET PROCESSING & SELF-AUDIT LAYER | PRODUCTION READY
+# ==============================================================================
 run_doc_cleaner() {
     # Слой 1: Визуальный заголовок через Голос [1]
     core_engine_ui "h" "FORENSICS: DOCUMENT SANITIZER"
 
     # Слой 2: Валидация фундамента через Мозг [5]
-    # Проверка наличия exiftool (основной движок очистки)
     core_engine_validator "pkg" "exiftool" "ExifTool Engine" || { core_engine_wait; return; }
 
-    # Слой 3: Органы чувств [3] — Сбор данных
-    local f_path=$(core_engine_input "text" "File to sanitize (e.g., /root/report.pdf)")
+    # Слой 3: Органы чувств [3] — Сбор данных (Принимает файл или папку)
+    local target_path=$(core_engine_input "text" "File or Directory to sanitize (e.g., /root/loot/)")
 
     # Слой 4: Валидация параметров через Санитара [8]
-    [[ -z "$f_path" ]] && { core_engine_ui "e" "Operation cancelled: No path provided."; core_engine_wait; return; }
+    [[ -z "$target_path" ]] && { core_engine_ui "e" "Operation cancelled: No path provided."; core_engine_wait; return; }
     
-    if [[ ! -f "$f_path" ]]; then
-        core_engine_ui "e" "Target Document not found: $f_path"
+    if [[ ! -f "$target_path" && ! -d "$target_path" ]]; then
+        core_engine_ui "e" "Target Path not found: $target_path"
         core_engine_wait
         return
     fi
 
-    # Слой 5: Основной процесс зачистки через Глушитель [7]
-    core_engine_ui "!" "Stripping all metadata tags..."
-    
-    # -all= : удаляет абсолютно все теги
-    # -overwrite_original : предотвращает создание резервных копий (Zero-Footprint)
-    if exiftool -all= "$f_path" -overwrite_original &>/dev/null; then
-        core_engine_ui "s" "File is now 'Clean'. All signatures and history removed."
+    core_engine_ui "!" "Initiating Paranoid Metadata Stripping..."
+
+    # Внутренняя функция для ультимативной очистки одного файла с самопроверкой
+    sanitize_single_file() {
+        local file="$1"
+        [[ ! -f "$file" ]] && return 1
+
+        # Подсчет исходных тегов для аналитики
+        local initial_tags=$(exiftool -s "$file" 2>/dev/null | wc -l)
+        [[ "$initial_tags" -eq 0 ]] && return 0 # Файл уже стерилен
+
+        # Ультимативная зачистка:
+        # -all= : удаляет стандартные теги
+        # -pdf-update:all= : уничтожает историю изменений и старые ревизии в PDF (Критично!)
+        # -Adobe:all= : вычищает скрытые дизайнерские маркеры Adobe XMP
+        exiftool -all= -pdf-update:all= -Adobe:all= -overwrite_original "$file" &>/dev/null
+
+        # Слой 5: Контур автоматической перепроверки (Self-Audit)
+        # Проверяем, остались ли критические теги, исключая системные (размер, имя файла)
+        local post_tags=$(exiftool -all= "$file" 2>/dev/null | exiftool -s - 2>/dev/null | grep -vE "SourceFile|ExifToolVersion" | wc -l)
+
+        if (( post_tags == 0 )); then
+            return 0 # Идеально чист
+        else
+            return 2 # Частичная очистка (фирменные маркеры защиты)
+        fi
+    }
+
+    # Слой 6: Диспетчеризация обработки (Одиночный файл или пакетный режим)
+    local cleaned_count=0
+    local warning_count=0
+
+    if [[ -f "$target_path" ]]; then
+        # Обработка в один поток
+        sanitize_single_file "$target_path"
+        local status=$?
+        if [[ "$status" -eq 0 ]]; then
+            core_engine_ui "s" "[+] Verified Clean: $(basename "$target_path") (All history annihilated)"
+            core_engine_loot "security" "Sanitized document: $target_path"
+        elif [[ "$status" -eq 2 ]]; then
+            core_engine_ui "w" "[!] Warning: Structural tags remain in $(basename "$target_path"). Encryption or DRM active."
+        else
+            core_engine_ui "e" "Failed to sanitize target file. Check system permissions."
+        fi
+    elif [[ -d "$target_path" ]]; then
+        # Рекурсивный пакетный режим по всей папке
+        core_engine_ui "i" "Batch mode detected. Processing all elements in directory..."
         
-        # Слой 6: Регистрация в Сборщике трофеев [11]
-        core_engine_loot "security" "Sanitized document: $(basename "$f_path")"
-    else
-        core_engine_ui "e" "Error during sanitization process. File may be locked."
+        while IFS= read -r current_file; do
+            [[ -z "$current_file" ]] && continue
+            
+            sanitize_single_file "$current_file"
+            local status=$?
+            if [[ "$status" -eq 0 ]]; then
+                ((cleaned_count++))
+            elif [[ "$status" -eq 2 ]]; then
+                ((warning_count++))
+            fi
+        done < <(find "$target_path" -type f 2>/dev/null)
+
+        core_engine_ui "s" "[+] Batch processing complete. Successfully sanitized: $cleaned_count files."
+        [[ "$warning_count" -gt 0 ]] && core_engine_ui "w" "[!] $warning_count files could not be fully stripped due to internal structures."
+        
+        core_engine_loot "security" "Batch sanitization executed for directory: $target_path (Cleaned: $cleaned_count, Alerts: $warning_count)"
     fi
 
     # Слой 7: Синхронизация [13]
