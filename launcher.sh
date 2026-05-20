@@ -6983,11 +6983,14 @@ run_osint_omni_crawler() {
             # Парсинг данных
             local raw_data=$(curl -s -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 "$request_url" 2>/dev/null)
             
-       # Аварийное переключение или пропуск при анти-флуд блоках
-            if [[ -z "$raw_data" || "$raw_data" =~ $GLOBAL_SEARCH_ANTI_FLOOD_REGEX ]]; then
-                core_engine_ui "w" "Engine $engine_name hit anti-flood. Skipping vector..."
-                continue
-            fi
+   
+            # --- Аварийное переключение с безопасным парсингом ---
+# Проверяем, пуст ли вывод или соответствует ли он анти-флуд паттерну через grep -qE
+if [[ -z "$raw_data" ]] || echo "$raw_data" | grep -qE "$GLOBAL_SEARCH_ANTI_FLOOD_REGEX" 2>/dev/null; then
+    core_engine_ui "w" "Engine $engine_name hit anti-flood or null payload. Skipping vector..."
+    continue
+fi
+
 
             # РЕКУРСИВНАЯ ЭКСТРАКЦИЯ В БУФЕРЫ NEXUS
             # 1. Телефоны
