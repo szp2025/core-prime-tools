@@ -6520,41 +6520,74 @@ run_forensic_core() {
 }
 
 # --- ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ---
+# ==============================================================================
+# @description: OSINT NEXUS v23.2 - AUTOMATIC FORENSIC ORCHESTRATOR
+# @status: PRE-FLIGHT ANALYSIS, INTEGRITY CHECK & ATOMIC LOGGING | PRODUCTION READY
+# ==============================================================================
 run_auto_forensics() {
     # Слой 1: Визуальный заголовок через Голос [1]
     core_engine_ui "h" "FORENSICS: AUTOMATIC CORE ANALYZER"
 
     # Слой 2: Органы чувств [3] — Сбор данных
-    # Используем универсальный ввод Ядра
     local f_path=$(core_engine_input "text" "Path to target file (e.g., /root/artifact.bin)")
 
-    # Слой 3: Валидация через Мозг [5] и Санитара [8]
-    # Проверка на пустой ввод
+    # Слой 3: Комплексная валидация безопасности и структуры
     [[ -z "$f_path" ]] && { core_engine_ui "e" "Operation cancelled: Empty path."; core_engine_wait; return; }
 
-    # Проверка физического существования файла
+    # Проверка физического существования и отсечение опасных типов (битые линки, сокеты)
     if [[ ! -f "$f_path" ]]; then
-        core_engine_ui "e" "Target for Analysis not found: $f_path"
+        core_engine_ui "e" "Target for Analysis not found or is not a regular file: $f_path"
         core_engine_wait
         return
     fi
 
-    # Слой 4: Информационный статус перед запуском
-    core_engine_ui "i" "Initializing Deep Forensic Scan..."
+    # Слой 4: Интеллектуальный пре-анализ метрик (Предполетный чек)
+    core_engine_ui "i" "Running pre-flight metrics extraction..."
     
+    # 1. Вычисление точного размера в байтах
+    local file_size_bytes=$(stat -c%s "$f_path" 2>/dev/null || wc -c < "$f_path" 2>/dev/null)
+    
+    # Защитный барьер: если файл больше 2 ГБ, предупреждаем о задержке
+    if (( file_size_bytes > 2147483648 )); then
+        core_engine_ui "w" "[!] Warning: Large object detected ($((file_size_bytes / 1024 / 1024)) MB). Processing may take time."
+    fi
+
+    # 2. Определение реального типа файла (MIME) независимо от расширения
+    local file_mime_type="Unknown"
+    if command -v file >/dev/null; then
+        file_mime_type=$(file -b --mime-type "$f_path" 2>/dev/null)
+    fi
+
+    # 3. Генерация уникального цифрового отпечатка (Криминалистический хэш)
+    local file_hash="UNKNOWN_HASH"
+    if command -v sha256sum >/dev/null; then
+        file_hash=$(sha256sum "$f_path" 2>/dev/null | awk '{print $1}')
+    fi
+
+    # Отрисовка паспорта объекта в интерфейсе фреймворка
+    echo -e "\n--- ARTIFACT PROFILE MANIFEST ---"
+    echo -e "  * Name:   $(basename "$f_path")"
+    echo -e "  * Size:   $((file_size_bytes / 1024)) KB"
+    echo -e "  * Type:   $file_mime_type"
+    echo -e "  * SHA256: $file_hash"
+    echo -e "---------------------------------\n"
+
     # Слой 5: Исполнение через основной Форензик-движок [24]
-    # Передаем управление модулю execute_forensic_core (run_forensic_core)
+    core_engine_ui "!" "Launching Deep Forensic Structural Analysis Pipeline..."
+    
+    # Передаем управление основному тяжелому ядру
     run_forensic_core "$f_path"
 
-    # Слой 6: Финализация и Сбор трофеев [11]
-    core_engine_ui "s" "Forensic Analysis Completed. Experience integrated."
+    # Слой 6: Финализация и Сбор трофеев [11] С УЛУЧШЕННОЙ МЕТРИКОЙ
+    core_engine_ui "s" "Forensic Analysis Completed. Object signature integrated."
     
-    # Регистрация события в глобальном логе
-    core_engine_loot "forensics" "Auto-Scan initiated for: $(basename "$f_path")"
+    # Регистрация события в глобальном логе с фиксацией хэша (Атомарный стандарт)
+    core_engine_loot "forensics" "Auto-Scan completed: $(basename "$f_path") | Type: $file_mime_type | SHA256: $file_hash"
 
     # Слой 7: Синхронизация [13]
     core_engine_wait
 }
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v23.1 - PARANOID DOCUMENT METADATA SANITIZER
