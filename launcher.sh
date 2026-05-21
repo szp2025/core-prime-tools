@@ -8446,6 +8446,36 @@ run_osint_omni_crawler() {
 }
 
 
+
+# 2. ФУНКЦИЯ ОБНОВЛЕНИЯ (APT + INTEGRITY CHECK)
+run_sys_update() {
+    echo "[*] Phase 1: apt sync & upgrade..."
+    if command -v apt &>/dev/null; then
+        apt update && apt upgrade -y && apt autoremove -y
+    fi
+    echo "[+] System upgrade finalized."
+}
+
+# 3. ФОРЕНЗИК-ХАРВЕСТЕР (Forensic Artifact Harvester)
+# Собирает состояние системы в момент обнаружения угрозы
+run_forensic_harvest() {
+    local log_file="nexus_forensic_$(date +%Y%m%d_%H%M%S).log"
+    echo "[!] ALERT: Threat detected. Harvesting artifacts..."
+    
+    {
+        echo "--- ARTIFACT SNAPSHOT: $(date) ---"
+        echo "[PROCESSES]"
+        ps aux | grep -vE "$GLOBAL_REGEX_PROC_WHITELIST" | head -n 10
+        echo "[NETWORK CONNECTIONS]"
+        netstat -tulnp 2>/dev/null
+        echo "[OPEN FILES]"
+        lsof -i 2>/dev/null | head -n 10
+    } > "$log_file"
+    
+    echo "[+] Artifacts saved to $log_file"
+}
+
+
 # ==========================================
 # 3. ОСНОВНОЙ ЦИКЛ (CORE LOOP)
 # ==========================================
