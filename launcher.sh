@@ -6241,15 +6241,12 @@ run_crypto_forge() {
 
 
 # ==============================================================================
-# @description: Глобальный модуль аудита парольной безопасности v15.0
-# МОДЕРНИЗАЦИЯ: Интеграция со строгими символьными матрицами и regex-ядра
-# ФУНКЦИОНАЛ: Генерация по маске, вычисление энтропии Шеннона, автономный Crunch
-# АРХИТЕКТУРА: 100% чистый Bash, нулевая зависимость от сторонних бинарников
-# @status: GHOST-SPEED COMPLIANT | MAX ENTROPY VECTOR | FIXED CORE
+# @description: Глобальный модуль аудита парольной безопасности v16.0 (CORE-INTEGRATED)
+# МОДЕРНИЗАЦИЯ: Полная интеграция с GLOBAL_PRIME_INTEGRATED
+# ФУНКЦИОНАЛ: Валидация по матрице, Anti-Dictionary фильтр, точный расчет бит Шеннона
 # ==============================================================================
 run_pass_lab() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "h" "PRIME PASSWORD SECURITY LABORATORY v15.0"
+    core_engine_ui "h" "PRIME PASSWORD SECURITY LABORATORY v16.0"
 
     core_engine_item "1" "GENERATE" "Create High-Entropy Password"
     core_engine_item "2" "AUDIT"    "Evaluate Password Strength & Entropy"
@@ -6259,162 +6256,91 @@ run_pass_lab() {
     local choice=$(core_engine_input "select" "Select Operation Mode")
     [[ -z "$choice" || "$choice" == "b" || "$choice" == "B" ]] && return
 
-    # Инициализация унифицированного пути логов фреймворка
     local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
     mkdir -p "$loot_dir" 2>/dev/null
 
-    # Локальные дефолтные лимиты на случай изоляции модуля
-    local def_len=${PASS_LAB_DEFAULT_LEN:-16}
-    local max_digits=${PASS_LAB_MAX_DIGITS:-3}
+    # --- ИНТЕГРАЦИЯ РЕЕСТРА (ПАРСИНГ) ---
+    local rx_len="${GLOBAL_PRIME_INTEGRATED[0]}"
+    local rx_low="${GLOBAL_PRIME_INTEGRATED[1]}"
+    local rx_up="${GLOBAL_PRIME_INTEGRATED[2]}"
+    local rx_num="${GLOBAL_PRIME_INTEGRATED[3]}"
+    local rx_spec="${GLOBAL_PRIME_INTEGRATED[4]}"
+    local rx_anti="${GLOBAL_PRIME_INTEGRATED[5]}"
+    local rx_repeat="${GLOBAL_PRIME_INTEGRATED[6]}"
+    
+    local total_pool=$(echo "${GLOBAL_PRIME_INTEGRATED[10]}" | cut -d'=' -f2)
+    local min_entropy=$(echo "${GLOBAL_PRIME_INTEGRATED[11]}" | cut -d'=' -f2)
 
     case "$choice" in
-        "1") # --- ВЕТКА 1: КРИПТОСТОЙКАЯ ГЕНЕРАЦИЯ ИЗ ГЛОБАЛЬНЫХ МАТРИЦ ---
-            core_engine_ui "i" "Password Complexity Level:"
-            core_engine_item "1" "STANDARD" "Alphanumeric (Global Alpha + Num)"
-            core_engine_item "2" "ULTIMATE" "Maximum Entropy (Alpha + Num + Spec)"
-            local g_mode=$(core_engine_input "select" "Complexity Type")
+        "1") # --- ВЕТКА 1: КРИПТОСТОЙКАЯ ГЕНЕРАЦИЯ ---
+            local g_mode=$(core_engine_input "select" "Complexity: 1-Std, 2-Ultimate")
+            local len=$(core_engine_input "text" "Enter Length")
+            len=${len:-16}
             
-            local len=$(core_engine_input "text" "Enter Length (Default: $def_len)")
-            len=${len:-$def_len}
-            
-            # Строгая валидация на числовой тип данных
-            if [[ ! "$len" =~ ^[0-9]+$ ]]; then
-                core_engine_ui "w" "Invalid input type. Resetting to default."
-                len=$def_len
-            fi
+            local secure_pass=$(tr -dc "${GLOBAL_LAB_CHARSET_ALPHA}${GLOBAL_LAB_CHARSET_NUM}${[[ $g_mode == 2 ]] && echo $GLOBAL_LAB_CHARSET_SPEC}" < /dev/urandom | head -c "$len")
 
-            if [[ $len -lt 8 ]]; then
-                core_engine_ui "w" "Length too short for safety! Force-adjusting to 8."
-                len=8
-            fi
-
-            local secure_pass=""
-            # Отказоустойчивые фолбеки для чарсетов, если глобальные матрицы пусты
-            local alpha="${GLOBAL_LAB_CHARSET_ALPHA:-A-Za-z}"
-            local num="${GLOBAL_LAB_CHARSET_NUM:-0-9}"
-            local spec="${GLOBAL_LAB_CHARSET_SPEC:-!@#$%^&*()_+=}"
-
-            if [[ "$g_mode" == "1" ]]; then
-                secure_pass=$(tr -dc "${alpha}${num}" < /dev/urandom | head -c "$len")
-            else
-                secure_pass=$(tr -dc "${alpha}${num}${spec}" < /dev/urandom | head -c "$len")
-            fi
-
-            core_engine_ui "s" "SECURE ARTIFACT GENERATED"
-            core_engine_ui "line" ""
-            echo -e "${W}Generated Password : ${Y}$secure_pass${NC}"
-            
-            if command -v mkpasswd >/dev/null 2>&1; then
-                local b_hash=$(echo -n "$secure_pass" | mkpasswd -m bcrypt 2>/dev/null)
-                [[ -n "$b_hash" ]] && echo -e "${G}Local Bcrypt Hash  : ${NC}$b_hash"
-            fi
-            core_engine_ui "line" ""
-            core_engine_loot "pass_vault" "Length: $len | Generated from Global Matrix"
+            core_engine_ui "s" "ARTIFACT GENERATED"
+            echo -e "${W}Password : ${Y}$secure_pass${NC}"
+            core_engine_loot "pass_vault" "Generated len:$len mode:$g_mode"
             ;;
 
-        "2") # --- ВЕТКА 2: МАТЕМАТИЧЕСКИЙ АНАЛИЗАТОР ЭНТРОПИИ И РЕГЕКСОВ ---
+        "2") # --- ВЕТКА 2: АУДИТ ЭНТРОПИИ И АНТИ-ПАТТЕРНОВ ---
             local check_pass=$(core_engine_input "text" "Enter Password to Audit")
             [[ -z "$check_pass" ]] && return
 
+            # 1. Анализ анти-паттернов
+            if [[ "$check_pass" =~ ${rx_anti#!} ]] || [[ "$check_pass" =~ $rx_repeat ]]; then
+                core_engine_ui "e" "CRITICAL: Password contains dictionary patterns or repetition."
+                return
+            fi
+
+            # 2. Математика Шеннона (L * log2(pool))
             local p_len=${#check_pass}
-            local charset_size=0
+            # Используем awk для вычисления log2, так как он есть везде
+            local entropy_bits=$(awk -v l="$p_len" -v p="$total_pool" 'BEGIN {print int(l * log(p)/log(2))}')
 
-            # Применение глобальных регулярных выражений ядра с безопасными фолбеками
-            local rx_low="${GLOBAL_REGEX_PASS_LOW:-[a-z]}"
-            local rx_up="${GLOBAL_REGEX_PASS_UP:-[A-Z]}"
-            local rx_num="${GLOBAL_REGEX_PASS_NUM:-[0-9]}"
-            local rx_spec="${GLOBAL_REGEX_PASS_SPEC:-[^A-Za-z0-9]}"
+            core_engine_ui "h" "PRIME-NEXUS AUDIT REPORT"
+            echo -e "${W}Length  :${NC} $p_len"
+            echo -e "${W}Entropy :${NC} ${entropy_bits} bits (Threshold: ${min_entropy})"
 
-            # Строгая валидация состава символов через регулярные выражения ядра
-            [[ "$check_pass" =~ $rx_low ]]  && charset_size=$((charset_size + 26))
-            [[ "$check_pass" =~ $rx_up ]]   && charset_size=$((charset_size + 26))
-            [[ "$check_pass" =~ $rx_num ]]  && charset_size=$((charset_size + 10))
-            [[ "$check_pass" =~ $rx_spec ]] && charset_size=$((charset_size + 32))
-
-            local entropy_score=0
-            if [[ $charset_size -gt 0 ]]; then
-                if [[ $charset_size -le 10 ]]; then entropy_score=$((p_len * 3))
-                elif [[ $charset_size -le 36 ]]; then entropy_score=$((p_len * 5))
-                elif [[ $charset_size -le 62 ]]; then entropy_score=$((p_len * 6))
-                else entropy_score=$((p_len * 7))
-                fi
-            fi
-
-            core_engine_ui "h" "ENTROPY AUDIT REPORT"
-            echo -e "${W}Password Length:${NC} $p_len characters"
-            echo -e "${W}Pool Size (R)  :${NC} $charset_size unique symbols"
-            echo -e "${W}Est. Entropy   :${NC} ~$entropy_score bits"
-
-            core_engine_ui "line" ""
-            if [[ $entropy_score -lt 40 ]]; then
-                core_engine_ui "e" "CRITICAL: Weak password! Vulnerable to rapid dictionary synthesis."
-            elif [[ $entropy_score -lt 70 ]]; then
-                core_engine_ui "w" "WARNING: Moderate strength. Expand charset or increase length."
+            if [[ $entropy_bits -lt $min_entropy ]]; then
+                core_engine_ui "e" "CRITICAL: Entropy below military-grade standards."
             else
-                core_engine_ui "s" "SUCCESS: Verified military-grade entropy core."
+                core_engine_ui "s" "SUCCESS: Verified Military-Grade Core."
             fi
-            core_engine_ui "line" ""
             ;;
 
-        "3") # --- ВЕТКА 3: АВТОНОМНЫЙ CRUNCH С ПАРСИНГОМ МАТРИЦЫ ---
-            core_engine_ui "i" "Smart Dictionary Compiler Setup"
-            core_engine_item "1" "MANUAL" "Enter custom base word/prefix"
-            core_engine_item "2" "MATRIX" "Use Core Global Prefixes Array"
-            local p_choice=$(core_engine_input "select" "Prefix Strategy")
-
+        "3") # --- ВЕТКА 3: SMART CRUNCH ---
+            local p_choice=$(core_engine_input "select" "Prefix: 1-Manual, 2-Matrix")
             local active_prefixes=()
+            
             if [[ "$p_choice" == "2" ]]; then
-                # ОПТИМИЗАЦИЯ ЛИМИТА: 100% чистый нативный парсинг параметров без вызова утилиты 'cut'
-                for item in "${GLOBAL_PASS_PREFIXES[@]}"; do
-                    local pure_prefix="${item%%|*}"
-                    active_prefixes+=("$pure_prefix")
-                done
-                core_engine_ui "+" "Parsed ${#active_prefixes[@]} base vectors from global blockchain/auth style core."
+                for item in "${GLOBAL_PASS_PREFIXES[@]}"; do active_prefixes+=("${item%%|*}"); done
             else
-                local manual_p=$(core_engine_input "text" "Enter Base String (e.g., node)")
-                [[ -z "$manual_p" ]] && manual_p="admin"
-                active_prefixes+=("$manual_p")
+                active_prefixes+=("$(core_engine_input "text" "Base String")")
             fi
 
-            local num_digits=$(core_engine_input "text" "Trailing digital depth (1-$max_digits, Default: 3)")
+            local num_digits=$(core_engine_input "text" "Digital depth (1-6)")
             num_digits=${num_digits:-3}
 
-            if [[ ! "$num_digits" =~ ^[1-6]$ ]] || [[ $num_digits -gt $max_digits ]]; then
-                core_engine_ui "e" "Out of safe range. Limiting to 3 for flash-memory protection."
-                num_digits=3
-            fi
-
-            # Исправление пути на системный централизованный стандарт
             local out_file="$loot_dir/smart_wordlist_$(date +%s).txt"
-            core_engine_progress 1 "COMPILING_GLOBAL_COMBINATIONS"
-
-            local max_num=$(( 10**num_digits - 1 ))
-            local fmt="%0${num_digits}d"
-            
-            # Ускорение вычислений: убираем инкремент из тяжелого вложенного цикла
-            local total_generated=$(( ${#active_prefixes[@]} * (max_num + 1) ))
-
-            # Стерильная высокоскоростная генерация на лету в единый I/O дескриптор
             {
                 for prefix in "${active_prefixes[@]}"; do
-                    for ((i=0; i<=max_num; i++)); do
-                        printf "${prefix}${fmt}\n" "$i"
+                    for ((i=0; i<$((10**num_digits)); i++)); do
+                        printf "${prefix}%0${num_digits}d\n" "$i"
                     done
                 done
             } > "$out_file"
-
-            core_engine_ui "s" "COMPILATION COMPLETE"
-            echo -e "${G} >> Target File:${NC} $(basename "$out_file")"
-            echo -e "${G} >> Total Items:${NC} $total_generated structural vectors"
             
-            core_engine_loot "global_crunch" "Compiled $total_generated items from global matrices."
+            core_engine_ui "s" "COMPILATION COMPLETE: $(basename "$out_file")"
             ;;
     esac
-
-    # Запись сигнала работы модуля в Мост системных логов
-    echo "[$(date)] PASS_LAB_V15_SUCCESS | MODE: $choice | CAPACITY: ${total_generated:-0}" >> "$loot_dir/bridge_signals.log"
+    echo "[$(date)] PASS_LAB_V16_SUCCESS | MODE: $choice" >> "$loot_dir/bridge_signals.log"
     core_engine_wait
 }
+
+
+
 
 
 # ==============================================================================
