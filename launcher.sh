@@ -1442,6 +1442,27 @@ GLOBAL_REGEX_BINARY_PACKERS="(UPX!|ASPack|Enigma|Themida|MPRESS|VMProtect|PEComp
 # 5. Ультимативная матрица эвристического обнаружения скрытых скриптовых угроз, шелл-кодов и техник обфускации
 GLOBAL_REGEX_HEURISTIC_SCRIPTS="([Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Gg][Zz][Ii][Nn][Ff][Ll][Aa][Tt][Ee]\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Ss][Tt][Rr]_[Rr][Oo][Tt]13\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Dd][Ee][Cc][Oo][Dd][Ee][Uu][Rr][Ii][Cc][Oo][Mm][Pp][Oo][Nn][Ee][Nn][Tt]\|[Ss][Tt][Rr][Ii][Nn][Gg]\.[Ff][Rr][Oo][Mm][Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee]\|[Ww][Rr][Ii][Tt][Ee][[:space:]]*[\"']<[Ss][Cc][Rr][Ii][Pp][Tt]\|[Ee][Xx][Ee][Cc][[:space:]]*(\|\|[[:space:]]*)[Bb][Aa][Ss][Ee]64\|[Bb][Aa][Ss][Ee]64_[Dd][Ee][Cc][Oo][Dd][Ee]\|[Cc][Oo][Mm][Pp][Ii][Ll][Ee][Ss][Tt][Rr][Ii][Nn][Gg]\|[Aa][Ss][Cc][Ii][Ii]2[Cc][Hh][Aa][Rr]\|[Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee][Aa][Tt])"
 
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР ФОРЕНЗИКИ И АНАЛИЗА ЯДРА (FORENSIC-NEXUS: ULTIMATE FULL-STACK v3.0)
+# ==============================================================================
+FORENSIC_MATRIX=(
+    # --- 1. Kernel Layer: Руткиты, eBPF-инжекты и модификация таблиц ---
+    '\b(rootkit|stealth|hide_proc|hook_sys|diamorphine|reptile|suterusu|kbeast|vlany|adore|enlight|mafalda|backdoor|rkstub|adore_ng|hpork|kbdv|knark|override|pridels|rialto|sucikit|tcunyc|zaurus|m0nad|wnps|fcomm|jynx|bdflush|skidmap|ebpf_control|kneedeeep|TripleCross|Jeefo|Umbreon|Azazel|Bedep|Volcani|Kinsing|Sysrv|Tsunami|Muhstik|sys_call_table|wp_page_fault|kprobe|ftrace_lookup|module_layout|kmem_cache|dentry_hook|task_struct_hide)\b'
+
+    # --- 2. Container Escape & Runtime Anomalies (Cloud Native) ---
+    '\b(nsenter|unshare|pivot_root|ptrace|cap_sys_admin|container_escape|docker_sock|runc_exploit|cgroup_v2_manipulation|proc_self_mem|memfd_create)\b'
+
+    # --- 3. Document Layer: Скрытые исполняемые цепочки (PDF/Office) ---
+    '\/([Jj][Ss]|[Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt]|[Oo][Pp][Ee][Nn][Aa][Cc][Tt][Ii][Oo][Nn]|[Aa][Aa]|[Aa][Cc][Rr][Oo][Ff][Oo][Rr][Mm]|[Jj][Bb][Ii][Gg]2[Dd][Ee][Cc][Oo][Dd][Ee]|[Rr][Ii][Cc][Hh][Mm][Ee][Dd][Ii][Aa]|[Ll][Aa][Uu][Nn][Cc][Hh]|[Ee][Mm][Bb][Ee][Dd][Dd][Ee][Dd][Ff][Ii][Ll][Ee]|[Vv][Bb][Aa][Mm][Aa][Cc][Rr][Oo]|[Oo][Cc][Xx]|[Cc][Mm][Dd])'
+
+    # --- 4. Execution Layer: LOLBAS и скриптовые инъекции ---
+    '\.(exe|scr|vbs|bat|ps1|js|vbe|cmd|jar|lnk|hta|cpl|inf|wsf|sh|py|pl|rb|msi|vba|ws|scf|com|pif|gadget|iso|vhd|img|elf|so|ko)$'
+    '\b(powershell|cmd\.exe|wmic|bitsadmin|certutil|rundll32|regsvr32|curl|wget|bash|nc|netcat|socat|/dev/tcp|perl|python3|ruby|node)\b'
+
+    # --- 5. Obfuscation & Persistence Layer (Advanced) ---
+    '\b(UPX!|ASPack|Enigma|Themida|MPRESS|VMProtect|PECompact|Petite|FSG!|PESpin|ConfuserEx|Dotfuscator|SmartAssembly|Yano|Goliath|Babel|CryptoObfuscator|Spox|Obsidium|Armadillo|base64_decode|gzinflate|eval|str_rot13)\b'
+)
+
 
 # ==============================================================================
 # GLOBAL PLATFORM IDENTIFIERS (ULTIMATE LINK PARSING MATRIX v15.0)
