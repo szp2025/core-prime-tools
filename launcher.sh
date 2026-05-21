@@ -730,6 +730,28 @@ GLOBAL_REGEX_WEB_SCRIPTS="\.(php[0-9]?|phtml|phar|aspx?|ashx|asmx|axd|jspx?|do|a
 # 2. Сигнатурная матрица детекции заглушек хостинга, стандартных ошибок и ложных ответов (Анти-Мусор)
 GLOBAL_REGEX_HOSTING_WASTE="(<html>|40[0-9] (Forbidden|Not Found|Bad Request|Unauthorized)|50[0-9] (Bad Gateway|Internal Server Error|Service Unavailable)|InfinityFree|Hostinger|Cloudflare|Cloudfront|Sucuri|Incapsula|Under Construction|Site Built With|Powered by cPanel|Plesk|Default Web Site|Welcome to nginx|Apache/|LiteSpeed|IIS/|Tomcat|Jetty|WebSphere|Oracle-HTTP-Server|Phusion Passenger|404 Page)"
 
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР АРТЕФАКТОВ И ХОСТИНГ-ОКРУЖЕНИЯ (ARTIFACT-CORE-NEXUS: ULTIMATE)
+# ==============================================================================
+GLOBAL_ARTIFACT_MATRIX=(
+    # --- 1. Конфигурационные секреты и дампы (Высокий приоритет) ---
+    '\.(env|bak|sql|sql\.gz|htaccess|git/config|conf|key|pem|htpasswd|old|swp|db|sqlite|log|ini|json|ya?ml|env\.example|docker-compose\.yml|credentials|config\.php)\b'
+    
+    # --- 2. Веб-артефакты и медиа-контейнеры ---
+    '\b[a-zA-Z0-9_\/\.-]+\.(php[0-9]?|aspx?|jspx?|pdf|docx?|xlsx?|zip|tar\.gz|tgz|rar|7z|sql)\b'
+    
+    # --- 3. Исполняемые и скомпилированные векторы ---
+    '\.(php[0-9]?|phtml|phar|aspx?|ashx|asmx|axd|jspx?|do|cgi|pl|pyc?|rb|sh|bat|cmd|go|rs|js|ts|dll|so|exe|bin|elf)$'
+    
+    # --- 4. Инфраструктурный мусор (Анти-шумовой фильтр) ---
+    # Добавлены паттерны заголовков ответов и сигнатуры хостинг-панелей
+    '(40[0-9]|50[0-9])[[:space:]]+(Forbidden|Not Found|Bad Request|Unauthorized|Bad Gateway|Internal Server Error|Service Unavailable)'
+    '(InfinityFree|Hostinger|Cloudflare|Cloudfront|Sucuri|Incapsula|Under Construction|Powered by cPanel|Plesk|Welcome to nginx|Apache/|LiteSpeed|IIS/|Tomcat|Jetty|WebSphere|Phusion Passenger|X-Powered-By:|Server:)'
+    
+    # --- 5. Скрытые административные артефакты ---
+    '\b(adminer|phpmyadmin|wp-admin|dashboard|cpanel|webmail|composer\.json|package\.json|node_modules|vendor|__pycache__)\b'
+)
+
 
 # ==============================================================================
 # 5. СЛОВАРЬ ФАЗЗИНГА ЧУВСТВИТЕЛЬНЫХ ТОЧЕК И АРТЕФАКТОВ (ULTIMATE FUZZ WORDLIST)
