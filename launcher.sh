@@ -1780,6 +1780,30 @@ GLOBAL_AV_ACTIVE_MALWARE_PROCS="(nc|netcat|socat|chisel|frp|ngrok|nmap|masscan|h
 # Детектирует: прослушивание портов (бэкдоры), установленные сессии (утечка данных) и синхронизацию сокетов
 GLOBAL_AV_SOCKET_STATES="(LISTEN|ESTABLISHED|ESTAB|SYN_SENT|SYN_RECV)"
 
+
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР АНТИВИРУСНОГО ДВИЖКА (ANTI-MALWARE CORE: ULTIMATE v4.0)
+# ==============================================================================
+GLOBAL_AV_MATRIX=(
+    # --- 1. Kernel Layer & Process Injection ---
+    '\b(ptrace|memfd_create|process_vm_(read|write)v|mprotect|mmap|execve|chroot|init_module|finit_module|kexec_load|inotify_init|vmsplice|splice|fork|clone)\b'
+    
+    # --- 2. Reverse Shell & Socket Hijacking (Network Persistence) ---
+    '(/dev/(tcp|udp)/[0-9.]+|nc\ -(e|c|l)|socat\ (tcp|udp|sctp)-connect|python3?.*(socket|subprocess)|bash\ -i|exec\ [0-9]<>/dev/tcp|mkfifo.*openssl|stty\ raw\ -echo)'
+    
+    # --- 3. Persistence & Forensics Sabotage (Anti-Audit) ---
+    '(unset\ HISTFILE|history\ -c|logsave\ /dev/null|openssl\ enc\ -aes|shred\ -u|cron\.d/|systemd/system/|chattr\ \+i|\.config/autostart|/etc/shadow|/etc/sudoers|/var/log/(auth|sys|secure)\.log)'
+    
+    # --- 4. LOLBAS & Advanced Exploitation (Cross-Platform) ---
+    '\b(powershell|wmic|bitsadmin|certutil|rundll32|regsvr32|mshta|psexec|mimikatz|nmap|masscan|sqlmap|hydra|chisel|frp|ngrok|cobaltstrike|metasploit|shadowsploit|linpeas|winpeas|exploitdb)\b'
+    
+    # --- 5. Memory-Resident Malware & Miners (Runtime) ---
+    '\b(xmrig|minerd|cryptonight|stratum\+tcp|reverse|tmux\ new.*-d|screen\ -d\ -m|memfd_create|/proc/self/fd/[0-9]+|/tmp/\.[a-zA-Z0-9]{8,})\b'
+    
+    # --- 6. Library Hijacking (LD_PRELOAD/LD_LIBRARY_PATH) ---
+    '\b(LD_PRELOAD|LD_LIBRARY_PATH|/etc/ld\.so\.preload|dlopen|dlsym)\b'
+)
+
 # ==============================================================================
 # ЕДИНЫЙ МОНОЛИТНЫЙ СУПЕР-КОНВЕЙЕР УЛЬТИМАТИВНОЙ ЭВРИСТИКИ ДЛЯ АВТОПИЛОТА CAME
 # ==============================================================================
