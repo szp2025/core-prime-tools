@@ -729,6 +729,8 @@ GLOBAL_REGEX_WEB_SCRIPTS="\.(php[0-9]?|phtml|phar|aspx?|ashx|asmx|axd|jspx?|do|a
 
 # 2. Сигнатурная матрица детекции заглушек хостинга, стандартных ошибок и ложных ответов (Анти-Мусор)
 GLOBAL_REGEX_HOSTING_WASTE="(<html>|40[0-9] (Forbidden|Not Found|Bad Request|Unauthorized)|50[0-9] (Bad Gateway|Internal Server Error|Service Unavailable)|InfinityFree|Hostinger|Cloudflare|Cloudfront|Sucuri|Incapsula|Under Construction|Site Built With|Powered by cPanel|Plesk|Default Web Site|Welcome to nginx|Apache/|LiteSpeed|IIS/|Tomcat|Jetty|WebSphere|Oracle-HTTP-Server|Phusion Passenger|404 Page)"
+
+
 # ==============================================================================
 # 5. СЛОВАРЬ ФАЗЗИНГА ЧУВСТВИТЕЛЬНЫХ ТОЧЕК И АРТЕФАКТОВ (ULTIMATE FUZZ WORDLIST)
 # ==============================================================================
