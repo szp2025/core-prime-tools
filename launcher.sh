@@ -6512,8 +6512,8 @@ run_forensic_core() {
         fi
     fi
 
-    # СОХРАНЕНИЕ УНИКАЛЬНОГО ОПЫТА (Атомарная запись без дублирования)
-    if [[ ! -f "$history_log" ] || ! grep -q "$f_hash" "$history_log" 2>/dev/null; then
+   # СОХРАНЕНИЕ УНИКАЛЬНОГО ОПЫТА (Атомарная запись без дублирования)
+    if [[ ! -f "$history_log" ]] || ! grep -q "$f_hash" "$history_log" 2>/dev/null; then
         echo "[$(date "+%Y-%m-%d %H:%M:%S")] $f_hash $f_name $mime_type" >> "$history_log"
     fi
     
