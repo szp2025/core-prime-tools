@@ -949,6 +949,27 @@ GLOBAL_SIG_VULN_ALERTS="([[:<:]](vulnerable|exploit_matched|rce_triggered|shell_
 # 9. СИГНАТУРЫ ИНТЕРПРЕТАТОРОВ И СЛУЖБ
 GLOBAL_SIG_WEB_RUNTIMES="[[:<:]](python([0-9](\.[0-9]+)?)?|node([0-9]+)?|php(-fpm)?([0-9](\.[0-9]+)?)?|go|ruby([0-9](\.[0-9]+)?)?|java|perl|dotnet|nginx|apache[0-9]?|httpd|lighttpd|caddy|traefik|gunicorn|uwsgi|puma|unicorn|passenger|tomcat|jetty|wildfly|glassfish|docker(-containerd|-current)?|dockerd|podman|containerd|kubelet|hypercorn|uvicorn|daphne)[[:>:]]"
 
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР СИСТЕМНОЙ БЕЗОПАСНОСТИ И ЭВРИСТИКИ (SIG-NEXUS: ULTIMATE)
+# ==============================================================================
+GLOBAL_SECURITY_MATRIX=(
+    # --- 6. Сигналы WAF и защиты ---
+    '\b(cloudflare|akamai|sucuri|incapsula|imperva|f5_big-ip|mod_security|fortigate|wordfence|aws-waf|cloudfront|fastly|__cfuid|cf-ray|x-sucuri-id|x-protected-by|x-waf-|429[[:space:]]+too[[:space:]]+many[[:space:]]+requests|security_challenge)\b'
+    
+    # --- 7. Сигналы структуры SQL / API ---
+    '\b(id|uid|uuid|page|category|article|product|file|action|mode|query|token_id|hash|payload|json|graphql|mutation)\b[[:space:]]*='
+    '\b(select|insert|update|delete|drop|union|load_file|benchmark|sleep|concat)\b'
+    '/api/(v[0-9]|v1|v2|v3)/[a-zA-Z0-9_-]+/[0-9]+'
+    
+    # --- 8. Сигналы аномалий и уязвимостей (CVE/SQL-Error/Injection) ---
+    '\b(vulnerable|rce_triggered|shell_spawned|unauthenticated|auth_bypass|sql_error|syntax_error|fatal_error|null_pointer)\b'
+    '\b(lfi|rfi|ssrf|xxe|command_injection|path_traversal)\b'
+    '\bcve-[0-9]{4}-[0-9]{4,7}\b'
+    
+    # --- 9. Сигналы рантаймов и контейнеризации ---
+    '\b(python[0-9.]*|node[0-9]*|php-fpm[0-9.]*|go|ruby|java|perl|nginx|apache[0-9]?|httpd|gunicorn|docker|podman|containerd|kubelet|uvicorn)\b'
+)
+
 
 # ==============================================================================
 # 10. СЛОВАРЬ ФАЗЗИНГА ВЕБХУКОВ И API ЭНДПОИНТОВ (ULTIMATE WEBHOOK WORDLIST)
