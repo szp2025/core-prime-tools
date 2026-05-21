@@ -1626,6 +1626,23 @@ GLOBAL_GATEWAY_RAW_VECTOR_SIGNATURES="(yahoo\.(com|co|fr|de|it|es|ca|co\.uk)|aol
 # 3. Шлюзы (вектор строгого URL-кодирования)
 GLOBAL_GATEWAY_ENCODED_VECTOR_SIGNATURES="(html\.duckduckgo\.com|search\.brave\.com|mojeek\.com|searx\.(be|fmac|me|space|info|link|work|xyz|org|net)|priv\.au|ononoki\.org)"
 
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР ШЛЮЗОВ И ПЛАТФОРМЕННЫХ РОУТОВ (GATEWAY-NEXUS: ULTIMATE FULL-STACK)
+# ==============================================================================
+GLOBAL_GATEWAY_MATRIX=(
+    # --- 1. Платформенные роуты (Исключение социального шума) ---
+    '\b(p|reel|reels|stories|share|messages|photo|photos|videos|watch|search|explore|shorts|status|trending|clips|live|about|legal|terms|privacy|help|settings|notifications|bookmark|lists|profile|analytics|ads|advertising|campaign|monetization|creators|community|channels|featured|playlists|subscriptions|store|podcasts|gaming|news|sports|fashion|beauty|learning|maps|hashtag|tags|category|posts|pages|groups|events|marketplace|jobs|companies|school|alumni|feed|following|followers|mutual|history|saved|archive|activity|digest|insights|verify|badge|security|login|signin|signup|register|logout)\b'
+
+    # --- 2. RAW-шлюзы (Классические и региональные поисковики) ---
+    '\b(yahoo\.(com|co|fr|de|it|es|ca|co\.uk)|aol\.(com|co\.uk)|ask\.com|excite\.com|search-results\.com|info\.com|gibiru\.com|bing\.com|yandex\.(ru|com)|baidu\.com|naver\.com|seznam\.cz)\b'
+
+    # --- 3. ENCODED/PRIVACY-шлюзы (Анонимные, мета-поиск и Tor2Web) ---
+    '\b(html\.duckduckgo\.com|search\.brave\.com|mojeek\.com|searx\.(be|fmac|me|space|info|link|work|xyz|org|net)|priv\.au|ononoki\.org|startpage\.com|metager\.de|swisscows\.com|qwant\.com|ecosia\.org)\b'
+
+    # --- 4. Deep Web Gateway (Tor2Web/Onion Proxies) ---
+    '\b([a-z0-9]+\.(onion|tor2web\.(org|me|to|cf|li|it)))\b'
+)
+
 
 # ==============================================================================
 # GLOBAL CORE NETWORK DNS INFRASTRUCTURE MATRIX (v22.0 INDUSTRIAL COMPLETE)
