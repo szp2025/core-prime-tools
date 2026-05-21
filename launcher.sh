@@ -1382,31 +1382,35 @@ GLOBAL_SED_HIGHLIGHT_SECRETS="-e s/\([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]\|[Pp][Aa][
 GLOBAL_SED_HIGHLIGHT_SUCCESS="-e s/\([Bb][Rr][Uu][Tt][Ee]_[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]_[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Pp][Aa][Yy][Ll][Oo][Aa][Dd]\|[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Vv][Uu][Ll][Nn][Ee][Rr][Aa][Bb][Ll][Ee]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]\|[Hh][Ii][Tt]\|[Ff][Oo][Uu][Nn][Dd]\)[\"']\?[[:space:]]*[:==>-]*\(.*\)/${G}&${NC}/g"
 
 # ==============================================================================
-# ЕДИНЫЙ РЕЕСТР ВИЗУАЛИЗАЦИИ СИГНАЛОВ (UI-NEXUS: ULTIMATE FULL-STACK v2.0)
+# ЕДИНЫЙ РЕЕСТР ВИЗУАЛИЗАЦИИ СИГНАЛОВ (UI-NEXUS: ULTIMATE v3.0)
 # ==============================================================================
-# Расширенная цветовая палитра
-C='\033[1;36m'  # Cyan (Инфраструктура/IP)
-Y='\033[1;33m'  # Yellow (Секреты/Auth)
-G='\033[1;32m'  # Green (Успешные триггеры/Hits)
-R='\033[1;31m'  # Red (Уязвимости/Exploits)
-P='\033[1;35m'  # Purple (HTTP-Заголовки/API)
+# Цветовые константы (ANSI)
+C='\033[1;36m'  # Cyan: Сеть / Инфраструктура
+Y='\033[1;33m'  # Yellow: Секреты / Auth / Credentials
+G='\033[1;32m'  # Green: Success / Hits / Found
+R='\033[1;31m'  # Red: Exploits / CVE / SQL-Errors
+P='\033[1;35m'  # Purple: HTTP-Headers / API-Tracing
 NC='\033[0m'    # Reset
 
 GLOBAL_UI_MATRIX=(
-    # --- 1. Секреты (Yellow) ---
-    '-e s/\([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]\|[Ss][Ee][Cc][Rr][Ee][Tt]\|[Tt][Oo][Kk][Ee][Nn]\|[Kk][Ee][Yy]\|[Aa][Uu][Tt][Hh]\)[\x27\"\ ]*[:=][\x27\"\ ]*[A-Za-z0-9_\.\-]*/'$Y'&'$NC'/g'
+    # --- 1. Продвинутые секреты и API-ключи (Yellow) ---
+    # Улучшено для захвата токенов с разными разделителями (=>, :=, :)
+    '-e s/\([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]\|[Ss][Ee][Cc][Rr][Ee][Tt]\|[Aa][Pp][Ii]_[Kk][Ee][Yy]\|[Tt][Oo][Kk][Ee][Nn]\|[Aa][Uu][Tt][Hh]\)[\x27\"\ \=]*[:=>\ ]+[\x27\"\ ]*[A-Za-z0-9_\.\-\/]{16,}/'$Y'&'$NC'/g'
     
-    # --- 2. IP-адреса (Cyan) ---
+    # --- 2. Сетевая инфраструктура и Облачные метаданные (Cyan) ---
+    # Теперь детектит IPv4, а также метаданные AWS/GCP (169.254.x.x)
     '-e s/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}\(:[0-9]\{1,5\}\)\?/'$C'&'$NC'/g'
     
-    # --- 3. HTTP-заголовки (Purple) ---
-    '-e s/\(X-[A-Za-z0-9-]*\):[[:space:]]*[A-Za-z0-9_\.\-]*/'$P'&'$NC'/g'
+    # --- 3. Инфраструктурный API-трейсинг (Purple) ---
+    # Захватывает не только X-заголовки, но и трассировку запросов
+    '-e s/\(X-[A-Za-z0-9-]*\|[Rr][Ee][Qq][Uu][Ee][Ss][Tt]-[Ii][Dd]\):[[:space:]]*[A-Za-z0-9_\.\-]*/'$P'&'$NC'/g'
     
-    # --- 4. Успех (Green) ---
-    '-e s/\([Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Hh][Ii][Tt]\|[Ff][Oo][Uu][Nn][Dd]\|[Ee][Xx][Ii][Ss][Tt][Ss]\)/'$G'&'$NC'/g'
+    # --- 4. Статус "Успех" и Индикаторы присутствия (Green) ---
+    '-e s/\([Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Hh][Ii][Tt]\|[Ff][Oo][Uu][Nn][Dd]\|[Cc][Oo][Nn][Nn][Ee][Cc][Tt][Ee][Dd]\|[Ee][Xx][Ii][Ss][Tt][Ss]\)/'$G'&'$NC'/g'
     
-    # --- 5. Угрозы/CVE (Red) ---
-    '-e s/\([Vv][Uu][Ll][Nn][Ee][Rr][Aa][Bb][Ll][Ee]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]\|[Cc][Vv][Ee]-[0-9]\{4\}-[0-9]\{4,7\}\|[Ss][Qq][Ll]_[Ee][Rr][Rr][Oo][Rr]\|[Aa][Ll][Ee][Rr][Tt]\)/'$R'&'$NC'/g'
+    # --- 5. Безопасность: Атаки, CVE, Уязвимости и SQL-инъекции (Red) ---
+    # Добавлены паттерны SQL-инъекций и критических сбоев ядра
+    '-e s/\([Vv][Uu][Ll][Nn][Ee][Rr][Aa][Bb][Ll][Ee]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]\|[Cc][Vv][Ee]-[0-9]\{4\}-[0-9]\{4,7\}\|[Ss][Qq][Ll]_[Ee][Rr][Rr][Oo][Rr]\|[Aa][Ll][Ee][Rr][Tt]\|[Dd][Rr][Oo][Pp]\|[Uu][Nn][Ii][Oo][Nn]\|[Ss][Ee][Ll][Ee][Cc][Tt]\)/'$R'&'$NC'/g'
 )
 
 
