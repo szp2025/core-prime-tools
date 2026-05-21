@@ -950,25 +950,30 @@ GLOBAL_SIG_VULN_ALERTS="([[:<:]](vulnerable|exploit_matched|rce_triggered|shell_
 GLOBAL_SIG_WEB_RUNTIMES="[[:<:]](python([0-9](\.[0-9]+)?)?|node([0-9]+)?|php(-fpm)?([0-9](\.[0-9]+)?)?|go|ruby([0-9](\.[0-9]+)?)?|java|perl|dotnet|nginx|apache[0-9]?|httpd|lighttpd|caddy|traefik|gunicorn|uwsgi|puma|unicorn|passenger|tomcat|jetty|wildfly|glassfish|docker(-containerd|-current)?|dockerd|podman|containerd|kubelet|hypercorn|uvicorn|daphne)[[:>:]]"
 
 # ==============================================================================
-# ЕДИНЫЙ РЕЕСТР СИСТЕМНОЙ БЕЗОПАСНОСТИ И ЭВРИСТИКИ (SIG-NEXUS: ULTIMATE)
+# ЕДИНЫЙ РЕЕСТР СИСТЕМНОЙ БЕЗОПАСНОСТИ И ЭВРИСТИКИ (SIG-NEXUS: ULTIMATE FULL)
 # ==============================================================================
 GLOBAL_SECURITY_MATRIX=(
-    # --- 6. Сигналы WAF и защиты ---
-    '\b(cloudflare|akamai|sucuri|incapsula|imperva|f5_big-ip|mod_security|fortigate|wordfence|aws-waf|cloudfront|fastly|__cfuid|cf-ray|x-sucuri-id|x-protected-by|x-waf-|429[[:space:]]+too[[:space:]]+many[[:space:]]+requests|security_challenge)\b'
+    # --- 6. Сигналы WAF и CDN (Infrastructure Fingerprinting) ---
+    '\b(cloudflare|akamai|sucuri|incapsula|imperva|f5_big-ip|mod_security|fortigate|wordfence|aws-waf|cloudfront|fastly|__cfuid|cf-ray|x-sucuri-id|x-protected-by|x-waf-|429[[:space:]]+too[[:space:]]+many[[:space:]]+requests|security_challenge|waf-bypass|block-code|threat-score)\b'
     
-    # --- 7. Сигналы структуры SQL / API ---
-    '\b(id|uid|uuid|page|category|article|product|file|action|mode|query|token_id|hash|payload|json|graphql|mutation)\b[[:space:]]*='
-    '\b(select|insert|update|delete|drop|union|load_file|benchmark|sleep|concat)\b'
-    '/api/(v[0-9]|v1|v2|v3)/[a-zA-Z0-9_-]+/[0-9]+'
+    # --- 7. Сигналы структуры SQL/NoSQL/API (Injection Vectors) ---
+    '\b(id|uid|uuid|page|category|product|action|query|token_id|hash|payload|graphql|mutation|schema|db_user)\b[[:space:]]*[:=]'
+    '\b(select|insert|update|delete|drop|union|load_file|benchmark|sleep|concat|exec|xp_cmdshell|declare|fetch)\b'
+    '\b(UNION[[:space:]]+SELECT|ORDER[[:space:]]+BY|GROUP[[:space:]]+BY|HAVING)\b'
+    '/api/(v[0-9]|v1|v2|v3|graphql)/[a-zA-Z0-9_-]+/[0-9]+'
     
-    # --- 8. Сигналы аномалий и уязвимостей (CVE/SQL-Error/Injection) ---
-    '\b(vulnerable|rce_triggered|shell_spawned|unauthenticated|auth_bypass|sql_error|syntax_error|fatal_error|null_pointer)\b'
-    '\b(lfi|rfi|ssrf|xxe|command_injection|path_traversal)\b'
+    # --- 8. Сигналы аномалий, CVE и эксплуатации ---
+    '\b(vulnerable|rce_triggered|shell_spawned|unauthenticated|auth_bypass|sql_error|syntax_error|fatal_error|null_pointer|stack_trace|debug_mode|hidden_config)\b'
+    '\b(lfi|rfi|ssrf|xxe|command_injection|path_traversal|eval\(|base64_decode|system\(|passthru\(|exec\()\b'
     '\bcve-[0-9]{4}-[0-9]{4,7}\b'
     
-    # --- 9. Сигналы рантаймов и контейнеризации ---
-    '\b(python[0-9.]*|node[0-9]*|php-fpm[0-9.]*|go|ruby|java|perl|nginx|apache[0-9]?|httpd|gunicorn|docker|podman|containerd|kubelet|uvicorn)\b'
+    # --- 9. Сигналы рантаймов и контейнеризации (Runtime Profiling) ---
+    '\b(python[0-9.]*|node[0-9]*|php-fpm[0-9.]*|go|ruby|java|perl|nginx|apache[0-9]?|httpd|gunicorn|docker|podman|containerd|kubelet|uvicorn|daphne|hypercorn)\b'
+    
+    # --- 10. Поведенческие индикаторы (Anomaly Detection) ---
+    '\b(brute_force|login_attempt|multiple_failed|ip_blacklist|geo_block|suspicious_user_agent|credential_stuffing|session_hijack)\b'
 )
+
 
 
 # ==============================================================================
