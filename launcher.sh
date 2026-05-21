@@ -6419,10 +6419,6 @@ run_pass_lab() {
 }
 
 
-
-
-
-
 # ==============================================================================
 # @description: Пассивный эвристический сканер конфигураций (GHOST-ENGINE INTEG v7.2)
 # @status: SAFE INFRASTRUCTURE GAP AUDITOR | ZERO-INTRUSIVE STREAM | PRODUCTION READY
