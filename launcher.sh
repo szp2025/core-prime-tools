@@ -1145,6 +1145,28 @@ GLOBAL_REGEX_HTTP_STATUS="^http/"
 GLOBAL_REGEX_HTTP_COOKIE="^(set-cookie|cookie|cookie2|x-xsrf-token|x-csrf-token|authorization|proxy-authorization|x-auth-token|x-session-id|x-request-id|cf-mitm-auth|cf-access-authenticated-user-email|x-amz-security-token|x-amzn-trace-id|ak_bmsc|bm_sv)"
 
 
+
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР HTTP-ИНТЕРФЕЙСОВ (HTTP-NEXUS: ULTIMATE FULL-STACK)
+# ==============================================================================
+GLOBAL_HTTP_MATRIX=(
+    # --- 1. Инфраструктурный слой (Server/CDN/Edge/Proxy) ---
+    '\b(server|via|x-asf-by|x-powered-by-plesk|x-advertising|x-responder|x-served-by|x-cached-by|x-cache|x-edge-location|x-amz-server-side-encryption|x-kong-proxy-latency|x-envoy-upstream-service-time|cf-ray|kiwi-id|x-proxy-id|x-cluster-id)\b'
+    
+    # --- 2. Runtime слой (Frameworks/CMS/API) ---
+    '\b(x-powered-by|x-runtime|x-version|x-aspnet-version|x-aspnetmvc-version|x-cocoa-version|x-generator|x-cms|x-nextjs-cache|x-nuxt-cache|x-redirected-by|x-framework|x-application-context|wp-super-cache|x-drupal-cache|x-varnish|x-api-key|x-request-id)\b'
+    
+    # --- 3. Security & Auth Shield (Заголовки безопасности и контроля) ---
+    '\b(content-security-policy|x-frame-options|x-content-type-options|strict-transport-security|x-xss-protection|referrer-policy|permissions-policy|cross-origin-embedder-policy|cross-origin-opener-policy|cross-origin-resource-policy|access-control-allow-origin|www-authenticate|proxy-authenticate|authorization|set-cookie)\b'
+    
+    # --- 4. Протокольный слой (HTTP/2, HTTP/3, QUIC) ---
+    '^(http/|h2|h3|alt-svc)'
+    
+    # --- 5. Заголовки отладки и трассировки (Debug/DevOps) ---
+    '\b(x-debug-token|x-debug-token-link|x-profiler|x-application-context|x-node-id|x-backend-id)\b'
+)
+
+
 # ==============================================================================
 # OSINT WHOIS LAYER: АТОМАРНЫЕ СУПЕР-МАТРИЦЫ ИНФРАСТРУКТУРНОЙ РАЗВЕДКИ
 # Полноценная изоляция текстовых шаблонов для мультиязычного парсинга (2026)
