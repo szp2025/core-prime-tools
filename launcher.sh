@@ -2145,33 +2145,35 @@ core_network_dns_sync() {
 
 
 # ==============================================================================
-# @description: System metrics harvester and kernel status display v24.5
-# OPTIMIZATION: Ultra-compact English layout for mobile terminal screens
-# COMPATIBILITY: Advanced non-root engine for Termux (Cellular & BT state fixes)
+# @description: System metrics harvester and kernel status display v24.6 (Fixed)
 # ==============================================================================
 core_engine_info() {
     core_engine_ui "i" "INFRASTRUCTURE SYSTEM STATUS"
 
-    # Агрегация данных через один вызов (ускоряет на 15-20% на старых CPU)
-    local sys_data=$(getprop | grep -E 'net\.|bluetooth\.')
+    # 1. Исправление getprop: проверяем наличие пути перед вызовом
+    local getprop_cmd=$(command -v getprop || echo "/system/bin/getprop")
+    local sys_data=$($getprop_cmd 2>/dev/null | grep -E 'net\.|bluetooth\.' | head -n 5)
     
-    # 1. Метрики (Минимизируем вызовы awk)
-    local mem_total=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2/1024}')
+    # 2. Исправление printf: используем %.0f для округления до целого,
+    # так как %d требует строго целых чисел.
+    # MemTotal в /proc/meminfo измеряется в kB.
+    local mem_total_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+    local mem_total_mb=$(awk "BEGIN {print $mem_total_kb / 1024}")
+    
     local disk_free=$(df -h / 2>/dev/null | tail -1 | awk '{print $4}')
     
-    # 2. Сетевой статус (Используем встроенные переменные вместо внешних grep)
+    # 3. Сетевой статус
     local active_uplink=$([[ -f /proc/net/route ]] && awk '$2=="00000000"{print $1}' /proc/net/route | head -1)
     
-    # Визуализация (Компактная верстка для Wiko)
-    printf " Mem/Disk  : RAM: %dMB | ROM: %s\n" "${mem_total:-0}" "${disk_free:-N/A}"
+    # 4. Визуализация (%.0f округляет дробное число до целого)
+    printf " Mem/Disk  : RAM: %.0fMB | ROM: %s\n" "${mem_total_mb:-0}" "${disk_free:-N/A}"
     printf " Net/Gate  : Link: %s\n" "${active_uplink:-OFFLINE}"
     printf " Radio     : %s\n" "$([[ -d /sys/class/bluetooth ]] && echo "BT:ACT" || echo "BT:ABS")"
     
-    # 3. Secure Tunnels (Одной строкой)
+    # 5. Secure Tunnels
     echo -e " Security  : $(grep -qE 'tun|wg' /proc/net/dev 2>/dev/null && echo -e "\e[1;32m[VPN ACTIVE]\e[0m" || echo -e "\e[1;31m[INACTIVE]\e[0m")"
     echo "--------------------------------------------------"
 }
-
 
 core_engine_progress() {
     local duration="${1:-1}"
