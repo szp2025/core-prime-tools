@@ -580,24 +580,42 @@ GLOBAL_REGEX_PHONE_VALID="^[0-9]{7,15}$"
 
 # ==============================================================================
 # @description: Ультимативный паттерн для потокового поиска IPv4/IPv6 и CIDR
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под POSIX ERE
 # ==============================================================================
-GLOBAL_REGEX_IP="(?i)\b(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(/[0-9]{1,2})?|([0-9a-f]{1,4}:){1,7}:?([0-9a-f]{1,4})?(:[0-9a-f]{1,4}){1,7}(/[0-9]{1,3})?)\b"
+# Использование: grep -oEi "$GLOBAL_REGEX_IP"
+GLOBAL_REGEX_IP="\b(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(/[0-9]{1,2})?|([0-9a-f]{1,4}:){1,7}:?([0-9a-f]{1,4})?(:[0-9a-f]{1,4}){1,7}(/[0-9]{1,3})?)\b"
 
 # ==============================================================================
 # @description: Ультимативный паттерн для потокового поиска и валидации доменов
+# МОДЕРНИЗАЦИЯ: Удален (?i), адаптирован для POSIX ERE (grep -iE)
 # ==============================================================================
-GLOBAL_REGEX_DOMAIN="(?i)\b((xn--[a-z0-9-]{1,59}|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})\b"
+# Паттерн поддерживает IDN (Punycode, xn--), многоуровневые домены и стандартные TLD
+GLOBAL_REGEX_DOMAIN="\b((xn--[a-z0-9-]{1,59}|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})\b"
 
 
 # ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска и валидации IBAN
+# @description: ГЛОБАЛЬНЫЙ ФИНАНСОВЫЙ СЛОЙ (INTERNATIONAL BANKING PATTERNS)
+# МОДЕРНИЗАЦИЯ: Добавлены стандарты для международных и специфических операций
 # ==============================================================================
-GLOBAL_REGEX_IBAN="(?i)\b[a-z]{2}[0-9]{2}([a-z0-9]\s*){10,30}[a-z0-9]\b"
 
-# ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска и валидации RIB (FR)
-# ==============================================================================
-GLOBAL_REGEX_RIB="(?i)\b[0-9]{5}[\s.-]?[0-9]{5}[\s.-]?[a-z0-9]{11}[\s.-]?[0-9]{2}\b"
+# 1. IBAN (Международный стандарт ISO 13616) - Работает для любой страны
+GLOBAL_REGEX_IBAN="\b[A-Z]{2}[0-9]{2}([A-Z0-9][[:space:]]*){10,30}[A-Z0-9]\b"
+
+# 2. SWIFT/BIC (Международный идентификатор банков)
+# 8 или 11 символов: 4 буквы (банк), 2 буквы (страна), 2 буквы (локация), 3 опциональные (филиал)
+GLOBAL_REGEX_SWIFT="\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b"
+
+# 3. RIB (Франция - Франция)
+GLOBAL_REGEX_RIB_FR="\b[0-9]{5}[[:space:].-]?[0-9]{5}[[:space:].-]?[a-zA-Z0-9]{11}[[:space:].-]?[0-9]{2}\b"
+
+# 4. BBAN (Basic Bank Account Number - общий формат для многих стран Европы)
+# Часто встречается в логах без префикса страны (более короткая форма IBAN)
+GLOBAL_REGEX_BBAN="\b[A-Z0-9]{10,20}\b"
+
+# 5. CREDIT_CARD (Стандартный поиск номеров карт по алгоритму Луна - паттерн для обнаружения)
+# Ищет 13-16 значные числа, часто используемые в транзакциях
+GLOBAL_REGEX_CC="\b[4-6][0-9]{3}([[:space:].-]?[0-9]{4}){3}\b"
+
 
 # Сигнатурный разделитель метаданных в системных логах (Loot Splitting Pattern)
 GLOBAL_REGEX_BRIDGE_DELIMITER=" -> "
@@ -725,28 +743,37 @@ GLOBAL_STATIC_SIGNATURES="(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(pass
 # --- Расширенные сигнатуры глубокого анализа (Deep Forensics & OSINT RegEx) ---
 # ==============================================================================
 # @description: Ультимативный паттерн для потокового поиска пар email:pass и login:pass
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под POSIX ERE
 # ==============================================================================
-GLOBAL_REGEX_CREDENTIALS="(?i)\b([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|[a-z0-9_.-]{3,32}):[^[:space:]]{3,64}\b"
+# Поиск пар в формате: [email или логин] : [пароль без пробелов]
+# Логин/Email: от 3 до 32 символов (для логина), Пароль: от 3 до 64 символов
+GLOBAL_REGEX_CREDENTIALS="\b([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|[a-z0-9_.-]{3,32}):[^[:space:]]{3,64}\b"
 
 # ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска и валидации IPv6 (RFC 5952)
+# @description: Ультимативный паттерн для потокового поиска IPv6 (RFC 5952)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под POSIX ERE
 # ==============================================================================
-GLOBAL_REGEX_IPV6="(?i)\b(((?=(?:.*:){7})[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){7})|((?=(?:.*:){1,6})[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){1,6}|)(?:::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){1,6}|))|(?:::(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})?))\b"
+# Паттерн поддерживает: полную запись, сжатую (::), и локальные адреса.
+GLOBAL_REGEX_IPV6="\b(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\b"
 
 # ==============================================================================
 # @description: Ультимативный паттерн для потокового поиска и валидации MAC-адресов (IEEE 802)
-# Supports: 00:11:22:33:44:55, 00-11-22-33-44-55, 0011.2233.4455, 001122334455
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), удалены непереносимые обратные ссылки
 # ==============================================================================
-GLOBAL_REGEX_MAC="(?i)\b(([0-9a-f]{2}(:)[0-9a-f]{2}(\4[0-9a-f]{2}){4})|([0-9a-f]{2}(-)[0-9a-f]{2}(\7[0-9a-f]{2}){4})|([0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4})|([0-9a-f]{12}))\b"
+# Поддерживает: 00:11:22:33:44:55, 00-11-22-33-44-55, 0011.2233.4455, 001122334455
+GLOBAL_REGEX_MAC="\b([0-9a-fA-F]{2}([::-][0-9a-fA-F]{2}){5}|[0-9a-fA-F]{4}(\.[0-9a-fA-F]{4}){2}|[0-9a-fA-F]{12})\b"
 
 # ==============================================================================
 # @description: Ультимативные паттерны для детекции и сепарации 32-символьных хэшей
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис, адаптирован под POSIX ERE для grep -Ei
 # ==============================================================================
-# Базовый сырой хэш (строго 32 символа Hex)
-GLOBAL_REGEX_HASH_32_HEX="(?i)\b[a-f0-9]{32}\b"
 
-# Сигнатурный контекст MD5: хэширование пустых строк, соли или маркеры бэкенда
-GLOBAL_SIG_HASH_MD5_MARKERS="(?i)(md5|password_hash|wp_|user_pass)"
+# Базовый хэш: строго 32 символа шестнадцатеричного формата
+GLOBAL_REGEX_HASH_32_HEX="\b[a-fA-F0-9]{32}\b"
+
+# Сигнатурный контекст MD5: маркеры для поиска "вблизи" подозрительных полей
+GLOBAL_SIG_HASH_MD5_MARKERS="(md5|password_hash|wp_|user_pass)"
+
 
 # Сигнатурный контекст NTLM: разделители учетных записей Windows (UID:RID:LM:NTLM)
 GLOBAL_SIG_HASH_NTLM_MARKERS=":[0-9a-f]{32}:[0-9a-f]{32}\b|:[a-f0-9]{32}$"
@@ -756,13 +783,17 @@ GLOBAL_SIG_HASH_NTLM_MARKERS=":[0-9a-f]{32}:[0-9a-f]{32}\b|:[a-f0-9]{32}$"
 # @description: Ультимативные паттерны криптографии, бот-менеджмента и JWT Intel
 # ==============================================================================
 
-# --- Криптография: Хэш-функции и приватные ключи (64 символа Hex) ---
-GLOBAL_REGEX_HASH_SHA256="(?i)\b[a-f0-9]{64}\b"
-GLOBAL_SIG_CRYPTO_KEY_MARKERS="(?i)(private_key|secret|wallet|priv|privkey|signing)"
+# Хэши SHA-256 (64 символа Hex)
+# Использование: grep -oEi "$GLOBAL_REGEX_HASH_SHA256"
+GLOBAL_REGEX_HASH_SHA256="\b[a-fA-F0-9]{64}\b"
 
-# --- Разведка: Токены управления Telegram-ботов (Поддержка ID нового поколения) ---
-# Бесшовно обрабатывает ID от 8 до 15 знаков внутри любого текстового массива/JSON
-GLOBAL_REGEX_TG_TOKEN="(?i)\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b"
+# Сигнатурный контекст для поиска приватных ключей и секретов
+GLOBAL_SIG_CRYPTO_KEY_MARKERS="(private_key|secret|wallet|priv|privkey|signing)"
+
+# Токены Telegram-ботов (Поддержка ID нового поколения)
+# Формат: [8-15 цифр]:[35 символов base64-style]
+GLOBAL_REGEX_TG_TOKEN="\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b"
+
 
 # --- Разведка: Веб-токены JWT (RFC 7519 Base64URL Strict Compliance) ---
 # Гарантирует наличие трех зон (Header.Payload.Signature) без ложных срабатываний
@@ -789,29 +820,22 @@ GLOBAL_SUPER_REGEX_TOKENS="($GLOBAL_REGEX_TG_TOKEN|$GLOBAL_REGEX_JWT)"
 GLOBAL_SUPER_REGEX_INFRA="($GLOBAL_REGEX_IP|$GLOBAL_REGEX_MAC|$GLOBAL_REGEX_DOMAIN)"
 
 
-# --- Сигнатуры эвристического движка анализа уязвимостей (Exploiter Engine Signatures) ---
 # ==============================================================================
-# 6. СИГНАЛЫ ПРИСУТСТВИЯ WAF И ЗАЩИТНЫХ СИСТЕМ (ULTIMATE WAF CORE)
+# @description: ГЛОБАЛЬНЫЕ СИГНАТУРЫ ЭВРИСТИЧЕСКОГО ДВИЖКА (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
-GLOBAL_SIG_WAF="(?i)(cloudflare|akamai|sucuri|incapsula|imperva|barracuda|f5_big-ip|mod_security|comodo|radware|fortigate|wordfence|asm|citrix|aws-waf|cloudfront|edgesuite|fastly|stackpath|__cfuid|cf-ray|cf-cache-status|x-sucuri-id|x-protected-by|x-waf-|x-cdn|err_connection_refused|captcha-bypass|challenge-platform|429 too many requests|block_id|security_challenge)"
 
-# ==============================================================================
-# 7. СИГНАЛЫ СТРУКТУРЫ ДЛЯ АКТИВАЦИИ SQL-ENGINE (ULTIMATE STRUCTURE MATRIX)
-# ==============================================================================
-GLOBAL_SIG_WEB_STRUCTURE="(?i)(\b(id|uid|uuid|p|page|cat|category|sec|section|art|article|post|prod|product|item|file|doc|lang|action|act|mode|view|search|q|query|sort|order|by|limit|offset|from|to|start|end|file_id|user_id|group_id|token_id|hash|data|payload|json|xml|ajax)\b\s*=|(\/api\/(v[0-9]|v1|v2|v3)\/[a-zA-Z0-9_-]+\/[0-9]+)|\b(select|insert|update|delete|drop|alter|union|where|having|orderby|groupby|into|load_file|benchmark|sleep|md5|sha1|concat)\b|\b(graphql|query\s*\{|\"query\"\s*:|mutation\b|\$gql))"
+# 6. СИГНАЛЫ WAF И ЗАЩИТНЫХ СИСТЕМ
+GLOBAL_SIG_WAF="(cloudflare|akamai|sucuri|incapsula|imperva|barracuda|f5_big-ip|mod_security|comodo|radware|fortigate|wordfence|asm|citrix|aws-waf|cloudfront|edgesuite|fastly|stackpath|__cfuid|cf-ray|cf-cache-status|x-sucuri-id|x-protected-by|x-waf-|x-cdn|err_connection_refused|captcha-bypass|challenge-platform|429[[:space:]]+too[[:space:]]+many[[:space:]]+requests|block_id|security_challenge)"
 
+# 7. СИГНАЛЫ СТРУКТУРЫ SQL/API-ENGINE
+GLOBAL_SIG_WEB_STRUCTURE="([[:<:]](id|uid|uuid|p|page|cat|category|sec|section|art|article|post|prod|product|item|file|doc|lang|action|act|mode|view|search|q|query|sort|order|by|limit|offset|from|to|start|end|file_id|user_id|group_id|token_id|hash|data|payload|json|xml|ajax)[[:>:]][[:space:]]*=|(/api/(v[0-9]|v1|v2|v3)/[a-zA-Z0-9_-]+/[0-9]+)|[[:<:]](select|insert|update|delete|drop|alter|union|where|having|orderby|groupby|into|load_file|benchmark|sleep|md5|sha1|concat)[[:>:]]|[[:<:]](graphql|query[[:space:]]*\{|\"query\"[[:space:]]*:|mutation|\\$gql)[[:>:]])"
 
-# ==============================================================================
-# 8. СИГНАЛЫ ВЫЯВЛЕНИЯ КРИТИЧЕСКИХ АНОМАЛИЙ И УЯЗВТИМОСТЕЙ (ULTIMATE ALERTS)
-# ==============================================================================
-GLOBAL_SIG_VULN_ALERTS="(?i)(\b(vulnerable|exploit_matched|rce_triggered|shell_spawned|privilege_escalation|unauthenticated|auth_bypass|remote_code_execution|buffer_overflow|segmentation_fault|core_dumped|access_denied|permission_denied)\b|\bcve-[0-9]{4}-[0-9]{4,7}\b|\b(sql_error|syntax_error|mariadb|postgresql|sqlite|oracle_error|unhandled_exception|stack_trace|fatal_error|null_pointer)\b|\b(lfi|rfi|ssrf|xxe|deserialization|command_injection|path_traversal)\b)"
+# 8. СИГНАЛЫ АНОМАЛИЙ И УЯЗВИМОСТЕЙ
+GLOBAL_SIG_VULN_ALERTS="([[:<:]](vulnerable|exploit_matched|rce_triggered|shell_spawned|privilege_escalation|unauthenticated|auth_bypass|remote_code_execution|buffer_overflow|segmentation_fault|core_dumped|access_denied|permission_denied)[[:>:]]|[[:<:]]cve-[0-9]{4}-[0-9]{4,7}[[:>:]]|[[:<:]](sql_error|syntax_error|mariadb|postgresql|sqlite|oracle_error|unhandled_exception|stack_trace|fatal_error|null_pointer)[[:>:]]|[[:<:]](lfi|rfi|ssrf|xxe|deserialization|command_injection|path_traversal)[[:>:]])"
 
-
-# --- Сигнатуры для сбора информации и разведки вебхуков (Recon & Webhook Signatures) ---
-# ==============================================================================
-# 9. СИГНАТУРЫ АКТИВНЫХ ИНТЕРПРЕТАТОРОВ И СЛУЖБ (ULTIMATE RUNTIMES MATRIX)
-# ==============================================================================
-GLOBAL_SIG_WEB_RUNTIMES="(?i)\b(python([0-9](\.[0-9]+)?)?|node([0-9]+)?|php(-fpm)?([0-9](\.[0-9]+)?)?|go|ruby([0-9](\.[0-9]+)?)?|java|perl|dotnet|nginx|apache[0-9]?|httpd|lighttpd|caddy|traefik|gunicorn|uwsgi|puma|unicorn|passenger|tomcat|jetty|wildfly|glassfish|docker(-containerd|-current)?|dockerd|podman|containerd|kubelet|hypercorn|uvicorn|daphne)\b"
+# 9. СИГНАТУРЫ ИНТЕРПРЕТАТОРОВ И СЛУЖБ
+GLOBAL_SIG_WEB_RUNTIMES="[[:<:]](python([0-9](\.[0-9]+)?)?|node([0-9]+)?|php(-fpm)?([0-9](\.[0-9]+)?)?|go|ruby([0-9](\.[0-9]+)?)?|java|perl|dotnet|nginx|apache[0-9]?|httpd|lighttpd|caddy|traefik|gunicorn|uwsgi|puma|unicorn|passenger|tomcat|jetty|wildfly|glassfish|docker(-containerd|-current)?|dockerd|podman|containerd|kubelet|hypercorn|uvicorn|daphne)[[:>:]]"
 
 
 # ==============================================================================
@@ -893,9 +917,12 @@ GLOBAL_WEBHOOK_WORDLIST=(
 
 
 # ==============================================================================
-# @description: Ультимативный паттерн поиска скрытых сетей и Web3-маршрутов
+# @description: ГЛОБАЛЬНЫЕ СИГНАЛЫ СКРЫТЫХ СЕТЕЙ И WEB3-МАРШРУТОВ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
-GLOBAL_REGEX_DARKWEB="(?i)(\b[a-z2-7]{56}\.onion\b|\b[a-z0-9]{52}\.b32\.i2p\b|\b[a-z0-9_-]+\.i2p\b|\b[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7}\b|(\.bit|\.lib|\.coin|\.bazar|\.emc|\.onion|\.i2p|\.ygg)\b)"
+
+# Паттерн покрывает .onion (v3), .i2p (base32 и имена), и альтернативные доменные зоны
+GLOBAL_REGEX_DARKWEB="([[:<:]][a-z2-7]{56}\.onion[[:>:]]|[[:<:]][a-z0-9]{52}\.b32\.i2p[[:>:]]|[[:<:]][a-z0-9_-]+\.i2p[[:>:]]|[[:<:]]([a-f0-9]{1,4}:){7}[a-f0-9]{1,4}[[:>:]]|[[:<:]].(bit|lib|coin|bazar|emc|onion|i2p|ygg)[[:>:]])"
 
 
 # ==============================================================================
@@ -907,10 +934,11 @@ GLOBAL_REGEX_DARKWEB="(?i)(\b[a-z2-7]{56}\.onion\b|\b[a-z0-9]{52}\.b32\.i2p\b|\b
 GLOBAL_CORE_MENU_MAX_LIMIT=99
 
 # ==============================================================================
-# @description: Ультимативная матрица валидации защищенных интерфейсов (Privacy Layer)
-# Защищает ядро от False Positive совпадений и покрывает стек протоколов 2026 года.
+# @description: УЛЬТИМАТИВНАЯ МАТРИЦА ВАЛИДАЦИИ ЗАЩИЩЕННЫХ ИНТЕРФЕЙСОВ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
-GLOBAL_REGEX_PRIVACY_INTERFACES="(?i)\b(tun[0-9]*|ppp[0-9]*|wg[0-9]*|wireguard[0-9]*|tap[0-9]*|csc[0-9]*|fct[0-9]*|forti[a-z]*|nordlynx|xvpn|tailscale[0-9]*|zt[0-9]*|zerotier|proton[a-z]*|anyconnect|sing-?tun|clash-?tun|xray-?tun|vtun[0-9]*)\b"
+# Паттерн охватывает стек VPN, туннелей и защищенных соединений 2026 года
+GLOBAL_REGEX_PRIVACY_INTERFACES="([[:<:]](tun[0-9]*|ppp[0-9]*|wg[0-9]*|wireguard[0-9]*|tap[0-9]*|csc[0-9]*|fct[0-9]*|forti[a-z]*|nordlynx|xvpn|tailscale[0-9]*|zt[0-9]*|zerotier|proton[a-z]*|anyconnect|sing-?tun|clash-?tun|xray-?tun|vtun[0-9]*)[[:>:]])"
 
 # ==============================================================================
 # SYSTEM CORE: АТОМАРНЫЕ СИСТЕМНЫЕ И ЛОГИЧЕСКИЕ ВАЛИДАТОРЫ
