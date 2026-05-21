@@ -1184,6 +1184,31 @@ GLOBAL_REGEX_WHOIS_NS="(nserver|name[-_ ]server|ns[0-9]*)"
 # 4. Детекция слоев приватности, GDPR-заглушек и обфускации владельца
 GLOBAL_REGEX_WHOIS_PRIVACY="(privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
 
+
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР WHOIS И ИНФРАСТРУКТУРНОЙ РАЗВЕДКИ (WHOIS-NEXUS: ULTIMATE FULL-STACK)
+# ==============================================================================
+GLOBAL_WHOIS_MATRIX=(
+    # --- 1. Identity Layer (Регистраторы, Органы, Лица) ---
+    '\b(registrar|reg-name|sponsoring|org|organization|registrant|person|descr|tech-id|mnt-by|contact|role|admin-c|bill-c|tech-c)\b'
+    
+    # --- 2. Lifecycle Layer (Жизненный цикл и временные метки) ---
+    '\b(expires|expired|exp-date|paid-till|validity|free-date|created|creation[-_ ]date|registered|reg-date|changed|modified|updated|renewal-date)\b'
+    
+    # --- 3. Delegation Layer (DNS/Маршрутизация/IP) ---
+    '\b(nserver|name[-_ ]server|ns[0-9]{1,2}|dnssec|ds-record|ip-address|glue-record)\b'
+    
+    # --- 4. Privacy Shield Layer (GDPR/Обфускация) ---
+    '\b(privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous|hidden|masked|data-protected|privacy-proxy|contact-privacy)\b'
+    
+    # --- 5. Status Layer (Техническое состояние) ---
+    '\b(status|domain-status|state|server-transfer|client-hold|client-delete|server-lock|inactive|parked|redemptionperiod)\b'
+    
+    # --- 6. Cyber-Scouting & Automation (Специфические метки) ---
+    '\b(source|query-time|last-update-of-whois|for-inquiries|abuse-contact|registrar-abuse-contact|website|reference)\b'
+)
+
+
 # ==============================================================================
 # @description: СВОДНЫЙ КОМПОЗИТ WHOIS (POSIX ERE COMPOSITE)
 # МОДЕРНИЗАЦИЯ: Синтаксис адаптирован для объединения атомарных матриц.
