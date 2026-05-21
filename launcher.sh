@@ -1343,6 +1343,30 @@ GLOBAL_REGEX_LFI_RISKS="\b(fopen|file_get_contents|include(_once)?|require(_once
 
 
 # ==============================================================================
+# ЕДИНЫЙ РЕЕСТР АНАЛИЗА ИСХОДНОГО КОДА (SAST-NEXUS: ULTIMATE FULL-STACK v2.0)
+# ==============================================================================
+GLOBAL_SAST_MATRIX=(
+    # --- 1. Секреты и конфигурационные утечки ---
+    '\b(mysqli?_connect|PDO|db_(password|user|pass|name|host|uri)|mysql_connect|pg_connect|createConnection|MongoClient|mongoose\.connect|sqlite3\.Database|DATABASE_URL|DB_(USERNAME|PASSWORD|DATABASE|HOST|SECRET|KEY))\b'
+    
+    # --- 2. Точки входа и API-инъекции ---
+    '\b(_POST|_GET|_REQUEST|_SERVER|req\.(body|query|params|cookies)|request\.(form|args|json|get_json)|@RequestParam|@RequestBody|@PathVariable|ParamUtil|r\.(FormValue|PostForm)|x-api-key)\b'
+    
+    # --- 3. RCE и исполнение команд ---
+    '\b(exec(ve|lp|p)?|system|passthru|shell_exec|popen|pclose|proc_open|subprocess\.(run|Popen|call|check_output)|child_process\.(exec|spawn|fork)|os\.(system|popen|spawn)|Runtime\.getRuntime\(\)\.exec|ProcessBuilder|syscall\.Exec)\b'
+    
+    # --- 4. LFI, RFI и файловые операции ---
+    '\b(fopen|file_get_contents|include(_once)?|require(_once)?|readfile|file|parse_ini_file|open|read|fs\.(readFile|readFileSync|createReadStream)|io\.ReadFile|ioutil\.ReadFile|os\.Open|fs\.file_System|FileInputStream|FileReader)\b'
+    
+    # --- 5. Векторы десериализации (Критический риск) ---
+    '\b(unserialize|pickle\.(load|loads)|yaml\.(load|unsafe_load)|json\.parse|fastjson|readObject|XMLDecoder|XStream)\b'
+    
+    # --- 6. XSS и Инъекционные Sink-функции ---
+    '\b(eval\(|base64_decode|innerHTML|outerHTML|document\.write|dangerouslySetInnerHTML|v-html|triple-curly|htmlspecialchars|strip_tags)\b'
+)
+
+
+# ==============================================================================
 # СИГНАТУРЫ ПОДСВЕТКИ И ВИЗУАЛИЗАЦИИ КОНТЕНТА (UI/UX HIGHLIGHT CORE)
 # ==============================================================================
 
