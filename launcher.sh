@@ -1499,6 +1499,23 @@ GLOBAL_OSINT_URL_BLACKLIST="/(search|html|privacy|help|login|signin|signup|logou
 
 
 # ==============================================================================
+# ЕДИНЫЙ РЕЕСТР ФИЛЬТРАЦИИ И OSINT-ГИГИЕНЫ (OSINT-NEXUS: ULTIMATE v2.0)
+# ==============================================================================
+GLOBAL_OSINT_MATRIX=(
+    # --- 1. System/Infrastructure Noise (Emails & Domains) ---
+    '\b([a-z0-9._%+-]+@)?(google|duckduckgo|bing|yahoo|yandex|baidu|w3|schema|ietf|githubusercontent|cloudfront|amazonaws|akamai|gtech|adsystem|doubleclick|analytics|crashlytics|sentry|facebook|twitter|instagram|tiktok|pinterest|linkedin|telegram|discord|whatsapp)\.(com|org|net|io|co|uk|de|ru|fr|es|it)\b'
+    '\b(reply|noreply|support|admin|info|contact|feedback|marketing|sales|billing|jobs|careers|privacy|terms|abuse|postmaster|root|webmaster|localhost|example|test|dev|null|mail|service|noreply)\b'
+    '\.(png|jpg|jpeg|gif|ico|svg|webp|css|js|json|xml|pdf|zip|tar|gz|exe|dmg|mp4|woff|woff2|wasm|sh|log|tmp|bak|sqlite)\b'
+
+    # --- 2. URL Path Noise (Social, Tracking & Web UI) ---
+    '\/(search|privacy|help|login|signin|signup|logout|register|account|status|sharer|share|cookie|settings|preferences|tos|legal|about|contact|support|faq|feedback|explore|trending|notifications|messages|chat|feed|rss|tags|category|archive|pages|blog|posts|reels|stories|shorts|video|photos|audio|music|maps|events|groups|marketplace|ads|advertising|analytics|developer|api|manage|billing|security|forgot-password|reset-password|verify|captcha|oauth|callback|redirect|goto|exit|click|track|iframe|embed|widget|assets|static|media|download|upload|view|preview|print|checkout|cart|shop|store|buy|purchase|subscribe|unsubscribe|newsletter)\b'
+    
+    # --- 3. Advanced AdTech & Fingerprinting (New 2026 Layer) ---
+    '\b(doubleclick|googletagmanager|adsense|adservice|optimizely|hotjar|newrelic|datadog|segment|mixpanel|amplitude|branch|adjust|appsflyer)\b'
+    '\/(pixel|track|click|beacon|log|gclid|fbclid|utm_source|utm_medium|utm_campaign|utm_term|utm_content)\b'
+)
+
+# ==============================================================================
 # GLOBAL FALLBACK SEARCH GATEWAYS (ULTIMATE ANTI-CAPTCHA ROUTING v15.5)
 # ==============================================================================
 # Массив резервных легковесных зеркал, отдающих чистый HTML без JS-валидации.
