@@ -949,39 +949,38 @@ GLOBAL_REGEX_DIGIT="^[0-9]+$"
 
 
 # ==============================================================================
-# @description: Ультимативная супер-матрица инфраструктурной разведки (OSINT Layer)
-# Мультиязычный бронированный композит для снайперского парсинга WHOIS-данных.
-# Покрывает международные, национальные (ccTLD) и новые (gTLD) зоны по состоянию на 2026 год.
+# @description: УЛЬТИМАТИВНАЯ МАТРИЦА ИНФРАСТРУКТУРНОЙ РАЗВЕДКИ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
-GLOBAL_SIG_WHOIS_MATRIX="(?i)(registrar|reg-name|sponsoring|org|organization|registrant|admin[-_ ]city|admin[-_ ]country|country|c:|co:|expires|expired|exp-date|paid-till|validity|free-date|created|creation[-_ ]date|registered|reg-date|changed|modified|updated|nserver|name[-_ ]server|ns[0-9]*|person|descr|tech-id|mnt-by|status|state|registrant[-_ ]email|e-mail|privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
+# Мультиязычный бронированный композит для парсинга WHOIS-данных
+GLOBAL_SIG_WHOIS_MATRIX="(registrar|reg-name|sponsoring|org|organization|registrant|admin[[:space:]-_]city|admin[[:space:]-_]country|country|c:|co:|expires|expired|exp-date|paid-till|validity|free-date|created|creation[[:space:]-_]date|registered|reg-date|changed|modified|updated|nserver|name[[:space:]-_]server|ns[0-9]*|person|descr|tech-id|mnt-by|status|state|registrant[[:space:]-_]email|e-mail|privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
 
-
-# ==============================================================================
-# OSINT CORE: УЛЬТИМАТИВНЫЕ МАТРИЦЫ АНАЛИЗА HTTP/HTTPS И СЕТЕВЫХ ЗАГОЛОВКОВ
-# Максимально полный мультиязычный стек паттернов для глубокой разведки (2026)
-# ==============================================================================
-
-# 1. Матрица определения серверного ПО и балансировщиков (Инфраструктурный слой)
-# Перехватывает не только классический Server, но и прокси, шлюзы, CDN и контроллеры ingress
-GLOBAL_REGEX_HTTP_SERVER="(?i)^(server|via|x-asf-by|x-powered-by-plesk|x-advertising|x-responder|x-served-by|x-cached-by|x-cache|x-edge-location|x-amz-server-side-encryption|x-kong-proxy-latency|x-envoy-upstream-service-time|cf-ray|kiwi-id)"
-
-# 2. Матрица версий, фреймворков и бэкенд-сред выполнения (Runtime Layer)
-# Содержит маркеры CMS, языков программирования, фреймворков, шаблонизаторов и серверов приложений
-GLOBAL_REGEX_HTTP_RUNTIME="(?i)^(x-powered-by|x-runtime|x-version|x-aspnet-version|x-aspnetmvc-version|x-cocoa-version|x-generator|x-cms|x-nextjs-cache|x-nuxt-cache|x-redirected-by|x-framework|x-application-context|wp-super-cache|x-drupal-cache|x-varnish)"
-
-# 3. Ультимативная матрица аудита заголовков безопасности и приватности (Security Shield)
-# Покрывает все современные политики контроля доступа, изоляции контекста и защиты от эксплуатации
-GLOBAL_REGEX_HTTP_SECURITY="(?i)^(content-security-policy|content-security-policy-report-only|x-frame-options|x-content-type-options|strict-transport-security|x-xss-protection|x-permitted-cross-domain-policies|referrer-policy|permissions-policy|clear-site-data|cross-origin-embedder-policy|cross-origin-opener-policy|cross-origin-resource-policy|expect-ct|access-control-allow-origin|access-control-allow-credentials|access-control-allow-headers|access-control-allow-methods)"
-
-# 4. Матрица детекции служебных параметров, статус-кодов и сетевого состояния
-GLOBAL_REGEX_HTTP_STATUS="(?i)^http/"
 
 # ==============================================================================
-# OSINT CORE: УЛЬТИМАТИВНАЯ МАТРИЦА СЕССИОННЫХ ДЕСКРИПТОРОВ (Cookie & Session Layer)
-# Максимально полный перехват векторов авторизации, трекеров и сессионных токенов.
-# Покрывает стандарты RFC 6265, JWT, OAuth, а также кастомные заголовки WAF/CDN (2026).
+# @description: ГЛОБАЛЬНЫЕ СИГНАЛЫ HTTP/HTTPS ИНФРАСТРУКТУРЫ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
-GLOBAL_REGEX_HTTP_COOKIE="(?i)^(set-cookie|cookie|cookie2|x-xsrf-token|x-csrf-token|authorization|proxy-authorization|x-auth-token|x-session-id|x-request-id|cf-mitm-auth|cf-access-authenticated-user-email|x-amz-security-token|x-amzn-trace-id|ak_bmsc|bm_sv)"
+
+# 1. Инфраструктурный слой (Server/Proxy/CDN/Ingress)
+GLOBAL_REGEX_HTTP_SERVER="^(server|via|x-asf-by|x-powered-by-plesk|x-advertising|x-responder|x-served-by|x-cached-by|x-cache|x-edge-location|x-amz-server-side-encryption|x-kong-proxy-latency|x-envoy-upstream-service-time|cf-ray|kiwi-id)"
+
+# 2. Runtime слой (Frameworks/CMS/Languages)
+GLOBAL_REGEX_HTTP_RUNTIME="^(x-powered-by|x-runtime|x-version|x-aspnet-version|x-aspnetmvc-version|x-cocoa-version|x-generator|x-cms|x-nextjs-cache|x-nuxt-cache|x-redirected-by|x-framework|x-application-context|wp-super-cache|x-drupal-cache|x-varnish)"
+
+# 3. Security Shield (Заголовки безопасности)
+GLOBAL_REGEX_HTTP_SECURITY="^(content-security-policy|content-security-policy-report-only|x-frame-options|x-content-type-options|strict-transport-security|x-xss-protection|x-permitted-cross-domain-policies|referrer-policy|permissions-policy|clear-site-data|cross-origin-embedder-policy|cross-origin-opener-policy|cross-origin-resource-policy|expect-ct|access-control-allow-origin|access-control-allow-credentials|access-control-allow-headers|access-control-allow-methods)"
+
+# 4. Статус-коды
+GLOBAL_REGEX_HTTP_STATUS="^http/"
+
+
+# ==============================================================================
+# @description: ГЛОБАЛЬНЫЕ СИГНАЛЫ СЕССИОННЫХ ДЕСКРИПТОРОВ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
+# ==============================================================================
+
+# Сессионный слой: Cookies, JWT, OAuth, токены защиты WAF
+GLOBAL_REGEX_HTTP_COOKIE="^(set-cookie|cookie|cookie2|x-xsrf-token|x-csrf-token|authorization|proxy-authorization|x-auth-token|x-session-id|x-request-id|cf-mitm-auth|cf-access-authenticated-user-email|x-amz-security-token|x-amzn-trace-id|ak_bmsc|bm_sv)"
 
 
 # ==============================================================================
@@ -1001,8 +1000,12 @@ GLOBAL_REGEX_WHOIS_NS="(nserver|name[-_ ]server|ns[0-9]*)"
 # 4. Детекция слоев приватности, GDPR-заглушек и обфускации владельца
 GLOBAL_REGEX_WHOIS_PRIVACY="(privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
 
-# Сводный композит для первичной фильтрации потока (Объединяет все атомарные матрицы)
-GLOBAL_SIG_WHOIS_MATRIX="(?i)(${GLOBAL_REGEX_WHOIS_REG}|${GLOBAL_REGEX_WHOIS_DATES}|${GLOBAL_REGEX_WHOIS_NS}|${GLOBAL_REGEX_WHOIS_PRIVACY})"
+# ==============================================================================
+# @description: СВОДНЫЙ КОМПОЗИТ WHOIS (POSIX ERE COMPOSITE)
+# МОДЕРНИЗАЦИЯ: Синтаксис адаптирован для объединения атомарных матриц.
+# ==============================================================================
+# Этот композит объединяет все уровни разведки WHOIS в единый фильтр
+GLOBAL_SIG_WHOIS_MATRIX="($GLOBAL_REGEX_WHOIS_REG|$GLOBAL_REGEX_WHOIS_DATES|$GLOBAL_REGEX_WHOIS_NS|$GLOBAL_REGEX_WHOIS_PRIVACY)"
 
 
 # ==============================================================================
@@ -1014,21 +1017,23 @@ GLOBAL_SIG_WHOIS_MATRIX="(?i)(${GLOBAL_REGEX_WHOIS_REG}|${GLOBAL_REGEX_WHOIS_DAT
 # Z (Zombie), D (Uninterruptible Sleep / Вредоносный I/O или Лок), T (Stopped), t (Traced / Отладка под малварью)
 GLOBAL_REGEX_BAD_PROC_STATUS="^[ZDTt]$"
 
-# 2. Индустриальный белый список процессов, критической инфраструктуры и системных демонов
-# ЗАПРЕЩЕНО трогать во избежание мгновенного краха ядра OS, SSH-сессий, контейнеров и шины управления
-GLOBAL_REGEX_PROC_WHITELIST="(?i)^(systemd|init|sshd|bash|sh|zsh|tmux|screen|adb|dockerd|containerd|podman|kthreadd|kworker.*|ksoftirqd.*|migration.*|rcu_sched|auditd|rsyslogd|systemd-journald|dbus-daemon|udevd|agetty|login)$"
+# ==============================================================================
+# @description: ГЛОБАЛЬНЫЕ СИСТЕМНЫЕ ПРЕДОХРАНИТЕЛИ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис, адаптирован под grep -Ei
+# ==============================================================================
 
-# 3. Максимальная матрица вредоносных, теневых и атакующих портов (Danger Network Perimeter)
-# Покрывает: Метасплоит, дефолтные RAT, криптомайнеры, бэкдоры, туннели (Ngrok/Chisel) и командные центры (C2)
+# 2. Индустриальный белый список процессов (защита от краха ядра и SSH)
+GLOBAL_REGEX_PROC_WHITELIST="^(systemd|init|sshd|bash|sh|zsh|tmux|screen|adb|dockerd|containerd|podman|kthreadd|kworker.*|ksoftirqd.*|migration.*|rcu_sched|auditd|rsyslogd|systemd-journald|dbus-daemon|udevd|agetty|login)$"
+
+# 3. Матрица опасных портов (Danger Network Perimeter)
 GLOBAL_REGEX_DANGER_PORTS="^(4444|55555|6666|7777|8888|9999|31337|1337|9001|8080|4443|65534|2022|8000|1080|5000|54321|4000|4545|8333|14337)$"
 
-# 4. Белый список портов управления, жизнеобеспечения и авторизованного доступа
-# Блокировка этих портов гарантирует моментальную потерю контроля над целевой системой (22: SSH, 80/443: Web, 5037/5555: ADB шина)
+# 4. Белый список портов управления
 GLOBAL_REGEX_PORT_WHITELIST="^(22|80|443|5037|5555|2376|6443|9100)$"
 
-# 5. Ультимативная сигнатурная маска критических системных файлов, баз данных и логов
-# ЗАПРЕЩЕНО перемещать в карантин, так как их удаление/блокировка разрушит ОС или затрет форензик-след для суда
-GLOBAL_REGEX_QUARANTINE_WHITELIST="(?i)\.(conf|lock|uuid|db|sqlite|passwd|shadow|journal|log|key|crt|pem|fstab|modules|enviroment)$"
+# 5. Маска критических системных файлов (Quarantine Whitelist)
+# Очищена от (?i), используй grep -Ei для проверки соответствия расширений
+GLOBAL_REGEX_QUARANTINE_WHITELIST="\.(conf|lock|uuid|db|sqlite|passwd|shadow|journal|log|key|crt|pem|fstab|modules|environment)$"
 
 
 # ==============================================================================
@@ -1061,7 +1066,12 @@ GLOBAL_NET_AUTONOMOUS_DELAY=300
 
 # 4. СИГНАТУРНЫЕ ФИЛЬТРЫ ОЧИСТКИ ТЕКСТОВОГО ПОТОКА NMAP
 # Паттерны для снайперского парсинга вывода во избежание засорения консоли лаунчера
-GLOBAL_REGEX_NET_REPORT="(?i)Nmap scan report for"
+# ==============================================================================
+# @description: ГЛОБАЛЬНЫЙ ПАТТЕРН ДЕТЕКЦИИ ОТЧЕТОВ СЕТЕВОГО СКАНИРОВАНИЯ
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
+# ==============================================================================
+# Использование: grep -Ei "$GLOBAL_REGEX_NET_REPORT"
+GLOBAL_REGEX_NET_REPORT="Nmap[[:space:]]+scan[[:space:]]+report[[:space:]]+for"
 GLOBAL_REGEX_NET_PORT_LINE="^[0-9]+/(tcp|udp)"
 
 
@@ -1166,16 +1176,15 @@ GLOBAL_PLATFORM_IDENTIFIERS=(
 # ==============================================================================
 
 # ==============================================================================
-# GLOBAL OSINT FILTRATION MATRIX (ULTIMATE BLACKLISTS v15.0)
+# @description: ГЛОБАЛЬНЫЕ ЧЕРНЫЕ СПИСКИ (OSINT FILTRATION MATRIX - POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
 
-# 1. Максимальный черный список для фильтрации сырого пула Email
-# Отсекает: поисковые движки, CDN, системные адреса W3C, рекламные домены, трекеры и все виды статических расширений
-GLOBAL_OSINT_EMAIL_BLACKLIST="(?i)(google|duckduckgo|bing|yahoo|yandex|baidu|w3\.org|schema\.org|ietf\.org|githubusercontent|cloudfront|amazonaws|akamai|gtech|adsystem|doubleclick|analytics|crashlytics|sentry|facebook|twitter|instagram|tiktok|pinterest|linkedin|reply|noreply|support|admin|info|contact|feedback|marketing|sales|billing|jobs|careers|privacy|terms|abuse|postmaster|root|webmaster|localhost|example|test|domain|\.(png|jpg|jpeg|gif|ico|svg|webp|css|js|json|xml|pdf|zip|tar|gz|exe|dmg|mp4|mp3|woff|woff2|ttf|eot|wasm|manifest))$"
+# 1. Черный список Email (Отсечение мусорных и системных адресов)
+GLOBAL_OSINT_EMAIL_BLACKLIST="(google|duckduckgo|bing|yahoo|yandex|baidu|w3\.org|schema\.org|ietf\.org|githubusercontent|cloudfront|amazonaws|akamai|gtech|adsystem|doubleclick|analytics|crashlytics|sentry|facebook|twitter|instagram|tiktok|pinterest|linkedin|reply|noreply|support|admin|info|contact|feedback|marketing|sales|billing|jobs|careers|privacy|terms|abuse|postmaster|root|webmaster|localhost|example|test|domain|\.(png|jpg|jpeg|gif|ico|svg|webp|css|js|json|xml|pdf|zip|tar|gz|exe|dmg|mp4|mp3|woff|woff2|ttf|eot|wasm|manifest))$"
 
-# 2. Максимальный черный список системных URL-паттернов для фильтрации Social Graph
-# Отсекает: технические страницы, фиды, параметры шеринга, разделы поддержки, правила, локализации, формы входа и сессий
-GLOBAL_OSINT_URL_BLACKLIST="(?i)/(search|html|privacy|help|login|signin|signup|logout|register|accounts|account|status|sharer|share|cookie|cookies|settings|preferences|tos|terms|legal|about|contact|support|faq|feedback|explore|trending|notifications|messages|direct|inbox|chat|feed|rss|atoms|tags|tag|category|categories|archive|archives|pages|page|blog|posts|articles|reels|reel|stories|story|highlights|shorts|video|videos|photo|photos|albums|album|audio|music|maps|places|events|groups|community|marketplace|ads|advertising|analytics|developer|developers|api|manage|dashboard|billing|security|privacy-policy|terms-of-service|forgot-password|reset-password|verify|captcha|oauth|callback|redirect|goto|exit|out|click|track|iframe|embed|widget|assets|static|media|download|upload|view|preview|print|checkout|cart|shop|store|buy|purchase|subscribe|unsubscribe|newsletter|jobs|careers|press|news|identity|checkpoint|legal|compliance|accessibility|lang|locale|en|ru|fr|es|de|it|pt|zh|ja|ko)$"
+# 2. Черный список URL-паттернов (Фильтрация Social Graph и системных путей)
+GLOBAL_OSINT_URL_BLACKLIST="/(search|html|privacy|help|login|signin|signup|logout|register|accounts|account|status|sharer|share|cookie|cookies|settings|preferences|tos|terms|legal|about|contact|support|faq|feedback|explore|trending|notifications|messages|direct|inbox|chat|feed|rss|atoms|tags|tag|category|categories|archive|archives|pages|page|blog|posts|articles|reels|reel|stories|story|highlights|shorts|video|videos|photo|photos|albums|album|audio|music|maps|places|events|groups|community|marketplace|ads|advertising|analytics|developer|developers|api|manage|dashboard|billing|security|privacy-policy|terms-of-service|forgot-password|reset-password|verify|captcha|oauth|callback|redirect|goto|exit|out|click|track|iframe|embed|widget|assets|static|media|download|upload|view|preview|print|checkout|cart|shop|store|buy|purchase|subscribe|unsubscribe|newsletter|jobs|careers|press|news|identity|checkpoint|legal|compliance|accessibility|lang|locale|en|ru|fr|es|de|it|pt|zh|ja|ko)$"
 
 
 # ==============================================================================
@@ -1212,9 +1221,12 @@ GLOBAL_FALLBACK_SEARCH_GATES=(
 # ==============================================================================
 # GLOBAL SHORT LINK & REDIRECT PATTERNS (ULTIMATE RESOLVER MATRIX v16.0)
 # ==============================================================================
-# Ультимативный паттерн для мгновенного перехвата коротких ссылок, мобильных шеров,
-# deep-links, био-агрегаторов и коммерческих редиректов. 100% покрытие OSINT-потока.
-GLOBAL_SHORT_LINK_REDIRECT_REGEX="(?i)(facebook\.com/share/|fb\.(watch|me)|vt\.tiktok\.com|instagram\.com/share|t\.(co|me/share)|youtu\.be/|lnkd\.in/|wa\.me/|vk\.cc|goo\.su|clck\.ru|bit\.ly|tinyurl\.com|cutt\.ly|shorturl\.at|linktr\.ee|lnk\.bio|ow\.ly|buff\.ly|rebrand\.ly|is\.gd|u\.to|shrtco\.de|viber\.click|tt\.me|line\.me|pin\.it|snapchat\.com/add/|bl\.ink|t2m\.io|adf\.ly|b23\.tv|gg\.gg|v\.gd|urlshrt\.me|click\.ru|ok\.me)"
+# ==============================================================================
+# @description: УЛЬТИМАТИВНАЯ МАТРИЦА ПЕРЕХВАТА РЕДИРЕКТОВ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
+# ==============================================================================
+# Покрывает: соцсети, мобильные deep-links, био-агрегаторы и коммерческие shorteners
+GLOBAL_SHORT_LINK_REDIRECT_REGEX="(facebook\.com/share/|fb\.(watch|me)|vt\.tiktok\.com|instagram\.com/share|t\.(co|me/share)|youtu\.be/|lnkd\.in/|wa\.me/|vk\.cc|goo\.su|clck\.ru|bit\.ly|tinyurl\.com|cutt\.ly|shorturl\.at|linktr\.ee|lnk\.bio|ow\.ly|buff\.ly|rebrand\.ly|is\.gd|u\.to|shrtco\.de|viber\.click|tt\.me|line\.me|pin\.it|snapchat\.com/add/|bl\.ink|t2m\.io|adf\.ly|b23\.tv|gg\.gg|v\.gd|urlshrt\.me|click\.ru|ok\.me)"
 
 
 
@@ -1253,9 +1265,12 @@ GLOBAL_SEARCH_ENGINES=(
 )
 
 
-# Тотальная регулярная маска (PCRE) для перехвата любых систем защиты, капч, блокировок и WAF-экранов.
-# Покрывает: Английский, Русский, Французский сегменты сети, маркеры Cloudflare, DDoS-Guard и Sucuri.
-GLOBAL_SEARCH_ANTI_FLOOD_REGEX="(?i)(detected unusual traffic|captcha|forbidden|automated requests|access denied|robot\.txt|unusual\s+activities|подозрительный\s+запрос|доступ\s+ограничен|робот|вы\s+робот|ошибка\s+403|error\s+403|action\s+required|cf-chk-wrapper|cloudflare|turnstile|hcaptcha|recaptcha|security\s+check|sucuri|ddos-guard|blocked\s+by|ip\s+blocked|checking\s+your\s+browser)"
+# ==============================================================================
+# @description: ГЛОБАЛЬНАЯ МАТРИЦА ДЕТЕКЦИИ БЛОКИРОВОК (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
+# ==============================================================================
+# Покрывает: Английский, Русский, Французский сегменты и специфичные маркеры WAF
+GLOBAL_SEARCH_ANTI_FLOOD_REGEX="(detected[[:space:]]+unusual[[:space:]]+traffic|captcha|forbidden|automated[[:space:]]+requests|access[[:space:]]+denied|robot\.txt|unusual[[:space:]]+activities|подозрительный[[:space:]]+запрос|доступ[[:space:]]+ограничен|робот|вы[[:space:]]+робот|ошибка[[:space:]]+403|error[[:space:]]+403|action[[:space:]]+required|cf-chk-wrapper|cloudflare|turnstile|hcaptcha|recaptcha|security[[:space:]]+check|sucuri|ddos-guard|blocked[[:space:]]+by|ip[[:space:]]+blocked|checking[[:space:]]+your[[:space:]]+browser)"
 
 
 
@@ -1270,20 +1285,18 @@ GLOBAL_RESOLVER_MAX_TIME=8
 
 
 # ==============================================================================
-# GLOBAL OSINT INDUSTRIAL FILTERS & GATEWAY SIGNATURES (v18.0 COMPLETE)
+# @description: ГЛОБАЛЬНЫЕ OSINT-ФИЛЬТРЫ И ШЛЮЗОВЫЕ СИГНАТУРЫ (POSIX ERE)
+# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
 
-# Тотальный черный список системных роутов, служебных путей и медиа-каталогов социальных сетей.
-# Исключает любые ложные срабатывания при парсинге URL-адресов (FB, X, Insta, YT, TT, LinkedIn, VK).
-GLOBAL_PLATFORM_SYSTEM_ROUTES="(?i)^(p|reel|reels|stories|share|messages|photo|photos|videos|watch|search|explore|shorts|status|trending|clips|live|about|legal|terms|privacy|help|settings|notifications|messages|bookmark|bookmarks|lists|profile|analytics|ads|advertising|campaign|monetization|creators|creator-academy|community|channels|featured|playlists|subscriptions|store|podcasts|gaming|news|sports|fashion|beauty|learning|maps|hashtag|tags|category|posts|pages|groups|events|marketplace|jobs|companies|school|alumni|feed|following|followers|mutual|history|saved|archive|activity|digest|insights|verify|verification|badge|security|login|signin|signup|register|logout)$"
+# 1. Системные роуты социальных платформ (Исключение ложных срабатываний)
+GLOBAL_PLATFORM_SYSTEM_ROUTES="^(p|reel|reels|stories|share|messages|photo|photos|videos|watch|search|explore|shorts|status|trending|clips|live|about|legal|terms|privacy|help|settings|notifications|messages|bookmark|bookmarks|lists|profile|analytics|ads|advertising|campaign|monetization|creators|creator-academy|community|channels|featured|playlists|subscriptions|store|podcasts|gaming|news|sports|fashion|beauty|learning|maps|hashtag|tags|category|posts|pages|groups|events|marketplace|jobs|companies|school|alumni|feed|following|followers|mutual|history|saved|archive|activity|digest|insights|verify|verification|badge|security|login|signin|signup|register|logout)$"
 
-# Максимально полный пул сигнатур шлюзов, требующих классического сложения через плюсы (+)
-# Покрывает глобальные мета-агрегаторы, их региональные поддомены, сателлиты и зеркала.
-GLOBAL_GATEWAY_RAW_VECTOR_SIGNATURES="(?i)(yahoo\.(com|co|fr|de|it|es|ca|co\.uk)|aol\.(com|co\.uk)|ask\.com|excite\.com|search-results\.com|info\.com|gibiru\.com)"
+# 2. Шлюзы (вектор классического сложения)
+GLOBAL_GATEWAY_RAW_VECTOR_SIGNATURES="(yahoo\.(com|co|fr|de|it|es|ca|co\.uk)|aol\.(com|co\.uk)|ask\.com|excite\.com|search-results\.com|info\.com|gibiru\.com)"
 
-# Ультимативный пул сигнатур шлюзов, требующих строгого URL-кодирования пробелов (%20)
-# Включает децентрализованные приватные узлы, инстанции SearXNG, Brave и независимые HTML-фронтенды.
-GLOBAL_GATEWAY_ENCODED_VECTOR_SIGNATURES="(?i)(html\.duckduckgo\.com|search\.brave\.com|mojeek\.com|searx\.(be|fmac|me|space|info|link|work|xyz|org|net)|priv\.au|ononoki\.org)"
+# 3. Шлюзы (вектор строгого URL-кодирования)
+GLOBAL_GATEWAY_ENCODED_VECTOR_SIGNATURES="(html\.duckduckgo\.com|search\.brave\.com|mojeek\.com|searx\.(be|fmac|me|space|info|link|work|xyz|org|net)|priv\.au|ononoki\.org)"
 
 
 # ==============================================================================
