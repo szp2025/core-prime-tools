@@ -866,6 +866,20 @@ GLOBAL_SIG_HASH_MD5_MARKERS="(md5|password_hash|wp_|user_pass)"
 # Сигнатурный контекст NTLM: разделители учетных записей Windows (UID:RID:LM:NTLM)
 GLOBAL_SIG_HASH_NTLM_MARKERS=":[0-9a-f]{32}:[0-9a-f]{32}\b|:[a-f0-9]{32}$"
 
+# ==============================================================================
+# ЕДИНЫЙ ХЭШ-РЕЕСТР PRIME (HASH-NEXUS)
+# ==============================================================================
+GLOBAL_HASH_MATRIX=(
+    # --- 1. Базовый хэш (MD5/32-hex) ---
+    '\b[a-fA-F0-9]{32}\b'
+    
+    # --- 2. Контекст MD5 (маркеры принадлежности) ---
+    '\b(md5|password_hash|wp_|user_pass)[[:space:]]*:[[:space:]]*[a-fA-F0-9]{32}\b'
+    
+    # --- 3. Контекст NTLM (Windows/AD структуры) ---
+    ':[0-9a-f]{32}:[0-9a-f]{32}\b'
+    ':[a-f0-9]{32}$'
+)
 
 # ==============================================================================
 # @description: Ультимативные паттерны криптографии, бот-менеджмента и JWT Intel
@@ -891,6 +905,33 @@ GLOBAL_REGEX_JWT="\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,
 GLOBAL_REGEX_DISCORD_TOKEN="\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b"
 GLOBAL_REGEX_AWS_KEY="\bAKIA[A-Z0-9]{16}\b"
 
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР КРИПТОГРАФИИ И СЕРВИСНЫХ КЛЮЧЕЙ (CRYPTO-NEXUS: ULTIMATE)
+# ==============================================================================
+GLOBAL_CRYPTO_MATRIX=(
+    # --- 1. SHA-256 (64 символа) & SHA-512 (128 символов) ---
+    '\b[a-fA-F0-9]{64}\b'
+    '\b[a-fA-F0-9]{128}\b'
+    
+    # --- 2. Контекстные секреты (Расширенные маркеры) ---
+    '\b(private_key|secret|wallet|priv|privkey|signing|password|passwd|apiKey|accessToken)[[:space:]]*[:=]{1,2}[[:space:]]*[A-Za-z0-9+/=_-]{20,}\b'
+    
+    # --- 3. Токены мессенджеров и систем ---
+    '\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b'                                  # Telegram
+    '\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b'         # Discord
+    '\b[a-fA-F0-9]{32,64}\.slack\.com\b'                                 # Slack Webhooks
+    
+    # --- 4. JWT & OAuth (RFC 7519 + ID Tokens) ---
+    '\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b'
+    
+    # --- 5. Cloud & Infrastructure Secrets ---
+    '\bAKIA[A-Z0-9]{16}\b'                                               # AWS Access Key
+    '\bAIza[0-9A-Za-z-_]{35}\b'                                          # Google API Key
+    '\b(ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36}\b'                         # GitHub Personal Access Token
+    
+    # --- 6. RSA / PKCS / SSH Key Headers ---
+    '-----BEGIN[[:space:]]+[A-Z[:space:]]+PRIVATE[[:space:]]+KEY-----'
+)
 
 # ==============================================================================
 # --- 3. ГЛОБАЛЬНЫЕ СУПЕР-КОМПОЗИТЫ (ОПТИМИЗАЦИЯ ПОТОКА) ---
