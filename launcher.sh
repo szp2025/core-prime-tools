@@ -9113,75 +9113,65 @@ run_osint_custom_socialscan() {
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v22.6 - HIGH-PERFORMANCE BREACH LEAKS ENGINE
-# @status: MULTI-THREADED LOCAL DISK SCANNING | PRODUCTION READY
+# @description: OSINT NEXUS v26.0 - INTEGRATED BREACH INTEL HUB
+# @status: LOCAL PARALLEL SCAN + DYNAMIC API BREACH VECTOR MAPPING
 # ==============================================================================
 run_osint_custom_leaks() {
     local leak_target="$1"
-    local raw_log="$2" # Принимает путь к логу для записи результатов
+    local raw_log="$2"
     
-    # 1. Автоматизация сессионного таргета
     [[ -z "$leak_target" ]] && leak_target="$target_user"
     [[ -z "$leak_target" ]] && return 1
 
     local clean_target=$(echo "$leak_target" | tr -d '[:space:]')
-    [[ -z "$clean_target" ]] && return 1
-    
-    core_engine_ui "i" "Nexus BreachLeaks: Launching High-Speed Parallel Signature Scan for [$clean_target]..."
+    core_engine_ui "h" "BREACH INTEL: ANALYZING [$clean_target]"
 
-    # Директории локального поиска
-    local search_dirs=("$HOME/arsenal_loot" "$HOME/prime_loot" "$HOME/reports")
-    
-    # Создаем изолированную песочницу для сбора результатов текущего шага
+    # 1. ЛОКАЛЬНЫЙ ПОИСК (Параллельный контур)
+    core_engine_ui "i" "Executing high-speed parallel local disk signature scan..."
     local sandbox_dir="/tmp/nexus_leaks_$$"
     mkdir -p "$sandbox_dir"
-    touch "$sandbox_dir/matches.raw"
-
-    # Извлекаем чистое имя файла лога, чтобы grep его случайно не сканировал
-    local log_filename=$(basename "$raw_log" 2>/dev/null)
-
-    # 2. ПАРАЛЛЕЛЬНЫЙ СИГНАТУРНЫЙ КОНТУР (Многопоточный xargs)
+    
+    local search_dirs=("$HOME/arsenal_loot" "$HOME/prime_loot" "$HOME/reports")
     for dir in "${search_dirs[@]}"; do
         if [[ -d "$dir" ]]; then
-            # find находит все файлы, а xargs распределяет их на все ядра процессора (-P 4)
-            # Исключаем сам файл лога через --exclude для полной безопасности
-            find "$dir" -type f 2>/dev/null | xargs -P 4 -I {} grep -ih --exclude="$log_filename" "$clean_target" "{}" 2>/dev/null | grep -v "LOCAL BREACH SEARCH REPORT" | head -n 50 >> "$sandbox_dir/matches.raw"
+            find "$dir" -type f 2>/dev/null | xargs -P 4 -I {} grep -ih "$clean_target" "{}" 2>/dev/null | \
+            grep -v "BREACH REPORT" | head -n 50 >> "$sandbox_dir/matches.raw"
         fi
     done
 
-    # 3. ПОСТ-ОБРАБОТКА И АВТОМАТИЧЕСКАЯ ЭКСТРАКЦИЯ
-    if [[ -s "$sandbox_dir/matches.raw" ]]; then
-        local match_count=0
+    # 2. ГЛОБАЛЬНЫЙ API-КАСКАД (Breach Intelligence)
+    core_engine_ui "i" "Querying GLOBAL_API_BREACH_NODES for external intelligence..."
+    for node in "${GLOBAL_API_BREACH_NODES[@]}"; do
+        local url_tpl="${node%%|*}"; local remaining="${node#*|}"
+        local method="${remaining%%|*}"; remaining="${remaining#*|}"
+        local type="${remaining%%|*}"; remaining="${remaining#*|}"
+        local vector="${remaining%%|*}"; local node_name="${remaining##*|}"
+
+        # Проверка вектора (если узел требует только EMAIL, а таргет - телефон, пропускаем)
+        [[ "$vector" != "ALL" && "$vector" != "$target_type" ]] && continue
+
+        local target_url="${url_tpl//\{TARGET\}/$clean_target}"
         
-        # Временные буферы для сбора артефактов без дубликатов
-        touch "$sandbox_dir/emails.tmp" "$sandbox_dir/phones.tmp"
+        # Запрос к API
+        local response=$(curl -s -X "$method" -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 "$target_url")
+        
+        if [[ -n "$response" && "$response" != *"error"* ]]; then
+            echo "[API_MATCH] Node: $node_name -> $response" >> "$raw_log"
+            core_engine_ui "s" "[+] External breach data acquired from $node_name"
+        fi
+    done
 
+    # 3. АГРЕГАЦИЯ И ИНТЕГРАЦИЯ
+    if [[ -s "$sandbox_dir/matches.raw" ]]; then
         while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
-            
-            # Запись в основной системный лог
-            echo "[BREACH_MATCH] Found -> $line" >> "$raw_log"
-            ((match_count++))
-            
-            # Экстракция уникальных артефактов для Omni-Crawler
-            echo "$line" | grep -oE "$GLOBAL_REGEX_EMAIL" >> "$sandbox_dir/emails.tmp" 2>/dev/null
-            echo "$line" | grep -oE "$GLOBAL_REGEX_PHONE" >> "$sandbox_dir/phones.tmp" 2>/dev/null
+            echo "[BREACH_MATCH] $line" >> "$raw_log"
+            # Экстракция артефактов через новые глобальные матрицы
+            echo "$line" | grep -oE "${GLOBAL_EMAIL_MATRIX[0]}" >> "/tmp/nexus_emails.tmp"
+            echo "$line" | grep -oE "${GLOBAL_PRIME_MATRIX[0]}|${GLOBAL_PRIME_MATRIX[3]}" >> "/tmp/nexus_phones.tmp"
         done < "$sandbox_dir/matches.raw"
-
-        # Атомарный сброс уникальных данных в глобальный кэш ядра
-        if [[ -s "$sandbox_dir/emails.tmp" ]]; then
-            sort -u "$sandbox_dir/emails.tmp" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
-        fi
-        if [[ -s "$sandbox_dir/phones.tmp" ]]; then
-            sort -u "$sandbox_dir/phones.tmp" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
-        fi
-
-        core_engine_ui "s" "[!] BREACH DETECTED: Identified $match_count signature matches. Artifacts integrated into pipeline."
-    else
-        core_engine_ui "i" "Nexus BreachLeaks: Clean (No local database matches found)."
+        core_engine_ui "s" "[!] Breach intelligence consolidated."
     fi
 
-    # Полная зачистка песочницы
     rm -rf "$sandbox_dir"
 }
 
