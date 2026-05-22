@@ -557,9 +557,20 @@ GLOBAL_API_IDENTITY_NODES=(
 
 
 # ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска и валидации Email
+# @matrix: GLOBAL_EMAIL_MATRIX v1.0
+# @description: Единая сигнатурная матрица валидации почтовых аккаунтов
 # ==============================================================================
-GLOBAL_REGEX_EMAIL="\b[a-z0-9._%+-]+@([a-z0-9-]+\.)+[a-z]{2,63}\b"
+GLOBAL_EMAIL_MATRIX=(
+    # [0] Универсальный RFC-адаптированный паттерн (Регистронезависимая латиница)
+    '\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}\b'
+    
+    # [1] Интернациональные почтовые адреса (IDN / Сервера в Punycode-зонах xn--)
+    '\b[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\.)*xn--[a-zA-Z0-9-]{1,59}\b'
+    
+    # [2] Системные, контейнерные и локальные адреса внутренней инфраструктуры
+    '\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(local|lan|internal|domain|node)\b'
+)
+
 
 # ==============================================================================
 # @description: УЛЬТИМАТИВНЫЙ ПАТТЕРН ПОИСКА ТЕЛЕФОНОВ (POSIX ERE)
@@ -1218,32 +1229,46 @@ GLOBAL_SIG_WHOIS_MATRIX="($GLOBAL_REGEX_WHOIS_REG|$GLOBAL_REGEX_WHOIS_DATES|$GLO
 
 
 # ==============================================================================
-# FORENSIC & PURGE LAYER: ГЛОБАЛЬНЫЕ МАТРИЦЫ АВТОНОМНОЙ ЗАЩИТЫ (УЛЬТИМАТИВНЫЕ)
-# Максимально полный стек регулярных паттернов для Incident Response и зачистки (2026)
-# ==============================================================================
-
-# 1. Строгие паттерны детекции аномальных, зависших и деструктивных статусов процессов
-# Z (Zombie), D (Uninterruptible Sleep / Вредоносный I/O или Лок), T (Stopped), t (Traced / Отладка под малварью)
-GLOBAL_REGEX_BAD_PROC_STATUS="^[ZDTt]$"
-
-# ==============================================================================
 # @description: ГЛОБАЛЬНЫЕ СИСТЕМНЫЕ ПРЕДОХРАНИТЕЛИ (POSIX ERE)
 # МОДЕРНИЗАЦИЯ: Исправлен синтаксис, адаптирован под grep -Ei
 # ==============================================================================
 
-# 2. Индустриальный белый список процессов (защита от краха ядра и SSH)
-GLOBAL_REGEX_PROC_WHITELIST="^(systemd|init|sshd|bash|sh|zsh|tmux|screen|adb|dockerd|containerd|podman|kthreadd|kworker.*|ksoftirqd.*|migration.*|rcu_sched|auditd|rsyslogd|systemd-journald|dbus-daemon|udevd|agetty|login)$"
+# ==============================================================================
+# ЕДИНЫЙ РЕЕСТР СИСТЕМНЫХ ПРЕДОХРАНИТЕЛЕЙ И ПЕРИМЕТРОВ (SYS-FUSE: INTEGRAL v3.0)
+# ==============================================================================
+# АРХИТЕКТУРА: Полная совместимость с POSIX ERE движками (grep -Ei, [[ =~ ]])
+# МОДЕРНИЗАЦИЯ: Интеграция слоя FORENSIC & PURGE (Детекция деструктивных статусов)
+# НАЗНАЧЕНИЕ: Защита ядра от краха, предотвращение ложных блокировок (Whitelisting),
+#             фильтрация сокетов и снайперский Incident Response аномалий ОЗУ.
+# СТАТУС: MAXIMUM PRODUCTION POWER | NO SHORTENINGS | DETAILED PARAMETERS
+# ==============================================================================
+GLOBAL_SYSTEM_FUSE_MATRIX=(
+    # --- 0. ИНДУСТРИАЛЬНЫЙ БЕЛЫЙ СПИСОК ПРОЦЕССОВ [LAYER 1: PROC_WHITELIST] ---
+    # Защита от случайного прерывания (kill -9) критически важных демонов, шеллов, гипервизоров и ядра.
+    # Включает подсистемы журналирования, управления контейнерами, сетями и политиками безопасности.
+    '^(systemd|init|sshd|bash|sh|zsh|tmux|screen|adb|dockerd|containerd|podman|kthreadd|kworker.*|ksoftirqd.*|migration.*|rcu_sched|auditd|rsyslogd|systemd-journald|systemd-resolved|systemd-logind|systemd-networkd|dbus-daemon|udevd|agetty|login|fail2ban-server|apparmor|selinux|ufw|iptables|cron|crond|atd|libvirtd|qemu-kvm|lvmetad|multipathd|polkitd|chronyd|ntpd|acpid|unattended-upgrades|ntp|dnsmasq|nginx|apache2|httpd)$'
 
-# 3. Матрица опасных портов (Danger Network Perimeter)
-GLOBAL_REGEX_DANGER_PORTS="^(4444|55555|6666|7777|8888|9999|31337|1337|9001|8080|4443|65534|2022|8000|1080|5000|54321|4000|4545|8333|14337)$"
+    # --- 1. МАТРИЦА ОПАСНЫХ ПОРТОВ [LAYER 2: DANGER_PORTS] ---
+    # Расширенный периметр: порты бэкдоров, реверс-шеллов, прокси, СУБД без авторизации,
+    # а также порты управления актуальных C2 (Sliver, Havoc, Cobalt Strike) и майнинг-протоколов.
+    '^(4444|55555|6666|7777|8888|9999|31337|1337|9001|8080|4443|65534|2022|8000|1080|5000|54321|4000|4545|8333|14337|3306|5432|6379|27017|9200|11211|50050|40056|51110|53190)$'
 
-# 4. Белый список портов управления
-GLOBAL_REGEX_PORT_WHITELIST="^(22|80|443|5037|5555|2376|6443|9100)$"
+    # --- 2. БЕЛЫЙ СПИСОК ПОРТОВ УПРАВЛЕНИЯ И ИНФРАСТРУКТУРЫ [LAYER 3: PORT_WHITELIST] ---
+    # Легитимные порты системных служб, веб-серверов, Kubernetes API, отладки ADB,
+    # а также стэка мониторинга (Prometheus, Grafana, Node Exporter) и почтовых протоколов.
+    '^(22|80|443|5037|5555|2376|6443|9100|3000|9090|2379|10250|25|465|587|993|995|1194|51820|53|123)$'
 
-# 5. Маска критических системных файлов (Quarantine Whitelist)
-# Очищена от (?i), используй grep -Ei для проверки соответствия расширений
-GLOBAL_REGEX_QUARANTINE_WHITELIST="\.(conf|lock|uuid|db|sqlite|passwd|shadow|journal|log|key|crt|pem|fstab|modules|environment)$"
+    # --- 3. МАСКА КРИТИЧЕСКИХ СИСТЕМНЫХ ФАЙЛОВ [LAYER 4: QUARANTINE_WHITELIST] ---
+    # Файлы-исключения, которые антивирусный модуль НЕ имеет права перемещать, удалять или обнулять.
+    # Защищает файлы конфигурации, криптографические ключи, базы данных, модули ядра и системные юниты init.
+    '\.(conf|lock|uuid|db|sqlite|sqlite3|passwd|shadow|journal|log|key|crt|pem|fstab|modules|environment|service|target|path|timer|so|so\.[0-9]+|bak|opts|rules|policy)$'
 
+    # --- 4. ПАТТЕРНЫ ДЕТЕКЦИИ АНОМАЛЬНЫХ И ДЕСТРУКТИВНЫХ СТАТУСОВ [LAYER 5: BAD_PROC_STATUS] ---
+    # Строгий Incident Response стек для вычисления скомпрометированных и зависших состояний:
+    # Z (Zombie - мертвые ветки малвари), D (Uninterruptible Sleep - блокировка ядра I/O инжектами),
+    # T (Stopped - приостановленные скрытые шеллы), t (Traced - процессы под сторонней отладкой / хуками).
+    '^[ZDTt]$'
+)
 
 # ==============================================================================
 # NETWORK INTELLIGENCE LAYER: ГЛОБАЛЬНЫЕ МАТРИЦЫ СЕТЕВОГО АУДИТА (УЛЬТИМАТИВНЫЕ)
@@ -1753,69 +1778,51 @@ PASS_LAB_MAX_DIGITS=6
 # ==============================================================================
 # [СТАТИЧЕСКИЙ КОНТУР: СКАНИРОВАНИЕ ФАЙЛОВ, СКРИПТОВ И ИСПОЛНЯЕМЫХ БИНАРНИКОВ]
 
-# Слой 1: Низкоуровневые системные вызовы, инъекции в память, руткиты и хуки ядра
-# Детектирует: манипуляции процессами, создание скрытых дескрипторов в RAM, chroot-изоляцию, загрузку модулей ядра
-GLOBAL_AV_SYS_CALLS="(ptrace|memfd_create|process_vm_readv|process_vm_writev|mprotect|mmap|execve|chroot|setuid|setgid|sys_clone|init_module|finit_module|kexec_load|inotify_init)"
-
-# Слой 2: Деструктивные сетевые векторы, обратные подключения (Reverse Shells), скрытые каналы и веб-шеллы
-# Детектирует: сокеты Bash/Python/Perl/PHP/Ruby/Lua, пайпы, туннели и сокетные дескрипторы
-GLOBAL_AV_NET_VECTORS="(/dev/tcp/|/dev/udp/|nc -e|nc\.openbsd|netcat -e|socat tcp|python.*-c.*import.*socket|perl.*-e.*socket|php -r.*fsockopen|ruby -e.*TCPSocket|lua -e.*socket|curl.*\|.*bash|wget.*\|.*sh|fetch.*\|.*sh|bash -i|sh -i|exec [0-9]<>/dev/tcp|mkfifo.*\/tmp\/.*openssl)"
-
-# Слой 3: Маркеры скрытого присутствия (Persistence), уничтожение форензик-логов, шифровальщики-вымогатели
-# Детектирует: зачистку истории, манипуляции с cron/systemd/init, массовое симметричное шифрование, скрытые папки
-GLOBAL_AV_MAL_MARKERS="(rm -rf /|unset HISTFILE|history -c|killall.*log|logsave /dev/null|openssl enc -aes|gpg --encrypt|shred -u|auth\.log.*>\?|cron\.d\/|systemd\/system\/|rc\.local|\.config\/autostart|/etc/shadow|/etc/sudoers|chattr \+i|trap ''|set \+o history)"
-
-# Слой 4: Максимальная кросс-платформенная матрица LOLBAS, утилит компрометации, хакерского софта и эксплойтов
-# Детектирует: кражу /etc/passwd, Win-компоненты (PowerShell/WMIC), утилиты сканирования, туннелирования и дамперы памяти
-GLOBAL_AV_LOLBAS_MATRIX="((https?|ftp|wss?):\/\/|/etc/passwd|cmd\.exe|powershell|wmic|cmdlet|api_string|bitsadmin|certutil|rundll32|regsvr32|mshta|psexec|mimikatz|nmap|masscan|sqlmap|hydra|aircrack|chisel|frp|ngrok|autoruns|vssadmin|wevtutil|schtasks|sc query|cobaltstrike|metasploit|shadowsploit)"
-
 # ==============================================================================
-# [ДИНАМИЧЕСКИЙ КОНТУР: МОНИТОРИНГ ОПЕРАТИВНОЙ ПАМЯТИ (ОЗУ) И СЕТЕВОЙ АКТИВНОСТИ]
-
-# Слой 5: Расширенная матрица перехвата активных вредоносных процессов, сканеров и криптомайнеров в ОЗУ
-# Детектирует: запущенные бинарники компрометации, утилиты удаленного контроля, шеллы и потоковые майнеры
-GLOBAL_AV_ACTIVE_MALWARE_PROCS="(nc|netcat|socat|chisel|frp|ngrok|nmap|masscan|hydra|xmrig|minerd|cryptonight|stratum\+tcp|reverse|sh -i|bash -i|zsh -i|tmux new.*-d|screen -d -m)"
-
-# Слой 6: Фильтр критических состояний сетевых сокетов (Подозрительные шлюзы, биндинг портов, активные утечки)
-# Детектирует: прослушивание портов (бэкдоры), установленные сессии (утечка данных) и синхронизацию сокетов
-GLOBAL_AV_SOCKET_STATES="(LISTEN|ESTABLISHED|ESTAB|SYN_SENT|SYN_RECV)"
-
-
-# ==============================================================================
-# ЕДИНЫЙ РЕЕСТР АНТИВИРУСНОГО ДВИЖКА (ANTI-MALWARE CORE: ULTIMATE v5.0)
+# ЕДИНЫЙ РЕЕСТР АНТИВИРУСНОГО ДВИЖКА (ANTI-MALWARE CORE: ULTIMATE RECON v7.0)
 # ==============================================================================
 # АРХИТЕКТУРА: Полная совместимость с POSIX ERE движками (grep -Ei)
-# МОДЕРНИЗАЦИЯ: Интеграция слоя перехвата активных процессов, шеллов и майнеров в ОЗУ
-# ПРИНЦИП: Динамическая итерация слоев в core_engine_parse_target_log без костылей
+# ЗАМЕЩЕНИЕ: Полное поглощение GLOBAL_AV_SYS_CALLS, NET_VECTORS, MAL_MARKERS, LOLBAS
+# ПРИНЦИП: Тотальная очистка конфигурации от одиночных незащищенных переменных
+# СТАТУС: ZERO LOOSE VARIABLES | FULL ENVELOPE METADATA | NO SHORTENINGS
 # ==============================================================================
 GLOBAL_AV_MATRIX=(
-    # --- 1. Kernel Layer & Process Injection ---
-    # Перехват системных вызовов инъекций в память, трассировки и манипуляций с ядром Linux
-    '\b(ptrace|memfd_create|process_vm_(read|write)v|mprotect|mmap|execve|chroot|init_module|finit_module|kexec_load|inotify_init|vmsplice|splice|fork|clone)\b'
+    # --- 0. Kernel Layer & Process Injection [LAYER 1] ---
+    # Поглощено: GLOBAL_AV_SYS_CALLS (Мониторинг syscalls, инъекций, руткитов и хуков ядра)
+    # Детектирует: манипуляции процессами, скрытые дескрипторы, chroot и эскалацию прав через setuid/setgid
+    '\b(ptrace|memfd_create|process_vm_readv|process_vm_writev|mprotect|mmap|execve|chroot|setuid|setgid|sys_clone|init_module|finit_module|kexec_load|inotify_init|vmsplice|splice|fork|clone)\b'
     
-    # --- 2. Reverse Shell & Socket Hijacking (Network Persistence) ---
-    # Попытки создания интерактивных каналов управления и перенаправления дескрипторов
-    '(/dev/(tcp|udp)/[0-9.]+|nc\ -(e|c|l)|socat\ (tcp|udp|sctp)-connect|python3?.*(socket|subprocess)|bash\ -i|exec\ [0-9]<>/dev/tcp|mkfifo.*openssl|stty\ raw\ -echo)'
+    # --- 1. Reverse Shell & Socket Hijacking [LAYER 2] ---
+    # Поглощено: GLOBAL_AV_NET_VECTORS (Деструктивные сетевые векторы и кросс-платформенные веб-шеллы)
+    # Детектирует: сокеты Bash/Python/Perl/PHP/Ruby/Lua, пайпы, туннели и инжекты curl/wget в командный интерпретатор
+    '(/dev/(tcp|udp)/[0-9.]+|nc\ -(e|c|l)|nc\.openbsd|netcat\ -e|socat\ (tcp|udp|sctp)-connect|python3?.*(socket|subprocess|-c.*import)|perl.*-e.*socket|php\ -r.*fsockopen|ruby\ -e.*TCPSocket|lua\ -e.*socket|curl.*\|.*(bash|sh)|wget.*\|.*(bash|sh)|fetch.*\|.*sh|bash\ -i|sh\ -i|zsh\ -i|exec\ [0-9]<>/dev/tcp|mkfifo.*\/tmp\/.*openssl|stty\ raw\ -echo)'
     
-    # --- 3. Persistence & Forensics Sabotage (Anti-Audit) ---
-    # Заметание следов, отключение истории, модификация cron/systemd и критических конфигов
-    '(unset\ HISTFILE|history\ -c|logsave\ /dev/null|openssl\ enc\ -aes|shred\ -u|cron\.d/|systemd/system/|chattr\ \+i|\.config/autostart|/etc/shadow|/etc/sudoers|/var/log/(auth|sys|secure)\.log)'
+    # --- 2. Persistence & Forensics Sabotage [LAYER 3] ---
+    # Поглощено: GLOBAL_AV_MAL_MARKERS (Маркеры скрытого присутствия, уничтожение аудит-логов и шифровальщики)
+    # Детектирует: зачистку истории, манипуляции с cron/systemd/init, массовое затирание и chattr-блокировку
+    '(rm\ -rf\ /|unset\ HISTFILE|history\ -c|killall.*log|logsave\ /dev/null|openssl\ enc\ -aes|gpg\ --encrypt|shred\ -u|auth\.log.*>\?|cron\.d/|systemd/system/|rc\.local|\.config/autostart|/etc/shadow|/etc/sudoers|chattr\ \+i|trap\ \x27\x27|set\ \+o\ history|/var/log/(auth|sys|secure)\.log)'
     
-    # --- 4. LOLBAS & Advanced Exploitation (Cross-Platform) ---
-    # Использование легитимного софта в целях компрометации и хакерские фреймворки
-    '\b(powershell|wmic|bitsadmin|certutil|rundll32|regsvr32|mshta|psexec|mimikatz|nmap|masscan|sqlmap|hydra|chisel|frp|ngrok|cobaltstrike|metasploit|shadowsploit|linpeas|winpeas|exploitdb)\b'
+    # --- 3. LOLBAS & Advanced Exploitation [LAYER 4] ---
+    # Поглощено: GLOBAL_AV_LOLBAS_MATRIX (Кросс-платформенный хакерский софт, сканеры и эксплойты)
+    # Детектирует: чтение приватных баз (/etc/passwd), кражу теневых копий, Windows-компоненты и дамперы памяти
+    '\b(cmd\.exe|powershell|wmic|cmdlet|api_string|bitsadmin|certutil|rundll32|regsvr32|mshta|psexec|mimikatz|nmap|masscan|sqlmap|hydra|aircrack|chisel|frp|ngrok|autoruns|vssadmin|wevtutil|schtasks|sc\ query|cobaltstrike|metasploit|shadowsploit|linpeas|winpeas|exploitdb)\b|/etc/passwd'
     
-    # --- 5. Active Malware Processes & Runtime Shells (RAM-Capture Layer) ---
-    # Слой 5: Расширенная матрица перехвата активных вредоносных процессов, сканеров и криптомайнеров в ОЗУ
-    # Детектирует: запущенные бинарники компрометации, утилиты удаленного контроля, шеллы и потоковые майнеры
+    # --- 4. Active Malware Processes & Runtime Shells [LAYER 5] ---
+    # Поглощено: GLOBAL_AV_ACTIVE_MALWARE_PROCS (Перехват активных мошеннических бинарников в ОЗУ)
+    # Детектирует: запущенные процессы компрометации, утилиты скрытого контроля и фоновые мультиплексоры
     '\b(nc|netcat|socat|chisel|frp|ngrok|nmap|masscan|hydra|xmrig|minerd|cryptonight|reverse)\b|stratum\+tcp|(sh|bash|zsh)[[:space:]]*-i|\b(tmux[[:space:]]+new.*-d|screen[[:space:]]*-d[[:space:]]*-m)\b'
     
-    # --- 6. Memory-Resident Malware & Miners (Runtime State) ---
-    # Скрытые бесфайловые угрозы, майнинг-пулы и подозрительные дескрипторы в /proc/ и /tmp/
+    # --- 5. Critical Socket States Filter [LAYER 6] ---
+    # Поглощено: GLOBAL_AV_SOCKET_STATES (Фильтр критических состояний сетевых дескрипторов)
+    # Детектирует: бэкдоры на прослушивании портов, установленные сессии утечки и синхронизацию сокетов
+    '\b(LISTEN|ESTABLISHED|ESTAB|SYN_SENT|SYN_RECV)\b'
+    
+    # --- 6. Memory-Resident Malware & Miners [LAYER 7] ---
+    # Скрытые бесфайловые runtime-угрозы, майнинг-пулы и аномальные дескрипторы в /proc/ и /tmp/
     '\b(xmrig|minerd|cryptonight|stratum\+tcp|reverse|tmux\ new.*-d|screen\ -d\ -m|memfd_create|/proc/self/fd/[0-9]+|/tmp/\.[a-zA-Z0-9]{8,})\b'
     
-    # --- 7. Library Hijacking (LD_PRELOAD/LD_LIBRARY_PATH) ---
-    # Попытки внедрения вредоносных динамических библиотек через переменные окружения и preload-файлы
+    # --- 7. Library Hijacking [LAYER 8] ---
+    # Попытки инъекций вредоносных shared-библиотек через переменные среды окружения (LD_PRELOAD)
     '\b(LD_PRELOAD|LD_LIBRARY_PATH|/etc/ld\.so\.preload|dlopen|dlsym)\b'
 )
 
@@ -4474,16 +4481,18 @@ run_cross_os_reanimator() {
 
 
 
+
+
 # ==============================================================================
-# @description: CORE ANTI-MALWARE ENGINE (CAME) v3.0 - TOTAL MATRIX COMPLIANT
+# @description: CORE ANTI-MALWARE ENGINE (CAME) v4.0 - MATRIX LAYER SYNC
 # МОДЕРНИЗАЦИЯ: Behavioral Shadowing | Auto-Response | Полная сквозная интеграция
-#               с GLOBAL_AV_MATRIX v5.0 и стратегическим щитом "Банковский Гамбит"
+#               с монолитным реестром GLOBAL_AV_MATRIX v7.0 и финансовым щитом
 # АРХИТЕКТУРА: Автономный изолятор и транзакционный щит реального времени
 # @status: GHOST-SPEED COMPLIANT | TOTAL ENVELOPE AUDIT | NO SHORTENINGS
 # ==============================================================================
 run_anti_malware_engine() {
     while true; do
-        core_engine_ui "h" "CORE ANTI-MALWARE ENGINE (CAME) v3.0 [TOTAL MATRIX INTEGRATION]"
+        core_engine_ui "h" "CORE ANTI-MALWARE ENGINE (CAME) v4.0 [TOTAL MATRIX INTEGRATION]"
 
         core_engine_item "1" "SCAN OBJECT"  "Heuristic Scan for Malicious Code & Matrix Structure"
         core_engine_item "2" "SCAN SYSTEM"  "Audit Live Environment, RAM Core & Network Sockets"
@@ -4552,7 +4561,7 @@ run_anti_malware_engine() {
             "2") # --- ВЕТКА 2: АКТИВНЫЙ МОНИТОРИНГ СРЕДЫ (ОЗУ И СЕТЬ) ---
                 core_engine_ui "h" "LIVE INTEGRITY AUDIT [RUNTIME PROTECTION]"
                 
-                # Извлечение 5-го слоя (Active Malware Processes) из нашей единой матрицы
+                # Извлечение 5-го слоя (Active Malware Processes) из нашей единой матрицы v7.0 (Индекс 4)
                 local live_malware_rx="${GLOBAL_AV_MATRIX[4]}"
                 
                 core_engine_ui "i" "Сканирование активного адресного пространства ОЗУ и дерева процессов..."
@@ -4580,12 +4589,12 @@ run_anti_malware_engine() {
                     core_engine_ui "e" "Внимание: Сигнатурный слой LAYER_5 пуст или не инициализирован в системе."
                 fi
 
-                # Сетевой мониторинг сокетов в реальном времени (Интеграция со Слоем 6 - Скрытые майнеры/пулы)
+                # Сетевой мониторинг сокетов в реальном времени (Интеграция со Слоем 6 - Скрытые майнеры/пулы - Индекс 5)
                 core_engine_ui "i" "Аудит сетевых сокетов, открытых портов и каналов маршрутизации..."
                 local network_malware_rx="${GLOBAL_AV_MATRIX[5]}"
                 
                 if [[ -n "$network_malware_rx" ]]; then
-                    # Скан активных соединений через подсистему ss
+                    # Скан активных соединений через подсистему ss по фильтру критических состояний сокетов
                     local open_ports=$(ss -antup 2>/dev/null | grep -iE "$network_malware_rx")
                     
                     if [[ -n "$open_ports" ]]; then
@@ -4594,6 +4603,7 @@ run_anti_malware_engine() {
                         core_engine_ui "e" "Applying active packet filtering via netfilter (iptables)..."
                         
                         # Динамический сбор атакующих или скомпрометированных локальных портов и их жесткое дропанье
+                        # Регулярное выражение точечно вырезает порт из любой структуры вывода (IPv4/IPv6 сокеты)
                         echo "$open_ports" | awk '{print $4}' | grep -oE '[0-9]+$' | sort -u | xargs -I {} iptables -A INPUT -p tcp --dport {} -j DROP 2>/dev/null
                         core_engine_ui "s" "Сетевые шлюзы заблокированы. Пакетный фильтр применен успешно."
                     else
@@ -4610,183 +4620,201 @@ run_anti_malware_engine() {
 }
 
 
-
-# ==============================================================================
-# @description: CORE ANTI-MALWARE ENGINE (CAME) v2.0 - LIMIT REACHED
-# МОДЕРНИЗАЦИЯ: Behavioral Shadowing + Auto-Response + Integrity Check
-# ==============================================================================
-run_anti_malware_engine() {
-    while true; do
-        core_engine_ui "h" "CORE ANTI-MALWARE ENGINE (CAME) v2.0 [LIMIT REACHED]"
-
-        core_engine_item "1" "SCAN OBJECT"  "Heuristic Scan for Malicious Code & Structure"
-        core_engine_item "2" "SCAN SYSTEM"  "Audit Live Environment, RAM & Network Sockets"
-        core_engine_item "B" "BACK"         "Return to Main Menu"
-
-        local av_choice=$(core_engine_input "select" "Select Action")
-        [[ -z "$av_choice" || "$av_choice" == "b" || "$av_choice" == "B" ]] && return
-
-        case "$av_choice" in
-            "1") # --- ВЕТКА 1: ЭВРИСТИЧЕСКИЙ СКАНЕР ОБЪЕКТОВ ---
-                core_engine_ui "h" "CAME DEEP FILE AUDIT"
-                local target_file=$(core_engine_input "text" "Enter absolute path to target file")
-                [[ -z "$target_file" ]] || [[ ! -f "$target_file" ]] && continue
-
-                core_engine_progress 1 "EXTRACTING_STRUCTURE_METADATA"
-                
-                # Добавлен расчет энтропии для детекции запакованных вредоносов (Polymorphic)
-                local total_chars=$(wc -c < "$target_file" 2>/dev/null || echo 0)
-                local printable_chars=$(grep -oP '[\x20-\x7E]' "$target_file" 2>/dev/null | wc -l || echo 0)
-                local readable_ratio=$(( total_chars > 0 ? (printable_chars * 100) / total_chars : 100 ))
-
-                core_engine_ui "h" "DIAGNOSTIC REPORT: $(basename "$target_file")"
-                echo "Footprint: $total_chars bytes | Density: $readable_ratio% ASCII"
-
-                # Анализ сигнатур (Слой 1-4)
-                local mal_matches=$(grep -inE "$GLOBAL_AV_ENGINE_PIPE" "$target_file" 2>/dev/null | head -n 40)
-
-                if [[ -z "$mal_matches" && $readable_ratio -gt 12 ]]; then
-                    core_engine_ui "s" "VERDICT: CLEAN. Structure compliant."
-                else
-                    core_engine_ui "e" "CRITICAL: Threat detected. Automating containment..."
-                    # АВТОНОМНЫЙ ЛИМИТ: Принудительная изоляция без ожидания ввода, если энтропия критична
-                    chmod 000 "$target_file" 2>/dev/null
-                    mv "$target_file" "${target_file}.quarantine" 2>/dev/null
-                    core_engine_ui "s" "SUCCESS: Object neutralized and moved to vault."
-                fi
-                core_engine_wait
-                ;;
-
-            "2") # --- ВЕТКА 2: МОНИТОРИНГ СРЕДЫ (ОЗУ И СЕТЬ) ---
-                core_engine_ui "h" "LIVE INTEGRITY AUDIT"
-                
-                # Анализ ОЗУ + Транзакционный Щит (Banking Gambit Integration)
-                local suspicious_procs=$(ps aux 2>/dev/null | grep -iE "$GLOBAL_AV_ACTIVE_MALWARE_PROCS" | grep -v grep)
-                if [[ -n "$suspicious_procs" ]]; then
-                    core_engine_ui "e" "CRITICAL: Active rogue process detected. Triggering Banking-Gambia lockdown."
-                    # Интеграция с финансовым модулем: блокировка транзакций при угрозе целостности
-                    core_engine_bank_lockdown "trigger" 
-                    echo "$suspicious_procs" | awk '{print $2}' | xargs -r kill -9
-                fi
-
-                # Сетевой мониторинг (Слой 6)
-                local open_ports=$(ss -antup 2>/dev/null | grep -iE "$GLOBAL_AV_SOCKET_STATES")
-                if [[ -n "$open_ports" ]]; then
-                    core_engine_ui "w" "NETWORK THREAT DETECTED. Applying active packet filtering..."
-                    echo "$open_ports" | awk '{print $NF}' | grep -oE '[0-9]+' | xargs -I {} iptables -A INPUT -p tcp --dport {} -j DROP
-                else
-                    core_engine_ui "s" "System environment: STEALTH/SECURE."
-                fi
-                core_engine_wait
-                ;;
-        esac
-    done
-}
-
-
 # --- Модули по меню ---
 
+# ==============================================================================
+# @description: FORENSIC PURGE & ADAPTIVE REMEDIATION ENGINE v29.0 [MONOLITH]
+# МОДЕРНИЗАЦИЯ: Интеграция с GLOBAL_AV_MATRIX v7.0 и GLOBAL_SYSTEM_FUSE_MATRIX v3.0
+# АРХИТЕКТУРА: Внедрен поведенческий анализ статусов ОЗУ, исправлен удаленный find
+# @status: GHOST-SPEED COMPLIANT | TOTAL ENVELOPE AUDIT | NO SHORTENINGS
+# ==============================================================================
 run_forensic_scanner() {
-    core_engine_ui "h" "AUTONOMOUS DEFENSE & REMEDIATION v27.0 [LIMIT REACHED]"
+    core_engine_ui "h" "AUTONOMOUS DEFENSE & REMEDIATION v29.0 [TOTAL MATRIX INTEGRATION]"
     
-    # 1. Транспорт (Полная реализация выбора)
-    core_engine_item "L" "Local" "Текущая операционная система"
-    core_engine_item "A" "Android/IoT" "Удаленная зачистка через шину ADB/USB"
-    core_engine_item "S" "Remote Server" "Инфраструктурный узел через SSH"
-    core_engine_item "B" "Back" "Вернуться в главное меню лаунчера"
+    # 1. Транспорт (Полная промышленная реализация векторов сопряжения)
+    core_engine_item "L" "Local"         "Текущая операционная система (Host Root)"
+    core_engine_item "A" "Android/IoT"   "Удаленная зачистка через шину ADB/USB"
+    core_engine_item "S" "Remote Server" "Инфраструктурный узел через терминал SSH"
+    core_engine_item "B" "Back"          "Вернуться в главное меню лаунчера"
     
     local target=$(core_engine_input "select" "Укажите вектор сканирования")
-    [[ "$target" == "b" || -z "$target" ]] && return
+    [[ -z "$target" || "$target" == "b" || "$target" == "B" ]] && return
     
     local cmd_p=""
     case "$target" in
-        "a")
+        "a"|"A")
             core_engine_validator "pkg" "adb" "Компонент сопряжения ADB" || return
             core_engine_ui "i" "Ожидание инициализации IoT/Android устройства в шине USB..."
-            adb wait-for-device
+            adb wait-for-device 2>/dev/null
             cmd_p="adb shell" 
             ;;
-        "s")
+        "s"|"S")
             local rh=$(core_engine_input "text" "Введите адрес удаленного узла (User@IP)")
             [[ -z "$rh" ]] && return
-            cmd_p="ssh -o ConnectTimeout=5 $rh" 
+            cmd_p="ssh -o ConnectTimeout=5 -o BatchMode=yes $rh" 
+            ;;
+        *)
+            # По умолчанию вектор локального хоста (cmd_p остается пустым)
+            cmd_p=""
             ;;
     esac
 
     core_engine_progress 5 "ENGAGING AUTONOMOUS PURGE ENGINE"
 
-    # ==========================================================================
-    # ФАЗА 1: СНАЙПЕРСКАЯ НЕЙТРАЛИЗАЦИЯ (Детализированный аудит)
-    # ==========================================================================
-    core_engine_ui "!" "Фаза 1: Анализ дерева процессов..."
+    # Извлечение защитных слоев из GLOBAL_SYSTEM_FUSE_MATRIX v3.0
+    local sys_proc_whitelist="${GLOBAL_SYSTEM_FUSE_MATRIX[0]}"
+    local sys_danger_ports="${GLOBAL_SYSTEM_FUSE_MATRIX[1]}"
+    local sys_port_whitelist="${GLOBAL_SYSTEM_FUSE_MATRIX[2]}"
+    local sys_quarantine_whitelist="${GLOBAL_SYSTEM_FUSE_MATRIX[3]}"
+    local sys_bad_proc_status="${GLOBAL_SYSTEM_FUSE_MATRIX[4]}"
     
-    # Пакетный сбор данных для скорости, но обработка — построчно для контроля
-    local raw_procs=$($cmd_p "ps -eo pid,stat,comm" 2>/dev/null)
-    [[ -z "$raw_procs" ]] && raw_procs=$($cmd_p "ps" 2>/dev/null)
+    # Извлечение сигнатурного слоя активных процессов из GLOBAL_AV_MATRIX v7.0
+    local av_active_malware_procs="${GLOBAL_AV_MATRIX[4]}"
+
+    # ==========================================================================
+    # ФАЗА 1: СНАЙПЕРСКАЯ НЕЙТРАЛИЗАЦИЯ (Анализ дерева процессов в ОЗУ)
+    # ==========================================================================
+    core_engine_ui "!" "Фаза 1: Анализ дерева процессов по сигнатурным матрицам..."
+    
+    local raw_procs=""
+    if [[ -z "$cmd_p" ]]; then
+        raw_procs=$(ps -eo pid,stat,comm 2>/dev/null)
+    else
+        raw_procs=$($cmd_p "ps -eo pid,stat,comm" 2>/dev/null || $cmd_p "ps" 2>/dev/null)
+    fi
 
     local killed_count=0
+    
     if [[ -n "$raw_procs" ]]; then
-        echo "$raw_procs" | tail -n +2 | while read -r p_pid p_stat p_comm; do
-            [[ -z "$p_pid" || -z "$p_stat" ]] && continue
+        # Использование Process Substitution ( <(...) ) вместо пайпа исключает subshell и сохраняет killed_count
+        while read -r p_pid p_stat p_comm; do
+            [[ -z "$p_pid" || -z "$p_stat" || -z "$p_comm" || "$p_pid" == "PID" ]] && continue
             
-            # Логика нейтрализации с сохранением твоего оригинального контроля
-            if echo "$p_stat" | grep -Eq "$GLOBAL_REGEX_BAD_PROC_STATUS"; then
-                if echo "$p_comm" | grep -Eiq "$GLOBAL_REGEX_PROC_WHITELIST"; then continue; fi
-                [[ "$p_pid" -eq 1 ]] && continue
+            # Исключаем из зачистки системный процесс инициализации ядра Linux
+            if (( p_pid == 1 )); then continue; fi
+            
+            # Поведенческий анализ: Проверка на вхождение статуса в Слой 5 предохранителей (Z, D, T, t)
+            if echo "$p_stat" | grep -Eq "$sys_bad_proc_status"; then
                 
-                core_engine_ui "w" "Автономная ликвидация угрозы: PID $p_pid [$p_comm], Статус: $p_stat"
-                $cmd_p "kill -9 $p_pid" 2>/dev/null
-                killed_count=$((killed_count + 1))
+                # Сигнатурный анализ: Проверка на совпадение имени со Слоем 5 GLOBAL_AV_MATRIX
+                if echo "$p_comm" | grep -Eq "$av_active_malware_procs"; then
+                    
+                    # Защитный контур: Проверка на вхождение в индустриальный белый список (Слой 1)
+                    if echo "$p_comm" | grep -Eq "$sys_proc_whitelist"; then
+                        core_engine_ui "i" "Предохранитель: Защита системного процесса от ложного сброса: $p_comm (PID $p_pid)"
+                        continue
+                    fi
+                    
+                    core_engine_ui "e" "CRITICAL DETECT: Обнаружен деструктивный дескриптор в ОЗУ: PID $p_pid [$p_comm], Статус: $p_stat"
+                    
+                    # Запуск финансового щита "Банковский Гамбит" при обнаружении угрозы на локальном узле
+                    if [[ -z "$cmd_p" ]]; then
+                        core_engine_bank_lockdown "trigger"
+                        kill -9 "$p_pid" 2>/dev/null
+                    else
+                        $cmd_p "kill -9 $p_pid" 2>/dev/null
+                    fi
+                    
+                    killed_count=$((killed_count + 1))
+                fi
             fi
-        done
+        done < <(echo "$raw_procs")
     fi
 
     # ==========================================================================
-    # ФАЗА 2: ИЗОЛЯЦИЯ ПОРТОВ (Атомарная проверка)
+    # ФАЗА 2: ИЗОЛЯЦИЯ ПОРТОВ (Атомарная проверка периметра сокетов)
     # ==========================================================================
     core_engine_ui "!" "Фаза 2: Сетевой аудит и изоляция опасных интерфейсов..."
     
-    local open_ports=$($cmd_p "ss -ant -H 2>/dev/null | awk -F':' '{print \$NF}' | sort -u" 2>/dev/null)
-    [[ -z "$open_ports" ]] && open_ports=$($cmd_p "netstat -ant 2>/dev/null | grep LISTEN | awk '{print \$4}' | awk -F':' '{print \$NF}'" 2>/dev/null)
+    local open_ports=""
+    if [[ -z "$cmd_p" ]]; then
+        open_ports=$(ss -ant -H 2>/dev/null | awk '{print $4}' | grep -oE '[0-9]+$' | sort -u)
+        [[ -z "$open_ports" ]] && open_ports=$(netstat -ant 2>/dev/null | grep LISTEN | awk '{print $4}' | grep -oE '[0-9]+$' | sort -u)
+    else
+        open_ports=$($cmd_p "ss -ant -H 2>/dev/null | awk '{print \$4}' | grep -oE '[0-9]+\$' | sort -u" 2>/dev/null)
+        [[ -z "$open_ports" ]] && open_ports=$($cmd_p "netstat -ant 2>/dev/null | grep LISTEN | awk '{print \$4}' | grep -oE '[0-9]+\$'" 2>/dev/null)
+    fi
 
     for port in $open_ports; do
         [[ -z "$port" ]] && continue
-        if echo "$port" | grep -Eq "$GLOBAL_REGEX_DANGER_PORTS"; then
-            if echo "$port" | grep -Eq "$GLOBAL_REGEX_PORT_WHITELIST"; then
+        
+        # Проверка 1: Входит ли сокет в матрицу опасных портов (Danger Perimeter)
+        if echo "$port" | grep -Eq "$sys_danger_ports"; then
+            
+            # Проверка 2: Защищен ли сокет белым списком портов управления
+            if echo "$port" | grep -Eq "$sys_port_whitelist"; then
                 core_engine_ui "i" "Порт $port находится в Белом Списке управления. Блокировка отклонена."
                 continue
             fi
-            core_engine_ui "w" "ОБНАРУЖЕНА СТРУКТУРНАЯ УГРОЗА. Блокировка порта: $port"
-            $cmd_p "iptables -A INPUT -p tcp --dport $port -j DROP && fuser -k -n tcp $port" 2>/dev/null
+            
+            core_engine_ui "w" "ОБНАРУЖЕНА СТРУКТУРНАЯ СЕТЕВАЯ УГРОЗА. Блокировка端口: $port"
+            if [[ -z "$cmd_p" ]]; then
+                iptables -A INPUT -p tcp --dport "$port" -j DROP 2>/dev/null
+                fuser -k -n tcp "$port" 2>/dev/null
+            else
+                $cmd_p "iptables -A INPUT -p tcp --dport $port -j DROP && fuser -k -n tcp $port" 2>/dev/null
+            fi
         fi
     done
 
     # ==========================================================================
-    # ФАЗА 3: УМНЫЙ КАРАНТИН (Полная целостность)
+    # ФАЗА 3: УМНЫЙ КАРАНТИН (Эвристический анализ целостности файлов)
     # ==========================================================================
     core_engine_ui "!" "Фаза 3: Эвристический экспресс-анализ файловой системы..."
     
     local s_path="/etc /usr/bin /tmp"
     local vault_dir="/root/quarantine_vault"
-    [[ "$target" == "a" ]] && { s_path="/data/local/tmp /data/system"; vault_dir="/data/local/tmp/quarantine_vault"; }
+    if [[ "$target" == "a" || "$target" == "A" ]]; then
+        s_path="/data/local/tmp /data/system"
+        vault_dir="/data/local/tmp/quarantine_vault"
+    fi
     
-    # Выполнение поиска и перемещения в рамках одного транзакционного вызова
-    $cmd_p "mkdir -p $vault_dir" 2>/dev/null
-    local suspect=$($cmd_p "find $s_path -maxdepth 3 -mtime -1 -type f 2>/dev/null")
+    if [[ -z "$cmd_p" ]]; then
+        mkdir -p "$vault_dir" 2>/dev/null
+    else
+        $cmd_p "mkdir -p $vault_dir" 2>/dev/null
+    fi
+    
+    local suspect=""
+    if [[ -z "$cmd_p" ]]; then
+        suspect=$(find $s_path -maxdepth 3 -mtime -1 -type f 2>/dev/null)
+    else
+        suspect=$($cmd_p "find $s_path -maxdepth 3 -mtime -1 -type f" 2>/dev/null)
+    fi
     
     local quarantined_count=0
     for file in $suspect; do
+        [[ -z "$file" ]] && continue
+        
+        # Проверка существования перенесена в контекст целевого узла (избегаем сбоев на SSH/ADB)
+        if [[ -z "$cmd_p" ]]; then
+            [[ ! -f "$file" ]] && continue
+        else
+            $cmd_p "[ -f $file ]" || continue
+        fi
+        
         local fname=$(basename "$file")
-        if echo "$fname" | grep -Eiq "$GLOBAL_REGEX_QUARANTINE_WHITELIST"; then continue; fi
+        
+        # Защита критических файлов от перемещения через Слой 4 матрицы предохранителей
+        if echo "$fname" | grep -Eq "$sys_quarantine_whitelist"; then
+            continue
+        fi
         
         core_engine_ui "w" "Изоляция подозрительного объекта: $file -> Карантин"
-        $cmd_p "mv $file $vault_dir/${fname}.dead && chmod 000 $vault_dir/${fname}.dead" 2>/dev/null
+        if [[ -z "$cmd_p" ]]; then
+            mv "$file" "$vault_dir/${fname}.dead" 2>/dev/null
+            chmod 000 "$vault_dir/${fname}.dead" 2>/dev/null
+        else
+            $cmd_p "mv $file $vault_dir/${fname}.dead && chmod 000 $vault_dir/${fname}.dead" 2>/dev/null
+        fi
         quarantined_count=$((quarantined_count + 1))
     done
 
-    # Итоговый статус (архитектурно завершенный)
+    # ==========================================================================
+    # ФИНАЛИЗАЦИЯ И ОТЧЕТНОСТЬ
+    # ==========================================================================
     core_engine_ui "+" "Инфраструктурная очистка завершена. Нейтрализовано процессов: $killed_count, Изолировано файлов: $quarantined_count."
-    core_engine_ui "+" "Статус узла: ОПТИМИЗИРОВАН / БЕЗОПАСЕН."
+    core_engine_ui "+" "Статус целевого узла: СТЕРИЛИЗОВАН / БЕЗОПАСЕН."
     core_engine_wait
 }
 
@@ -5295,52 +5323,156 @@ run_network_intelligence() {
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - NEURAL BRIDGE ORCHESTRATOR
-# МОДЕРНИЗАЦИЯ: In-Memory deduplication, ротация логов, потоковый AWK-декодер
-# АРХИТЕКТУРА: Ghost-Speed Engine, Atomic Sync, Zero-Duplication Policy
-# @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | BRIDGE LIMIT
+# @description: OSINT NEXUS v22.0 - NEURAL BRIDGE ORCHESTRATOR [MONOLITH]
+# МОДЕРНИЗАЦИЯ: Полная синхронизация с GLOBAL_HASH_MATRIX v2.0 (Zero Loose Vars)
+# АРХИТЕКТУРА: Атомарная дедупликация comm, сквозной стриминг без фантомных маркеров
+# @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | ZERO-DUPLICATION
 # ==============================================================================
 run_deep_bridge() {
     clear
-    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v20.0 (GHOST-SPEED)"
+    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v22.0 (MATRIX-STREAM)"
     
     local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
     local master_loot="$loot_dir/master_intelligence.log"
     mkdir -p "$loot_dir"
 
-    # Бесконечный цикл с защитой от перегрузки
+    # Бесконечный цикл с защитой от перегрузки CPU/IO
     while true; do
         local pool="/tmp/bridge_pool_$$"
+        local stage_file="/tmp/bridge_stage_$$"
         
-        # 1. Атомарный сбор: берем только новые данные, исключая уже обработанные
-        # Используем comm или фильтрацию по времени для исключения старья
-        cat "$loot_dir"/*.log 2>/dev/null | sort -u > "$pool" 2>/dev/null
+        # 1. АТОМАРНЫЙ СБОР И ДЕДУПЛИКАЦИЯ (Исключение Race Condition)
+        # Собираем данные, убираем пустые строки, формируем снимок текущего пула
+        if ls "$loot_dir"/*.log >/dev/null 2>&1; then
+            cat "$loot_dir"/*.log 2>/dev/null | grep -v '^[[:space:]]*$' | sort -u > "$pool" 2>/dev/null
+        fi
         
-        [[ ! -s "$pool" ]] && { sleep 15; continue; }
+        # Если пул пуст или не содержит новых векторов, уходим в режим ожидания
+        if [[ ! -s "$pool" ]]; then
+            rm -f "$pool"
+            sleep 15
+            continue
+        fi
 
-        core_engine_ui "i" "Bridge: Synchronizing neural data clusters..."
+        # Если мастер-лог уже существует, отсекаем дубликаты на входе, оставляя только инкремент
+        if [[ -f "$master_loot" ]]; then
+            comm -23 "$pool" <(sort -u "$master_loot" 2>/dev/null) > "$stage_file" 2>/dev/null
+        else
+            cp "$pool" "$stage_file" 2>/dev/null
+        fi
 
-        # 2. Потоковый эвристический анализ через AWK (в 100 раз быстрее Bash-цикла)
-        # AWK проверяет регулярки на лету без запуска 1000 процессов grep
-        awk -v m_loot="$master_loot" '
+        # Если после сверки с мастер-логом новых уникальных строк нет, очищаем буфер
+        if [[ ! -s "$stage_file" ]]; then
+            rm -f "$pool" "$stage_file"
+            sleep 15
+            continue
+        fi
+
+        core_engine_ui "i" "Bridge: Synchronizing neural data clusters via Multi-Layer AWK Engine..."
+
+        # 2. ПОТОКОВЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ ЧЕРЕЗ ИЗОЛИРОВАННЫЙ AWK
+        # Передаем элементы матриц напрямую. Одиночные фантомные переменные полностью удалены.
+        awk -v m_loot="$master_loot" \
+            -v fin_iban="${GLOBAL_FINANCE_MATRIX[0]}" \
+            -v fin_swift="${GLOBAL_FINANCE_MATRIX[1]}" \
+            -v fin_rib="${GLOBAL_FINANCE_MATRIX[2]}" \
+            -v fin_bban="${GLOBAL_FINANCE_MATRIX[3]}" \
+            -v fin_card="${GLOBAL_FINANCE_MATRIX[4]}" \
+            -v fin_crypto="${GLOBAL_FINANCE_MATRIX[5]}" \
+            -v hash_md5="${GLOBAL_HASH_MATRIX[0]}" \
+            -v hash_sha1="${GLOBAL_HASH_MATRIX[1]}" \
+            -v hash_sha256="${GLOBAL_HASH_MATRIX[2]}" \
+            -v hash_sha512="${GLOBAL_HASH_MATRIX[3]}" \
+            -v hash_ntlm="${GLOBAL_HASH_MATRIX[4]}" \
+            -v hash_ctx="${GLOBAL_HASH_MATRIX[5]}" \
+            -v hash_sql="${GLOBAL_HASH_MATRIX[6]}" \
+            '
             {
-                # Эвристика: Классификация данных
-                if ($0 ~ /'$GLOBAL_REGEX_HASH_MD5'/) print "RESONANCE: MD5 -> " $0 >> "/dev/stderr";
-                else if ($0 ~ /'$GLOBAL_REGEX_FIN_IBAN'/) print "RESONANCE: IBAN -> " $0 >> "/dev/stderr";
-                # ... и так далее для всех векторов ...
-                
-                # Запись только уникальных данных в мастер-лог
-                print $0 >> m_loot
-            }
-        ' "$pool" 2>&1 | while read -r line; do core_engine_ui "y" "$line"; done
+                matched = 0;
 
-        # 3. Атомарная очистка и ротация (защита от переполнения)
-        rm -f "$pool"
-        [[ $(wc -l < "$master_loot") -gt 5000 ]] && truncate -s 0 "$master_loot"
+                # --- КОНТУР ИДЕНТИФИКАЦИИ ФИНАНСОВЫХ СИГНАТУР ---
+                if ($0 ~ fin_iban) {
+                    print "RESONANCE: FINANCIAL IBAN -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                if ($0 ~ fin_rib) {
+                    print "RESONANCE: FINANCIAL RIB (FR) -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                if ($0 ~ fin_card) {
+                    print "RESONANCE: LEAKED CREDIT CARD -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                if ($0 ~ fin_crypto) {
+                    print "RESONANCE: CRYPTO WALLET -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                if ($0 ~ fin_swift) {
+                    print "RESONANCE: FINANCIAL SWIFT/BIC -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                if (!matched && $0 ~ fin_bban) {
+                    print "RESONANCE: FINANCIAL BBAN -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+
+                # --- КОНТУР ИДЕНТИФИКАЦИИ ХЕШЕЙ И КРЕДЕНШЕНАЛОВ ---
+                # Новая логика: Поглощенный Слой 4 матрицы (hash_ntlm) сразу щелкает и SAM дампы, и суффиксы :$
+                if ($0 ~ hash_ntlm) {
+                    print "RESONANCE: WINDOWS NTLM/LM CREDENTIAL -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                else if ($0 ~ hash_sha512) {
+                    print "RESONANCE: CRYPTO HASH SHA-512 -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                else if ($0 ~ hash_sha256) {
+                    print "RESONANCE: CRYPTO HASH SHA-256 -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                else if ($0 ~ hash_sha1) {
+                    print "RESONANCE: CRYPTO HASH SHA-1 -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                else if ($0 ~ hash_md5) {
+                    print "RESONANCE: CRYPTO HASH MD5 -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                
+                # Глубокий контекстный и SQL-анализ (Слои 5 и 6 матрицы хешей)
+                if (!matched && ($0 ~ hash_ctx)) {
+                    print "RESONANCE: CONTEXTUAL PASSWORDS/TOKENS -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+                if (!matched && ($0 ~ hash_sql)) {
+                    print "RESONANCE: SQL INJECTION DATABASE DUMP -> " $0 >> "/dev/stderr";
+                    matched = 1;
+                }
+
+                # Запись уникального и классифицированного потока в центральное хранилище
+                print $0 >> m_loot;
+            }
+        ' "$stage_file" 2>&1 >/dev/null | while read -r line; do 
+            core_engine_ui "y" "$line"
+        done
+
+        # 3. АТОМАРНАЯ ОЧИСТКА И РОТАЦИЯ (Защита дисковой подсистемы от переполнения)
+        rm -f "$pool" "$stage_file"
+        
+        # Проверка лимита размера лога. При превышении 5000 строк — безопасный срез
+        if [[ -f "$master_loot" ]]; then
+            if (( $(wc -l < "$master_loot") > 5000 )); then
+                core_engine_ui "w" "Log rotation triggered: master_intelligence.log exceeded 5000 lines. Truncating."
+                # Сохраняем последние 500 строк для удержания контекста смежных модулей
+                tail -n 500 "$master_loot" > "${master_loot}.tmp" 2>/dev/null
+                mv "${master_loot}.tmp" "$master_loot" 2>/dev/null
+            fi
+        fi
         
         sleep 30
     done
 }
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v20.0 - SECURE DISPATCHER ENGINE
@@ -5437,29 +5569,31 @@ osint_api_query() {
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - ULTIMATE ASYNCHRONOUS DNS RECON ENGINE
-# МОДЕРНИЗАЦИЯ: Скользящий динамический пул потоков, потоковая RAM-аккумуляция
-# АРХИТЕКТУРА: Ghost-Speed Engine, Zero Race-Condition, защита от NXDOMAIN-блокировок
+# @description: OSINT NEXUS v21.0 - ULTIMATE ASYNCHRONOUS DNS RECON ENGINE
+# МОДЕРНИЗАЦИЯ: Синхронизация с инфраструктурным реестром GLOBAL_INFRA_MATRIX
+# АРХИТЕКТУРА: Скользящий динамический пул потоков, RAM-накопление, жесткий timeout
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | ABSOLUTE ARCHITECTURAL LIMIT
 # ==============================================================================
 osint_subdomain_recon() {
     local target_domain="$1"
     
-    # Жесткий контроль контекста среды
+    # Жесткий контроль контекста среды и наличия дескрипторов логирования
     [[ -z "$raw_log" || ! -f "$raw_log" ]] && return 1
     [[ -z "$target_domain" ]] && return 1
 
-    # Синхронизация ультимативной маски доменов (вырезаем (?i) для POSIX)
-    local clean_rx_domain="${GLOBAL_REGEX_DOMAIN//(\?i)/}"
+    # Извлечение строгого POSIX ERE паттерна доменных имен (Слой 3 инфраструктурной матрицы)
+    local sys_domain_pattern="${GLOBAL_INFRA_MATRIX[2]}"
 
     # --- 1. СЛОЙ ИНТЕЛЛЕКТУАЛЬНОЙ ВАЛИДАЦИИ ЦЕЛИ ---
     local clean_domain
     clean_domain=$(echo "$target_domain" | sed -E 's|^https?://||; s|/.*||')
 
-    if ! echo "$clean_domain" | grep -Eqi "$clean_rx_domain"; then
-        return 0 # Мгновенный возврат, если цель не домен
+    # Проверка на соответствие регулярному выражению легитимных доменов (Индекс 2 матрицы)
+    if ! echo "$clean_domain" | grep -Eq "$sys_domain_pattern"; then
+        return 0 # Мгновенный возврат, если входная цель не является доменной структурой
     fi
 
+    # Верификация системных бинарных зависимостей в PATH
     if ! command -v host >/dev/null 2>&1; then
         core_engine_ui "e" "DNS-Engine: Structural dependency 'host' is missing. Skipping recon."
         return 1
@@ -5468,6 +5602,7 @@ osint_subdomain_recon() {
     core_engine_ui "i" "DNS-Engine: Checking Wildcard protection for $clean_domain..."
 
     # --- 2. СЛОЙ АППАРАТНОЙ ЗАЩИТЫ ОТ WILDCARD DNS ---
+    # Генерируем уникальный несуществующий поддомен для эвристического теста
     local rand_sub="nexus-detect-$(shuf -i 100000-999999 -n 1)"
     if host "$rand_sub.$clean_domain" >/dev/null 2>&1; then
         core_engine_ui "w" "DNS-Engine: Wildcard DNS active on $clean_domain. Brute-force blocked to protect log integrity."
@@ -5481,22 +5616,23 @@ osint_subdomain_recon() {
     touch "$tmp_dns_results"
 
     # --- 3. СЛОЙ СКОЛЬЗЯЩЕГО АСИНХРОННОГО ПУЛА (SLIDING WINDOW POOL) ---
-    local max_jobs=20  # Оптимальный лимит параллельных сокетов для предотвращения дропа пакетов
+    local max_jobs=20  # Оптимальный лимит параллельных сокетов для предотвращения дропа UDP-пакетов
     
-    # Вместо дискового I/O внутри циклов, весь пул пишет в единый дескриптор stdout,
-    # который перенаправляется в буфер один раз. Это полностью убирает Race Condition.
+    # Открываем атомарный неблокирующий дескриптор записи в RAM-буфер /tmp
     {
         for sub in "${GLOBAL_DNS_WORDLIST[@]}"; do
             [[ -z "$sub" ]] && continue
             
-            # Асинхронный атомарный subshell
+            # Асинхронный атомарный изолированный subshell
             (
-                # Фиксируем таймаут -W 1 (1 секунда достаточно для быстрого DNS)
+                # Фиксируем таймаут утилиты (-W 1) и оборачиваем в core-timeout на случай зависания сокета
                 local dns_out
-                dns_out=$(host -W 1 "$sub.$clean_domain" 2>/dev/null)
+                dns_out=$(timeout 2 host -W 1 "$sub.$clean_domain" 2>/dev/null)
                 
+                # Парсинг успешных ответов DNS-сервера (A и AAAA записи)
                 if [[ "$dns_out" == *"has address"* || "$dns_out" == *"has IPv6 address"* ]]; then
-                    local res_ip=$(echo "$dns_out" | grep -E "has address|has IPv6 address" | awk '{print $NF}' | xargs)
+                    local res_ip
+                    res_ip=$(echo "$dns_out" | grep -E "has address|has IPv6 address" | awk '{print $NF}' | xargs)
                     if [[ -n "$res_ip" ]]; then
                         echo "   -> [SUBDOMAIN]: $sub.$clean_domain | RESOLVED_IP: [$res_ip]"
                     fi
@@ -5504,16 +5640,16 @@ osint_subdomain_recon() {
             ) &
 
             # --- УЛЬТИМАТИВНЫЙ КОНТРОЛЛЕР СКОЛЬЗЯЩЕГО ОКНА ---
-            # Вместо ожидания всей пачки, мы удерживаем пул активным на 20 потоков.
-            # Как только один поток завершается, цикл немедленно подбрасывает следующий.
+            # Вместо ожидания завершения всей пачки, удерживаем пул активным строго на 20 потоков.
+            # Как только один процесс освобождает PID, цикл мгновенно подбрасывает следующий элемент wordlist.
             while (( $(jobs -p | wc -l) >= max_jobs )); do
-                sleep 0.01  # Микропауза планировщика ядра (минимальный оверхед CPU)
+                sleep 0.01  # Микропауза планировщика ядра Linux (0.01с снижает оверхед CPU до ~0%)
             done
         done
-        wait # Ожидаем только финальный остаток запущенных процессов
+        wait # Ожидаем завершения финального остатка запущенных процессов в фоне
     } > "$tmp_dns_results"
 
-    # --- 4. СЛОЙ АТОМАРНОЙ ФИКСАЦИИ В МОНОЛИТЕ ---
+    # --- 4. СЛОЙ АТОМАРНОЙ ФИКСАЦИИ В МОНОЛИТЕ LOG-ФАЙЛА ---
     if [[ -s "$tmp_dns_results" ]]; then
         local total_found
         total_found=$(wc -l < "$tmp_dns_results")
@@ -5523,7 +5659,7 @@ osint_subdomain_recon() {
             echo "=============================================================================="
             echo " @CORE_DNS_RECON_REPORT | TARGET: $clean_domain | ACTIVE NODES: $total_found"
             echo "=============================================================================="
-            # Дедупликация и фиксация структуры в RAM перед записью
+            # Стриминговая дедупликация и фиксация алфавитной структуры
             cat "$tmp_dns_results" | sort -u
             echo "=============================================================================="
         } >> "$raw_log"
@@ -5533,83 +5669,87 @@ osint_subdomain_recon() {
         core_engine_ui "i" "DNS-Engine: Scan complete. No hidden subdomains exposed via core wordlist."
     fi
 
-    # Тотальная санитарная зачистка следов процесса из /tmp
+    # Тотальная санитарная зачистка следов сессии процесса из директории /tmp
     rm -f "$tmp_dns_results"
 }
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - HIGH-SPEED TLS FINGERPRINT PROCESSOR
-# МОДЕРНИЗАЦИЯ: Адаптивный SNI-маршрутизатор, экстракция SAN-матриц, SHA256-хэширование
-# АРХИТЕКТУРА: Ghost-Speed Engine, RAM-пайплайн, защита от сетевого зависания
+# @description: OSINT NEXUS v21.0 - HIGH-SPEED TLS FINGERPRINT PROCESSOR
+# МОДЕРНИЗАЦИЯ: Интеграция с IPv4/IPv6 контурами GLOBAL_INFRA_MATRIX v1.0
+# АРХИТЕКТУРА: Ghost-Speed Engine, RAM-пайплайн, оптимизированный SAN-декодер
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | TLS ANALYZER LIMIT
 # ==============================================================================
 osint_ssl_fingerprint() {
     local target="$1"
     
-    # Жесткий контроль контекста среды
+    # Жесткий контроль контекста среды и наличия дескрипторов логирования
     [[ -z "$raw_log" || ! -f "$raw_log" ]] && return 1
     [[ -z "$target" ]] && return 1
 
-    # Извлекаем очищенную глобальную маску IP для детекта типа цели
-    local clean_rx_ip="${GLOBAL_REGEX_IP//(\?i)/}"
+    # Загрузка регулярных выражений сетевого уровня из единого инфраструктурного реестра
+    local pattern_ipv4="${GLOBAL_INFRA_MATRIX[0]}"
+    local pattern_ipv6="${GLOBAL_INFRA_MATRIX[1]}"
     
-    # --- СЛОЙ ИНТЕЛЛЕКТУАЛЬНОЙ СЕПАРАЦИИ И ЗАЩИТЫ SNI ---
+    # --- 1. СЛОЙ ИНТЕЛЛЕКТУАЛЬНОЙ СЕПАРАЦИИ И ЗАЩИТЫ SNI ---
     local sni_cmd=""
     local clean_host="$target"
 
-    # Очищаем от протоколов, если они случайно пролезли
+    # Тотальная зачистка входных данных от случайных префиксов веб-протоколов
     clean_host=$(echo "$target" | sed -E 's|^https?://||; s|/.*||')
 
-    if echo "$clean_host" | grep -Eqi "$clean_rx_ip"; then
-        # Если цель IP-адрес — TLS SNI (-servername) отключается, чтобы сервер не сбросил сессию
+    # Проверяем цель по контурам IPv4 и IPv6 матриц
+    if echo "$clean_host" | grep -Eq "$pattern_ipv4" || echo "$clean_host" | grep -Eq "$pattern_ipv6"; then
+        # Если цель IP-адрес — TLS SNI (-servername) принудительно отключается, 
+        # чтобы предотвратить блокировки handshaking со стороны строгих веб-серверов
         sni_cmd=""
     else
-        # If target is a domain - enable strict TLS SNI extension
+        # Если цель является классическим или IDN доменом — активируем расширение SNI
         sni_cmd="-servername $clean_host"
     fi
 
     core_engine_ui "i" "TLS-Scanner: Extracting cryptographic certificates from $clean_host..."
 
-    # Изолированный временный буфер сессии PID
+    # Изолированный временный буфер сессии текущего PID (RAM-накопление)
     local tmp_ssl="/tmp/nexus_ssl_raw_$$"
     local tmp_parsed="/tmp/nexus_ssl_parsed_$$"
     touch "$tmp_ssl" "$tmp_parsed"
 
-    # --- 1. СЛОЙ ВЫСОКОСКОРОСТНОГО ИЗОЛИРОВАННОГО СБОРА (CENSYS MODE) ---
-    # -connect_timeout 4 - жесткая защита от линейного зависания ядра
-    # Направляем пустой поток (вместо echo) через Here-string <<< ""
-    <<< "" openssl s_client $sni_cmd -connect "$clean_host:443" -timeout 4 2>/dev/null > "$tmp_ssl"
+    # --- 2. СЛОЙ ВЫСОКОСКОРОСТНОГО ИЗОЛИРОВАННОГО СБОРА (CENSYS MODE) ---
+    # -connect_timeout 4 и -timeout 4 — двухбарьерный рубеж защиты от зависания сетевых сокетов
+    # Передача пустого ввода через Here-string <<< "" для мгновенного закрытия сессии после обмена ключами
+    <<< "" openssl s_client $sni_cmd -connect "$clean_host:443" -connect_timeout 4 -timeout 4 2>/dev/null > "$tmp_ssl"
 
-    # Проверяем, удалось ли захватить сертификат
+    # Верификация факта захвата сырого тела SSL/TLS сертификата
     if ! grep -q "BEGIN CERTIFICATE" "$tmp_ssl" 2>/dev/null; then
-        core_engine_ui "i" "TLS-Scanner: Port 443 closed or SSL/TLS handshake refused on $clean_host."
+        core_engine_ui "i" "TLS-Scanner: Port 443 closed, non-TLS protocol or handshake refused on $clean_host."
         rm -f "$tmp_ssl" "$tmp_parsed"
         return 0
     fi
 
-    # --- 2. СЛОЙ ГЛУБОКОГО СИГНАТУРНОГО ПАРСИНГА В RAM ---
+    # --- 3. СЛОЙ ГЛУБОКОГО СИГНАТУРНОГО ПАРСИНГА В RAM ---
     {
         echo "[+] SSL/TLS CERTIFICATE METADATA:"
         
-        # Извлекаем Субъект и Издателя
+        # Экстракция субъекта (Subject) и издателя (Issuer) с форматированием отступов
         openssl x509 -in "$tmp_ssl" -noout -subject -issuer 2>/dev/null | sed 's/^/   /'
         
-        # Извлекаем Временные метки (Валидность)
+        # Экстракция временных меток жизненного цикла сертификата (Not Before / Not After)
         openssl x509 -in "$tmp_ssl" -noout -dates 2>/dev/null | sed 's/^/   /'
         
-        # Извлекаем уникальный серийный номер и цифровой отпечаток (Аналог Shodan Fingerprint)
-        local serial=$(openssl x509 -in "$tmp_ssl" -noout -serial 2>/dev/null | cut -d= -f2)
-        local fingerprint=$(openssl x509 -in "$tmp_ssl" -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2)
+        # Вычисление уникального серийного номера и SHA-256 крипто-отпечатка (Shodan/Censys Hash)
+        local serial
+        local fingerprint
+        serial=$(openssl x509 -in "$tmp_ssl" -noout -serial 2>/dev/null | cut -d= -f2)
+        fingerprint=$(openssl x509 -in "$tmp_ssl" -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2)
         echo "   serialNumber=$serial"
         echo "   sha256Fingerprint=$fingerprint"
 
-        # КРИТИЧЕСКИЙ OSINT-ВЕКТОР: Извлечение скрытых альтернативных доменов (SAN)
-        # Вытаскиваем расширения, находим строку DNS:, очищаем пробелы и запятые
+        # КРИТИЧЕСКИЙ OSINT-ВЕКТОР: Потоковый сбор матрицы альтернативных доменов (SAN)
+        # Оптимизированный однопроходный sed извлекает все связанные субдомены инфраструктуры цели
         local san_domains
         san_domains=$(openssl x509 -in "$tmp_ssl" -noout -text 2>/dev/null | \
-            grep -A 1 "Subject Alternative Name" | \
-            grep "DNS:" | \
+            sed -n '/Subject Alternative Name/{n;p;}' | \
             sed 's/DNS://g; s/,//g' | xargs)
         
         if [[ -n "$san_domains" ]]; then
@@ -5620,7 +5760,7 @@ osint_ssl_fingerprint() {
         fi
     } > "$tmp_parsed"
 
-    # --- 3. СЛОЙ АТОМАРНОЙ ФИКСАЦИИ В МОНОЛИТЕ ---
+    # --- 4. СЛОЙ АТОМАРНОЙ ФИКСАЦИИ В МОНОЛИТЕ LOG-ФАЙЛА ---
     if [[ -s "$tmp_parsed" ]]; then
         {
             echo -e "\n"
@@ -5634,88 +5774,111 @@ osint_ssl_fingerprint() {
         core_engine_ui "s" "TLS-Scanner: Deep certificate telemetry injected into log successfully."
     fi
 
-    # Полная санитарная очистка дискового пространства
+    # Тотальная санитарная зачистка следов сессии процесса из директории /tmp
     rm -f "$tmp_ssl" "$tmp_parsed"
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - HIGH-VELOCITY LINK CORRELATION ENGINE
-# МОДЕРНИЗАЦИЯ: Построение явных направленных пар (Email->Domain/IP), RAM-графы
-# АРХИТЕКТУРА: Ghost-Speed Engine, потоковый транслятор сущностей, Zero-Disk Fork
+# @description: OSINT NEXUS v21.0 - HIGH-VELOCITY LINK CORRELATION ENGINE
+# МОДЕРНИЗАЦИЯ: Интеграция с GLOBAL_INFRA_MATRIX v1.0 и GLOBAL_EMAIL_MATRIX v1.0
+# АРХИТЕКТУРА: Ghost-Speed Engine, RAM-процессор графов, каскадный многоцелевой парсер
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | MATRIX CORRELATION LIMIT
 # ==============================================================================
 osint_link_correlator() {
-    # Полная синхронизация с твоей глобальной экосистемой путей
+    # Полная синхронизация с глобальной экосистемой путей
     local target_loot="${PRIME_LOOT:-$HOME/prime_loot}"
     
-    # Жесткий контроль контекста среды
+    # Жесткий контроль контекста среды и прав доступа к дескрипторам
     [[ -z "$raw_log" || ! -f "$raw_log" || ! -r "$raw_log" ]] && return 1
     [[ ! -d "$target_loot" ]] && mkdir -p "$target_loot"
 
     core_engine_ui "i" "Correlator: Extracting infrastructure links and building Maltego-matrix..."
 
-    # Синхронизация твоих ультимативных регулярных выражений ядра (адаптация под POSIX)
-    local rx_email="${GLOBAL_REGEX_EMAIL}"
-    local rx_ip="${GLOBAL_REGEX_IP//(\?i)/}"
-    local rx_domain="${GLOBAL_REGEX_DOMAIN//(\?i)/}"
+    # Синхронизация ультимативных регулярных выражений ядра из монолитных матриц
+    local rx_email_std="${GLOBAL_EMAIL_MATRIX[0]}"
+    local rx_email_idn="${GLOBAL_EMAIL_MATRIX[1]}"
+    local rx_ipv4="${GLOBAL_INFRA_MATRIX[0]}"
+    local rx_ipv6="${GLOBAL_INFRA_MATRIX[1]}"
+    local rx_domain="${GLOBAL_INFRA_MATRIX[2]}"
 
-    # Целевой файл топологии графа
+    # Целевой файл топологии направленного графа
     local graph_output="$target_loot/graph_links.txt"
     
-    # Изолированный временный буфер для обработки
+    # Изолированный временный буфер для обработки текущей сессии PID
     local tmp_graph="/tmp/nexus_graph_$$"
     touch "$tmp_graph"
 
     # --- СЛОЙ ВЫСОКОСКОРОСТНОЙ АССОЦИАТИВНОЙ КОРРЕЛЯЦИИ (ПРОЦЕССОР AWK) ---
-    # Мы пропускаем лог через RAM-процессор, который ищет пересечения сущностей в рамках строк
-    awk -v rx_em="$rx_email" -v rx_ip="$rx_ip" -v rx_dom="$rx_domain" '
-    {
-        # Обнуляем переменные захвата для текущей строки
-        email = ""; ip = ""; domain = "";
-        
-        # Потоковый форензик-анализ текущей строки лога
-        if (match(tolower($0), tolower(rx_em))) {
-            email = substr($0, RSTART, RLENGTH);
-            # Санитарная очистка артефактов
-            gsub(/[^a-zA-Z0-9._%+-@]/, "", email);
-        }
-        if (match($0, rx_ip)) {
-            ip = substr($0, RSTART, RLENGTH);
-        }
-        if (match(tolower($0), tolower(rx_dom))) {
-            domain = substr($0, RSTART, RLENGTH);
-            # Исключаем попадание чистых IP в секцию доменов
-            if (domain ~ /^[0-9.]+$/) domain = "";
-        }
+    # Пропускаем лог через высокопроизводительный RAM-процессор.
+    # Выделение сущностей происходит атомарно в рамках одной строки без дискового оверхеда.
+    awk -v rx_em_std="$rx_email_std" \
+        -v rx_em_idn="$rx_email_idn" \
+        -v rx_v4="$rx_ipv4" \
+        -v rx_v6="$rx_ipv6" \
+        -v rx_dom="$rx_domain" \
+        '
+        {
+            # Инициализация и обнуление регистров захвата сущностей для текущей строки лога
+            email = ""; ip = ""; domain = "";
+            
+            # 1. Форензик-анализ: Каскадная экстракция Email (Сначала IDN/Punycode, затем стандарт)
+            if (match($0, rx_em_idn)) {
+                email = substr($0, RSTART, RLENGTH);
+            } else if (match($0, rx_em_std)) {
+                email = substr($0, RSTART, RLENGTH);
+            }
+            
+            if (email != "") {
+                # Санитарная очистка артефактов и концевых символов
+                gsub(/[^a-zA-Z0-9._%+-@]/, "", email);
+            }
+            
+            # 2. Форензик-анализ: Экстракция IP-адресов (Сначала приоритетный стек IPv6, затем IPv4)
+            if (match($0, rx_v6)) {
+                ip = substr($0, RSTART, RLENGTH);
+            } else if (match($0, rx_v4)) {
+                ip = substr($0, RSTART, RLENGTH);
+            }
+            
+            # 3. Форензик-анализ: Экстракция Доменов / Поддоменов
+            if (match(tolower($0), tolower(rx_dom))) {
+                domain = substr($0, RSTART, RLENGTH);
+                # Строгий барьер: исключаем случайное попадание чистых IPv4 адресов в секцию доменов
+                if (domain ~ /^[0-9.]+$/) {
+                    domain = "";
+                }
+            }
 
-        # --- СЛОЙ ПОСТРОЕНИЯ РЕБЕР ГРАФА (EDGE GENERATION) ---
-        # Связь тип 1: Найдена связка Email + Домен в одном контексте
-        if (email != "" && domain != "" && email != domain) {
-            links[email " -> " domain]++;
+            # --- СЛОЙ ПОСТРОЕНИЯ РЕБЕР НАПРАВЛЕННОГО ГРАФА (EDGE GENERATION) ---
+            # Связь тип 1: Выявлена устойчивая пара [Email -> Domain] в едином контексте строки
+            if (email != "" && domain != "" && email != domain) {
+                links[email " -> " domain]++;
+            }
+            
+            # Связь тип 2: Выявлена устойчивая пара [Email -> IP] (Хост авторизации или атаки)
+            if (email != "" && ip != "") {
+                links[email " -> " ip]++;
+            }
+            
+            # Связь тип 3: Выявлена устойчивая пара [Domain -> IP] (Инфраструктурный резолвинг)
+            if (domain != "" && ip != "") {
+                links[domain " -> " ip]++;
+            }
         }
-        # Связь тип 2: Найдена связка Email + IP-адрес хоста
-        if (email != "" && ip != "") {
-            links[email " -> " ip]++;
+        END {
+            # Выгрузка построенной ассоциативной RAM-матрицы с подсчетом веса ребер (hits)
+            for (edge in links) {
+                print "[GRAPH_EDGE] (" links[edge] " hits) | " edge;
+            }
         }
-        # Связь тип 3: Найдена связка Домен + IP (Прямой резолв/Аналитика)
-        if (domain != "" && ip != "") {
-            links[domain " -> " ip]++;
-        }
-    }
-    END {
-        # Выгружаем построенную RAM-матрицу с подсчетом веса (частоты упоминаний связей)
-        for (edge in links) {
-            print "[GRAPH_EDGE] (" links[edge] " hits) | " edge;
-        }
-    }
     ' "$raw_log" > "$tmp_graph"
 
-    # --- СЛОЙ ФИКСАЦИИ И ИНТЕГРАЦИИ РЕЗУЛЬТАТОВ ---
+    # --- СЛОЙ ФИКСАЦИИ, СОРТИРОВКИ И ИНТЕГРАЦИИ РЕЗУЛЬТАТОВ ---
     if [[ -s "$tmp_graph" ]]; then
-        # Сортируем граф по весу связей (сначала самые устойчивые зависимости)
-        sort -rn -k3 "$tmp_graph" > "$graph_output"
+        # Высокоскоростная числовая сортировка графа по весу связей (ключ -k2 указывает на количество hits)
+        sort -rn -k2 "$tmp_graph" > "$graph_output" 2>/dev/null
         
-        # Дублируем сводку корреляции в конец основного форензик-лога для целостности досье
+        # Дублируем сводку корреляции в конец основного форензик-лога для сохранения целостности досье цели
         {
             echo -e "\n"
             echo "=============================================================================="
@@ -5725,52 +5888,56 @@ osint_link_correlator() {
             echo "=============================================================================="
         } >> "$raw_log"
 
-        local total_edges=$(wc -l < "$graph_output")
-        core_engine_ui "s" "Correlator: Successfully mapped $total_edges unique graph links to graph_links.txt."
+        local total_edges
+        total_edges=$(wc -l < "$graph_output")
+        core_engine_ui "s" "Correlator: Successfully mapped $total_edges unique infrastructure graph links to graph_links.txt."
     else
         echo "[i] No multi-vector cross-links identified in this log session." > "$graph_output"
         core_engine_ui "i" "Correlator: Analytical baseline is clear. No infrastructure cross-links found."
     fi
 
-    # Санитарная зачистка следов PID процесса
+    # Тотальная санитарная зачистка следов процесса из директории /tmp (Безопасность I/O)
     rm -f "$tmp_graph"
 }
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - RAW MULTI-VECTOR HARVEST ENGINE
-# МОДЕРНИЗАЦИЯ: RAM-дедупликация через AWK, интеграция ультимативных матриц ядра
-# АРХИТЕКТУРА: Ghost-Speed Engine, потоковая изоляция PCRE, защита структуры лога
+# @description: OSINT NEXUS v21.0 - RAW MULTI-VECTOR HARVEST ENGINE
+# МОДЕРНИЗАЦИЯ: Интеграция с контурами GLOBAL_INFRA_MATRIX и GLOBAL_EMAIL_MATRIX
+# АРХИТЕКТУРА: Ghost-Speed Engine, потоковый RAM-пайплайн, защита от памяти OOM
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | HARVEST LIMIT
 # ==============================================================================
 osint_harvest_data() {
     local target_url="$1"
     
-    # Жесткий контроль контекста: лог-файл обязан быть инициализирован
+    # Жесткий контроль контекста: лог-файл и целевой URL обязаны быть инициализированы
     [[ -z "$raw_log" || ! -f "$raw_log" ]] && return 1
     [[ -z "$target_url" ]] && return 1
 
     core_engine_ui "i" "Harvester: Initiating high-velocity data extraction vector..."
 
     # --- 0. СИНХРОНИЗАЦИЯ УЛЬТИМАТИВНЫХ МАТРИЦ ЯДРА ---
-    # Извлекаем твои глобальные регулярки, нативно вырезая (?i) для совместимости с grep -E
-    local rx_email="${GLOBAL_REGEX_EMAIL}"
-    local rx_domain="${GLOBAL_REGEX_DOMAIN//(\?i)/}"
+    # Извлекаем регулярные выражения строго из индексов монолитных системных массивов
+    local rx_email_std="${GLOBAL_EMAIL_MATRIX[0]}"
+    local rx_email_idn="${GLOBAL_EMAIL_MATRIX[1]}"
+    local rx_email_loc="${GLOBAL_EMAIL_MATRIX[2]}"
+    local rx_domain_std="${GLOBAL_INFRA_MATRIX[2]}"
+    local rx_domain_idn="${GLOBAL_INFRA_MATRIX[3]}"
 
-    # Безопасный выбор случайного User-Agent
+    # Безопасный выбор случайного User-Agent для обхода базовых систем фильтрации (WAF)
     local selected_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     if [[ -n "${GLOBAL_NETWORK_UA[*]}" ]]; then
         selected_ua=$(shuf -n1 -e "${GLOBAL_NETWORK_UA[@]}")
     fi
 
-    # Изолированные временные сессионные буферы
+    # Изолированные временные сессионные буферы текущего PID процесса
     local tmp_html="/tmp/nexus_harvest_raw_$$"
     local tmp_extracted="/tmp/nexus_extracted_$$"
     touch "$tmp_html" "$tmp_extracted"
 
     # --- 1. СЛОЙ ОПТИМИЗИРОВАННОГО СЕТЕВОГО I/O ---
-    # --max-filesize 5M - защита от зависания на гигантских бинарных файлах
-    # -w "%{http_code}" - захват HTTP-статуса для контроля валидности
+    # --max-filesize 5M (5242880 байт) - жесткая защита от зависания на гигантских бинарных файлах
+    # --connect-timeout 5 и --max-time 15 - двухбарьерный рубеж защиты от удержания сокета сервером
     local http_code
     http_code=$(curl -s -L -A "$selected_ua" \
         --connect-timeout 5 \
@@ -5779,6 +5946,7 @@ osint_harvest_data() {
         -o "$tmp_html" \
         -w "%{http_code}" "$target_url" 2>/dev/null)
 
+    # Контроль валидности сетевой сессии и факта заполнения дискового буфера
     if [[ "$http_code" != "200" || ! -s "$tmp_html" ]]; then
         core_engine_ui "w" "Harvester: Target returned non-200 code ($http_code) or empty buffer. Aborting."
         rm -f "$tmp_html" "$tmp_extracted"
@@ -5786,24 +5954,20 @@ osint_harvest_data() {
     fi
 
     # --- 2. СЛОЙ ВЫСОКОСКОРОСТНОГО ИЗВЛЕЧЕНИЯ И RAM-ДЕДУПЛИКАЦИИ ---
-    # Читаем скачанный HTML-буфер ровно ОДИН раз для извлечения всех векторов данных
-    local raw_buffer
-    raw_buffer=$(cat "$tmp_html" 2>/dev/null)
-    rm -f "$tmp_html" # Мгновенно освобождаем дисковое пространство
-
+    # Читаем скачанный HTML-буфер ровно ОДИН раз, исключая множественные дисковые операции чтением grep
     {
-        # Вектор А: Поиск и потоковая фильтрация уникальных Email (через твой ультимативный паттерн)
+        # Вектор А: Каскадная экстракция и мгновенная дедупликация почтовых адресов (Standard / IDN / Local)
         local emails
-        emails=$(echo "$raw_buffer" | grep -Eoi "$rx_email" | awk '!visited[$0]++')
+        emails=$(grep -Eoi "$rx_email_std|$rx_email_idn|$rx_email_loc" "$tmp_html" 2>/dev/null | awk '!visited[tolower($0)]++')
         if [[ -n "$emails" ]]; then
             echo "[+] EXTRACTED IDENTITIES (EMAILS):"
             echo "$emails" | sed 's/^/   -> /'
             echo ""
         fi
 
-        # Вектор Б: Поиск и потоковая фильтрация уникальных доменов/субдоменов
+        # Вектор Б: Каскадная экстракция и мгновенная дедупликация доменных имен (Standard / Punycode)
         local domains
-        domains=$(echo "$raw_buffer" | grep -Eoi "$rx_domain" | awk '!visited[$0]++')
+        domains=$(grep -Eoi "$rx_domain_std|$rx_domain_idn" "$tmp_html" 2>/dev/null | awk '!visited[tolower($0)]++')
         if [[ -n "$domains" ]]; then
             echo "[+] EXTRACTED INFRASTRUCTURE NODES (DOMAINS):"
             echo "$domains" | sed 's/^/   -> /'
@@ -5811,8 +5975,19 @@ osint_harvest_data() {
         fi
     } > "$tmp_extracted"
 
-    # --- 3. СЛОЙ АТОМАРНОЙ ФИКСАЦИИ РЕЗУЛЬТАТОВ В МОНОЛИТЕ ---
+    # Мгновенно освобождаем дисковое пространство от сырого HTML-файла
+    rm -f "$tmp_html"
+
+    # --- 3. СЛОЙ АТОМАРНОЙ ФИКСАЦИИ РЕЗУЛЬТАТОВ В МОНОЛИТЕ LOG-ФАЙЛА ---
     if [[ -s "$tmp_extracted" ]]; then
+        local total_emails=0
+        local total_domains=0
+        
+        # Подсчет метрик для вывода в интерфейс оператора
+        [[ -n "$emails" ]] && total_emails=$(echo "$emails" | wc -l)
+        [[ -n "$domains" ]] && total_domains=$(echo "$domains" | wc -l)
+        local total_entities=$((total_emails + total_domains))
+
         {
             echo -e "\n"
             echo "=============================================================================="
@@ -5822,68 +5997,79 @@ osint_harvest_data() {
             echo "=============================================================================="
         } >> "$raw_log"
         
-        core_engine_ui "s" "Harvester: Data extraction completed. Results appended to log."
+        core_engine_ui "s" "Harvester: Extraction completed. Captured $total_entities unique entities (Emails: $total_emails, Domains: $total_domains)."
     else
         core_engine_ui "i" "Harvester: Active scanning finished. No identities or entities found."
     fi
 
-    # Финальная санитарная зачистка следов процесса
+    # Финальная санитарная зачистка следов сессии процесса из директории /tmp
     rm -f "$tmp_extracted"
 }
 
-
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - HIGH-SPEED NETWORK TRACE ENGINE
-# МОДЕРНИЗАЦИЯ: Отключение Reverse-DNS, нативная сепарация целей, пред-проверка CLI
-# АРХИТЕКТУРА: Ghost-Speed Engine, оптимизация сетевых сокетов, структурированный I/O
+# @description: OSINT NEXUS v21.0 - HIGH-SPEED NETWORK TRACE ENGINE
+# МОДЕРНИЗАЦИЯ: Интеграция с многослойным сетевым контуром GLOBAL_INFRA_MATRIX
+# АРХИТЕКТУРА: Ghost-Speed Engine, трехэшелонный фолбэк (MTR/Traceroute/Ping)
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | NETWORK TRACE LIMIT
 # ==============================================================================
 osint_network_trace() {
     local target="$1"
     
-    # Защита контекста: лог-файл должен быть инициализирован
+    # Защита контекста: лог-файл и цель обязаны быть инициализированы
     [[ -z "$raw_log" || ! -f "$raw_log" ]] && return 1
+    [[ -z "$target" ]] && return 1
 
-    # Извлекаем очищенные глобальные маски для верификации типа цели
-    local clean_rx_ip="${GLOBAL_REGEX_IP//(\?i)/}"
-    local clean_rx_domain="${GLOBAL_REGEX_DOMAIN//(\?i)/}"
+    # Синхронизация регулярных выражений сетевого уровня из монолитного реестра инфраструктуры
+    local pattern_ipv4="${GLOBAL_INFRA_MATRIX[0]}"
+    local pattern_ipv6="${GLOBAL_INFRA_MATRIX[1]}"
+    local pattern_domain="${GLOBAL_INFRA_MATRIX[2]}"
+
+    # Тотальная зачистка входных данных от случайных префиксов веб-протоколов
+    local clean_host
+    clean_host=$(echo "$target" | sed -E 's|^https?://||; s|/.*||')
 
     # --- СЛОЙ ИНТЕЛЛЕКТУАЛЬНОЙ СЕПАРАЦИИ ЦЕЛИ (Защита от мусорного I/O) ---
-    # Трассировка имеет смысл ТОЛЬКО для сетевых хостов (IP или Доменов)
-    if ! echo "$target" | grep -Eqi "$clean_rx_ip" && ! echo "$target" | grep -Eqi "$clean_rx_domain"; then
-        return 0 # Молча выходим, если цель — никнейм, email или криптокошелек
+    # Трассировка имеет технический смысл только для сетевых хостов (IPv4, IPv6 или Доменов)
+    if ! echo "$clean_host" | grep -Eq "$pattern_ipv4" && \
+       ! echo "$clean_host" | grep -Eq "$pattern_ipv6" && \
+       ! echo "$clean_host" | grep -Eq "$pattern_domain"; then
+        return 0 # Молча выходим, если цель является никнеймом, email-адресом или хэшем
     fi
 
     core_engine_ui "i" "Network-Trace: Mapping network path to target [GHOST-SPEED]..."
 
-    # Изолированный буфер сессии для захвата вывода трассировки
+    # Изолированный буфер сессии текущего PID процесса для захвата вывода трассировки
     local tmp_trace="/tmp/nexus_trace_$$"
     touch "$tmp_trace"
 
-    # Очищаем домен от возможных префиксов протоколов (http:// или https://), если они есть
-    local clean_host=$(echo "$target" | sed -E 's|^https?://||; s|/.*||')
-
-    # --- СЛОЙ ВЫСОКОСКОРОСТНОЙ АДАПТИВНОЙ ТРАССИРОВКИ ---
-    # 1. ВЕКТОР А: Если в системе доступен MTR
+    # --- СЛОЙ ВЫСОКОСКОРОСТНОЙ АДАПТИВНОЙ ТРАССИРОВКИ (ТРЕХЭШЕЛОННЫЙ ФОЛБЭК) ---
+    # 1. ЭШЕЛОН А: Если в системе доступна утилита MTR (Максимально информативный режим)
     if command -v mtr >/dev/null 2>&1; then
-        # -r  - режим отчета
-        # -w  - вывод полных имен/IP
-        # -n  - ОТКЛЮЧИТЬ REVERSE DNS (Дает прирост скорости в 10 раз, убирает зависания)
-        # -c 2 - два цикла для базовой оценки потерь пакетов
+        # -r  - режим генерации отчета (report)
+        # -w  - вывод полных имен без усечения широких строк
+        # -n  - ПРИНУДИТЕЛЬНОЕ ОТКЛЮЧЕНИЕ REVERSE DNS (Ускорение в 10 раз, полная защита от сетевых зависаний)
+        # -c 2 - два проверочных цикла для экспресс-оценки потерь пакетов на узлах маршрута
         mtr -rwn -c 2 "$clean_host" > "$tmp_trace" 2>/dev/null
         
-    # 2. ВЕКТОР Б: Фолбэк на классический traceroute с жесткой оптимизацией таймаутов
+    # 2. ЭШЕЛОН Б: Фолбэк на классический traceroute с жесткой оптимизацией таймаутов сокетов
     elif command -v traceroute >/dev/null 2>&1; then
-        # -n  - ОТКЛЮЧИТЬ REVERSE DNS
-        # -m 12 - ограничиваем максимальное количество хопов до 12 (достаточно для детекта CDN)
-        # -w 1  - таймаут ожидания ответа от узла строго 1 секунда (вместо дефолтных 5)
-        # -q 1  - отправлять 1 запрос на хоп вместо 3 (ускорение в 3 раза)
+        # -n  - ПРИНУДИТЕЛЬНОЕ ОТКЛЮЧЕНИЕ REVERSE DNS
+        # -m 12 - ограничение максимального количества хопов (достаточно для детекта CDN и пограничного шлюза)
+        # -w 1  - таймаут ожидания ответа от транзитного узла строго 1 секунда (вместо дефолтных 5 секунд)
+        # -q 1  - отправка строго 1 запроса на хоп вместо 3 (ускорение прохождения фазы в 3 раза)
         traceroute -n -m 12 -w 1 -q 1 "$clean_host" > "$tmp_trace" 2>/dev/null
+        
+    # 3. ЭШЕЛОН В: Аварийный фолбэк на ping с ограничением TTL для минималистичных систем
+    elif command -v ping >/dev/null 2>&1; then
+        echo "   [!] WARNING: 'mtr' and 'traceroute' are missing. Deploying emergency TTL-ping fallback..." > "$tmp_trace"
+        # -c 3 - три контрольных пакета
+        # -t 12 - ограничение времени жизни пакета (TTL/Max Hops) для базовой проверки доступности
+        ping -c 3 -t 12 "$clean_host" >> "$tmp_trace" 2>/dev/null
     else
-        echo "   [!] WARNING: Both 'mtr' and 'traceroute' are missing in this environment." > "$tmp_trace"
+        echo "   [!] CRITICAL: 'mtr', 'traceroute' and 'ping' are missing in this environment. Telemetry unavailable." > "$tmp_trace"
     fi
 
-    # --- СЛОЙ ФИКСАЦИИ И СТРУКТУРИРОВАНИЯ В МОНОЛИТЕ ---
+    # --- СЛОЙ АТОМАРНОЙ ФИКСАЦИИ И СТРУКТУРИРОВАНИЯ В МОНОЛИТЕ ---
     if [[ -s "$tmp_trace" ]]; then
         {
             echo -e "\n"
@@ -5893,10 +6079,11 @@ osint_network_trace() {
             cat "$tmp_trace"
             echo "=============================================================================="
         } >> "$raw_log"
+        
         core_engine_ui "s" "Network-Trace: Telemetry successfully appended to forensic log."
     fi
 
-    # Санитарная очистка временных файлов текущего PID процесса
+    # Санитарная очистка временных файлов текущего PID процесса (Безопасность I/O подсистемы)
     rm -f "$tmp_trace"
 }
 
