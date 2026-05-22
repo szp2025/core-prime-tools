@@ -9396,6 +9396,43 @@ run_forensic_harvest() {
 }
 
 
+# ==============================================================================
+# @description: OSINT NEXUS v26.1 - GEO-INTELLIGENCE MODULE
+# @status: BETA | INTEGRATED WITH IP-GEOLOCATION & OSINT-ASSOCIATION
+# ==============================================================================
+
+# Реестр API для гео-данных
+GLOBAL_GEO_NODES=(
+    "https://ipapi.co/{TARGET}/json/|IP|ipapi.co (Provider/City)"
+    "https://ip-api.com/json/{TARGET}|IP|ip-api.com (General)"
+)
+
+run_geo_lookup() {
+    local target="$1"
+    
+    # 1. Если это IP
+    if [[ "$target" =~ ${GLOBAL_INFRA_MATRIX[0]} ]]; then
+        core_engine_ui "i" "Performing IP-Geo lookup for: $target"
+        for node in "${GLOBAL_GEO_NODES[@]}"; do
+            local url_tpl="${node%%|*}"; local type="${node##*|}"
+            [[ "$type" != "IP" ]] && continue
+            
+            local url="${url_tpl//\{TARGET\}/$target}"
+            local data=$(curl -s -L "$url")
+            echo "[GEO_DATA] $data" >> "/tmp/nexus_geo.log"
+            core_engine_ui "s" "Geo-data captured from $node"
+        done
+    
+    # 2. Если это Email/Phone — поиск через SocialScan
+    else
+        core_engine_ui "i" "Geo-correlation via SocialScan initiated..."
+        # Используем существующий механизм для поиска «цифрового следа»
+        run_osint_custom_socialscan "$target" "/tmp/nexus_geo_association.log"
+        core_engine_ui "s" "Association search complete. Check logs for location mentions."
+    fi
+}
+
+
 # ==========================================
 # 3. ОСНОВНОЙ ЦИКЛ (CORE LOOP)
 # ==========================================
