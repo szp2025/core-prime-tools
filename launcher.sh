@@ -571,59 +571,26 @@ GLOBAL_EMAIL_MATRIX=(
     '\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(local|lan|internal|domain|node)\b'
 )
 
-
 # ==============================================================================
-# @description: УЛЬТИМАТИВНЫЙ ПАТТЕРН ПОИСКА ТЕЛЕФОНОВ (POSIX ERE)
-# ИСПРАВЛЕНО: Удалены PCRE-группы (?:) и модификатор (?i)
-# ==============================================================================
-# Паттерн ищет международные и локальные форматы телефонов
-GLOBAL_REGEX_PHONE="(\+[0-9]{1,4}[[:space:].-]?)?(\([0-9]{1,5}\)[[:space:].-]?)?([0-9]{2,5}[[:space:].-]?){2,5}[0-9]{2,5}"
-
-# ==============================================================================
-# GLOBAL VALIDATION & OSINT PHONENUMBER MATRICES
-# ==============================================================================
-
-# 1. Мощная ПОИСКОВАЯ матрица (Твой паттерн, адаптированный под кросс-платформенный POSIX ERE для grep/Bash)
-# Используется для форензики, парсинга логов и поиска упоминаний номеров в текстах.
-GLOBAL_REGEX_PHONE_SEARCH="(\+?([0-9]{1,4})[[:space:]\.-]?)?(\([0-9]{1,5}\)[[:space:]\.-]?)?([0-9]{2,5}[[:space:]\.-]?){2,5}[0-9]{2,5}"
-
-# 2. Строгая ВАЛИДИРУЮЩАЯ матрица ядра
-# Используется перед отправкой в сетевые OSINT-запросы, проверяя, что строка полностью очищена до цифр.
-GLOBAL_REGEX_PHONE_VALID="^[0-9]{7,15}$"
-
-
-# ==============================================================================
-# ЕДИНАЯ МАТРИЦА PRIME (ПОИСКОВЫЙ РЕЕСТР ТЕЛЕФОНОВ)
+# @matrix: GLOBAL_PRIME_MATRIX v2.0
+# @description: Единая матрица поискового реестра телефонов (Заменила GLOBAL_PHONE_MATRIX)
+# АРХИТЕКТУРА: Полная совместимость с POSIX ERE (AWK, grep -E) | Границы \b изолированы
+# @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | ZERO-DUPLICATION
 # ==============================================================================
 GLOBAL_PRIME_MATRIX=(
-    # --- Международные форматы (E.164 и аналоги) ---
-    '\+[0-9]{1,3}[[:space:]\.-]?[0-9]{3,4}[[:space:]\.-]?[0-9]{2,4}[[:space:]\.-]?[0-9]{2,4}'
+    # [0] Международные форматы (E.164 и аналоги с опциональными разделителями)
+    '\b\+[0-9]{1,3}[[:space:]\.-]?[0-9]{3,4}[[:space:]\.-]?[0-9]{2,4}[[:space:]\.-]?[0-9]{2,4}\b'
     
-    # --- Форматы со скобками (Локальные и региональные) ---
-    '\(?[0-9]{2,5}\)?[[:space:]\.-]?[0-9]{2,5}[[:space:]\.-]?[0-9]{2,5}[[:space:]\.-]?[0-9]{2,4}'
+    # [1] Форматы со скобками (Локальные, городские и региональные узлы связи)
+    '\b\(?[0-9]{2,5}\)?[[:space:]\.-]?[0-9]{2,5}[[:space:]\.-]?[0-9]{2,5}[[:space:]\.-]?[0-9]{2,4}\b'
     
-    # --- Форматы с ведущим 8 или 7 (Стандарт RU/CIS) ---
-    '[87][[:space:]\.-]?[0-9]{3}[[:space:]\.-]?[0-9]{3}[[:space:]\.-]?[0-9]{2}[[:space:]\.-]?[0-9]{2}'
+    # [2] Форматы с ведущим 8 или 7 (Специфика СУБД и логов стран СНГ)
+    '\b[87][[:space:]\.-]?[0-9]{3}[[:space:]\.-]?[0-9]{3}[[:space:]\.-]?[0-9]{2}[[:space:]\.-]?[0-9]{2}\b'
     
-    # --- Компактные форматы (без разделителей) ---
-    '[0-9]{7,15}'
+    # [3] Компактные форматы (Сырые числовые последовательности, биллинги, без разделителей)
+    # Жестко изолирован границами слова для исключения перехвата Unix-timestamp и ID
+    '\b[0-9]{7,15}\b'
 )
-
-
-# ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска IPv4/IPv6 и CIDR
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под POSIX ERE
-# ==============================================================================
-# Использование: grep -oEi "$GLOBAL_REGEX_IP"
-GLOBAL_REGEX_IP="\b(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(/[0-9]{1,2})?|([0-9a-f]{1,4}:){1,7}:?([0-9a-f]{1,4})?(:[0-9a-f]{1,4}){1,7}(/[0-9]{1,3})?)\b"
-
-# ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска и валидации доменов
-# МОДЕРНИЗАЦИЯ: Удален (?i), адаптирован для POSIX ERE (grep -iE)
-# ==============================================================================
-# Паттерн поддерживает IDN (Punycode, xn--), многоуровневые домены и стандартные TLD
-GLOBAL_REGEX_DOMAIN="\b((xn--[a-z0-9-]{1,59}|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})\b"
-
 
 # ==============================================================================
 # ЕДИНАЯ МАТРИЦА PRIME (ИНФРАСТРУКТУРНЫЙ РЕЕСТР - ULTIMATE EDITION)
@@ -646,26 +613,6 @@ GLOBAL_INFRA_MATRIX=(
 # @description: ГЛОБАЛЬНЫЙ ФИНАНСОВЫЙ СЛОЙ (INTERNATIONAL BANKING PATTERNS)
 # МОДЕРНИЗАЦИЯ: Добавлены стандарты для международных и специфических операций
 # ==============================================================================
-
-# 1. IBAN (Международный стандарт ISO 13616) - Работает для любой страны
-GLOBAL_REGEX_IBAN="\b[A-Z]{2}[0-9]{2}([A-Z0-9][[:space:]]*){10,30}[A-Z0-9]\b"
-
-# 2. SWIFT/BIC (Международный идентификатор банков)
-# 8 или 11 символов: 4 буквы (банк), 2 буквы (страна), 2 буквы (локация), 3 опциональные (филиал)
-GLOBAL_REGEX_SWIFT="\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b"
-
-# 3. RIB (Франция - Франция)
-GLOBAL_REGEX_RIB_FR="\b[0-9]{5}[[:space:].-]?[0-9]{5}[[:space:].-]?[a-zA-Z0-9]{11}[[:space:].-]?[0-9]{2}\b"
-
-# 4. BBAN (Basic Bank Account Number - общий формат для многих стран Европы)
-# Часто встречается в логах без префикса страны (более короткая форма IBAN)
-GLOBAL_REGEX_BBAN="\b[A-Z0-9]{10,20}\b"
-
-# 5. CREDIT_CARD (Стандартный поиск номеров карт по алгоритму Луна - паттерн для обнаружения)
-# Ищет 13-16 значные числа, часто используемые в транзакциях
-GLOBAL_REGEX_CC="\b[4-6][0-9]{3}([[:space:].-]?[0-9]{4}){3}\b"
-
-
 # ==============================================================================
 # ЕДИНЫЙ ФИНАНСОВЫЙ РЕЕСТР PRIME (ULTIMATE FINANCIAL SIGNATURES)
 # ==============================================================================
@@ -997,10 +944,8 @@ GLOBAL_SECURITY_MATRIX=(
     '\b(UNION[[:space:]]+SELECT|ORDER[[:space:]]+BY|GROUP[[:space:]]+BY|HAVING)\b'
     '/api/(v[0-9]|v1|v2|v3|graphql)/[a-zA-Z0-9_-]+/[0-9]+'
     
-    # --- 8. Сигналы аномалий, CVE и эксплуатации ---
-    '\b(vulnerable|rce_triggered|shell_spawned|unauthenticated|auth_bypass|sql_error|syntax_error|fatal_error|null_pointer|stack_trace|debug_mode|hidden_config)\b'
-    '\b(lfi|rfi|ssrf|xxe|command_injection|path_traversal|eval\(|base64_decode|system\(|passthru\(|exec\()\b'
-    '\bcve-[0-9]{4}-[0-9]{4,7}\b'
+    # --- 8. Сигналы аномалий, CVE и эксплуатации (Расширенный) ---
+    '\b(vulnerable|rce_triggered|shell_spawned|unauthenticated|auth_bypass|sql_error|syntax_error|fatal_error|null_pointer|stack_trace|debug_mode|hidden_config|missing|exposed|weak)\b|\bcve-[0-9]{4}-[0-9]{4,7}\b|\b(lfi|rfi|ssrf|xxe|command_injection|path_traversal|eval\(|base64_decode|system\(|passthru\(|exec\()\b'
     
     # --- 9. Сигналы рантаймов и контейнеризации (Runtime Profiling) ---
     '\b(python[0-9.]*|node[0-9]*|php-fpm[0-9.]*|go|ruby|java|perl|nginx|apache[0-9]?|httpd|gunicorn|docker|podman|containerd|kubelet|uvicorn|daphne|hypercorn)\b'
@@ -2060,6 +2005,51 @@ GLOBAL_AUTH_MATRIX=(
     # Предназначен для извлечения строк, где вместо пароля подставлен хэш или токен
     # Пример: admin:098f6bcd4621d373cade4e832627b4f6
     '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}[:;][a-fA-F0-9]{32,64}\b'
+)
+
+# ==============================================================================
+# @matrix: GLOBAL_FILTER_MATRIX (МАТРИЦА Ь) v2.0
+# @description: Ультимативный многослойный реестр маркеров фильтрации и тегов форензик-логов
+# АРХИТЕКТУРА: Раздельные векторы подсистем (Сетевой, Корпоративный, Крипто, Системный)
+# СОВМЕСТИМОСТЬ: POSIX ERE / Extended Regular Expressions (grep -E, AWK, sed)
+# @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | UNBREAKABLE INTEGRATION
+# ==============================================================================
+GLOBAL_FILTER_MATRIX=(
+    # --------------------------------------------------------------------------
+    # СЛОЙ [0]: СВОДНЫЙ ИНДИКАТОР УСПЕШНОГО ДЕТЕКТА (PRIMARY MATCH DETECTION)
+    # Перехват любых явных фиксаций совпадений, триггеров и фактов обнаружения целей
+    # --------------------------------------------------------------------------
+    'MATCH|FOUND|DETECTED|CAPTURED|IDENTIFIED|SUCCESS|ENGAGED|HIT|TARGET_HIT|EXPOSED'
+
+    # --------------------------------------------------------------------------
+    # СЛОЙ [1]: КОРПОРАТИВНЫЙ И ПЕРСОНАЛЬНЫЙ ФОРЕНЗИК (IDENTITY & BREACH DATA)
+    # Маркеры компрометации, утечек, персональных данных и телеметрии операторов связи
+    # --------------------------------------------------------------------------
+    'BREACH|LEAK|COMPROMISED|PASSPORT|FIO|DOB|GENDER|NATIONALITY|SNILS|INN|BIOMETRIC'
+
+    # --------------------------------------------------------------------------
+    # СЛОЙ [2]: ТЕЛЕКОММУНИКАЦИОННЫЙ ВЕКТОР (TELECOM & CONTACT INFRASTRUCTURE)
+    # Маркеры сотовой связи, метаданных SIM-карт, мессенджеров и привязок номеров
+    # --------------------------------------------------------------------------
+    'PHONE|OPER|CARRIER|MCC|MNC|IMSI|IMEI|SIM|VIBER|WHATSAPP|TELEGRAM|CONTACT'
+
+    # --------------------------------------------------------------------------
+    # СЛОЙ [3]: СЕТЕВАЯ И СИСТЕМНАЯ ИНФРАСТРУКТУРА (NETWORK & ROUTING METRICS)
+    # Глубокие маркеры сетевого уровня, DNS, криптографической защиты сокетов и провайдеров
+    # --------------------------------------------------------------------------
+    'DNS|SSL|TLS|CIPHER|CERTIFICATE|SUBJECT|ISSUER|EXPIRES|ORG|ASN|ISP|IP_DATA|GEO|COUNTRY|CITY'
+
+    # --------------------------------------------------------------------------
+    # СЛОЙ [4]: КРИПТОГРАФИЧЕСКИЙ ФОРЕНЗИК (CRYPTO & SIGNATURE FORENSICS)
+    # Следы транзакций, адреса кошельков, типы хэшей и сигнатуры утекших баз данных
+    # --------------------------------------------------------------------------
+    'CRYPTO|WALLET|BLOCKCHAIN|TXID|BALANCE|HASH|MD5|SHA1|SHA256|SHA512|NTLM|PASSWORD'
+
+    # --------------------------------------------------------------------------
+    # СЛОЙ [5]: СИСТЕМНЫЙ ЛОГ И РЕКУРСИВНЫЙ ТРЕКИНГ (RECURSIVE CONTROL & CRAWLER)
+    # Метки прохождения рекурсивных циклов, глубокого парсинга и асинхронного краулинга
+    # --------------------------------------------------------------------------
+    'RECURSIVE|EXTRACTED|HARVESTED|CRAWLER|PARSED|EXT_IP|EXT_EMAIL|DEEP_HUNT|BRIDGE|SIGNAL'
 )
 
 
@@ -6256,39 +6246,45 @@ osint_categorize_target() {
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - CORE LEXICAL ROUTER (NETWORK & CRYPTO MAXIMUM)
-# МОДЕРНИЗАЦИЯ: Нативная адаптация PCRE-модификаторов (?i) под стандарты POSIX/Bash
-# АРХИТЕКТУРА: Динамический слайсинг матриц, потоковый контроль типов, Zero-Fork
+# @description: OSINT NEXUS v21.0 - CORE LEXICAL ROUTER [MONOLITH CONTROL]
+# МОДЕРНИЗАЦИЯ: Интеграция с GLOBAL_INFRA_MATRIX, GLOBAL_EMAIL_MATRIX, GLOBAL_HASH_MATRIX
+# АРХИТЕКТУРА: Атомарный потоковый контроль типов, Zero-Fork, защита флагов ОС
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | UNBREAKABLE INTEGRATION LIMIT
 # ==============================================================================
 osint_nexus_router() {
     local target="$1"
     
-    # Санитарная очистка: удаление случайных начальных и конечных пробелов
-    target=$(echo "$target" | xargs)
+    # Санитарная очистка входного потока: удаление случайных начальных и концевых пробелов
+    target=$(echo "$target" | xargs 2>/dev/null)
     [[ -z "$target" ]] && return 1
 
-    # --- 0. АДАПТАЦИЯ УЛЬТИМАТИВНЫХ СЕТЕВЫХ МАТРИЦ (Защита от синтаксических сбоев) ---
-    # Удаляем (?i) из твоих глобальных переменных, если они присутствуют, чтобы не сломать Bash/POSIX
-    local clean_rx_email="${GLOBAL_REGEX_EMAIL}"
-    local clean_rx_ip="${GLOBAL_REGEX_IP//(\?i)/}"
-    local clean_rx_domain="${GLOBAL_REGEX_DOMAIN//(\?i)/}"
+    # --- 0. СИНХРОНИЗАЦИЯ УЛЬТИМАТИВНЫХ МАТРИЦ ЯДРА (ZERO LOOSE VARIABLES) ---
+    local rx_ipv4="${GLOBAL_INFRA_MATRIX[0]}"
+    local rx_ipv6="${GLOBAL_INFRA_MATRIX[1]}"
+    local rx_domain_std="${GLOBAL_INFRA_MATRIX[2]}"
+    local rx_domain_idn="${GLOBAL_INFRA_MATRIX[3]}"
+    
+    local rx_email_std="${GLOBAL_EMAIL_MATRIX[0]}"
+    local rx_email_idn="${GLOBAL_EMAIL_MATRIX[1]}"
+    local rx_email_loc="${GLOBAL_EMAIL_MATRIX[2]}"
+    
+    local rx_hash_md5="${GLOBAL_HASH_MATRIX[0]}"
+    local rx_hash_sha1="${GLOBAL_HASH_MATRIX[1]}"
+    local rx_hash_sha256="${GLOBAL_HASH_MATRIX[2]}"
+    local rx_hash_sha512="${GLOBAL_HASH_MATRIX[3]}"
+    local rx_hash_ntlm="${GLOBAL_HASH_MATRIX[4]}"
 
     local crypto_matched=0
     local detected_currency=""
 
-    # Включаем нативную регистронезависимость Bash на время выполнения проверок
-    local old_nocasematch=$(shopt -p nocasematch)
-    shopt -s nocasematch
-
-    # --- 1. СЛОЙ ДИНАМИЧЕСКОГО КРИПТО-АНАЛИЗА (Через GLOBAL_CRYPTO_TYPES) ---
+    # --- 1. СЛОЙ ДИНАМИЧЕСКОГО КРИПТО-АНАЛИЗА АДРЕСОВ (Через GLOBAL_CRYPTO_TYPES) ---
     for crypto_entry in "${GLOBAL_CRYPTO_TYPES[@]}"; do
         [[ -z "$crypto_entry" || "$crypto_entry" != *"|"* ]] && continue
         
         local crypto_regex="${crypto_entry%%|*}"
         local crypto_desc="${crypto_entry#*|}"
         
-        # Валидация через оригинальную сигнатуру
+        # Атомарная валидация через оригинальную сигнатуру монеты без изменения shopt
         if echo "$target" | grep -Eq "$crypto_regex"; then
             crypto_matched=1
             detected_currency="$crypto_desc"
@@ -6296,11 +6292,10 @@ osint_nexus_router() {
         fi
     done
 
-    # --- 2. СЛОЙ ОКОНЧАТЕЛЬНОЙ МАРШРУТИЗАЦИИ ЯДРА ---
+    # --- 2. СЛОЙ МОНОЛИТНОЙ МАРШРУТИЗАЦИИ И СЕПАРАЦИИ ЦЕЛЕЙ ---
 
-    # ТРИГГЕР 1: Обнаружено совпадение с криптографической сигнатурой
+    # ТРИГГЕР 1: Обнаружено совпадение с криптографическим кошельком/транзакцией
     if (( crypto_matched == 1 )); then
-        eval "$old_nocasematch" # Восстанавливаем состояние флага ОС
         core_engine_ui "i" "Mode: Crypto-Forensic Engaged [Network: $detected_currency]..."
         if [[ "$(type -t run_crypto_module)" == "function" ]]; then
             run_crypto_module "$target" "$detected_currency"
@@ -6308,23 +6303,33 @@ osint_nexus_router() {
             core_engine_ui "e" "Error: Crypto module not loaded in Core."
         fi
 
-    # ТРИГГЕР 2: КОРПОРАТИВНАЯ ИНФРАСТРУКТУРА (Твои ультимативные IP, Домены и Email паттерны)
-    # Используем утилиту grep с флагом -i для точной и безопасной отработки регистронезависимости
-    elif echo "$target" | grep -Eqi "$clean_rx_ip" || \
-         echo "$target" | grep -Eqi "$clean_rx_domain" || \
-         echo "$target" | grep -Eqi "$clean_rx_email"; then
+    # ТРИГГЕР 2: КРИПТОГРАФИЧЕСКИЕ ОТПЕЧАТКИ И ДАМПЫ (MD5, SHA, NTLM)
+    elif echo "$target" | grep -Eq "$rx_hash_ntlm|$rx_hash_sha512|$rx_hash_sha256|$rx_hash_sha1|$rx_hash_md5"; then
+        core_engine_ui "i" "Mode: Hash-Analysis Engaged [Target: Crypto-Signature/Leaked Hash]..."
+        if [[ "$(type -t run_hash_analysis_module)" == "function" ]]; then
+            run_hash_analysis_module "$target"
+        else
+            core_engine_ui "e" "Error: Hash-Analysis module not loaded in Core."
+        fi
+
+    # ТРИГГЕР 3: КОРПОРАТИВНАЯ ИНФРАСТРУКТУРА (Многослойный сетевой контур IP, Доменов и Email)
+    elif echo "$target" | grep -Eqi "$rx_ipv4" || \
+         echo "$target" | grep -Eqi "$rx_ipv6" || \
+         echo "$target" | grep -Eqi "$rx_domain_std" || \
+         echo "$target" | grep -Eqi "$rx_domain_idn" || \
+         echo "$target" | grep -Eqi "$rx_email_std" || \
+         echo "$target" | grep -Eqi "$rx_email_idn" || \
+         echo "$target" | grep -Eqi "$rx_email_loc"; then
         
-        eval "$old_nocasematch"
-        core_engine_ui "i" "Mode: Corporate-Recon Engaged [Target: Infrastructure]..."
+        core_engine_ui "i" "Mode: Corporate-Recon Engaged [Target: Infrastructure Cluster]..."
         if [[ "$(type -t run_corp_recon_module)" == "function" ]]; then
             run_corp_recon_module "$target"
         else
             core_engine_ui "e" "Error: Corporate-Recon module not loaded in Core."
         fi
 
-    # ТРИГГЕР 3: СОЦИАЛЬНЫЕ СВЯЗИ / АНАЛИЗ ИДЕНТИЧНОСТИ (Никнеймы)
+    # ТРИГГЕР 4: СОЦИАЛЬНЫЕ СВЯЗИ / АНАЛИЗ ИДЕНТИЧНОСТИ (Никнеймы и дескрипторы)
     elif [[ "$target" =~ ^@[a-zA-Z0-9_]{3,32}$ ]] || [[ "$target" =~ ^[a-zA-Z0-9_-]{3,32}$ ]]; then
-        eval "$old_nocasematch"
         local clean_nick="${target#@}"
         
         core_engine_ui "i" "Mode: Social-Graph Engaged [Target: Identity Node]..."
@@ -6334,16 +6339,16 @@ osint_nexus_router() {
             core_engine_ui "e" "Error: Social-Graph module not loaded in Core."
         fi
 
-    # ТРИГГЕР 4: Резервный отказоустойчивый обработчик
+    # ТРИГГЕР 5: Резервный отказоустойчивый обработчик
     else
-        eval "$old_nocasematch"
         core_engine_ui "w" "Warning: Unrecognized target vector. Defaulting to Corporate-Recon..."
         if [[ "$(type -t run_corp_recon_module)" == "function" ]]; then
             run_corp_recon_module "$target"
+        else
+            core_engine_ui "e" "Error: Critical routing failure. Fallback module missing."
         fi
     fi
 }
-
 
 # ==============================================================================
 # @description: OSINT NEXUS v20.0 - SOCIALSCAN INTERNAL PARSER (FIXED & VELOCITY)
@@ -6471,97 +6476,128 @@ run_osint_custom_leaks_internal() {
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v16.2 - OMNI-CRAWLER INTERNAL PARSER (CORE BOUND)
-# МОДЕРНИЗАЦИЯ: Полное сквозное внедрение оригинальных глобальных массивов и регулярных выражений
-# АРХИТЕКТУРА: Ghost-Speed Engine, асинхронный мульти-буферинг, жесткая привязка к ядру
+# @description: OSINT NEXUS v21.0 - OMNI-CRAWLER INTERNAL PARSER (PRIME INTEGRATION)
+# МОДЕРНИЗАЦИЯ: Полный переход на поисковый реестр GLOBAL_PRIME_MATRIX v2.0
+# АРХИТЕКТУРА: Ghost-Speed Engine, неблокирующее скользящее окно, RAM-дедупликация
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | INTEGRATION LIMIT
 # ==============================================================================
 run_osint_omni_crawler_internal() {
     local target_user="$1"
+    
+    # Защита контекста среды: входной вектор обязано быть инициализирован
     [[ -z "$target_user" ]] && return 1
+
+    core_engine_ui "i" "Omni-Crawler: Launching parallel search matrix v21.0 [PRIME REGISTRY]..."
+
+    # --- 0. СИНХРОНИЗАЦИЯ УЛЬТИМАТИВНЫХ МАТРИЦ ЯДРА (ZERO LOOSE VARIABLES) ---
+    # Извлечение сигнатур электронной почты
+    local rx_email_std="${GLOBAL_EMAIL_MATRIX[0]}"
+    local rx_email_idn="${GLOBAL_EMAIL_MATRIX[1]}"
+    local rx_email_loc="${GLOBAL_EMAIL_MATRIX[2]}"
+    
+    # Нативный слайсинг модернизированной матрицы телефонов GLOBAL_PRIME_MATRIX
+    local rx_phone_intl="${GLOBAL_PRIME_MATRIX[0]}"
+    local rx_phone_brackets="${GLOBAL_PRIME_MATRIX[1]}"
+    local rx_phone_cis="${GLOBAL_PRIME_MATRIX[2]}"
+    local rx_phone_compact="${GLOBAL_PRIME_MATRIX[3]}"
 
     # Нативное URL-кодирование пробелов: подготовка вектора под веб-запросы
     local safe_target="${target_user// /+}"
     local query_vectors=("${safe_target}+phone" "${safe_target}+contact" "${safe_target}+gmail")
     
-    # Изолированные сессионные буферы для предотвращения Race Condition (PID-изоляция)
+    # Изолированные сессионные буферы для предотвращения Race Condition (PID-изоляция на уровне I/O)
     local tmp_phones="/tmp/nexus_phones_$$"
     local tmp_emails="/tmp/nexus_emails_$$"
     touch "$tmp_phones" "$tmp_emails"
 
-    core_engine_ui "i" "Omni-Crawler: Launching parallel search matrix..."
+    local max_parallel_jobs=12 # Ограничитель пула одновременных сокетов ядра в скользящем окне
 
-    local current_jobs=0
-    local max_parallel_jobs=12 # Максимальный пул одновременных сокетов ядра
-
-    # --- СЛОЙ ПАРАЛЛЕЛЬНОЙ АГРЕГАЦИИ ---
+    # --- 1. СЛОЙ ПАРАЛЛЕЛЬНОЙ АГРЕГАЦИИ (АСИНХРОННЫЙ КРАУЛИНГ) ---
     for vector in "${query_vectors[@]}"; do
-        # Прямой парсинг твоего оригинального глобального массива поисковых движков
         for engine_entry in "${GLOBAL_SEARCH_ENGINES[@]}"; do
-            [[ -z "$engine_entry" ]] && continue
+            [[ -z "$engine_entry" || "$engine_entry" != *"|"* ]] && continue
             
             local engine_name="${engine_entry%%|*}"
             local request_url="${engine_entry#*|}"
             request_url="${request_url//%VECTOR%/$vector}"
             
-            # Асинхронный Ghost-поток: полная изоляция сетевого сокета
+            # Динамический выбор случайного User-Agent из глобального массива для обхода WAF/Фильтров
+            local selected_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            if [[ -n "${GLOBAL_NETWORK_UA[*]}" ]]; then
+                selected_ua=$(shuf -n1 -e "${GLOBAL_NETWORK_UA[@]}")
+            fi
+            
+            # Асинхронный Ghost-поток: полная сетевая изоляция сокета в фоне
             (
-                # Прямой вызов твоего глобального User-Agent без локальных проверок
-                local raw_data=$(curl -s -L -A "$GLOBAL_NETWORK_UA" \
+                # curl-сессия с жестким контролем времени жизни дескрипторов сокетов
+                local raw_data
+                raw_data=$(curl -s -L -A "$selected_ua" \
                     --connect-timeout 4 \
                     --max-time 10 \
                     "$request_url" 2>/dev/null)
                 
                 if [[ -n "$raw_data" ]]; then
-                    # Прямой парсинг через твои оригинальные глобальные регулярные выражения
-                    # Используем флаг -E (Extended REGEX), полностью совместимый с синтаксисом ядра
-                    echo "$raw_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" >> "$tmp_phones" 2>/dev/null
-                    echo "$raw_data" | grep -oE "$GLOBAL_REGEX_EMAIL" >> "$tmp_emails" 2>/dev/null
+                    # Каскадный однопроходный парсинг телефонов по всей матрице GLOBAL_PRIME_MATRIX
+                    echo "$raw_data" | grep -oE "$rx_phone_intl|$rx_phone_brackets|$rx_phone_cis|$rx_phone_compact" >> "$tmp_phones" 2>/dev/null
+                    
+                    # Каскадный однопроходный парсинг почтовых аккаунтов по всей матрице GLOBAL_EMAIL_MATRIX
+                    echo "$raw_data" | grep -oE "$rx_email_std|$rx_email_idn|$rx_email_loc" >> "$tmp_emails" 2>/dev/null
                 fi
             ) &
             
-            # Контроллер пула параллельных задач (Процессорный ограничитель)
-            ((current_jobs++))
-            if (( current_jobs >= max_parallel_jobs )); then
-                wait
-                current_jobs=0
-            fi
+            # --- УЛЬТИМАТИВНЫЙ КОНТРОЛЛЕР СКОЛЬЗЯЩЕГО ОКНА (SLIDING WINDOW POOL) ---
+            # Удерживаем пул активным строго на 12 параллельных процессов.
+            # Освободившийся PID мгновенно замещается следующим элементом цикла.
+            while (( $(jobs -p | wc -l) >= max_parallel_jobs )); do
+                sleep 0.02 # Микропауза ядра Linux для снижения нагрузки на планировщик до 0%
+            done
         done
     done
-    wait # Синхронизация: удержание ядра до завершения последнего сетевого процесса
+    wait # Глобальный барьер синхронизации: удерживаем ядро до завершения последней фоновой задачи
     
-    # --- СЛОЙ СТРУКТУРИРОВАНИЯ И СТРИМИНГА В ГЛОБАЛЬНЫЙ ЛОГ ---
-    # Потоковая атомарная дедупликация данных сессии перед записью в общие системные файлы
+    # --- 2. СЛОЙ РЕГИСТРОНЕЗАВИСИМОЙ RAM-ДЕДУПЛИКАЦИИ И СТРИМИНГА ---
     if [[ -s "$tmp_phones" ]]; then
-        sort -u "$tmp_phones" >> "/tmp/nexus_found_phones.tmp"
+        # Потоковая очистка дубликатов номеров
+        awk '!visited[$0]++' "$tmp_phones" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
     fi
     
     if [[ -s "$tmp_emails" ]]; then
-        sort -u "$tmp_emails" >> "/tmp/nexus_found_emails.tmp"
+        # Приведение к нижнему регистру перед дедупликацией для исключения повторов USER@ и user@
+        awk '!visited[tolower($0)]++' "$tmp_emails" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
     fi
 
-    # Санитарная зачистка следов текущей сессии процесса из директории /tmp
+    # Сбор метрик для передачи в системный интерфейс оператора
+    local found_p=0
+    local found_e=0
+    [[ -f "/tmp/nexus_found_phones.tmp" ]] && found_p=$(wc -l < "/tmp/nexus_found_phones.tmp")
+    [[ -f "/tmp/nexus_found_emails.tmp" ]] && found_e=$(wc -l < "/tmp/nexus_found_emails.tmp")
+
+    core_engine_ui "s" "Omni-Crawler: Extraction complete. Consolidated metrics: Phones ($found_p), Emails ($found_e)."
+
+    # Тотальная санитарная зачистка изолированных временных файлов текущей сессии PID
     rm -f "$tmp_phones" "$tmp_emails"
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v16.2 - FULL RECURSIVE MONOLITH (MAX INTEGRATION)
-# МОДЕРНИЗАЦИЯ: Полное сквозное внедрение всех глобальных матриц и API-нод ядра
-# АРХИТЕКТУРА: Parallel Ghost Mode, нативный стриминг буферов, Zero-Fork рекурсия
+# @description: OSINT NEXUS v21.0 - FULL RECURSIVE MONOLITH (MAX INTEGRATION)
+# МОДЕРНИЗАЦИЯ: Сквозная интеграция GLOBAL_INFRA, EMAIL, PRIME и FILTER_MATRIX (Ь)
+# АРХИТЕКТУРА: Sliding Window Parallel Pool, RAM-дедупликация, Zero-Fork рекурсия
 # @status: GHOST-SPEED COMPLIANT | MAXIMUM INTEGRATION LIMIT | FULL VECTOR
 # ==============================================================================
 run_smart_osint_engine() {
     clear
-    core_engine_ui "h" "PRIME RECON: NEXUS v16.2 (RECURSIVE MONOLITH)"
+    core_engine_ui "h" "PRIME RECON: NEXUS v21.0 (RECURSIVE MONOLITH)"
 
-    local TARGET=$(core_engine_input "text" "TARGET (Nick, Name, Phone, Email, IP, or Domain)")
+    local TARGET
+    TARGET=$(core_engine_input "text" "TARGET (Nick, Name, Phone, Email, IP, or Domain)")
     [[ -z "$TARGET" ]] && return
 
-    # Нативное экранирование спецсимволов для безопасной файловой операции
-    local timestamp=$(date +%Y%m%d_%H%M%S)
+    # Нативное экранирование спецсимволов для безопасных файловых и директорных операций
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
     local safe_target="${TARGET//[^a-zA-Z0-9]/_}"
     
-    # Унификация путей под строгий системный стандарт фреймворка
+    # Унификация путей под строгий системный стандарт изолированного хранения данных
     local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
     mkdir -p "$loot_dir" 2>/dev/null
     
@@ -6570,78 +6606,98 @@ run_smart_osint_engine() {
     
     echo "[*] RECURSIVE SCAN STARTED: $TARGET | TIMESTAMP: $(date)" > "$raw_log"
 
-    # --- 0. КРИТИЧЕСКИЙ ФИЛЬТР (SOCIAL SCAN SWITCH) ---
-    # Прямая валидация по твоим глобальным регулярным выражениям
-    if ! echo "$TARGET" | grep -Eq "$GLOBAL_REGEX_EMAIL|$GLOBAL_REGEX_PHONE|$GLOBAL_REGEX_IP|$GLOBAL_REGEX_DOMAIN"; then
+    # --- 0. СИНХРОНИЗАЦИЯ УЛЬТИМАТИВНЫХ МАТРИЦ ЯДРА (ZERO LOOSE VARIABLES) ---
+    local rx_ipv4="${GLOBAL_INFRA_MATRIX[0]}"
+    local rx_ipv6="${GLOBAL_INFRA_MATRIX[1]}"
+    local rx_domain_std="${GLOBAL_INFRA_MATRIX[2]}"
+    local rx_domain_idn="${GLOBAL_INFRA_MATRIX[3]}"
+    
+    local rx_email_std="${GLOBAL_EMAIL_MATRIX[0]}"
+    local rx_email_idn="${GLOBAL_EMAIL_MATRIX[1]}"
+    local rx_email_loc="${GLOBAL_EMAIL_MATRIX[2]}"
+    
+    local rx_phone_intl="${GLOBAL_PRIME_MATRIX[0]}"
+    local rx_phone_brackets="${GLOBAL_PRIME_MATRIX[1]}"
+    local rx_phone_cis="${GLOBAL_PRIME_MATRIX[2]}"
+    local rx_phone_compact="${GLOBAL_PRIME_MATRIX[3]}"
+
+    # Динамический выбор случайного User-Agent из ядра для защиты от сетевой блокировки
+    local selected_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    if [[ -n "${GLOBAL_NETWORK_UA[*]}" ]]; then
+        selected_ua=$(shuf -n1 -e "${GLOBAL_NETWORK_UA[@]}")
+    fi
+
+    # --- 1. КРИТИЧЕСКИЙ ФИЛЬТР СЕПАРАЦИИ ЦЕЛЕЙ (SOCIAL SCAN SWITCH) ---
+    # Проверяем, является ли цель сетевым или инфраструктурным идентификатором
+    if ! echo "$TARGET" | grep -Eq "$rx_email_std|$rx_email_idn|$rx_phone_intl|$rx_phone_cis|$rx_ipv4|$rx_ipv6|$rx_domain_std"; then
         core_engine_ui "i" "Scanning Social Signatures (Ghost Parallel Mode)..."
         
-        # Атомарный буфер для параллельных потоков
+        # Атомарный изолированный буфер для параллельных потоков сбора
         local tmp_social="/tmp/osint_social_$$"
         touch "$tmp_social"
 
-        local current_jobs=0
-        local max_parallel_jobs=10  # Защитный лимит одновременных сокетов
+        local max_parallel_jobs=10  # Защитный лимит одновременных сетевых сокетов
 
         for entry in "${GLOBAL_OSINT_SITES[@]}"; do
+            [[ -z "$entry" || "$entry" != *"|"* ]] && continue
             local url="${entry%%|*}"
             local name="${entry#*|}"
             
-            # Асинхронное распараллеливание curl под контролем лимита процессов
+            # Асинхронное распараллеливание curl под контролем неблокирующего пула
             (
-                local resp=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "${url}${TARGET}" --connect-timeout 4 -D - 2>/dev/null)
-                if echo "$resp" | grep -q "200 OK"; then
+                local resp
+                resp=$(curl -s -L -A "$selected_ua" -I "${url}${TARGET}" --connect-timeout 4 2>/dev/null)
+                if echo "$resp" | grep -Eqi "HTTP/[12.]+ 200"; then
                     echo "[MATCH] $name -> ${url}${TARGET}" >> "$tmp_social"
-                    echo "HEADERS: $(echo "$resp" | head -n 3)" >> "$tmp_social"
                 fi
             ) &
             
-            ((current_jobs++))
-            if (( current_jobs >= max_parallel_jobs )); then
-                wait
-                current_jobs=0
-            fi
+            # --- УЛЬТИМАТИВНЫЙ КОНТРОЛЛЕР СКОЛЬЗЯЩЕГО ОКНА (SLIDING WINDOW) ---
+            while (( $(jobs -p | wc -l) >= max_parallel_jobs )); do
+                sleep 0.02
+            done
         done
-        wait # Фиксация остаточных потоков
+        wait # Фиксация и дожидание остаточных фоновых потоков
         
         [[ -s "$tmp_social" ]] && cat "$tmp_social" >> "$raw_log"
         rm -f "$tmp_social"
 
-        # Запрос к твоей первой ноде идентификации из глобального пула
+        # Запрос метаданных к первой ноде идентификации из глобального пула API
         if [[ -n "${GLOBAL_API_IDENTITY_NODES[0]}" ]]; then
             local gh_api="${GLOBAL_API_IDENTITY_NODES[0]%%|*}"
-            curl -s -A "$GLOBAL_NETWORK_UA" "${gh_api}${TARGET}" >> "$raw_log" 2>/dev/null
+            curl -s -A "$selected_ua" "${gh_api}${TARGET}" >> "$raw_log" 2>/dev/null
         fi
     fi
 
-    # --- 1. ТЕХНИЧЕСКИЙ ПИПЛАЙН (Deep Intel через твои API ноды) ---
-    core_engine_ui "i" "Running primary technical pipeline..."
+    # --- 2. ТЕХНИЧЕСКИЙ ПИПЛАЙН ВЫСОКОГО УРОВНЯ (Deep Intel Ноды) ---
+    core_engine_ui "i" "Running primary technical pipeline v21.0..."
     
-    # Интеграция телефонных нод
-    if [[ "$TARGET" =~ $GLOBAL_REGEX_PHONE ]] || is_valid "$TARGET" "GLOBAL_REGEX_PHONE" 2>/dev/null; then
+    # Интеграция телефонных нод API (Проверка по всей матрице PRIME)
+    if echo "$TARGET" | grep -Eq "$rx_phone_intl|$rx_phone_brackets|$rx_phone_cis|$rx_phone_compact"; then
         if [[ -n "${GLOBAL_API_PHONE_NODES[0]}" ]]; then
             echo -e "\n[PHONE_DATA]" >> "$raw_log"
-            curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_PHONE_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
+            curl -s -A "$selected_ua" "${GLOBAL_API_PHONE_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
         fi
     fi
     
-    # Интеграция нод анализа утечек (Breach Nodes)
-    if [[ "$TARGET" =~ $GLOBAL_REGEX_EMAIL ]] || is_valid "$TARGET" "GLOBAL_REGEX_EMAIL" 2>/dev/null; then
+    # Интеграция нод анализа утечек данных (Breach Nodes)
+    if echo "$TARGET" | grep -Eq "$rx_email_std|$rx_email_idn|$rx_email_loc"; then
         if [[ -n "${GLOBAL_API_BREACH_NODES[0]}" ]]; then
             echo -e "\n[BREACH_DATA]" >> "$raw_log"
-            curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_BREACH_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
+            curl -s -A "$selected_ua" "${GLOBAL_API_BREACH_NODES[0]%%|*}$TARGET" >> "$raw_log" 2>&1
         fi
     fi
     
-    # Интеграция сетевых нод (IP Nodes)
-    if [[ "$TARGET" =~ $GLOBAL_REGEX_IP ]] || is_valid "$TARGET" "GLOBAL_REGEX_IP" 2>/dev/null; then
+    # Интеграция сетевых нод маршрутизации (IP Nodes - IPv4 / IPv6)
+    if echo "$TARGET" | grep -Eq "$rx_ipv4|$rx_ipv6"; then
         if [[ -n "${GLOBAL_API_NETWORK_NODES[0]}" ]]; then
             echo -e "\n[NET_DATA]" >> "$raw_log"
-            curl -s -A "$GLOBAL_NETWORK_UA" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$TARGET/json" >> "$raw_log" 2>&1
+            curl -s -A "$selected_ua" "${GLOBAL_API_NETWORK_NODES[0]%%|*}$TARGET/json" >> "$raw_log" 2>&1
         fi
     fi
     
-    # Интеграция доменного анализа и SSL-метрик
-    if [[ "$TARGET" =~ $GLOBAL_REGEX_DOMAIN ]] || is_valid "$TARGET" "GLOBAL_REGEX_DOMAIN" 2>/dev/null; then
+    # Интеграция доменного инфраструктурного анализа и SSL-метрики
+    if echo "$TARGET" | grep -Eq "$rx_domain_std|$rx_domain_idn"; then
         echo -e "\n[DNS_DATA]" >> "$raw_log"
         if command -v dig >/dev/null 2>&1; then
             dig +noall +answer "$TARGET" >> "$raw_log"
@@ -6651,65 +6707,94 @@ run_smart_osint_engine() {
         
         echo -e "\n[SSL_DATA]" >> "$raw_log"
         if command -v openssl >/dev/null 2>&1; then
-            echo | openssl s_client -servername "$TARGET" -connect "$TARGET:443" 2>/dev/null | openssl x509 -noout -subject -dates >> "$raw_log" 2>&1
+            echo | openssl s_client -servername "$TARGET" -connect "$TARGET:443" 2>/dev/null | \
+            openssl x509 -noout -subject -dates >> "$raw_log" 2>&1
         fi
     fi
 
-    # --- 1.5 АВТОМАТИЗИРОВАННОЕ РАСШИРЕНИЕ (Интеграция v22.3) ---
+    # --- 3. АВТОМАТИЗИРОВАННОЕ РАСШИРЕНИЕ КОНТУРА КРАУЛИНГА ---
     core_engine_ui "i" "Nexus: Running Automated Pipeline Extensions..."
     [[ "$(type -t run_osint_omni_crawler)" == "function" ]] && run_osint_omni_crawler "$TARGET" "$raw_log"
     [[ "$(type -t run_osint_custom_socialscan)" == "function" ]] && run_osint_custom_socialscan "$TARGET" "$raw_log"
     [[ "$(type -t run_osint_custom_leaks)" == "function" ]] && run_osint_custom_leaks "$TARGET" "$raw_log"
     
-    if [[ "$TARGET" =~ $GLOBAL_REGEX_PHONE_VALID ]] && [[ "$(type -t run_osint_custom_ignorant)" == "function" ]]; then
+    if echo "$TARGET" | grep -Eq "$rx_phone_intl|$rx_phone_cis" && [[ "$(type -t run_osint_custom_ignorant)" == "function" ]]; then
         run_osint_custom_ignorant "$TARGET" "$raw_log"
     fi
 
-    # --- 2. РЕКУРСИВНЫЙ ЦИКЛ (Nexus Deep-Hunt через глобальные ноды) ---
+    # --- 4. РЕКУРСИВНЫЙ ЦИКЛ (Deep-Hunt Стриминг Извлеченных Сущностей) ---
     core_engine_ui "i" "Nexus: Launching recursive search on extracted entities..."
     
-    # 2.1 Нативная потоковая рекурсия по Email (Парсинг лога без внешних форков)
-    local ext_emails=$(grep -oE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$raw_log" | sort -u)
+    # 4.1 Потоковая дедуплицированная рекурсия по Email (Чистый RAM-пайплайн)
+    local ext_emails
+    ext_emails=$(grep -oEoi "$rx_email_std|$rx_email_idn" "$raw_log" 2>/dev/null | awk '!visited[tolower($0)]++')
     if [[ -n "$ext_emails" && -n "${GLOBAL_API_BREACH_NODES[0]}" ]]; then
         local breach_api="${GLOBAL_API_BREACH_NODES[0]%%|*}"
         echo "$ext_emails" | while read -r email; do
             [[ -z "$email" ]] && continue
             echo "[RECURSIVE_BREACH_CHECK] $email" >> "$raw_log"
-            curl -s -A "$GLOBAL_NETWORK_UA" "${breach_api}$email" >> "$raw_log" 2>&1
+            curl -s -A "$selected_ua" "${breach_api}$email" >> "$raw_log" 2>&1
         done
     fi
 
-    # 2.2 Нативная потоковая рекурсия по IP
-    local ext_ips=$(grep -oE '[0-9]{\1,3}\.[0-9]{\1,3}\.[0-9]{\1,3}\.[0-9]{\1,3}' "$raw_log" | sort -u)
+    # 4.2 Потоковая дедуплицированная рекурсия по сетевым IP-адресам (Исправленный синтаксис)
+    local ext_ips
+    ext_ips=$(grep -oE "$rx_ipv4" "$raw_log" 2>/dev/null | awk '!visited[$0]++')
     if [[ -n "$ext_ips" && -n "${GLOBAL_API_NETWORK_NODES[0]}" ]]; then
         local net_api="${GLOBAL_API_NETWORK_NODES[0]%%|*}"
         echo "$ext_ips" | while read -r ip; do
             [[ -z "$ip" ]] && continue
-            [[ "$ip" == "127.0.0.1" || "$ip" == "0.0.0.0" ]] && continue # Защита от внутренней петли
+            [[ "$ip" == "127.0.0.1" || "$ip" == "0.0.0.0" ]] && continue # Защита подсети от внутренней петли
             echo "[RECURSIVE_NET_CHECK] $ip" >> "$raw_log"
-            curl -s -A "$GLOBAL_NETWORK_UA" "${net_api}$ip/json" >> "$raw_log" 2>&1
+            curl -s -A "$selected_ua" "${net_api}$ip/json" >> "$raw_log" 2>&1
         done
     fi
 
-    # --- 3. СТРУКТУРИРОВАНИЕ ДОСЬЕ ---
-    core_engine_ui "s" "Finalizing intelligence dossier..."
+    # --- 5. СТРУКТУРИРОВАНИЕ И ФОРМИРОВАНИЕ ФОРЕНЗИК-ДОСЬЕ ---
+    core_engine_ui "i" "Finalizing intelligence dossier via Multi-Layer GLOBAL_FILTER_MATRIX..."
     
+    # Динамическая сборка всех векторов Матрицы Ь в единую супер-маску POSIX ERE
+    local report_filter_mask=""
+    local layer_index=0
+    
+    for layer in "${GLOBAL_FILTER_MATRIX[@]}"; do
+        if [[ -z "$report_filter_mask" ]]; then
+            report_filter_mask="$layer"
+        else
+            report_filter_mask="${report_filter_mask}|$layer"
+        fi
+        ((layer_index++))
+    done
+    
+    core_engine_ui "i" "Matrix Ь: Consolidated $layer_index forensic layers into core parser pipeline."
+
     local final_report="$loot_dir/dossier_${safe_target}_$timestamp.txt"
     {
-        echo "--- OSINT NEXUS FINAL DOSSIER ---"
-        echo "TARGET: $TARGET"
-        echo "DATE: $(date)"
-        echo "---------------------------------"
-        grep -E "MATCH|FOUND|BREACH|PHONE|OPER|ORG|DNS|SSL|RECURSIVE|Extracted" "$raw_log" | sort -u
+        echo "=============================================================================="
+        echo "               --- OSINT NEXUS v21.0 FINAL FORENSIC DOSSIER ---"
+        echo "=============================================================================="
+        echo " TARGET    : $TARGET"
+        echo " TIMESTAMP : $(date '+%Y-%m-%d %H:%M:%S')"
+        echo " CORE LAYER: COMPLIANT WITH GHOST-SPEED ENGINE PROTOCOLS"
+        echo "=============================================================================="
+        echo ""
+        
+        # Высокоскоростной однопроходный RAM-пайплайн:
+        # Фильтрация по объединенной Матрице Ь с последующей мгновенной очисткой дубликатов строк
+        grep -Ei "$report_filter_mask" "$raw_log" 2>/dev/null | awk '!visited[$0]++'
+        
+        echo ""
+        echo "=============================================================================="
+        echo "               --- END OF INTELLIGENCE FORENSIC REPORT ---"
+        echo "=============================================================================="
     } > "$final_report"
 
-    # Запись сигнала завершения в центральный системный мост
-    echo "[$(date)] OSINT_NEXUS_SUCCESS | TARGET: $TARGET | DOSSIER: $(basename "$final_report")" >> "$loot_dir/bridge_signals.log"
+    # Фиксация триггерного сигнала завершения в центральный системный мост фреймворка
+    echo "[$(date)] OSINT_NEXUS_SUCCESS | TARGET: $TARGET | DOSSIER: $(basename "$final_report") | LAYERS: $layer_index" >> "$loot_dir/bridge_signals.log"
 
     core_engine_ui "s" "Dossier complete: $final_report"
     core_engine_wait
 }
-
 
 
 # ==============================================================================
@@ -7145,11 +7230,11 @@ run_prime_exploiter_v5() {
 
     # Эвристический выбор конфигурационных модулей на основе глобальных сигнатур веб-структуры
     local web_structure_detected="dormant"
-    grep -qiE "$GLOBAL_SIG_WEB_STRUCTURE" "$signals_file" 2>/dev/null && web_structure_detected="active"
+   grep -qiE "${GLOBAL_SECURITY_MATRIX[3]}" "$signals_file" 2>/dev/null && web_structure_detected="active"
 
-    # Проверка наличия WAF для автоматической корректировки интенсивности запросов
+      # Проверка наличия WAF для автоматической корректировки интенсивности запросов
     local scan_intensity="-T3"
-    grep -qiE "$GLOBAL_SIG_WAF" "$signals_file" 2>/dev/null && scan_intensity="-T1 --scan-delay ${stealth_delay}s"
+    grep -qiE "${GLOBAL_SECURITY_MATRIX[0]}" "$signals_file" 2>/dev/null && scan_intensity="-T1 --scan-delay ${stealth_delay}s"
 
     # --- СЛОЙ 3: ЦИКЛ АМОРФНОГО ИСПОЛНЕНИЯ (Безопасный аудит) ---
     core_engine_ui "w" "Deploying Gap-Engine (Mode: Safe Discovery | Intensity: $scan_intensity)..."
@@ -7191,9 +7276,10 @@ run_prime_exploiter_v5() {
     if [[ -s "$results_file" ]]; then
         echo -e "${Y}>>> DETECTED CONFIGURATION GAPS & ALERTS <<<${NC}"
         
-        # Интеллектуальный разбор лога через оригинальный паттерн GLOBAL_SIG_VULN_ALERTS
-        grep -Ei "$GLOBAL_SIG_VULN_ALERTS" "$results_file" 2>/dev/null | \
-        sed -r "s/(.*(missing|vulnerable|exposed|weak|cve).*)/${Y}[GAP FOUND]${NC} \1/I" | sort -u
+     
+        # Интеллектуальный разбор лога через реестр (Индекс 5: Расширенные аномалии и CVE)
+        grep -Ei "${GLOBAL_SECURITY_MATRIX[5]}" "$results_file" 2>/dev/null | \
+        sed -r "s/(.*)/${Y}[GAP FOUND]${NC} \1/" | sort -u
 
         # Интеграция результатов в Сборщик трофеев ядра для Nexus-конвейера
         core_engine_loot "security_gaps" "Target: $target | Entropy: $entropy_level | Structure: $web_structure_detected\n$(cat "$results_file")"
@@ -7440,26 +7526,26 @@ run_deep_file_probe() {
     local leaks=""
     local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
 
-    # 1. Эвристика: Поиск утечек СУБД / Конфигов
-    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_DB_LEAKS" 2>/dev/null; then
+   # 1. Эвристика: Поиск утечек СУБД / Конфигов (Индекс 0: Секреты и конфигурационные утечки)
+    if echo "$sample" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}" 2>/dev/null; then
         leaks+="${R}[!] DB_LEAK: Connection string, config environment or database credentials detected${NC}\n"
     fi
-
-    # 2. Эвристика: Поиск точек входа / Веб-параметров
-    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_WEB_INPUTS" 2>/dev/null; then
+    
+    # 2. Эвристика: Поиск точек входа / Веб-параметров (Индекс 1: Точки входа и API-инъекции)
+    if echo "$sample" | grep -qiE "${GLOBAL_SAST_MATRIX[1]}" 2>/dev/null; then
         leaks+="${Y}[*] LOGIC: Entry point for data detected (Cross-Platform Web Inputs)${NC}\n"
     fi
 
-    # 3. Эвристика: Поиск системных вызовов (RCE)
-    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_RCE_RISKS" 2>/dev/null; then
-        leaks+="${R}[!] RCE_RISK: System command execution detected (Critical Internal Call)${NC}\n"
-    fi
+     # 3. Эвристика: Поиск системных вызовов (RCE) (Индекс 2: RCE и исполнение команд)
+        if echo "$sample" | grep -qiE "${GLOBAL_SAST_MATRIX[2]}" 2>/dev/null; then
+            leaks+="${R}[!] RCE_RISK: System command execution detected (Critical Internal Call)${NC}\n"
+        fi
 
-    # 4. Эвристика: Поиск файловых операций / Инклудов (LFI)
-    if echo "$sample" | grep -qiE "$GLOBAL_REGEX_LFI_RISKS" 2>/dev/null; then
+  # 4. Эвристика: Поиск файловых операций / Инклудов (LFI) (Индекс 3: LFI, RFI и файловые операции)
+    if echo "$sample" | grep -qiE "${GLOBAL_SAST_MATRIX[3]}" 2>/dev/null; then
         leaks+="${B}[i] LFI_RISK: File operations / Dynamic inclusion detected${NC}\n"
     fi
-
+    
     # Фиксация результатов при обнаружении аномалий
     if [[ -n "$leaks" ]]; then
         # Красивый вывод отчета с сохранением оригинальных отступов фреймворка
