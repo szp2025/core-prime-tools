@@ -9058,66 +9058,57 @@ run_dd_logic() {
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.1 - NATIVE UNIVERSAL SOCIALSCAN MODULE
-# @status: MULTI-VECTOR VALIDATION (NICK/EMAIL/PHONE/IP) - FULLY INTEGRATED
+# @description: OSINT NEXUS v25.5 - UNIVERSAL IDENTIFIER DISPATCHER
+# @status: FULL-STACK MATRIX INTEGRATION | AUTONOMOUS ARTIFACT EXTRACTION
 # ==============================================================================
 run_osint_custom_socialscan() {
     local input_target="$1"
     local raw_log="$2"
 
-       # 1. Приоритет ввода: аргумент -> сессионный таргет
     [[ -z "$input_target" ]] && input_target="$target_user"
     [[ -z "$input_target" ]] && return 1
 
-    # 2. Фильтрация системных маршрутов (Nexus Bypass Protection)
-    if is_valid "$input_target" "GLOBAL_PLATFORM_SYSTEM_ROUTES"; then
-        return 1
-    fi
+    # Защита от системных петель
+    if is_valid "$input_target" "GLOBAL_PLATFORM_SYSTEM_ROUTES"; then return 1; fi
 
+    # 1. Автоматическое определение типа цели (Авто-маршрутизация)
+    local target_type="NICK"
+    [[ "$input_target" =~ ${GLOBAL_EMAIL_MATRIX[0]} ]] && target_type="EMAIL"
+    [[ "$input_target" =~ ${GLOBAL_PRIME_MATRIX[0]} || "$input_target" =~ ${GLOBAL_PRIME_MATRIX[3]} ]] && target_type="PHONE"
+    [[ "$input_target" =~ ${GLOBAL_INFRA_MATRIX[0]} || "$input_target" =~ ${GLOBAL_INFRA_MATRIX[2]} ]] && target_type="INFRA"
 
-    # Определение режима: если это ник — Ghost Mode, если данные — API-валидация
-    local is_nick=1
-    echo "$input_target" | grep -Eq "$GLOBAL_REGEX_EMAIL|$GLOBAL_REGEX_PHONE|$GLOBAL_REGEX_IP|$GLOBAL_REGEX_DOMAIN" && is_nick=0
+    core_engine_ui "i" "Nexus Dispatcher: Target type [$target_type] | Scanning registry..."
 
-    core_engine_ui "i" "Nexus SocialScan: $( [[ $is_nick -eq 1 ]] && echo "Ghost Mode" || echo "API-Validation" ) initiated for [$input_target]"
-
+    # 2. Итерация по реестру платформ
     for site_entry in "${GLOBAL_OSINT_SITES[@]}"; do
-        [[ "$site_entry" != *"|"* ]] && continue
-        
-        # Парсинг матрицы [BaseURL|CheckType|ErrorMarker|Category|SiteName]
         local base_url="${site_entry%%|*}"; local remaining="${site_entry#*|}"
         local check_type="${remaining%%|*}"; remaining="${remaining#*|}"
-        local error_marker="${remaining%%|*}"; remaining="${remaining#*|}"
-        local category="${remaining%%|*}"; local site_name="${remaining#*|}"
+        local error_marker="${remaining%%|*}"; local site_name="${remaining##*|}"
         
-        # Формирование URL (автоматическая адаптация под тип цели)
         local full_url="${base_url}${input_target}"
         local account_exists=0
 
-        # Диспетчеризация логики проверки
+        # Диспетчер методов проверки
         if [[ "$check_type" == "HTTP_CODE" ]]; then
-            local http_code=$(curl -s -o /dev/null -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 -w "%{http_code}" "$full_url")
-            [[ "$http_code" == "200" ]] && account_exists=1
+            [[ "$(curl -s -o /dev/null -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 -w "%{http_code}" "$full_url")" == "200" ]] && account_exists=1
         elif [[ "$check_type" == "TEXT_ABSENT" ]]; then
-            local page_body=$(curl -s -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 5 "$full_url" 2>/dev/null)
+            local page_body=$(curl -s -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 "$full_url" 2>/dev/null)
             [[ -n "$page_body" && ! "$page_body" =~ "$error_marker" ]] && account_exists=1
         fi
 
-        # РЕКУРСИВНЫЙ ВЫХЛОП И ЭКСТРАКЦИЯ АРТЕФАКТОВ
+        # 3. Рекурсивная экстракция через Матрицы
         if (( account_exists == 1 )); then
-            # Маркировка типа найденного соответствия
-            local match_type=$([[ $is_nick -eq 1 ]] && echo "NICK" || echo "DATA")
-            echo "[MATCH_SOCIAL_$match_type] $site_name -> $full_url" >> "$raw_log"
-            core_engine_ui "s" "[+] Linked ($match_type): $site_name (Artifacts extraction...)"
+            echo "[MATCH_$target_type] $site_name -> $full_url" >> "$raw_log"
+            core_engine_ui "s" "[+] Linked: $site_name (Artifact Extraction Active)"
             
-            # Фоновая экстракция для каскада Omni-Crawler
             local page_data=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "$full_url" 2>/dev/null)
-            echo "$page_data" | grep -oE "$GLOBAL_REGEX_EMAIL" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
-            echo "$page_data" | grep -oE "$GLOBAL_REGEX_PHONE" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
+            
+            # Извлечение артефактов по глобальным матрицам
+            echo "$page_data" | grep -oE "${GLOBAL_EMAIL_MATRIX[0]}" >> "/tmp/nexus_emails.tmp" 2>/dev/null
+            echo "$page_data" | grep -oE "${GLOBAL_PRIME_MATRIX[0]}|${GLOBAL_PRIME_MATRIX[3]}" >> "/tmp/nexus_phones.tmp" 2>/dev/null
+            echo "$page_data" | grep -oE "${GLOBAL_INFRA_MATRIX[0]}" >> "/tmp/nexus_ips.tmp" 2>/dev/null
         fi
-        
-        # Анти-бот задержка
-        sleep 0.3
+        sleep 0.4
     done
 }
 
