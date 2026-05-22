@@ -8508,107 +8508,64 @@ run_kernel_check() {
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v23.3 - PARANOID FORENSIC ANALYSIS CORE
-# @status: MULTI-LAYERED HEURISTICS & METRIC INHERITANCE | PRODUCTION READY
+# @description: OSINT NEXUS v25.0 - UNIFIED FORENSIC-NEXUS ANALYSIS CORE
+# @status: FULLY INTEGRATED WITH FORENSIC_MATRIX | DYNAMIC HEURISTIC ENGINE
 # ==============================================================================
 run_forensic_core() {
     local f_path="$1"
-    
-    # Слой 1: Наследование метрик или безопасный ленивый сбор (если запущен автономно)
-    if [[ ! -f "$f_path" ]]; then
-        core_engine_ui "e" "Target file not found: $f_path"
-        return 1
-    fi
+    [[ ! -f "$f_path" ]] && { core_engine_ui "e" "Target: $f_path unreachable."; return 1; }
 
-    # Используем унаследованные переменные от run_auto_forensics, либо собираем атомарно
-    local mime_type="${file_mime_type:-$(file --mime-type -b "$f_path" 2>/dev/null)}"
-    local f_hash="${file_hash:-$(sha256sum "$f_path" 2>/dev/null | awk '{print $1}')}"
     local f_name=$(basename "$f_path")
+    local f_hash=$(sha256sum "$f_path" | awk '{print $1}')
+    local mime_type=$(file --mime-type -b "$f_path")
+
+    core_engine_ui "h" "FORENSIC-NEXUS: ANALYZING $f_name"
+
+    # 1. СТАТИЧЕСКИЙ АНАЛИЗ (Метаданные + Слой 5: Obfuscation/Persistence)
+    core_engine_ui "i" "Extracting Metadata & Obfuscation fingerprints..."
+    exiftool "$f_path" 2>/dev/null | grep -E "^(Date|Time|GPS|Software|Creator)" | sed 's/^/  [META]: /'
     
-    local base_loot_dir="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
-    local history_log="${base_loot_dir}/forensic_history.log"
-    local raw_python_code=""
+    # Поиск обфускации через FORENSIC_MATRIX[4]
+    local obs_found=$(LC_ALL=C strings "$f_path" 2>/dev/null | grep -Ei "${FORENSIC_MATRIX[4]}" | head -n 3)
+    [[ -n "$obs_found" ]] && core_engine_ui "!" "HEURISTIC: Obfuscation layer detected: $obs_found"
 
-    mkdir -p "$base_loot_dir" 2>/dev/null
-
-    # ПАМЯТЬ СИСТЕМЫ: Интеллектуальное сопоставление
-    if [[ -f "$history_log" ]] && grep -q "$f_hash" "$history_log" 2>/dev/null; then
-        core_engine_ui "w" "ADAPTIVE: Artifact hash recognized from historic database. Analyzing structures for anomalies..."
-    fi
-
-    core_engine_ui "h" "CORE ANALYSIS: $f_name"
-    
-    # 1. СТАТИЧЕСКИЙ АНАЛИЗ МЕТАДАННЫХ (Строгий парсинг тегов)
-    core_engine_ui "i" "Extracting Metadata Attributes..."
-    exiftool "$f_path" 2>/dev/null | grep -E "^(Date|Time|Make|Model|GPS|Software|User|Creator|Producer|Title|Author)" | sed 's/^/  [META]: /'
-
-    # 2. МНОГОСЛОЙНЫЙ АДАПТИВНЫЙ CASE-КОНТУР
+    # 2. МНОГОСЛОЙНЫЙ АДАПТИВНЫЙ КОНТУР
     case "$mime_type" in
-        image/*)
-            core_engine_ui "w" "Analyzing Image Integrity (Error Level Analysis)..."
-            python3 -c "import PIL" &>/dev/null || core_engine_validator "pkg" "python3-pil" "PIL Library"
-            
-            raw_python_code=$(generate_image_analyzer_code_raw 2>/dev/null)
-            if [[ -n "$raw_python_code" ]]; then
-                # Изолируем выхлоп Python, убирая пустые строки и системный мусор
-                local py_res=$(echo "$raw_python_code" | python3 - "$f_path" 2>/dev/null | sed 's/^/    [ELA_PY]: /')
-                [[ -n "$py_res" ]] && echo "$py_res"
-            fi
-            ;;
-            
         application/pdf)
-            core_engine_ui "w" "Scanning PDF Tree for Active Exploits & Hidden Objects..."
-            if grep -aE "$GLOBAL_REGEX_PDF_THREATS" "$f_path" >/dev/null 2>&1; then
-                core_engine_ui "e" "CRITICAL DANGER: Malicious active content / Macro-triggers triggered!"
-                grep -aE "$GLOBAL_REGEX_PDF_THREATS" "$f_path" 2>/dev/null | sort -u | sed 's/^/    [TRIGGER]: /'
-            else
-                core_engine_ui "s" "No high-risk active structures identified in PDF container."
-            fi
+            # Слой 3: Документарные угрозы (PDF/Office)
+            core_engine_ui "w" "Auditing PDF tree via FORENSIC_MATRIX[2]..."
+            grep -aEi "${FORENSIC_MATRIX[2]}" "$f_path" 2>/dev/null | sort -u | sed 's/^/    [TRIGGER]: /'
             ;;
 
-        application/zip|application/x-rar|application/x-7z-compressed|application/x-tar|application/x-gzip)
-            core_engine_ui "w" "Deep Container Inspection & Embedded Extensions Audit..."
-            core_engine_validator "pkg" "p7zip-full" "7-Zip" || return 1
-            
-            local container_matches=$(7z l "$f_path" 2>/dev/null | grep -iE "$GLOBAL_REGEX_CONTAINER_THREATS")
-            if [[ -n "$container_matches" ]]; then
-                core_engine_ui "!" "ALERT: Dangerous executable signatures inside compressed container!"
-                echo "$container_matches" | sed 's/^/    [RISK_FILE]: /'
-            else
-                core_engine_ui "s" "Container structure passed expansion safety validation."
-            fi
+        application/zip|application/x-rar|application/x-7z-compressed)
+            # Слой 4: Контейнеры и LOLBAS
+            core_engine_ui "w" "Auditing container integrity via FORENSIC_MATRIX[3]..."
+            7z l "$f_path" 2>/dev/null | grep -Ei "${FORENSIC_MATRIX[3]}" | sed 's/^/    [RISK_FILE]: /'
             ;;
 
-        application/x-executable|application/x-sharedlib|application/x-dosexec|application/octet-stream)
-            core_engine_ui "w" "Binary Heuristics & Core Packer Detection..."
+        application/x-executable|application/x-sharedlib|application/octet-stream)
+            # Слой 1 (Руткиты) и Слой 4 (Бинарные вызовы)
+            core_engine_ui "w" "Binary Heuristics & Symbol Hook Analysis..."
             
-            # Сетевой и системный вектор
-            local net_cmds=$(LC_ALL=C strings -n 6 "$f_path" 2>/dev/null | grep -E "$GLOBAL_REGEX_BINARY_NETCMD" | head -n 10)
-            [[ -n "$net_cmds" ]] && echo "$net_cmds" | sed 's/^/    [SYSTEM_CALL]: /'
-            
-            # Поиск упаковщиков / крипторов малвари
-            if grep -aE "$GLOBAL_REGEX_BINARY_PACKERS" "$f_path" >/dev/null 2>&1; then
-                core_engine_ui "e" "ALERT: Signature matches cryptographic packer or software protector (UPX/Themida)."
-            fi
+            # Проверка на наличие вредоносных системных вызовов
+            local calls=$(LC_ALL=C strings -n 6 "$f_path" 2>/dev/null | grep -Ei "${FORENSIC_MATRIX[0]}|${FORENSIC_MATRIX[3]}" | head -n 10)
+            [[ -n "$calls" ]] && echo "$calls" | sed 's/^/    [SYSTEM_CALL]: /'
             ;;
     esac
 
-    # 3. ДОПОЛНИТЕЛЬНЫЙ ЭВРИСТИЧЕСКИЙ СЛОЙ (Защита от Polyglot-файлов и обхода MIME)
-    # Если файл имеет тип отличный от обычного текста, но содержит подозрительные скриптовые паттерны
-    if [[ "$mime_type" != "text/plain" ]]; then
-        local obfuscation_check=$(LC_ALL=C strings "$f_path" 2>/dev/null | grep -E "$GLOBAL_REGEX_HEURISTIC_SCRIPTS" | head -n 3)
-        if [[ -n "$obfuscation_check" ]]; then
-            core_engine_ui "!" "HEURISTIC ALERT: Embedded Obfuscated Code/Execution Patterns detected inside binary stream!"
-            echo "$obfuscation_check" | sed 's/^/    [SUSPICIOUS_STREAM]: /'
-        fi
+    # 3. СЛОЙ ОБХОДА КОНТЕЙНЕРИЗАЦИИ (Слой 2: Runtime Anomalies)
+    # Поиск попыток эскейпа контейнера или манипуляции памятью
+    local escape_attempts=$(LC_ALL=C strings "$f_path" 2>/dev/null | grep -Ei "${FORENSIC_MATRIX[1]}")
+    if [[ -n "$escape_attempts" ]]; then
+        core_engine_ui "e" "CRITICAL: Potential Container Escape sequence identified!"
+        echo "$escape_attempts" | sed 's/^/    [ESCAPE_VEC]: /'
     fi
 
-   # СОХРАНЕНИЕ УНИКАЛЬНОГО ОПЫТА (Атомарная запись без дублирования)
-    if [[ ! -f "$history_log" ]] || ! grep -q "$f_hash" "$history_log" 2>/dev/null; then
-        echo "[$(date "+%Y-%m-%d %H:%M:%S")] $f_hash $f_name $mime_type" >> "$history_log"
-    fi
+    # Сохранение лога в лут
+    local base_loot="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}"
+    echo "[$(date "+%Y-%m-%d %H:%M:%S")] $f_hash $f_name $mime_type" >> "${base_loot}/forensic_history.log"
     
-    core_engine_ui "s" "Forensic cycle completed successfully."
+    core_engine_ui "s" "Forensic cycle completed."
 }
 
 # --- ИНТЕРФЕЙСНЫЕ ФУНКЦИИ ---
