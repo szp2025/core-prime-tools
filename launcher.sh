@@ -9401,36 +9401,62 @@ run_forensic_harvest() {
 # @status: BETA | INTEGRATED WITH IP-GEOLOCATION & OSINT-ASSOCIATION
 # ==============================================================================
 
-# Реестр API для гео-данных
+# ==============================================================================
+# @matrix: GLOBAL_GEO_NODES v3.0 (ULTIMATE GEO-INTEL)
+# Формат: "URL|TYPE|PROVIDER_NAME|PARSER_COMMAND"
+# ==============================================================================
 GLOBAL_GEO_NODES=(
-    "https://ipapi.co/{TARGET}/json/|IP|ipapi.co (Provider/City)"
-    "https://ip-api.com/json/{TARGET}|IP|ip-api.com (General)"
+    "https://ipapi.co/{TARGET}/json/|IP|ipapi.co|jq -r '.city, .region, .country_name, .asn'"
+    "https://ip-api.com/json/{TARGET}?fields=status,message,country,regionName,city,lat,lon,isp,proxy|IP|ip-api.com|jq -r '.city, .lat, .lon, .isp, .proxy'"
+    "https://api.iplocation.net/?ip={TARGET}|IP|iplocation.net|jq -r '.country_name, .isp'"
 )
 
+# ==============================================================================
+# @description: OSINT NEXUS v27.0 - GEOSPATIAL INTELLIGENCE CORE
+# @status: FULL-STACK GEO-CORRELATION | PRODUCTION READY
+# ==============================================================================
 run_geo_lookup() {
     local target="$1"
-    
-    # 1. Если это IP
+    [[ -z "$target" ]] && return 1
+
+    core_engine_ui "h" "GEO-INTEL CORE: MAPPING [$target]"
+
+    # 1. IP-VECTOR: Глубокая декомпозиция
     if [[ "$target" =~ ${GLOBAL_INFRA_MATRIX[0]} ]]; then
-        core_engine_ui "i" "Performing IP-Geo lookup for: $target"
+        core_engine_ui "i" "Performing multi-node IP triangulation..."
+        
         for node in "${GLOBAL_GEO_NODES[@]}"; do
-            local url_tpl="${node%%|*}"; local type="${node##*|}"
+            local url_tpl="${node%%|*}"; local remaining="${node#*|}"
+            local type="${remaining%%|*}"; remaining="${remaining#*|}"
+            local name="${remaining%%|*}"; local parser="${remaining##*|}"
+            
             [[ "$type" != "IP" ]] && continue
             
             local url="${url_tpl//\{TARGET\}/$target}"
-            local data=$(curl -s -L "$url")
-            echo "[GEO_DATA] $data" >> "/tmp/nexus_geo.log"
-            core_engine_ui "s" "Geo-data captured from $node"
+            local response=$(curl -s -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 5 "$url")
+            
+            if [[ -n "$response" ]]; then
+                echo "[GEO_MATCH] Source: $name" >> "/tmp/nexus_geo.log"
+                # Используем jq для точечного извлечения данных
+                local parsed=$(echo "$response" | eval "$parser")
+                echo "$parsed" | sed 's/^/    [DATA]: /'
+            fi
         done
     
-    # 2. Если это Email/Phone — поиск через SocialScan
+    # 2. SOCIAL-VECTOR: Корреляционный поиск
     else
-        core_engine_ui "i" "Geo-correlation via SocialScan initiated..."
-        # Используем существующий механизм для поиска «цифрового следа»
+        core_engine_ui "i" "Running Social-Geo correlation..."
+        # Запуск сканирования и последующий парсинг найденных данных на упоминания городов/регионов
         run_osint_custom_socialscan "$target" "/tmp/nexus_geo_association.log"
-        core_engine_ui "s" "Association search complete. Check logs for location mentions."
+        
+        # Поиск упоминаний локаций в найденных данных
+        core_engine_ui "i" "Scanning for location artifacts in digital footprint..."
+        grep -Ei "(city|location|address|region|from|living in|в городе|живу в)" "/tmp/nexus_geo_association.log" | head -n 10
     fi
+    
+    core_engine_ui "s" "Geo-Intelligence lookup finished."
 }
+
 
 
 # ==========================================
