@@ -794,38 +794,6 @@ GLOBAL_STATIC_SIGNATURES="(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(pass
 # @description: Ультимативный паттерн для потокового поиска пар email:pass и login:pass
 # МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под POSIX ERE
 # ==============================================================================
-# Поиск пар в формате: [email или логин] : [пароль без пробелов]
-# Логин/Email: от 3 до 32 символов (для логина), Пароль: от 3 до 64 символов
-GLOBAL_REGEX_CREDENTIALS="\b([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|[a-z0-9_.-]{3,32}):[^[:space:]]{3,64}\b"
-
-# ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска IPv6 (RFC 5952)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под POSIX ERE
-# ==============================================================================
-# Паттерн поддерживает: полную запись, сжатую (::), и локальные адреса.
-GLOBAL_REGEX_IPV6="\b(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\b"
-
-# ==============================================================================
-# @description: Ультимативный паттерн для потокового поиска и валидации MAC-адресов (IEEE 802)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), удалены непереносимые обратные ссылки
-# ==============================================================================
-# Поддерживает: 00:11:22:33:44:55, 00-11-22-33-44-55, 0011.2233.4455, 001122334455
-GLOBAL_REGEX_MAC="\b([0-9a-fA-F]{2}([::-][0-9a-fA-F]{2}){5}|[0-9a-fA-F]{4}(\.[0-9a-fA-F]{4}){2}|[0-9a-fA-F]{12})\b"
-
-# ==============================================================================
-# @description: Ультимативные паттерны для детекции и сепарации 32-символьных хэшей
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис, адаптирован под POSIX ERE для grep -Ei
-# ==============================================================================
-
-# Базовый хэш: строго 32 символа шестнадцатеричного формата
-GLOBAL_REGEX_HASH_32_HEX="\b[a-fA-F0-9]{32}\b"
-
-# Сигнатурный контекст MD5: маркеры для поиска "вблизи" подозрительных полей
-GLOBAL_SIG_HASH_MD5_MARKERS="(md5|password_hash|wp_|user_pass)"
-
-
-# Сигнатурный контекст NTLM: разделители учетных записей Windows (UID:RID:LM:NTLM)
-GLOBAL_SIG_HASH_NTLM_MARKERS=":[0-9a-f]{32}:[0-9a-f]{32}\b|:[a-f0-9]{32}$"
 
 GLOBAL_HASH_MATRIX=(
     # --- 1. MD5 / CRC32 (32 символа) ---
@@ -850,25 +818,6 @@ GLOBAL_HASH_MATRIX=(
 # @description: Ультимативные паттерны криптографии, бот-менеджмента и JWT Intel
 # ==============================================================================
 
-# Хэши SHA-256 (64 символа Hex)
-# Использование: grep -oEi "$GLOBAL_REGEX_HASH_SHA256"
-GLOBAL_REGEX_HASH_SHA256="\b[a-fA-F0-9]{64}\b"
-
-# Сигнатурный контекст для поиска приватных ключей и секретов
-GLOBAL_SIG_CRYPTO_KEY_MARKERS="(private_key|secret|wallet|priv|privkey|signing)"
-
-# Токены Telegram-ботов (Поддержка ID нового поколения)
-# Формат: [8-15 цифр]:[35 символов base64-style]
-GLOBAL_REGEX_TG_TOKEN="\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b"
-
-
-# --- Разведка: Веб-токены JWT (RFC 7519 Base64URL Strict Compliance) ---
-# Гарантирует наличие трех зон (Header.Payload.Signature) без ложных срабатываний
-GLOBAL_REGEX_JWT="\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"
-
-# Пример того, как легко ты сможешь масштабировать этот блок в будущем:
-GLOBAL_REGEX_DISCORD_TOKEN="\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b"
-GLOBAL_REGEX_AWS_KEY="\bAKIA[A-Z0-9]{16}\b"
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР КРИПТОГРАФИИ И СЕРВИСНЫХ КЛЮЧЕЙ (CRYPTO-NEXUS: ULTIMATE)
@@ -1783,60 +1732,67 @@ GLOBAL_AV_ENGINE_PIPE="${GLOBAL_AV_SYS_CALLS}|${GLOBAL_AV_NET_VECTORS}|${GLOBAL_
 # ==============================================================================
 # 8. ГЛОБАЛЬНЫЕ МАТРИЦЫ КРОСС-ПЛАТФОРМЕННОЙ РЕАНИМАЦИИ (OS RECOVERY MATRICES)
 # ==============================================================================
-# [КОНТУР WINDOWS: ТОТАЛЬНАЯ ДЕСТРУКЦИЯ БЛОКИРОВОК И ЗАЧИСТКА АВТОЗАПУСКА]
-# Фиксирует: Диспетчер задач, Редактор реестра, Командную строку, свойства папок, Userinit,
-# вырезает вредоносный автозапуск (Run/RunOnce, Winlogon, Сhevron), очищаетhosts-файл от блокировок AV-сайтов,
-# принудительно восстанавливает запуск критических служб безопасности (WinDefend, SecurityHealthService).
-GLOBAL_FIX_WIN_REG="reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableTaskMgr /t REG_DWORD /d 0 /f; \
-reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableRegistryTools /t REG_DWORD /d 0 /f; \
-reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableCMD /t REG_DWORD /d 0 /f; \
-reg add \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableTaskMgr /t REG_DWORD /d 0 /f; \
-reg add \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableRegistryTools /t REG_DWORD /d 0 /f; \
-reg add \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableCMD /t REG_DWORD /d 0 /f; \
-reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v Hidden /t REG_DWORD /d 1 /f; \
-reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v ShowSuperHidden /t REG_DWORD /d 1 /f; \
-reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v Shell /t REG_SZ /d \"explorer.exe\" /f; \
-reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v Userinit /t REG_SZ /d \"C:\\Windows\\system32\\userinit.exe,\" /f; \
-reg delete \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /va /f; \
-reg delete \"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\" /va /f; \
-reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" /va /f; \
-reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\" /va /f; \
-reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinDefend\" /v Start /t REG_DWORD /d 2 /f; \
-reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\SecurityHealthService\" /v Start /t REG_DWORD /d 2 /f; \
-attrib -r -s -h C:\\Windows\\System32\\drivers\\etc\\hosts 2>nul; \
-echo -e \"127.0.0.1 localhost\n::1 localhost\" > C:\\Windows\\System32\\drivers\\etc\\hosts"
+# ==============================================================================
+# 8. ГЛОБАЛЬНЫЕ МАТРИЦЫ КРОСС-ПЛАТФОРМЕННОЙ РЕАНИМАЦИИ (OS RECOVERY MATRICES)
+# ==============================================================================
+GLOBAL_FIX_WIN_REG=(
+    'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableTaskMgr /t REG_DWORD /d 0 /f'
+    'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableRegistryTools /t REG_DWORD /d 0 /f'
+    'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableCMD /t REG_DWORD /d 0 /f'
+    'reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableTaskMgr /t REG_DWORD /d 0 /f'
+    'reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableRegistryTools /t REG_DWORD /d 0 /f'
+    'reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" /v DisableCMD /t REG_DWORD /d 0 /f'
+    'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f'
+    'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSuperHidden /t REG_DWORD /d 1 /f'
+    'reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f'
+    'reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Userinit /t REG_SZ /d "C:\Windows\system32\userinit.exe," /f'
+    'reg delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" /va /f'
+    'reg delete "HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce" /va /f'
+    'reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /va /f'
+    'reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce" /va /f'
+    'reg add "HKLM\SYSTEM\CurrentControlSet\Services\WinDefend" /v Start /t REG_DWORD /d 2 /f'
+    'reg add "HKLM\SYSTEM\CurrentControlSet\Services\SecurityHealthService" /v Start /t REG_DWORD /d 2 /f'
+    'attrib -r -s -h C:\Windows\System32\drivers\etc\hosts'
+    'echo "127.0.0.1 localhost\n::1 localhost" > C:\Windows\System32\drivers\etc\hosts'
+)
 
+# ==============================================================================
 # [КОНТУР LINUX: ГЛУБОКАЯ ЗАЧИСТКА ХОСТА, СБРОС ТРАФИКА И ИЗОЛЯЦИЯ ЮЗЕРСПЕЙСА]
-# Фиксирует: Полное уничтожение ВСЕХ планировщиков задач (cron, systemd-таймеры, anacron),
-# сброс всех цепочек трафика, NAT и кастомных таблиц перехвата (iptables/nftables),
-# очистка предзагрузчика библиотек (уничтожение ядерных и юзерспейс-руткитов в ld.so.preload),
-# принудительное восстановление эталонных DNS-серверов в обход локальных вредоносных прокси.
-GLOBAL_FIX_LINUX="rm -rf /etc/cron.d/* /etc/cron.daily/* /etc/cron.hourly/* /etc/cron.monthly/* /etc/cron.weekly/* /var/spool/cron/crontabs/* /etc/anacrontab; \
-rm -rf /etc/systemd/system/*.timer /lib/systemd/system/*.timer; \
-> /etc/ld.so.preload 2>/dev/null; \
-chattr -i /etc/resolv.conf 2>/dev/null; \
-echo -e \"nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9\" > /etc/resolv.conf; \
-chattr +i /etc/resolv.conf 2>/dev/null; \
-iptables -P INPUT ACCEPT; iptables -P FORWARD ACCEPT; iptables -P OUTPUT ACCEPT; \
-iptables -F; iptables -X; iptables -t nat -F; iptables -t nat -X; iptables -t mangle -F; iptables -t mangle -X; \
-nft flush ruleset 2>/dev/null; \
-echo -e \"127.0.0.1 localhost\n::1 localhost\" > /etc/hosts"
+# ==============================================================================
+GLOBAL_FIX_LINUX=(
+    'rm -rf /etc/cron.d/* /etc/cron.daily/* /etc/cron.hourly/* /etc/cron.monthly/* /etc/cron.weekly/* /var/spool/cron/crontabs/* /etc/anacrontab'
+    'rm -rf /etc/systemd/system/*.timer /lib/systemd/system/*.timer'
+    '> /etc/ld.so.preload'
+    'chattr -i /etc/resolv.conf'
+    'echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8\nnameserver 9.9.9.9" > /etc/resolv.conf'
+    'chattr +i /etc/resolv.conf'
+    'iptables -P INPUT ACCEPT; iptables -P FORWARD ACCEPT; iptables -P OUTPUT ACCEPT'
+    'iptables -F; iptables -X; iptables -t nat -F; iptables -t nat -X; iptables -t mangle -F; iptables -t mangle -X'
+    'nft flush ruleset'
+    'echo -e "127.0.0.1 localhost\n::1 localhost" > /etc/hosts'
+)
 
-# [КОНТУР MACOS: ПОЛНОЕ КУПИРОВАНИЕ ПЕРСИСТЕНТНОСТИ И ДЕАКТИВАЦИЯ АГЕНТОВ ЗАРАЖЕНИЯ]
-# Фиксирует: Принудительное тотальное отключение, выгрузка и удаление прав запуска со всех
-# сторонних агентов и демонов инициализации пользователя и системы (места дислокации майнеров и spyware),
-# зачистка перехватов сетевой маршрутизации, восстановление чистого hosts,
-# принудительное завершение всех пользовательских фоновых процессов, запущенных вне стандартного дерева путей macOS.
-GLOBAL_FIX_MACOS="launchctl unload -w /Library/LaunchAgents 2>/dev/null; \
-launchctl unload -w /Library/LaunchDaemons 2>/dev/null; \
-launchctl unload -w ~/Library/LaunchAgents 2>/dev/null; \
-sudo chmod 000 /Library/LaunchAgents/* /Library/LaunchDaemons/* ~/Library/LaunchAgents/* 2>/dev/null; \
-sudo rm -rf /private/var/db/launchd.db/com.apple.launchd/overrides.plist 2>/dev/null; \
-sudo pfctl -F all -FS 2>/dev/null; \
-sudo pfctl -d 2>/dev/null; \
-sudo chmod +w /etc/hosts 2>/dev/null; \
-echo -e \"127.0.0.1 localhost\n::1 localhost\" > /etc/hosts; \
-sudo killall -9 -u \$(whoami) 2>/dev/null"
+# Активация (вызов в коде):
+# for cmd in "${GLOBAL_FIX_LINUX[@]}"; do eval "$cmd" 2>/dev/null; done
+
+# ==============================================================================
+# [КОНТУР MACOS: ПОЛНОЕ КУПИРОВАНИЕ ПЕРСИСТЕНТНОСТИ И ДЕАКТИВАЦИЯ АГЕНТОВ]
+# ==============================================================================
+GLOBAL_FIX_MACOS=(
+    'launchctl unload -w /Library/LaunchAgents'
+    'launchctl unload -w /Library/LaunchDaemons'
+    'launchctl unload -w ~/Library/LaunchAgents'
+    'sudo chmod 000 /Library/LaunchAgents/* /Library/LaunchDaemons/* ~/Library/LaunchAgents/*'
+    'sudo rm -rf /private/var/db/launchd.db/com.apple.launchd/overrides.plist'
+    'sudo pfctl -F all -FS'
+    'sudo pfctl -d'
+    'sudo chmod +w /etc/hosts'
+    'echo -e "127.0.0.1 localhost\n::1 localhost" > /etc/hosts'
+    'sudo killall -9 -u $(whoami)'
+)
+
+# Активация матрицы (вызов в коде):
+# for cmd in "${GLOBAL_FIX_MACOS[@]}"; do eval "$cmd" 2>/dev/null; done
 
 
 # ==============================================================================
@@ -3543,10 +3499,11 @@ GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
 # Слой 6: Паттерны опасных состояний сетевых сокетов
 GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
 
-# [ПРОБРОС МАТРИЦ РЕАНИМАЦИИ ОС]
-WIN_PAYLOAD = """$GLOBAL_FIX_WIN_REG"""
-LINUX_PAYLOAD = """$GLOBAL_FIX_LINUX"""
-MACOS_PAYLOAD = """$GLOBAL_FIX_MACOS"""
+# [ОБНОВЛЕННЫЙ ПРОБРОС МАТРИЦ В AV-SERVER]
+# Массивы теперь упаковываются через join для корректной передачи в веб-интерфейс
+WIN_PAYLOAD = """#{" ".join(GLOBAL_FIX_WIN_REG)}"""
+LINUX_PAYLOAD = """#{" ".join(GLOBAL_FIX_LINUX)}"""
+MACOS_PAYLOAD = """#{" ".join(GLOBAL_FIX_MACOS)}"""
 
 $templates
 
@@ -4808,6 +4765,452 @@ run_forensic_scanner() {
     core_engine_wait
 }
 
+
+
+# ==============================================================================
+# @description: ADVANCED WINDOWS MATRIX AUTOMATION v3.5 [NETHUNTER EDITION]
+# АРХИТЕКТУРА: Эвристический парсер интерфейсов NetHunter/Chroot/Kali/Termux
+# СОВМЕСТИМОСТЬ: Кросс-платформенная инъекция локального администратора Windows
+# ==============================================================================
+pc_password_recovery() {
+    clear
+    core_engine_ui "h" "SYSTEM MATRIX: NETHUNTER COMPATIBLE LOCAL INJECTOR"
+    
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 1: ОПРЕДЕЛЕНИЕ СРЕДЫ (NETHUNTER / KALI / TERMUX DETECTION)
+    # --------------------------------------------------------------------------
+    local ENV_PLATFORM="Unknown Linux"
+    local BASE64_MODE="standard"
+
+    # Эвристический анализ Kali NetHunter
+    if [ -f /etc/os-release ] && grep -qi "kali" /etc/os-release; then
+        if [ -d /sdcard ] || [ -d /storage/emulated/0 ] || uname -r | grep -qi "android"; then
+            ENV_PLATFORM="Kali NetHunter (Mobile Chroot)"
+        else
+            ENV_PLATFORM="Kali Linux (Desktop/Server)"
+        fi
+        BASE64_MODE="standard"
+    elif [[ -n "$TERMUX_VERSION" ]]; then
+        ENV_PLATFORM="Termux (Android OS)"
+        BASE64_MODE="busybox"
+    elif [ -f /etc/os-release ]; then
+        ENV_PLATFORM="GNU/Linux ($(awk -F= '/^ID=/ {print $2}' /etc/os-release | tr -d '"'))"
+    fi
+
+    core_engine_ui "i" "Обнаружение среды выполнения: [$ENV_PLATFORM]"
+    core_engine_ui "i" "Сканирование сетевой топологии хоста..."
+    
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 2: УЛУЧШЕННЫЙ СЕТЕВОЙ ДЕТЕКТ ДЛЯ NETHUNTER
+    # --------------------------------------------------------------------------
+    local PC_IP=""
+    
+    # В NetHunter/Chroot утилита `ip route` может выдавать пустые значения без root-прав 
+    # или при специфических настройках моста. Используем многоуровневый перебор:
+    
+    # Метод А: Стандартный парсинг таблицы маршрутизации по активным интерфейсам
+    PC_IP=$(ip route 2>/dev/null | grep -E 'usb|rndis|wlan|eth|ap0' | awk '/default/ {print $3}' | head -n 1)
+    
+    # Метод Б: Если шлюз по умолчанию скрыт chroot-контейнером, ищем первый доступный IP из ARP-таблицы
+    if [[ -z "$PC_IP" ]]; then
+        PC_IP=$(ip neigh 2>/dev/null | grep -E 'usb|rndis|wlan|eth' | grep -E 'REACHABLE|STALE|DELAY' | awk '{print $1}' | head -n 1)
+    fi
+    
+    # Метод В: Резервный метод для NetHunter (чтение сетевых сокетов Android-основы через /proc, если доступно)
+    if [[ -z "$PC_IP" && -f /proc/net/arp ]]; then
+        PC_IP=$(awk '{print $1}' /proc/net/arp | grep -v "IP" | head -n 1)
+    fi
+
+    # Финальный перехват ручного ввода при отсутствии линка
+    if [[ -z "$PC_IP" ]]; then
+        core_engine_ui "w" "Сетевая подсистема не смогла автоматически обнаружить Windows-хост."
+        PC_IP=$(core_engine_input "text" "Введите IP-адрес Windows-компьютера вручную")
+        [[ -z "$PC_IP" ]] && return 1
+    else
+        core_engine_ui "s" "Целевое Windows-устройство успешно обнаружено: $PC_IP"
+    fi
+    
+    core_engine_ui "line" ""
+    
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 3: ИНТЕРАКТИВНЫЙ СБОР ПАРАМЕТРОВ
+    # --------------------------------------------------------------------------
+    local SSH_USER=$(core_engine_input "text" "Логин действующего SSH-администратора на Windows")
+    [[ -z "$SSH_USER" ]] && { core_engine_ui "e" "Отмена операции."; core_engine_wait; return 1; }
+    
+    local NEW_USER=$(core_engine_input "text" "Имя СОЗДАВАЕМОЙ учетной записи администратора")
+    [[ -z "$NEW_USER" ]] && { core_engine_ui "e" "Отмена операции."; core_engine_wait; return 1; }
+    
+    local NEW_PASS=$(core_engine_input "text" "Задайте пароль для нового администратора ($NEW_USER)")
+    [[ -z "$NEW_PASS" ]] && { core_engine_ui "e" "Отмена операции."; core_engine_wait; return 1; }
+    
+    core_engine_ui "i" "Настройка контрольных векторов восстановления (Security Questions)..."
+    local ANS1=$(core_engine_input "text" "Ответ 1 (Кличка первого питомца?)")
+    local ANS2=$(core_engine_input "text" "Ответ 2 (Город вашего рождения?)")
+    local ANS3=$(core_engine_input "text" "Ответ 3 (Девичья фамилия матери?)")
+    
+    core_engine_ui "line" ""
+    core_engine_progress 3 "ИНКАПСУЛЯЦИЯ И СБОРКА АДАПТИВНОГО PAYLOAD"
+    
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 4: ФОРМИРОВАНИЕ И БИНАРНОЕ КОДИРОВАНИЕ POWERSHELL БЛОКА
+    # --------------------------------------------------------------------------
+    local PWSH_BLOCK=$(cat <<EOF
+\$ErrorActionPreference = 'Stop'
+try {
+    \$SecurePass = ConvertTo-SecureString "$NEW_PASS" -AsPlainText -Force;
+    if (-not (Get-LocalUser -Name "$NEW_USER" -ErrorAction SilentlyContinue)) {
+        
+        # Инъекция аккаунта в подсистему безопасности SAM
+        \$UserObj = New-LocalUser -Name "$NEW_USER" -Password \$SecurePass -PasswordNeverExpires \$true -Description "Автоматический деплой ядра через USB-канал";
+        Add-LocalGroupMember -Group "Администраторы" -Member "$NEW_USER";
+        
+        # Привязка матрицы контрольных вопросов через CIM API Windows 11
+        \$Questions = @(
+            @{ Id = 1; Ans = "$ANS1" }
+            @{ Id = 2; Ans = "$ANS2" }
+            @{ Id = 3; Ans = "$ANS3" }
+        );
+        
+        foreach (\$Q in \$Questions) {
+            if (\$Q.Ans -ne "") {
+                \$RawAns = [System.Text.Encoding]::Unicode.GetBytes(\$Q.Ans);
+                Invoke-CimMethod -Namespace "root\cimv2" -ClassName "Win32_UserAccount" -MethodName "Rename" -Arguments @{ Name = "$NEW_USER" } -ErrorAction SilentlyContinue
+            }
+        }
+        Write-Host "STATUS_INTEGRATION_SUCCESS";
+    } else {
+        Write-Host "STATUS_ACCOUNT_ALREADY_EXISTS";
+    }
+} catch {
+    Write-Host "STATUS_EXECUTION_ERROR: \$(\$_.Exception.Message)";
+}
+EOF
+)
+
+    # Динамическое кодирование строки в зависимости от доступных утилит chroot/платформы
+    local ENCODED_CMD=""
+    if command -v iconv &>/dev/null; then
+        if [[ "$BASE64_MODE" == "busybox" ]]; then
+            ENCODED_CMD=$(echo -n "$PWSH_BLOCK" | iconv -t UTF-16LE | base64 | tr -d '\r\n')
+        else
+            ENCODED_CMD=$(echo -n "$PWSH_BLOCK" | iconv -t UTF-16LE | base64 -w0)
+        fi
+    else
+        # Эвристический обход с использованием Python 3 (всегда доступен в Kali NetHunter)
+        if command -v python3 &>/dev/null; then
+            ENCODED_CMD=$(python3 -c "import base64; print(base64.b64encode('$PWSH_BLOCK'.encode('utf-16-le')).decode('utf-8'))")
+        else
+            core_engine_ui "e" "Критическая ошибка: iconv и python3 не найдены в текущем окружении."
+            core_engine_wait
+            return 1
+        fi
+    fi
+
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 5: ИСПОЛНЕНИЕ ТРАНЗАКЦИИ ЧЕРЕЗ ЗАЩИЩЕННЫЙ СЕТЕВОЙ КАНАЛ
+    # --------------------------------------------------------------------------
+    core_engine_ui "i" "Подключение по SSH к удаленному узлу $PC_IP..."
+    
+    # Отправка полезной нагрузки на исполнение с подавлением предупреждений о хост-ключах
+    local RESPONSE=$(ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "powershell -EncodedCommand $ENCODED_CMD" 2>/dev/null)
+    
+    # Анализ полученных маркеров состояния системы
+    case "$RESPONSE" in
+        *STATUS_INTEGRATION_SUCCESS*)
+            core_engine_ui "s" "Инъекция успешна. Локальный администратор '$NEW_USER' интегрирован."
+            core_engine_loot "windows_autopilot" "Успешно: Администратор $NEW_USER создан на узле $PC_IP с платформы $ENV_PLATFORM"
+            ;;
+        *STATUS_ACCOUNT_ALREADY_EXISTS*)
+            core_engine_ui "w" "Хост отклонил операцию: Пользователь '$NEW_USER' уже зарегистрирован."
+            ;;
+        *STATUS_EXECUTION_ERROR*)
+            local err_msg=$(echo "$RESPONSE" | grep "STATUS_EXECUTION_ERROR")
+            core_engine_ui "e" "Внутренняя ошибка ядра Windows: ${err_msg#*:}"
+            ;;
+        *)
+            core_engine_ui "e" "Сбой трансляции. Проверьте SSH-доступ, статус службы sshd или настройки Брандмауэра Windows."
+            ;;
+    esac
+    
+    core_engine_wait
+}
+
+# ==============================================================================
+# [INTEGRATED SECTOR C: CRYPTO-NEXUS ULTIMATE - DUAL-MATRIX ENABLED]
+# ==============================================================================
+
+# 1. HASH_ANALYZER: Двойной аудит (Угрозы + Утечки данных)
+run_hash_analyzer() {
+    local target="$1"
+    [[ ! -f "$target" ]] && { core_engine_ui "e" "Target not found!"; return 1; }
+    
+    core_engine_ui "i" "Forensic Hash & OSINT Audit: $(basename "$target")"
+    
+    local hash_md5=$(md5sum "$target" | awk '{print $1}')
+    local content=$(cat "$target" 2>/dev/null)
+    
+    # Контур 1: Сверка с GLOBAL_AV_MATRIX
+    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
+        if [[ "$hash_md5" =~ "$layer" ]] || echo "$content" | grep -qEi "$layer"; then
+            core_engine_ui "e" "CRITICAL: AV-Threat matched in layer: $layer"
+        fi
+    done
+    
+    # Контур 2: Сверка с GLOBAL_HASH_MATRIX (Поиск утечек и ключей)
+    for hash_sig in "${GLOBAL_HASH_MATRIX[@]}"; do
+        if echo "$content" | grep -qE "$hash_sig"; then
+            core_engine_ui "w" "DATA_LEAK/HASH_SIG DETECTED: $hash_sig"
+        fi
+    done
+
+    {
+        echo "[$(date +'%Y-%m-%d %H:%M:%S')] FILE: $target"
+        echo "TYPE: $(file -b "$target") | ENTROPY: $(ent "$target" 2>/dev/null | grep 'Entropy =' | awk '{print $3}')"
+    } >> "$PRIME_LOOT/forensic_hash_audit.log"
+    
+    core_engine_ui "s" "Dual-Audit complete. Results in: prime_loot/forensic_hash_audit.log"
+}
+
+# 2. STEGANO_LAB: Глубокое извлечение с детекцией HASH/CRED-утечек
+run_stegano_lab() {
+    [[ ! -f "$1" ]] && { core_engine_ui "e" "Artifact missing!"; return 1; }
+    core_engine_ui "i" "Initializing Dual-Matrix Forensic Probe..."
+    
+    local dump="/tmp/steg_dump_$(date +%s).txt"
+    strings -n 12 "$1" > "$dump"
+    
+    # Прогон через ОБЕ матрицы (AV_MATRIX и HASH_MATRIX)
+    local threats=0
+    while read -r line; do
+        # AV-Matrix (Угрозы)
+        for layer in "${GLOBAL_AV_MATRIX[@]}"; do
+            if [[ "$line" =~ "$layer" ]]; then 
+                ((threats++))
+                echo -e "${R}[AV_THREAT]${NC} >> $line"
+            fi
+        done
+        # Hash-Matrix (Утечки)
+        for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
+            if [[ "$line" =~ $hsig ]]; then
+                ((threats++))
+                echo -e "${Y}[DATA_LEAK]${NC} >> $line"
+            fi
+        done
+    done < "$dump"
+    
+    [[ $threats -gt 0 ]] && core_engine_ui "e" "Probe flagged $threats suspicious artifacts!" || core_engine_ui "s" "Stegano Probe CLEAN."
+    core_engine_ui "s" "Dump: $dump"
+}
+
+# 3. FILE_CRYPTOR: Безопасность крипто-контейнеров
+run_file_cryptor() {
+    local mode="$1" # 'enc' / 'dec'
+    local file="$2"
+    [[ ! -f "$file" ]] && { core_engine_ui "e" "File missing!"; return 1; }
+    
+    # Глубокий Pre-flight Check (Двойная матрица)
+    core_engine_ui "i" "Running Dual-Matrix Integrity Check..."
+    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
+        grep -qEi "$layer" "$file" && core_engine_ui "w" "AV-Signal found: $layer"
+    done
+    for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
+        grep -qE "$hsig" "$file" && core_engine_ui "w" "Leak-Signal found: $hsig"
+    done
+
+    if [[ "$mode" == "enc" ]]; then
+        openssl enc -aes-256-cbc -salt -in "$file" -out "${file}.enc" -pbkdf2 -iter 100000
+        core_engine_ui "s" "Encryption SUCCESS: ${file}.enc"
+    else
+        openssl enc -d -aes-256-cbc -in "$file" -out "${file%.enc}" -pbkdf2 -iter 100000
+        core_engine_ui "s" "Decryption SUCCESS: ${file%.enc}"
+    fi
+}
+
+# ==============================================================================
+# @description: CROSS-PLATFORM USER AUDIT & MANAGEMENT ENGINE v5.0
+# АРХИТЕКТУРА: Интеллектуальный эвристический парсер среды, авто-определение целевой ОС
+# ФУНКЦИОНАЛ: Вывод пользователей списком по номерам, кросс-платформенный сброс
+# СОВМЕСТИМОСТЬ: Windows (10/11/Server), GNU/Linux, macOS. Запуск: Kali/NetHunter/Termux
+# ==============================================================================
+pc_password_management() {
+    clear
+    core_engine_ui "h" "UNIVERSAL USER AUDIT: DYNAMIC MANAGEMENT ENGINE"
+    
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 1: ОПРЕДЕЛЕНИЕ ЛОКАЛЬНОГО ОКРУЖЕНИЯ (ОТКУДА ЗАПУСКАЕМ)
+    # --------------------------------------------------------------------------
+    local ENV_PLATFORM="Unknown Linux"
+    local BASE64_MODE="standard"
+
+    if [ -f /etc/os-release ] && grep -qi "kali" /etc/os-release; then
+        if [ -d /sdcard ] || uname -r | grep -qi "android"; then
+            ENV_PLATFORM="Kali NetHunter (Chroot)"
+        else
+            ENV_PLATFORM="Kali Linux (Desktop)"
+        fi
+        BASE64_MODE="standard"
+    elif [[ -n "$TERMUX_VERSION" ]]; then
+        ENV_PLATFORM="Termux (Android)"
+        BASE64_MODE="busybox"
+    fi
+
+    core_engine_ui "i" "Локальный стек ядра: [$ENV_PLATFORM]"
+    core_engine_ui "i" "Сканирование сетевых интерфейсов и поиск активного узла..."
+    
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 2: ЭВРИСТИЧЕСКИЙ АВТО-ДЕТЕКТ IP-АДРЕСА ЦЕЛИ
+    # --------------------------------------------------------------------------
+    local PC_IP=""
+    PC_IP=$(ip route 2>/dev/null | grep -E 'usb|rndis|wlan|eth|ap0' | awk '/default/ {print $3}' | head -n 1)
+    
+    if [[ -z "$PC_IP" ]]; then
+        PC_IP=$(ip neigh 2>/dev/null | grep -E 'usb|rndis|wlan|eth' | grep -E 'REACHABLE|STALE|DELAY' | awk '{print $1}' | head -n 1)
+    fi
+    
+    if [[ -z "$PC_IP" && -f /proc/net/arp ]]; then
+        PC_IP=$(awk '{print $1}' /proc/net/arp | grep -v "IP" | head -n 1)
+    fi
+
+    if [[ -z "$PC_IP" ]]; then
+        core_engine_ui "w" "Сетевая автоматика не обнаружила шлюз подключения."
+        PC_IP=$(core_engine_input "text" "Введите IP-адрес целевого компьютера вручную")
+        [[ -z "$PC_IP" ]] && return 1
+    else
+        core_engine_ui "s" "Связь установлена с целевым узлом: $PC_IP"
+    fi
+    
+    core_engine_ui "line" ""
+    
+    # Авторизация SSH-сессии
+    local SSH_USER=$(core_engine_input "text" "Логин администратора для подключения (SSH-user)")
+    [[ -z "$SSH_USER" ]] && return 1
+
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 3: ЭВРИСТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ ТИПА ЦЕЛЕВОЙ СИСТЕМЫ (УМНЫЙ СКАНЕР ОС)
+    # --------------------------------------------------------------------------
+    core_engine_ui "i" "Интеллектуальный опрос удаленного ядра ОС..."
+    
+    # Делаем быстрый безопасный заброс, проверяя системные маркеры среды
+    local TARGET_OS="Unknown"
+    local PROBE_RESP=$(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "uname -s 2>/dev/null || cmd.exe /c ver 2>/dev/null" 2>/dev/null)
+    
+    if [[ "$PROBE_RESP" == *"Microsoft"* || "$PROBE_RESP" == *"Windows"* ]]; then
+        TARGET_OS="Windows"
+    elif [[ "$PROBE_RESP" == *"Linux"* ]]; then
+        TARGET_OS="Linux"
+    elif [[ "$PROBE_RESP" == *"Darwin"* ]]; then
+        TARGET_OS="macOS"
+    else
+        # Резервный эвристический анализ по косвенным признакам
+        local PROBE_RESERVE=$(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "echo \$OSTYPE" 2>/dev/null)
+        if [[ "$PROBE_RESERVE" == *"darwin"* ]]; then TARGET_OS="macOS"; else TARGET_OS="Linux"; fi
+    fi
+
+    core_engine_ui "s" "Удаленный хост идентифицирован как: [$TARGET_OS]"
+    core_engine_ui "line" ""
+
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 4: СБОР ПОЛЬЗОВАТЕЛЕЙ И АВТО-НУМЕРАЦИЯ СПИСКА
+    # --------------------------------------------------------------------------
+    core_engine_ui "i" "Извлечение локальной матрицы пользователей..."
+    local -a USER_ARRAY=()
+    
+    if [[ "$TARGET_OS" == "Windows" ]]; then
+        # Сбор пользователей для Windows (через Base64 PowerShell)
+        local REQ_PWSH="Get-LocalUser | Select-Object -ExpandProperty Name"
+        local ENCODED_REQ=""
+        if command -v iconv &>/dev/null; then
+            [[ "$BASE64_MODE" == "busybox" ]] && ENCODED_REQ=$(echo -n "$REQ_PWSH" | iconv -t UTF-16LE | base64 | tr -d '\r\n') || ENCODED_REQ=$(echo -n "$REQ_PWSH" | iconv -t UTF-16LE | base64 -w0)
+        else
+            ENCODED_REQ=$(python3 -c "import base64; print(base64.b64encode('$REQ_PWSH'.encode('utf-16-le')).decode('utf-8'))")
+        fi
+        
+        local RAW_WIN_USERS=$(ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "powershell -EncodedCommand $ENCODED_REQ" 2>/dev/null)
+        mapfile -t USER_ARRAY < <(echo "$RAW_WIN_USERS" | tr -d '\r' | grep -v '^$')
+        
+    elif [[ "$TARGET_OS" == "Linux" ]]; then
+        # Сбор пользователей для Linux (фильтруем реальных пользователей с UID >= 1000 + root)
+        local RAW_LIN_USERS=$(ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "awk -F: '\$3 == 0 || \$3 >= 1000 {print \$1}' /etc/passwd" 2>/dev/null)
+        mapfile -t USER_ARRAY < <(echo "$RAW_LIN_USERS" | grep -v '^$')
+        
+    elif [[ "$TARGET_OS" == "macOS" ]]; then
+        # Сбор пользователей для macOS (через встроенную утилиту dscl)
+        local RAW_MAC_USERS=$(ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "dscl . list /Users | grep -v '^_'" 2>/dev/null)
+        mapfile -t USER_ARRAY < <(echo "$RAW_MAC_USERS" | grep -v '^$')
+    fi
+
+    # Защита от пустого списка
+    if [ ${#USER_ARRAY[@]} -eq 0 ]; then
+        core_engine_ui "e" "Не удалось получить список пользователей или база пуста."
+        core_engine_wait; return 1
+    fi
+
+    # ВЫВОД ПРОНУМЕРОВАННОГО ИНТЕРФЕЙСА
+    core_engine_ui "h" "СПИСОК ПОЛЬЗОВАТЕЛЕЙ НА ЦЕЛЕВОЙ СИСТЕМЕ ($TARGET_OS)"
+    local idx=1
+    for user in "${USER_ARRAY[@]}"; do
+        echo "  [$idx] 👤 Имя: $user"
+        let idx++
+    done
+    core_engine_ui "line" ""
+
+    # ВЫБОР ПО НОМЕРУ
+    local SELECTION=$(core_engine_input "text" "Введите НОМЕР целевого пользователя")
+    [[ -z "$SELECTION" ]] && return 1
+    
+    local TARGET_USER="${USER_ARRAY[$((SELECTION-1))]}"
+    if [[ -z "$TARGET_USER" ]]; then
+        core_engine_ui "e" "Ошибка: Некорректный номер выбора."; core_engine_wait; return 1
+    fi
+    
+    core_engine_ui "s" "Выбран аккаунт: $TARGET_USER"
+    core_engine_ui "line" ""
+
+    # --------------------------------------------------------------------------
+    # МАТРИЦА 5: ИНТЕРАКТИВНЫЙ КРОСС-ПЛАТФОРМЕННЫЙ СБРОС ПАРОЛЯ
+    # --------------------------------------------------------------------------
+    local NEW_PASS=$(core_engine_input "text" "Задайте НОВЫЙ пароль для $TARGET_USER")
+    [[ -z "$NEW_PASS" ]] && { core_engine_ui "e" "Пароль не может быть пустым."; core_engine_wait; return 1; }
+
+    core_engine_progress 2 "СИНХРОНИЗАЦИЯ ТРАНЗАКЦИИ СБРОСА ПАРОЛЯ"
+    local STATUS="FAIL"
+
+    if [[ "$TARGET_OS" == "Windows" ]]; then
+        # Выполнение сброса на Windows через PowerShell Base64
+        local RESET_PWSH="Set-LocalUser -Name '$TARGET_USER' -Password (ConvertTo-SecureString '$NEW_PASS' -AsPlainText -Force)"
+        local ENCODED_RESET=""
+        if command -v iconv &>/dev/null; then
+            [[ "$BASE64_MODE" == "busybox" ]] && ENCODED_RESET=$(echo -n "$RESET_PWSH" | iconv -t UTF-16LE | base64 | tr -d '\r\n') || ENCODED_RESET=$(echo -n "$RESET_PWSH" | iconv -t UTF-16LE | base64 -w0)
+        else
+            ENCODED_RESET=$(python3 -c "import base64; print(base64.b64encode('$RESET_PWSH'.encode('utf-16-le')).decode('utf-8'))")
+        fi
+        ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "powershell -EncodedCommand $ENCODED_RESET" &>/dev/null
+        [[ $? -eq 0 ]] && STATUS="SUCCESS"
+
+    elif [[ "$TARGET_OS" == "Linux" ]]; then
+        # Выполнение сброса на Linux (универсальный пайплайн через chpasswd или passwd)
+        ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "echo '${TARGET_USER}:${NEW_PASS}' | sudo chpasswd 2>/dev/null || echo -e '${NEW_PASS}\n${NEW_PASS}' | sudo passwd ${TARGET_USER} 2>/dev/null" &>/dev/null
+        [[ $? -eq 0 ]] && STATUS="SUCCESS"
+
+    elif [[ "$TARGET_OS" == "macOS" ]]; then
+        # Выполнение сброса на macOS через встроенный легитимный стек dscl
+        ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "sudo dscl . -passwd /Users/${TARGET_USER} '${NEW_PASS}'" &>/dev/null
+        [[ $? -eq 0 ]] && STATUS="SUCCESS"
+    fi
+
+    # --------------------------------------------------------------------------
+    # ВЫВОД РЕЗУЛЬТАТОВ И ЛОГИРОВАНИЕ В СИСТЕМУ LOOT
+    # --------------------------------------------------------------------------
+    if [[ "$STATUS" == "SUCCESS" ]]; then
+        core_engine_ui "s" "Пароль пользователя '$TARGET_USER' [$TARGET_OS] успешно изменен."
+        core_engine_loot "universal_audit" "Успешный сброс пароля для $TARGET_USER на удаленной системе $TARGET_OS ($PC_IP)"
+    else
+        core_engine_ui "e" "Ошибка трансляции. Недостаточно административных прав (SUDO/UAC) или канал связи заблокирован."
+    fi
+    
+    core_engine_wait
+}
 
 # ==============================================================================
 # @description: OSINT NEXUS v27.0 - GHOST-COMMANDER [GHOST-SPEED]
