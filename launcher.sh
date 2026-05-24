@@ -669,6 +669,24 @@ GLOBAL_NETWORK_UA=(
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/605.1.15"
 )
 
+
+
+# ==============================================================================
+# ГЛОБАЛЬНАЯ МАТРИЦА СЕТЕВЫХ ОТПЕЧАТКОВ И ЛОКАЛИЗАЦИЙ (NEXUS MATRIX POOL v25.6)
+# ==============================================================================
+GLOBAL_LANG_POOL=(
+    "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
+    "en-US,en;q=0.9,fr;q=0.7,de;q=0.5"
+    "en-GB,en;q=0.9,en-US;q=0.8,de;q=0.6"
+    "es-ES,es;q=0.9,en;q=0.7,ca;q=0.5"
+    "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.6"
+    "it-IT,it;q=0.9,en;q=0.7,el;q=0.5"
+)
+GLOBAL_ENC_POOL=("gzip, deflate, br, zstd" "gzip, deflate, br" "identity")
+GLOBAL_BASE_ACCEPT="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+
+
+
 # ==============================================================================
 # МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
 # ==============================================================================
@@ -5640,55 +5658,6 @@ run_network_intelligence() {
     done
 }
 
-# ==============================================================================
-# ГЛОБАЛЬНАЯ МАТРИЦА СЕТЕВЫХ ОТПЕЧАТКОВ И ЛОКАЛИЗАЦИЙ (NEXUS MATRIX POOL)
-# ==============================================================================
-GLOBAL_LANG_POOL=("en-US,en;q=0.9" "fr-FR,fr;q=0.8,en;q=0.7" "en-GB,en;q=0.9,de;q=0.7" "es-ES,es;q=0.9" "it-IT,it;q=0.9,en;q=0.8")
-GLOBAL_ENC_POOL=("gzip, deflate, br" "gzip, deflate" "identity")
-
-# Матрица соответствия User-Agent и клиентских подсказок (Client Hints) для обхода умных WAF
-GLOBAL_CH_PLATFORM=("\"Windows\"" "\"macOS\"" "\"Linux\"")
-GLOBAL_CH_VERSIONS=(
-    "\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\""
-    "\"Chromium\";v=\"125\", \"Google Chrome\";v=\"125\", \"Not-A.Brand\";v=\"99\""
-)
-
-# Стандартный унифицированный набор базовых заголовков комплаенса
-GLOBAL_BASE_ACCEPT="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
-
-
-
-generate_matrix_arguments() {
-    local target_ip="$1"
-    
-    # Выбираем случайные индексы из глобальных пулов матрицы
-    local r_lang="${GLOBAL_LANG_POOL[$((RANDOM % ${#GLOBAL_LANG_POOL[@]}))]}"
-    local r_enc="${GLOBAL_ENC_POOL[$((RANDOM % ${#GLOBAL_ENC_POOL[@]}))]}"
-    local r_plat="${GLOBAL_CH_PLATFORM[$((RANDOM % ${#GLOBAL_CH_PLATFORM[@]}))]}"
-    local r_ver="${GLOBAL_CH_VERSIONS[$((RANDOM % ${#GLOBAL_CH_VERSIONS[@]}))]}"
-    local r_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
-    
-    # Если глобальный UA пуст, подставляем дефолтный валидный маркер
-    if [[ -z "$r_ua" ]]; then
-        r_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    fi
-
-    # Собираем массив аргументов для curl
-    CURL_MATRIX_ARGS=(
-        -A "$r_ua"
-        -H "Accept: $GLOBAL_BASE_ACCEPT"
-        -H "Accept-Language: $r_lang"
-        -H "Accept-Encoding: $r_enc"
-        -H "Cache-Control: max-age=0"
-        -H "Sec-Ch-Ua: $r_ver"
-        -H "Sec-Ch-Ua-Mobile: ?0"
-        -H "Sec-Ch-Ua-Platform: $r_plat"
-        -H "X-Forwarded-For: $target_ip"
-        -H "X-Real-IP: $target_ip"
-        -H "Client-IP: $target_ip"
-        -H "CF-Connecting-IP: $target_ip"
-    )
-}
 
 
 
