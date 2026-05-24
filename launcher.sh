@@ -697,12 +697,6 @@ GLOBAL_ENC_POOL=(
 GLOBAL_BASE_ACCEPT="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
 
 
-/**
- * Функция для динамической сборки сетевых параметров из глобальной матрицы.
- * Анализирует выбранный User-Agent и формирует строго соответствующий ему
- * набор заголовков Client Hints (Sec-Ch-Ua) для предотвращения блокировок WAF.
- * * @param string $1 - Целевой IP-адрес для подмены в заголовках происхождения.
- */
 generate_matrix_arguments() {
     local target_ip="$1"
     
