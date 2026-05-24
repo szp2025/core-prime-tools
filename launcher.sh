@@ -5842,52 +5842,62 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ОБНОВЛЕННЫЙ ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (АДАПТИВНЫЙ)
+    # ОБНОВЛЕННЫЙ ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (УЛЬТРА-АДАПТИВНЫЙ)
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Stealth Mode Enabled)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     touch "$tmp_hits"
     
-    # Базовые параметры адаптации
-    local base_delay=0.45
+    local base_delay=0.6
     local max_threads=3
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
         (
-            # 1. Рандомизация сетевого стека для каждого потока
             generate_matrix_arguments "$fake_ip" "$r_target"
             
-            # 2. Адаптивная задержка (jitter) для имитации человека
-            local jitter=$(awk -v base="$base_delay" 'BEGIN{srand(); print base + (rand() * 0.8)}')
-            sleep "$jitter"
+            # Рандомизация паузы
+            sleep $(awk -v b="$base_delay" 'BEGIN{srand(); print b + (rand() * 1.2)}')
             
-            # 3. Выполнение запроса с фильтрацией мусора на лету
-            # Мы используем curl -sL и парсим вывод
-            local response=$(curl -sL --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
-            local code=$(curl -s -I -L --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
+            # Выполняем запрос с параметром --compressed для имитации браузера
+            # и --next для полной очистки сессии curl
+            local res_data=$(curl -sL --compressed --connect-timeout 5 \
+                "${CURL_MATRIX_ARGS[@]}" \
+                "$base_url/$hook" 2>/dev/null)
+            
+            local code=$(curl -sI --compressed --connect-timeout 4 \
+                "${CURL_MATRIX_ARGS[@]}" \
+                -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
 
-            # 4. ЭВРИСТИЧЕСКИЙ ФИЛЬТР: игнорируем ответы с признаками WAF-заглушек
-            if [[ "$response" =~ "js-modal" || "$response" =~ "adgAccessBlocked" ]]; then
+            # Фильтр: игнорируем страницы с ключевыми словами защиты
+            if [[ "$res_data" =~ "js-modal" || "$res_data" =~ "adgAccessBlocked" || "$res_data" =~ "captcha" ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
             elif [[ "$code" == "200" ]]; then
-                # Записываем только чистые 200 OK
                 echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
                 echo -e "${G}[!] FOUND: /$hook (200 OK)${NC}"
-            elif [[ "$code" == "403" || "$code" == "500" ]]; then
+            elif [[ "$code" =~ ^(403|500|503)$ ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
             fi
         ) &
         
-        # 5. Динамическое управление нагрузкой
-        if [[ -f "$tmp_hits" && $(grep -c "WAF_BLOCK" "$tmp_hits") -gt 5 ]]; then
-            max_threads=1 # Резко снижаем нагрузку при срабатывании защиты
-            base_delay=1.5
-        fi
+        # БЕЗОПАСНОЕ УПРАВЛЕНИЕ ПОТОКАМИ
+        local current_jobs=$(jobs -p | wc -l)
+        while [[ $current_jobs -ge $max_threads ]]; do
+            sleep 0.3
+            current_jobs=$(jobs -p | wc -l)
+        done
         
-        while (( $(jobs -p | wc -l) >= max_threads )); do sleep 0.2; done
+        # Динамическое замедление (без арифметических ошибок)
+        if [[ -f "$tmp_hits" ]]; then
+            local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null || echo 0)
+            if [[ $b_count -gt 8 ]]; then
+                max_threads=1
+                base_delay=2.0
+            fi
+        fi
     done
     wait
+
 
 
     # ==================================================================
