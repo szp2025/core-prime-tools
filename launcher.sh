@@ -5780,47 +5780,42 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (С ALERT-СИСТЕМОЙ)
+    # ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (СИНХРОННЫЙ РЕЖИМ ДЛЯ ВЫВОДА)
     # ==================================================================
-    core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Stealth Mode Enabled)..."
+    core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Synchronous Mode)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
     
-    local max_threads=3
     local base_delay=0.6
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
-        # Выполняем фаззинг
-        (
-            generate_matrix_arguments "$fake_ip" "$r_target"
-            sleep $(awk -v b="$base_delay" 'BEGIN{srand(); print b + (rand() * 1.2)}')
-            
-            local res_data=$(curl -sL --compressed --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
-            local code=$(curl -sI --compressed --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
+        # Выполняем генерацию аргументов для каждого запроса
+        generate_matrix_arguments "$fake_ip" "$r_target"
+        
+        # Задержка
+        sleep $(awk -v b="$base_delay" 'BEGIN{srand(); print b + (rand() * 1.2)}')
+        
+        # Выполняем запрос синхронно (без &)
+        local res_data=$(curl -sL --compressed --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
+        local code=$(curl -sI --compressed --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
 
-            if [[ "$res_data" =~ "js-modal" || "$res_data" =~ "adgAccessBlocked" || "$res_data" =~ "captcha" ]]; then
-                echo "WAF_BLOCK" >> "$tmp_hits"
-            elif [ "$code" = "200" ]; then
-                # === ALERT-СИСТЕМА ===
-                # Выводим информацию прямо в основной поток терминала через /dev/tty
-                echo -e "${G}[!] ALERT: TARGET EXPOSED AT /$hook (200 OK)${NC}" > /dev/tty
-                echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
-            fi
-        ) &
+        # Обработка результата
+        if [[ "$res_data" =~ "js-modal" || "$res_data" =~ "adgAccessBlocked" || "$res_data" =~ "captcha" ]]; then
+            echo "WAF_BLOCK" >> "$tmp_hits"
+        elif [ "$code" = "200" ]; then
+            # Этот вывод будет гарантированно отображаться на экране
+            echo -e "${G}[!] ALERT: TARGET EXPOSED AT /$hook (200 OK)${NC}"
+            echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
+        fi
         
-        # Управление потоками
-        while [ ${#jobstates} -ge $max_threads ]; do
-            sleep 0.5
-        done
-        
-        # Корректировка сложности
+        # Динамическая корректировка (простое сравнение строк)
         local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
         if [ "$b_count" -gt 8 ]; then
-            max_threads=1
             base_delay=2.0
         fi
     done
+
     wait
 
 
