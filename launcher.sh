@@ -1066,24 +1066,6 @@ GLOBAL_HTTP_MATRIX=(
 
 
 # ==============================================================================
-# OSINT WHOIS LAYER: АТОМАРНЫЕ СУПЕР-МАТРИЦЫ ИНФРАСТРУКТУРНОЙ РАЗВЕДКИ
-# Полноценная изоляция текстовых шаблонов для мультиязычного парсинга (2026)
-# ==============================================================================
-
-# 1. Данные регистратора, организаций, провайдеров и ответственных лиц
-GLOBAL_REGEX_WHOIS_REG="(registrar|reg-name|sponsoring|org|organization|registrant|person|descr|tech-id|mnt-by)"
-
-# 2. Метки жизненного цикла инфраструктуры (Временные маркеры и даты)
-GLOBAL_REGEX_WHOIS_DATES="(expires|expired|exp-date|paid-till|validity|free-date|created|creation[-_ ]date|registered|reg-date|changed|modified|updated)"
-
-# 3. Маршрутизация DNS-серверов и узлов делегирования трафика
-GLOBAL_REGEX_WHOIS_NS="(nserver|name[-_ ]server|ns[0-9]*)"
-
-# 4. Детекция слоев приватности, GDPR-заглушек и обфускации владельца
-GLOBAL_REGEX_WHOIS_PRIVACY="(privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
-
-
-# ==============================================================================
 # ЕДИНЫЙ РЕЕСТР WHOIS И ИНФРАСТРУКТУРНОЙ РАЗВЕДКИ (WHOIS-NEXUS: ULTIMATE FULL-STACK)
 # ==============================================================================
 GLOBAL_WHOIS_MATRIX=(
