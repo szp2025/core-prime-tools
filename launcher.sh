@@ -5773,6 +5773,7 @@ run_network_intelligence() {
 
 
 run_system_info() {
+    local start_time=$(date +%s)
     core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
     
     local r_target=$(core_engine_input "text" "Enter Target Domain, Host or IP [default: localhost]")
@@ -5792,7 +5793,7 @@ run_system_info() {
     fi
 
     # ==================================================================
-    # ВЕКТОР 2: УДАЛЕННЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ (РАСШИРЕННЫЙ)
+    # ВЕКТОР 2: УДАЛЕННЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ
     # ==================================================================
     core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
     
@@ -5800,11 +5801,9 @@ run_system_info() {
     echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
     echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
 
-    # Генерация матрицы для глубокого анализа
     local fake_ip="$((RANDOM % 190 + 11)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
     generate_matrix_arguments "$fake_ip" "$r_target"
 
-    # Выполняем HEAD запрос для получения полной инфо-карты
     local info_payload=$(curl -s -I -L --connect-timeout 8 "${CURL_MATRIX_ARGS[@]}" "http://$r_target/" 2>/dev/null)
     
     echo -e "\n${Y}--- [INFRASTRUCTURE INTELLIGENCE CARD] ---${NC}"
@@ -5818,48 +5817,45 @@ run_system_info() {
     # ЭТАП 3: АГРЕССИВНЫЙ АДАПТИВНЫЙ ФАЗЗИНГ
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Deep Scan)..."
-    # Оценка времени: количество хуков * задержка (примерно)
-    local total_hooks=${#GLOBAL_FUZZ_WORDLIST[@]}
-    local estimated_sec=$(( total_hooks * 1 )) 
     
-    core_engine_progress "$estimated_sec" "FUZZING" &
-    local progress_pid=$!
-
-
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
-    local base_delay=0.4 # Ускоренный темп для полного покрытия
+    local base_delay=0.4
+    
+    # Запуск визуального прогресса в фоне (не блокирует вывод ALERT)
+    core_engine_progress "$(( ${#GLOBAL_FUZZ_WORDLIST[@]} / 2 ))" "FUZZING" &
+    local prog_pid=$!
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
         generate_matrix_arguments "$fake_ip" "$r_target"
         
-        # Получаем код и заголовки для каждого хука
         local req_result=$(curl -sI -L --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" "http://$r_target/$hook" 2>/dev/null)
         local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}' | tr -d '\r')
         local server_type=$(echo "$req_result" | grep -Ei "^Server:" | cut -d' ' -f2-)
 
         if [ "$code" = "200" ]; then
-            echo -e "${G}[!] HIT: /$hook | Code: 200 | Server: ${server_type:-Unknown}${NC}"
+            # Вывод критических находок в основной поток
+            echo -e "\r\e[K${G}[!] HIT: /$hook | Code: 200 | Server: ${server_type:-Unknown}${NC}"
             echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
         elif [ "$code" = "403" ] || [ "$code" = "406" ]; then
-            echo -e "${R}[WAF] Blocked at /$hook${NC}"
             echo "WAF_BLOCK" >> "$tmp_hits"
         fi
         
-        # Динамическое замедление при жестком WAF
         local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
-        if [ "$b_count" -gt 5 ]; then
-            sleep 1.5
-        else
-            sleep 0.2
-        fi
+        [ "$b_count" -gt 5 ] && sleep 1.5 || sleep 0.2
     done
+    
+    wait $prog_pid 2>/dev/null
 
     # ==================================================================
     # ЭТАП 4: FINAL INTELLIGENCE REPORT
     # ==================================================================
+    local total_duration=$(( $(date +%s) - start_time ))
+    
     echo -e "\n${Y}--- [FINAL INTELLIGENCE SUMMARY] ---${NC}"
+    echo -e "${W}Total Audit Time     :${NC} ${G}${total_duration}s${NC}"
     [ -s "$tmp_hits" ] && cat "$tmp_hits" || echo -e "${W}No additional endpoints discovered.${NC}"
+    
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
