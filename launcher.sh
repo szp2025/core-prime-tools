@@ -5780,57 +5780,49 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ОБНОВЛЕННЫЙ ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (ZSH-СОВМЕСТИМЫЙ)
-    # ==================================================================
-        # ==================================================================
-    # ВОЗВРАТ К ДЕТАЛЬНОМУ ОТЧЕТУ (STAGE 3)
+    # ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (С ALERT-СИСТЕМОЙ)
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Stealth Mode Enabled)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
-    touch "$tmp_hits"
+    : > "$tmp_hits"
     
     local max_threads=3
     local base_delay=0.6
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
+        # Выполняем фаззинг
         (
             generate_matrix_arguments "$fake_ip" "$r_target"
             sleep $(awk -v b="$base_delay" 'BEGIN{srand(); print b + (rand() * 1.2)}')
             
-            # Выполняем проверку
             local res_data=$(curl -sL --compressed --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
             local code=$(curl -sI --compressed --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
 
-            # ЛОГИКА ФИКСАЦИИ ДАННЫХ
             if [[ "$res_data" =~ "js-modal" || "$res_data" =~ "adgAccessBlocked" || "$res_data" =~ "captcha" ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
             elif [ "$code" = "200" ]; then
-                # ВОЗВРАЩАЕМ ВЫВОД: записываем в файл и сразу выводим на экран
-                local hit_msg="HIT:/$hook | Code: 200"
-                echo "$hit_msg" >> "$tmp_hits"
-                echo -e "${G}[!] $hit_msg${NC}"
+                # === ALERT-СИСТЕМА ===
+                # Выводим информацию прямо в основной поток терминала через /dev/tty
+                echo -e "${G}[!] ALERT: TARGET EXPOSED AT /$hook (200 OK)${NC}" > /dev/tty
+                echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
             fi
         ) &
         
-        # Безопасное управление потоками (без арифметических ошибок)
-        while true; do
-            if [ ${#jobstates} -lt $max_threads ]; then
-                break
-            fi
+        # Управление потоками
+        while [ ${#jobstates} -ge $max_threads ]; do
             sleep 0.5
         done
         
-        # Динамическая корректировка сложности
-        if [[ -f "$tmp_hits" ]]; then
-            local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
-            if [ "$b_count" -gt 8 ]; then
-                max_threads=1
-                base_delay=2.0
-            fi
+        # Корректировка сложности
+        local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
+        if [ "$b_count" -gt 8 ]; then
+            max_threads=1
+            base_delay=2.0
         fi
     done
     wait
+
 
 
     # ==================================================================
