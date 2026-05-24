@@ -5740,16 +5740,12 @@ run_network_intelligence() {
 
 
 
-# ==============================================================================
-# [OSINT NEXUS v25.2 - AUTOMATED HEURISTIC SECURITY COMPLIANCE ENGINE]
-# АВТОРСТВО: Модернизированное эвристическое ядро "Ghost Core - ULTIMATE" 2026.
-# КЛАССИФИКАЦИЯ: Автономный сканер периметра повышенной отказоустойчивости.
-# МОДИФИКАЦИЯ: Полная блокировка просачивания стороннего HTML-кода при HEAD-запросах.
-# СТРАТЕГИЯ: Прецизионная изоляция потоков данных, обход поведенческих WAF-экранов.
-# ==============================================================================
 
+# ==============================================================================
+# ОСНОВНАЯ ИСПОЛНЯЕМАЯ ФУНКЦИЯ КОМПЛАЕНС-МОНИТОРИНГА ПЕРИМЕТРА
+# ==============================================================================
 run_system_info() {
-    core_engine_ui "h" "NEXUS v25.2: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
+    core_engine_ui "h" "NEXUS v25.6: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
     
     local r_target=$(core_engine_input "text" "Enter Target Domain, Host or IP [default: localhost]")
     if [[ -z "$r_target" ]]; then
@@ -5778,28 +5774,20 @@ run_system_info() {
     core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
     echo -e "\n${Y}--- [STAGE 1: HEURISTIC INFRASTRUCTURE DETECTOR] ---${NC}"
     
-    # Снайперский резолвинг сетевого адреса без системного мусора
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
     echo -e "${W}Target Target Domain :${NC} ${Y}$r_target${NC}"
     echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
 
-    # ------------------------------------------------------------------
-    # ПУЛ МАСКИРОВКИ: ГЕНЕРАТОР ВАЛИДНЫХ СЕТЕВЫХ СИГНАТУР И ЯЗЫКОВ
-    # ------------------------------------------------------------------
-    local lang_pool=("en-US,en;q=0.9" "fr-FR,fr;q=0.8,en;q=0.7" "en-GB,en;q=0.9,de;q=0.7" "es-ES,es;q=0.9")
-    local enc_pool=("gzip, deflate, br" "gzip, deflate" "identity")
-    
-    # Безопасная генерация IP (Исключаем приватные сети 10.x, 127.x, 172.x, 192.x)
+    # Безопасная эвристическая генерация базового IP подмены происхождения
     local block_a=$((RANDOM % 190 + 11))
     while [[ "$block_a" -eq 127 || "$block_a" -eq 10 || "$block_a" -eq 172 || "$block_a" -eq 192 ]]; do
         block_a=$((RANDOM % 190 + 11))
     done
     local fake_ip="${block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
 
-    # Вытаскиваем параметры маскировки из пула
+    # Извлекаем случайный UA из твоего глобального ротатора для предварительной проверки редиректа
     local random_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
-    local random_lang="${lang_pool[$((RANDOM % ${#lang_pool[@]}))]}"
-    local random_enc="${enc_pool[$((RANDOM % ${#enc_pool[@]}))]}"
+    [[ -z "$random_ua" ]] && random_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     # Эвристическое определение протокола и корректная обработка SSL-редиректов
     local base_url="http://$r_target"
@@ -5810,19 +5798,13 @@ run_system_info() {
         echo -e "${Y}[i] Heuristic Engine: SSL/TLS Redirection Forced. Switching to Secure Base URL.${NC}"
     fi
 
-    # Сбор первичного слепка инфраструктуры. Строго изолируем вывод.
+    # Инициализируем аргументы Глобальной Матрицы для съёма слепка
+    generate_matrix_arguments "$fake_ip"
+
+    # Сбор первичного слепка инфраструктуры через Матрицу
     local full_payload=$(curl -s -i -L --connect-timeout 6 \
-        -A "$random_ua" \
-        -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
-        -H "Accept-Language: $random_lang" \
-        -H "Accept-Encoding: $random_enc" \
-        -H "Cache-Control: no-cache" \
+        "${CURL_MATRIX_ARGS[@]}" \
         -H "Pragma: no-cache" \
-        -H "Connection: keep-alive" \
-        -H "X-Forwarded-For: $fake_ip" \
-        -H "X-Real-IP: $fake_ip" \
-        -H "Client-IP: $fake_ip" \
-        -H "CF-Connecting-IP: $fake_ip" \
         "$base_url/")
 
     # Хирургическое разделение пакета данных (Гарантия Zero-Leak сырого HTML)
@@ -5887,64 +5869,47 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (С ДИФФЕРЕНЦИАЛЬНОЙ ФИЛЬТРАЦИЕЙ HTML)
+    # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (МАТРИЧНАЯ РОТАЦИЯ И ANTI-HTML LEAK)
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Anti-HTML Leak & Traffic Shifter)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     touch "$tmp_hits"
     
-    # Системные константы динамической балансировки
     local base_delay=0.20
     local max_threads=4
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
         (
-            # Расчет дробного интервала ожидания для дезориентации WAF
+            # Динамический Jitter
             local jitter=$(awk -v base="$base_delay" 'BEGIN{srand(); print base + (rand() * 0.40)}')
             sleep "$jitter"
             
-            # Контекстные параметры сетевого отпечатка
-            local thread_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
-            local thread_lang="${lang_pool[$((RANDOM % ${#lang_pool[@]}))]}"
-            
-            # Генерация валидного IP-адреса источника
+            # Генерация уникального IP для текущей итерации потока
             local t_block_a=$((RANDOM % 190 + 11))
             while [[ "$t_block_a" -eq 127 || "$t_block_a" -eq 10 || "$t_block_a" -eq 172 || "$t_block_a" -eq 192 ]]; do
                 t_block_a=$((RANDOM % 190 + 11))
             done
             local thread_ip="${t_block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
             
-            # МОДИФИКАЦИЯ: Явный перехват HTTP-кода напрямую из вывода curl без сохранения тела ответа.
-            # Если WAF попытается подсунуть HTML-страницу в HEAD-запрос, ключ '-o /dev/null' и '-w %{http_code}' полностью её уничтожат.
+            # Пересобираем Глобальную Матрицу Контекста под текущий поток (Берется новый UA из ротатора)
+            generate_matrix_arguments "$thread_ip"
+            
+            # Перехват HTTP-кода напрямую из вывода curl с полным уничтожением входящего HTML-тела
             local code=$(curl -s -I -L --connect-timeout 4 \
-                -A "$thread_ua" \
-                -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
-                -H "Accept-Language: $thread_lang" \
-                -H "Cache-Control: max-age=0" \
-                -H "Sec-Ch-Ua: \"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\"" \
-                -H "Sec-Ch-Ua-Mobile: ?0" \
-                -H "Sec-Ch-Ua-Platform: \"Windows\"" \
-                -H "X-Forwarded-For: $thread_ip" \
-                -H "X-Real-IP: $thread_ip" \
-                -H "Client-IP: $thread_ip" \
-                -H "CF-Connecting-IP: $thread_ip" \
+                "${CURL_MATRIX_ARGS[@]}" \
                 -o /dev/null \
                 -w "%{http_code}" \
                 "$base_url/$hook" 2>/dev/null)
 
-            # Чистим переменную от возможных артефактов переноса каретки
             code=$(echo "$code" | tr -d '\r' | awk '{print $1}')
             
             if [[ "$code" == "500" || "$code" == "403" ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
-                
-                # При фиксации плотного шторма блокировок искусственно притормаживаем поток
                 if [[ $([ -f "$tmp_hits" ] && grep -c "WAF_BLOCK" "$tmp_hits") -gt 4 ]]; then
                     sleep 0.6
                 fi
             elif [[ "$code" == "200" ]]; then
-                # Классификация критичности обнаруженного объекта
                 if [[ "$hook" =~ (\.env|\.git|\.hta|config|backup|wp-config|mysql|dump|setup|phpinfo|deploy) ]]; then
                     echo "ALERT:/$hook | Code: 200 | EXPOSED" >> "$tmp_hits"
                     echo -e "${R}[ALERT: CRITICAL LEAK] /$hook is fully open (HTTP 200)!${NC}"
@@ -5955,7 +5920,7 @@ run_system_info() {
             fi
         ) &
         
-        # Контроль динамической нагрузки: если WAF агрессивен, зажимаем сканер до 2 потоков
+        # Динамический контроль нагрузки ядра
         local active_blocks=0
         if [ -f "$tmp_hits" ]; then
             active_blocks=$(grep -c "WAF_BLOCK" "$tmp_hits")
@@ -5983,7 +5948,6 @@ run_system_info() {
         echo -e "${R}[!] WAF PERIMETER STATUS: Active Shielding Engaged (${total_blocks} requests isolated via Sandbox).${NC}"
     fi
 
-    # Раздел 1: Подтвержденные критические утечки конфигурационных файлов
     local has_critical_leaks=0
     if [ -f "$tmp_hits" ] && grep -q "^ALERT:" "$tmp_hits"; then
         has_critical_leaks=1
@@ -5993,7 +5957,6 @@ run_system_info() {
         done
     fi
 
-    # Раздел 2: Публичные стандартные файлы периметра
     if [ -f "$tmp_hits" ] && grep -q "^HIT:" "$tmp_hits"; then
         echo -e "\n${G}✔️ [Exposed Standard Public Objects (Code: 200)]:${NC}"
         grep "^HIT:" "$tmp_hits" | sed 's/^HIT://' | while read -r line; do
@@ -6001,9 +5964,6 @@ run_system_info() {
         done
     fi
 
-    # ------------------------------------------------------------------
-    # РАЗДЕЛ 3: ЕДИНАЯ ТАБЛИЦА СТАНДАРТОВ И АУДИТА БЕЗОПАСНОСТИ РЕСУРСА
-    # ------------------------------------------------------------------
     echo -e "\n${Y}================================================================${NC}"
     echo -e "${Y}🛡️  [SECURITY ARCHITECTURE COMPLIANCE AUDIT]${NC}"
     echo -e "${Y}================================================================${NC}"
@@ -6020,7 +5980,6 @@ run_system_info() {
         echo -e "  Intrusion Prevention & WAF  : [${Y}NOT DETECTED${NC}] - Perimeter open or complete stealth bypass achieved."
     fi
 
-    # Детализированная проверка матрицы заголовков
     local matrix_regex=$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")
     local leaked_headers=""
     
@@ -6041,7 +6000,6 @@ run_system_info() {
     fi
     echo -e "${Y}================================================================${NC}"
 
-    # Фиксация результатов в долгосрочное хранилище LOOT
     if [ -f "$tmp_hits" ] && grep -Eq "^(HIT|ALERT):" "$tmp_hits"; then
         core_engine_loot "recon" "Target: $r_target\nUltimate Audit Completed.\n$(grep -E '^(HIT|ALERT):' "$tmp_hits")"
     fi
