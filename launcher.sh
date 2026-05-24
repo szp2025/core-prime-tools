@@ -5782,6 +5782,9 @@ run_system_info() {
     # ==================================================================
     # ОБНОВЛЕННЫЙ ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (ZSH-СОВМЕСТИМЫЙ)
     # ==================================================================
+        # ==================================================================
+    # ВОЗВРАТ К ДЕТАЛЬНОМУ ОТЧЕТУ (STAGE 3)
+    # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Stealth Mode Enabled)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
@@ -5795,18 +5798,22 @@ run_system_info() {
             generate_matrix_arguments "$fake_ip" "$r_target"
             sleep $(awk -v b="$base_delay" 'BEGIN{srand(); print b + (rand() * 1.2)}')
             
+            # Выполняем проверку
             local res_data=$(curl -sL --compressed --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
             local code=$(curl -sI --compressed --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
 
+            # ЛОГИКА ФИКСАЦИИ ДАННЫХ
             if [[ "$res_data" =~ "js-modal" || "$res_data" =~ "adgAccessBlocked" || "$res_data" =~ "captcha" ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
-            elif [[ "$code" == "200" ]]; then
-                echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
-                echo -e "${G}[!] FOUND: /$hook (200 OK)${NC}"
+            elif [ "$code" = "200" ]; then
+                # ВОЗВРАЩАЕМ ВЫВОД: записываем в файл и сразу выводим на экран
+                local hit_msg="HIT:/$hook | Code: 200"
+                echo "$hit_msg" >> "$tmp_hits"
+                echo -e "${G}[!] $hit_msg${NC}"
             fi
         ) &
         
-        # БЕЗОПАСНЫЙ ЦИКЛ (Используем нативную переменную ZSH)
+        # Безопасное управление потоками (без арифметических ошибок)
         while true; do
             if [ ${#jobstates} -lt $max_threads ]; then
                 break
@@ -5814,11 +5821,9 @@ run_system_info() {
             sleep 0.5
         done
         
-        # Динамическая корректировка
+        # Динамическая корректировка сложности
         if [[ -f "$tmp_hits" ]]; then
-            # Очищаем вывод от пробелов для чистого сравнения
             local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
-            # Используем безопасное сравнение строк
             if [ "$b_count" -gt 8 ]; then
                 max_threads=1
                 base_delay=2.0
@@ -5826,6 +5831,7 @@ run_system_info() {
         fi
     done
     wait
+
 
     # ==================================================================
     # ЭТАП 4: СВОДНЫЙ ОТЧЕТ
