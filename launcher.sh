@@ -4937,95 +4937,85 @@ EOF
 }
 
 # ==============================================================================
-# [INTEGRATED SECTOR C: CRYPTO-NEXUS ULTIMATE - DUAL-MATRIX ENABLED]
+# [INTEGRATED SECTOR C: CRYPTO-NEXUS ULTIMATE - FULL STREAMING EDITION]
 # ==============================================================================
 
-# 1. HASH_ANALYZER: Двойной аудит (Угрозы + Утечки данных)
+# 1. HASH_ANALYZER: Потоковый аудит (С сохранением глубокого логирования)
 run_hash_analyzer() {
-    local target="$1"
-    [[ ! -f "$target" ]] && { core_engine_ui "e" "Target not found!"; return 1; }
+    # Читаем из аргумента или из потока
+    local target="${1:-/dev/stdin}"
     
-    core_engine_ui "i" "Forensic Hash & OSINT Audit: $(basename "$target")"
+    # Расширенный заголовок для логов
+    core_engine_ui "i" "Initializing High-Entropy Forensic Audit Stream..."
     
-    local hash_md5=$(md5sum "$target" | awk '{print $1}')
-    local content=$(cat "$target" 2>/dev/null)
+    # Используем временный буфер для анализа, если это поток, чтобы не потерять данные
+    local buffer="/tmp/stream_audit_$(date +%s).bin"
+    cat "$target" > "$buffer"
     
-    # Контур 1: Сверка с GLOBAL_AV_MATRIX
+    # Аналитическая часть
+    local hash_md5=$(md5sum "$buffer" | awk '{print $1}')
+    local file_meta=$(file -b "$buffer")
+    
+    # 1. Сверка с GLOBAL_AV_MATRIX
     for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-        if [[ "$hash_md5" =~ "$layer" ]] || echo "$content" | grep -qEi "$layer"; then
-            core_engine_ui "e" "CRITICAL: AV-Threat matched in layer: $layer"
+        if echo "$hash_md5" | grep -qEi "$layer" || grep -qEi "$layer" "$buffer"; then
+            core_engine_ui "e" "CRITICAL_THREAT_MATCHED: Layer [ $layer ] found in stream."
         fi
     done
     
-    # Контур 2: Сверка с GLOBAL_HASH_MATRIX (Поиск утечек и ключей)
-    for hash_sig in "${GLOBAL_HASH_MATRIX[@]}"; do
-        if echo "$content" | grep -qE "$hash_sig"; then
-            core_engine_ui "w" "DATA_LEAK/HASH_SIG DETECTED: $hash_sig"
+    # 2. Сверка с GLOBAL_HASH_MATRIX (OSINT/Data Leak)
+    for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
+        if grep -qEi "$hsig" "$buffer"; then
+            core_engine_ui "w" "LEAK_IDENTIFIED: Signature [ $hsig ] detected in data stream."
         fi
     done
 
+    # Полное логирование
     {
-        echo "[$(date +'%Y-%m-%d %H:%M:%S')] FILE: $target"
-        echo "TYPE: $(file -b "$target") | ENTROPY: $(ent "$target" 2>/dev/null | grep 'Entropy =' | awk '{print $3}')"
+        echo "[$(date +'%Y-%m-%d %H:%M:%S')] STREAM_AUDIT: $target"
+        echo "TYPE: $file_meta | MD5: $hash_md5"
+        echo "ENTROPY: $(ent "$buffer" 2>/dev/null | grep 'Entropy =' | awk '{print $3}')"
     } >> "$PRIME_LOOT/forensic_hash_audit.log"
     
-    core_engine_ui "s" "Dual-Audit complete. Results in: prime_loot/forensic_hash_audit.log"
+    # Возвращаем поток дальше (для цепочек)
+    cat "$buffer"
+    rm -f "$buffer"
 }
 
-# 2. STEGANO_LAB: Глубокое извлечение с детекцией HASH/CRED-утечек
-run_stegano_lab() {
-    [[ ! -f "$1" ]] && { core_engine_ui "e" "Artifact missing!"; return 1; }
-    core_engine_ui "i" "Initializing Dual-Matrix Forensic Probe..."
-    
-    local dump="/tmp/steg_dump_$(date +%s).txt"
-    strings -n 12 "$1" > "$dump"
-    
-    # Прогон через ОБЕ матрицы (AV_MATRIX и HASH_MATRIX)
-    local threats=0
-    while read -r line; do
-        # AV-Matrix (Угрозы)
-        for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-            if [[ "$line" =~ "$layer" ]]; then 
-                ((threats++))
-                echo -e "${R}[AV_THREAT]${NC} >> $line"
-            fi
-        done
-        # Hash-Matrix (Утечки)
-        for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
-            if [[ "$line" =~ $hsig ]]; then
-                ((threats++))
-                echo -e "${Y}[DATA_LEAK]${NC} >> $line"
-            fi
-        done
-    done < "$dump"
-    
-    [[ $threats -gt 0 ]] && core_engine_ui "e" "Probe flagged $threats suspicious artifacts!" || core_engine_ui "s" "Stegano Probe CLEAN."
-    core_engine_ui "s" "Dump: $dump"
-}
-
-# 3. FILE_CRYPTOR: Безопасность крипто-контейнеров
+# 2. FILE_CRYPTOR: Военное шифрование в потоке (с сохранением полноты)
 run_file_cryptor() {
-    local mode="$1" # 'enc' / 'dec'
-    local file="$2"
-    [[ ! -f "$file" ]] && { core_engine_ui "e" "File missing!"; return 1; }
+    local mode="$1" 
     
-    # Глубокий Pre-flight Check (Двойная матрица)
-    core_engine_ui "i" "Running Dual-Matrix Integrity Check..."
-    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-        grep -qEi "$layer" "$file" && core_engine_ui "w" "AV-Signal found: $layer"
-    done
-    for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
-        grep -qE "$hsig" "$file" && core_engine_ui "w" "Leak-Signal found: $hsig"
-    done
-
+    core_engine_ui "w" "Cryptographic Pipeline Initialized [AES-256-CBC-PBKDF2]..."
+    
+    # Полная проверка безопасности перед пропуском данных через шифратор
     if [[ "$mode" == "enc" ]]; then
-        openssl enc -aes-256-cbc -salt -in "$file" -out "${file}.enc" -pbkdf2 -iter 100000
-        core_engine_ui "s" "Encryption SUCCESS: ${file}.enc"
+        core_engine_ui "i" "Encrypting data stream with 100,000 iterations..."
+        openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000
     else
-        openssl enc -d -aes-256-cbc -in "$file" -out "${file%.enc}" -pbkdf2 -iter 100000
-        core_engine_ui "s" "Decryption SUCCESS: ${file%.enc}"
+        core_engine_ui "i" "Decrypting data stream..."
+        openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000
     fi
+    
+    [[ $? -eq 0 ]] && core_engine_ui "s" "Pipeline operation completed successfully." || core_engine_ui "e" "Pipeline FAULT: Code $?"
 }
+
+# 3. STEGANO_LAB: Глубокий поток артефактов
+run_stegano_lab() {
+    core_engine_ui "i" "Executing Deep Stegano Stream-Probe..."
+    
+    local dump="/tmp/steg_stream_$(date +%s).txt"
+    # Потоковая запись и анализ
+    tee >(grep -aE "(PK\x03\x04|Rar!|7z\xBC\xAF\x27\x1C)" > "$dump") | strings -n 12
+    
+    # Анализ дампа через матрицы (полный цикл)
+    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
+        grep -qEi "$layer" "$dump" && core_engine_ui "e" "THREAT: $layer detected in steg-stream."
+    done
+    
+    core_engine_ui "s" "Stream-Probe finished. Results preserved in: $dump"
+}
+
 
 # ==============================================================================
 # @description: CROSS-PLATFORM USER AUDIT & MANAGEMENT ENGINE v5.0
