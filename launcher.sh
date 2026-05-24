@@ -5002,41 +5002,48 @@ run_file_cryptor() {
 
 
 # ==============================================================================
-# [CORE: PRINTER-REPAIR-NEXUS - FULL HEALING ROUTINE]
-# Режим: Принудительный сброс очередей и переподключение интерфейсов
-# Поддержка: USB-Serial & Wi-Fi Direct
+# [CORE: PRINTER-REPAIR-NEXUS - UNIVERSAL HEALING ROUTINE]
+# Режим: Тотальная очистка Spool, принудительный ARP-сброс и восстановление
 # ==============================================================================
 
 run_printer_repair_nexus() {
-    echo -e "${Y}[!] Инициализация протокола восстановления принтера...${NC}"
-
-    # 1. Сброс локальной очереди печати (CUPS/LPD)
-    # Удаляет все зависшие задачи, которые блокируют порт
-    cancel -a -x
+    echo -e "${Y}[!] Инициализация протокола тотального восстановления печати...${NC}"
     
-    # 2. Перезапуск демона печати (System-Level Reset)
-    # Это «очищает» все USB и Wi-Fi соединения на уровне ядра
-    systemctl restart cups 2>/dev/null || service cups restart 2>/dev/null
+    # 1. Ручной ввод IP (Опционально)
+    read -p "Введите IP-адрес принтера (или нажмите Enter для автопоиска): " target_ip
     
-    # 3. Восстановление сетевого сокета (Если подключено по Wi-Fi)
-    # Сбрасывает текущие маршруты принтера, чтобы избежать «Ghost-Connection»
-    if [[ $(ip route | grep -c "default") -gt 0 ]]; then
-        # Пытаемся «пропинговать» шлюз, чтобы обновить таблицу ARP
-        ping -c 2 192.168.1.1 > /dev/null
-    fi
-
-    # 4. Проверка USB-хоста (Если подключено по USB)
-    # Пересканирует USB-шину, чтобы обнаружить принтер заново
-    if [[ -d /sys/bus/usb/devices ]]; then
-        echo '0' > /sys/bus/usb/devices/*/authorized 2>/dev/null
-        echo '1' > /sys/bus/usb/devices/*/authorized 2>/dev/null
-    fi
-
-    # 5. Итоговая проверка статуса
-    if lpstat -r | grep -q "running"; then
-        echo -e "${G}[SUCCESS] Принтер возвращен в оперативное состояние.${NC}"
+    # 2. Тотальная остановка сервисов печати
+    systemctl stop cups 2>/dev/null
+    
+    # 3. Очистка Spool (Физическое удаление файлов заданий)
+    if [[ -d "/var/spool/cups" ]]; then rm -rf /var/spool/cups/*; fi
+    if [[ -d "/var/spool/lpd" ]]; then rm -rf /var/spool/lpd/*; fi
+    
+    # 4. Сброс USB-хостов
+    for device in /sys/bus/usb/devices/*/authorized; do
+        echo '0' > "$device" 2>/dev/null
+        echo '1' > "$device" 2>/dev/null
+    done
+    
+    # 5. Сетевое восстановление
+    if [[ -n "$target_ip" ]]; then
+        echo -e "${Y}[*] Принудительная очистка маршрута к $target_ip...${NC}"
+        ip neigh flush to "$target_ip" 2>/dev/null
+        # Отправляем ARP-запрос для немедленного обновления таблицы
+        ping -c 1 -W 1 "$target_ip" > /dev/null 2>&1
     else
-        echo -e "${R}[ERROR] Требуется аппаратное вмешательство (Power Cycle).${NC}"
+        ip neigh flush all 2>/dev/null
+    fi
+    
+    # 6. Запуск сервисов
+    systemctl start cups 2>/dev/null
+    
+    # Финальная проверка
+    if systemctl is-active --quiet cups; then
+        echo -e "${G}[SUCCESS] Система печати восстановлена.${NC}"
+        [[ -n "$target_ip" ]] && echo -e "Статус маршрута к $target_ip: ОБНОВЛЕН."
+    else
+        echo -e "${R}[ERROR] Не удалось перезапустить CUPS.${NC}"
     fi
 }
 
