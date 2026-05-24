@@ -5842,66 +5842,53 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (МАТРИЧНАЯ РОТАЦИЯ И АНТИ-БЛОК)
+    # ОБНОВЛЕННЫЙ ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (АДАПТИВНЫЙ)
     # ==================================================================
-    core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Anti-HTML Leak & Traffic Shifter)..."
+    core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Stealth Mode Enabled)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     touch "$tmp_hits"
     
-    local base_delay=0.20
-    local max_threads=4
+    # Базовые параметры адаптации
+    local base_delay=0.45
+    local max_threads=3
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
         (
-            local jitter=$(awk -v base="$base_delay" 'BEGIN{srand(); print base + (rand() * 0.40)}')
+            # 1. Рандомизация сетевого стека для каждого потока
+            generate_matrix_arguments "$fake_ip" "$r_target"
+            
+            # 2. Адаптивная задержка (jitter) для имитации человека
+            local jitter=$(awk -v base="$base_delay" 'BEGIN{srand(); print base + (rand() * 0.8)}')
             sleep "$jitter"
             
-            local t_block_a=$((RANDOM % 190 + 11))
-            while [[ "$t_block_a" -eq 127 || "$t_block_a" -eq 10 || "$t_block_a" -eq 172 || "$t_block_a" -eq 192 ]]; do
-                t_block_a=$((RANDOM % 190 + 11))
-            done
-            local thread_ip="${t_block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
-            
-            generate_matrix_arguments "$thread_ip"
-            
-            local code=$(curl -s -I -L --connect-timeout 4 \
-                "${CURL_MATRIX_ARGS[@]}" \
-                -o /dev/null \
-                -w "%{http_code}" \
-                "$base_url/$hook" 2>/dev/null)
+            # 3. Выполнение запроса с фильтрацией мусора на лету
+            # Мы используем curl -sL и парсим вывод
+            local response=$(curl -sL --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
+            local code=$(curl -s -I -L --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
 
-            code=$(echo "$code" | tr -d '\r' | awk '{print $1}')
-            
-            if [[ "$code" == "500" || "$code" == "403" ]]; then
+            # 4. ЭВРИСТИЧЕСКИЙ ФИЛЬТР: игнорируем ответы с признаками WAF-заглушек
+            if [[ "$response" =~ "js-modal" || "$response" =~ "adgAccessBlocked" ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
-                if [[ $([ -f "$tmp_hits" ] && grep -c "WAF_BLOCK" "$tmp_hits") -gt 4 ]]; then
-                    sleep 0.6
-                fi
             elif [[ "$code" == "200" ]]; then
-                if [[ "$hook" =~ (\.env|\.git|\.hta|config|backup|wp-config|mysql|dump|setup|phpinfo|deploy) ]]; then
-                    echo "ALERT:/$hook | Code: 200 | EXPOSED" >> "$tmp_hits"
-                    echo -e "${R}[ALERT: CRITICAL LEAK] /$hook is fully open (HTTP 200)!${NC}"
-                else
-                    echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
-                    echo -e "${G}[!] FOUND: /$hook (200 OK)${NC}"
-                fi
+                # Записываем только чистые 200 OK
+                echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
+                echo -e "${G}[!] FOUND: /$hook (200 OK)${NC}"
+            elif [[ "$code" == "403" || "$code" == "500" ]]; then
+                echo "WAF_BLOCK" >> "$tmp_hits"
             fi
         ) &
         
-        local active_blocks=0
-        if [ -f "$tmp_hits" ]; then
-            active_blocks=$(grep -c "WAF_BLOCK" "$tmp_hits")
+        # 5. Динамическое управление нагрузкой
+        if [[ -f "$tmp_hits" && $(grep -c "WAF_BLOCK" "$tmp_hits") -gt 5 ]]; then
+            max_threads=1 # Резко снижаем нагрузку при срабатывании защиты
+            base_delay=1.5
         fi
         
-        if (( active_blocks > 6 )); then
-            max_threads=2
-            base_delay=0.50
-        fi
-        
-        while (( $(jobs -p | wc -l) >= max_threads )); do sleep 0.1; done
+        while (( $(jobs -p | wc -l) >= max_threads )); do sleep 0.2; done
     done
     wait
+
 
     # ==================================================================
     # ЭТАП 4: СВОДНЫЙ ИНТЕЛЛЕКТУАЛЬНЫЙ ОТЧЕТ И СИСТЕМНЫЙ КОМПЛАЕНС
