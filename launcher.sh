@@ -5776,17 +5776,21 @@ run_system_info() {
     local start_time=$(date +%s)
     core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
     
+    # 1. Приоритетный выбор цели
     local r_target=$(core_engine_input "text" "Enter Target Domain, Host or IP [default: localhost]")
     [[ -z "$r_target" ]] && r_target="localhost"
     [[ "$r_target" =~ ^[bB](ack)?$ ]] && return
     clear
 
-    # ==================================================================
-    # ВЕКТОР 2: INFRASTRUCTURE & WHOIS NEXUS
-    # ==================================================================
-    core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
-    echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
+    # 2. Локальный или удаленный режим
+    core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT [TARGET: $r_target]"
     
+    # Определение IP для удаленного хоста
+    local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
+    echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
+    echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-LOCAL_SYSTEM}${NC}"
+
+    # 3. Анализ инфраструктуры (HTTP Headers)
     local info_payload=$(curl -s -I -L --connect-timeout 8 "http://$r_target/" 2>/dev/null)
     echo -e "\n${Y}--- [INFRASTRUCTURE INTELLIGENCE CARD] ---${NC}"
     for pattern in "${GLOBAL_HTTP_MATRIX[@]}"; do
@@ -5794,25 +5798,21 @@ run_system_info() {
         [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${G}${match}${NC}"
     done
 
-    # ==================================================================
-    # ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING (VERBOSE MODE)
-    # ==================================================================
+    # 4. Фаззинг (Files + Webhooks)
     core_engine_ui "w" "Launching Multi-Layer Fuzzing (Verbose Mode)..."
     local tmp_hits="/tmp/recon_hits_$$"
-    local log_file="/tmp/audit_verbose_$$"
     : > "$tmp_hits"
-    : > "$log_file"
     
+    # Объединяем словари
     local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
     
-    # Прямой вывод каждого шага для "экранизации" процесса
     for hook in "${full_list[@]}"; do
         local req_result=$(curl -sI -L --connect-timeout 2 "http://$r_target/$hook" 2>/dev/null)
         local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
         
-        # Вывод в консоль "на лету"
         if [[ -n "$code" ]]; then
-            echo -e "[${W}$code${NC}] /$hook" | tee -a "$log_file"
+            # Экранизация процесса (детальный вывод)
+            echo -e "[${W}$code${NC}] /$hook"
             
             if [[ "$code" == "200" ]]; then
                 echo -e "${G}[!] HIT: /$hook (200 OK)${NC}"
@@ -5821,28 +5821,24 @@ run_system_info() {
         fi
     done
 
-    # ==================================================================
-    # ЭТАП 4: FINAL INTELLIGENCE REPORT (МАКСИМАЛЬНО ДЕТАЛЬНО)
-    # ==================================================================
+    # 5. Итоговый отчет (Remote Assessment)
     local total_duration=$(( $(date +%s) - start_time ))
-    
     core_engine_ui "h" "FINAL INTELLIGENCE SUMMARY"
     echo -e "${W}Total Audit Time     :${NC} ${G}${total_duration}s${NC}"
     echo -e "${W}Total Endpoints Scan :${NC} ${G}${#full_list[@]}${NC}"
     
     echo -e "\n${Y}--- [SUCCESSFUL ENDPOINTS DISCOVERED] ---${NC}"
-    if [ -s "$tmp_hits" ]; then
-        while IFS= read -r line; do
-            echo -e "${G}>> $line${NC}"
-        done < "$tmp_hits"
-    else
-        echo -e "${W}No high-value endpoints found.${NC}"
-    fi
+    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo -e "${W}No high-value endpoints found.${NC}"
 
-    echo -e "\n${Y}--- [SAST VULNERABILITY ANALYSIS] ---${NC}"
-    grep -rE "$(IFS='|'; echo "${GLOBAL_SAST_MATRIX[*]}")" . 2>/dev/null | head -n 10 || echo "No critical patterns detected."
+    # 6. Анализ заголовков безопасности удаленного сервера
+    echo -e "\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
+    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection")
+    for h in "${sec_headers[@]}"; do
+        local val=$(echo "$info_payload" | grep -Ei "^$h:" | cut -d':' -f2-)
+        [[ -n "$val" ]] && echo -e "${G}[+] $h : Present${NC}" || echo -e "${R}[-] $h : Missing${NC}"
+    done
 
-    rm -f "$tmp_hits" "$log_file"
+    rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
