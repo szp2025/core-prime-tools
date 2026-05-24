@@ -686,6 +686,84 @@ GLOBAL_ENC_POOL=("gzip, deflate, br, zstd" "gzip, deflate, br" "identity")
 GLOBAL_BASE_ACCEPT="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
 
 
+generate_matrix_arguments() {
+    local target_ip="$1"
+    
+    # 1. Берем случайный User-Agent из твоего легитимного массива 12
+    local r_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
+    if [[ -z "$r_ua" ]]; then
+        r_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    fi
+
+    # 2. Эвристический анализатор UA для динамической сборки Client Hints
+    local p_ch_ua="\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\""
+    local p_platform="\"Windows\""
+    local p_mobile="?0"
+    local p_arch="\"x86\""
+
+    # Вычисляем платформу
+    if [[ "$r_ua" =~ "Macintosh" || "$r_ua" =~ "iPhone" ]]; then
+        p_platform="\"macOS\""
+        [[ "$r_ua" =~ "iPhone" ]] && p_platform="\"iOS\""
+    elif [[ "$r_ua" =~ "Linux" || "$r_ua" =~ "Ubuntu" ]]; then
+        p_platform="\"Linux\""
+        [[ "$r_ua" =~ "Android" ]] && p_platform="\"Android\""
+    fi
+
+    # Вычисляем мобильный маркер
+    if [[ "$r_ua" =~ "Mobile" || "$r_ua" =~ "Android" || "$r_ua" =~ "iPhone" ]]; then
+        p_mobile="?1"
+        p_arch="\"arm\""
+    fi
+
+    # Вычисляем версию для Chrome/Edge/Firefox
+    if [[ "$r_ua" =~ "Edge/" ]]; then
+        p_ch_ua="\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\""
+    elif [[ "$r_ua" =~ "Firefox/" ]]; then
+        # Firefox не использует Client Hints по стандарту, но для WAF-мимикрии подсовываем пустую заглушку
+        p_ch_ua="\"Not-A.Brand\";v=\"99\", \"Firefox\";v=\"125\""
+    fi
+
+    # 3. Извлекаем случайные параметры локализации и сжатия
+    local r_lang="${GLOBAL_LANG_POOL[$((RANDOM % ${#GLOBAL_LANG_POOL[@]}))]}"
+    local r_enc="${GLOBAL_ENC_POOL[$((RANDOM % ${#GLOBAL_ENC_POOL[@]}))]}"
+    local r_gpc=$((RANDOM % 2))
+
+    # 4. Сборка монолитного массива аргументов curl из единого пула
+    CURL_MATRIX_ARGS=(
+        -A "$r_ua"
+        -H "Accept: $GLOBAL_BASE_ACCEPT"
+        -H "Accept-Language: $r_lang"
+        -H "Accept-Encoding: $r_enc"
+        -H "Cache-Control: max-age=0"
+        -H "Connection: keep-alive"
+        
+        # Динамические Client Hints, высчитанные из твоего массива UA
+        -H "Sec-Ch-Ua: $p_ch_ua"
+        -H "Sec-Ch-Ua-Mobile: $p_mobile"
+        -H "Sec-Ch-Ua-Platform: $p_platform"
+        -H "Sec-Ch-Ua-Arch: $p_arch"
+        -H "Sec-Ch-Ua-Bitness: \"64\""
+        
+        # Поведенческий контекст (Имитация клика человека из браузера)
+        -H "Sec-Fetch-Site: none"
+        -H "Sec-Fetch-Mode: navigate"
+        -H "Sec-Fetch-User: ?1"
+        -H "Sec-Fetch-Dest: document"
+        -H "Upgrade-Insecure-Requests: 1"
+        -H "Sec-GPC: $r_gpc"
+        
+        # Полный стек подмены IP происхождения (Защита твоего реального интерфейса)
+        -H "X-Forwarded-For: $target_ip"
+        -H "X-Real-IP: $target_ip"
+        -H "Client-IP: $target_ip"
+        -H "CF-Connecting-IP: $target_ip"
+        -H "True-Client-IP: $target_ip"
+        -H "X-Client-IP: $target_ip"
+        -H "Forwarded: for=$target_ip;proto=https"
+    )
+}
+
 
 # ==============================================================================
 # МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
