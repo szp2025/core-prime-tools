@@ -4972,47 +4972,7 @@ run_stealth_stream_analyzer() {
 # [INTEGRATED SECTOR C: CRYPTO-NEXUS ULTIMATE - FULL STREAMING EDITION]
 # ==============================================================================
 
-# 1. HASH_ANALYZER: Потоковый аудит (С сохранением глубокого логирования)
-run_hash_analyzer() {
-    # Читаем из аргумента или из потока
-    local target="${1:-/dev/stdin}"
-    
-    # Расширенный заголовок для логов
-    core_engine_ui "i" "Initializing High-Entropy Forensic Audit Stream..."
-    
-    # Используем временный буфер для анализа, если это поток, чтобы не потерять данные
-    local buffer="/tmp/stream_audit_$(date +%s).bin"
-    cat "$target" > "$buffer"
-    
-    # Аналитическая часть
-    local hash_md5=$(md5sum "$buffer" | awk '{print $1}')
-    local file_meta=$(file -b "$buffer")
-    
-    # 1. Сверка с GLOBAL_AV_MATRIX
-    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-        if echo "$hash_md5" | grep -qEi "$layer" || grep -qEi "$layer" "$buffer"; then
-            core_engine_ui "e" "CRITICAL_THREAT_MATCHED: Layer [ $layer ] found in stream."
-        fi
-    done
-    
-    # 2. Сверка с GLOBAL_HASH_MATRIX (OSINT/Data Leak)
-    for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
-        if grep -qEi "$hsig" "$buffer"; then
-            core_engine_ui "w" "LEAK_IDENTIFIED: Signature [ $hsig ] detected in data stream."
-        fi
-    done
 
-    # Полное логирование
-    {
-        echo "[$(date +'%Y-%m-%d %H:%M:%S')] STREAM_AUDIT: $target"
-        echo "TYPE: $file_meta | MD5: $hash_md5"
-        echo "ENTROPY: $(ent "$buffer" 2>/dev/null | grep 'Entropy =' | awk '{print $3}')"
-    } >> "$PRIME_LOOT/forensic_hash_audit.log"
-    
-    # Возвращаем поток дальше (для цепочек)
-    cat "$buffer"
-    rm -f "$buffer"
-}
 
 # 2. FILE_CRYPTOR: Военное шифрование в потоке (с сохранением полноты)
 run_file_cryptor() {
@@ -5031,23 +4991,6 @@ run_file_cryptor() {
     
     [[ $? -eq 0 ]] && core_engine_ui "s" "Pipeline operation completed successfully." || core_engine_ui "e" "Pipeline FAULT: Code $?"
 }
-
-# 3. STEGANO_LAB: Глубокий поток артефактов
-run_stegano_lab() {
-    core_engine_ui "i" "Executing Deep Stegano Stream-Probe..."
-    
-    local dump="/tmp/steg_stream_$(date +%s).txt"
-    # Потоковая запись и анализ
-    tee >(grep -aE "(PK\x03\x04|Rar!|7z\xBC\xAF\x27\x1C)" > "$dump") | strings -n 12
-    
-    # Анализ дампа через матрицы (полный цикл)
-    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-        grep -qEi "$layer" "$dump" && core_engine_ui "e" "THREAT: $layer detected in steg-stream."
-    done
-    
-    core_engine_ui "s" "Stream-Probe finished. Results preserved in: $dump"
-}
-
 
 # ==============================================================================
 # @description: CROSS-PLATFORM USER AUDIT & MANAGEMENT ENGINE v5.0
