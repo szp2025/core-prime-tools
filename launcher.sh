@@ -674,8 +674,6 @@ GLOBAL_NETWORK_UA=(
 # ==============================================================================
 # ГЛОБАЛЬНАЯ МАТРИЦА СЕТЕВЫХ ОТПЕЧАТКОВ И ЛОКАЛИЗАЦИЙ (NEXUS MATRIX POOL v25.7)
 # ==============================================================================
-# Массив локализаций содержит реальные языковые маркеры современных дистрибутивов 
-# браузеров с весовыми коэффициентами качества (q-фактор).
 GLOBAL_LANG_POOL=(
     "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
     "en-US,en;q=0.9,fr;q=0.7,de;q=0.5"
@@ -685,62 +683,56 @@ GLOBAL_LANG_POOL=(
     "it-IT,it;q=0.9,en;q=0.7,el;q=0.5"
 )
 
-# Алгоритмы сжатия данных. Включают 'zstd' (стандарт компрессии к 2026 году),
-# что делает сигнатуру curl неотличимой от оригинального десктопа.
 GLOBAL_ENC_POOL=(
     "gzip, deflate, br, zstd"
     "gzip, deflate, br"
     "gzip, deflate"
 )
 
-# Унифицированный комплаенс-набор медиатипов MIME для эмуляции Chromium-архитектуры
 GLOBAL_BASE_ACCEPT="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+
+# Системный массив для выявления утечек заголовков серверной инфраструктуры
+GLOBAL_HTTP_MATRIX=("X-Powered-By" "Server" "X-AspNet-Version" "X-Runtime" "X-Version" "Via" "X-Cache")
+
 
 
 generate_matrix_arguments() {
     local target_ip="$1"
     
-    # Извлекаем случайный User-Agent из глобального ротатора
     local r_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
     if [[ -z "$r_ua" ]]; then
         r_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     fi
 
-    # Инициализация дефолтных параметров для Chromium-подобных систем
     local p_ch_ua="\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\""
     local p_platform="\"Windows\""
     local p_mobile="?0"
     local p_arch="\"x86\""
 
-    # Эвристическое определение платформы операционной системы
-    if [[ "$r_ua" =~ "Macintosh" || "$r_ua" =~ "iPhone" ]]; then
+    # ИСПРАВЛЕНО: Удалены внутренние кавычки из регулярных выражений Bash
+    if [[ "$r_ua" =~ Macintosh || "$r_ua" =~ iPhone ]]; then
         p_platform="\"macOS\""
-        [[ "$r_ua" =~ "iPhone" ]] && p_platform="\"iOS\""
-    elif [[ "$r_ua" =~ "Linux" || "$r_ua" =~ "Ubuntu" ]]; then
+        [[ "$r_ua" =~ iPhone ]] && p_platform="\"iOS\""
+    elif [[ "$r_ua" =~ Linux || "$r_ua" =~ Ubuntu ]]; then
         p_platform="\"Linux\""
-        [[ "$r_ua" =~ "Android" ]] && p_platform="\"Android\""
+        [[ "$r_ua" =~ Android ]] && p_platform="\"Android\""
     fi
 
-    # Определение мобильного фактора и архитектуры процессора
-    if [[ "$r_ua" =~ "Mobile" || "$r_ua" =~ "Android" || "$r_ua" =~ "iPhone" ]]; then
+    if [[ "$r_ua" =~ Mobile || "$r_ua" =~ Android || "$r_ua" =~ iPhone ]]; then
         p_mobile="?1"
         p_arch="\"arm\""
     fi
 
-    # Корректировка версий под конкретные типы обозревателей периметра
-    if [[ "$r_ua" =~ "Edge/" ]]; then
+    if [[ "$r_ua" =~ Edge/ ]]; then
         p_ch_ua="\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\""
-    elif [[ "$r_ua" =~ "Firefox/" ]]; then
-        # Эмуляция структуры исключения для Firefox (сокрытие факта автоматизации)
+    elif [[ "$r_ua" =~ Firefox/ ]]; then
         p_ch_ua="\"Not-A.Brand\";v=\"99\", \"Firefox\";v=\"125\""
     fi
 
-    # Выбор случайных параметров локализации, компрессии и флага приватности
     local r_lang="${GLOBAL_LANG_POOL[$((RANDOM % ${#GLOBAL_LANG_POOL[@]}))]}"
     local r_enc="${GLOBAL_ENC_POOL[$((RANDOM % ${#GLOBAL_ENC_POOL[@]}))]}"
     local r_gpc=$((RANDOM % 2))
 
-    # Сборка финального монолитного массива аргументов для curl
     CURL_MATRIX_ARGS=(
         -A "$r_ua"
         -H "Accept: $GLOBAL_BASE_ACCEPT"
@@ -748,23 +740,17 @@ generate_matrix_arguments() {
         -H "Accept-Encoding: $r_enc"
         -H "Cache-Control: max-age=0"
         -H "Connection: keep-alive"
-        
-        # Блок синхронизированных заголовков Client Hints
         -H "Sec-Ch-Ua: $p_ch_ua"
         -H "Sec-Ch-Ua-Mobile: $p_mobile"
         -H "Sec-Ch-Ua-Platform: $p_platform"
         -H "Sec-Ch-Ua-Arch: $p_arch"
         -H "Sec-Ch-Ua-Bitness: \"64\""
-        
-        # Контекстные поведенческие маркеры (Имитация ручного клика пользователя)
         -H "Sec-Fetch-Site: none"
         -H "Sec-Fetch-Mode: navigate"
         -H "Sec-Fetch-User: ?1"
         -H "Sec-Fetch-Dest: document"
         -H "Upgrade-Insecure-Requests: 1"
         -H "Sec-GPC: $r_gpc"
-        
-        # Развернутый стек спуфинга IP-адресов источника для обхода логирования WAF
         -H "X-Forwarded-For: $target_ip"
         -H "X-Real-IP: $target_ip"
         -H "Client-IP: $target_ip"
