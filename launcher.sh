@@ -5818,7 +5818,14 @@ run_system_info() {
     # ЭТАП 3: АГРЕССИВНЫЙ АДАПТИВНЫЙ ФАЗЗИНГ
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Deep Scan)..."
+    # Оценка времени: количество хуков * задержка (примерно)
+    local total_hooks=${#GLOBAL_FUZZ_WORDLIST[@]}
+    local estimated_sec=$(( total_hooks * 1 )) 
     
+    core_engine_progress "$estimated_sec" "FUZZING" &
+    local progress_pid=$!
+
+
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
     local base_delay=0.4 # Ускоренный темп для полного покрытия
