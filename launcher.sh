@@ -5643,15 +5643,15 @@ run_network_intelligence() {
 
 
 # ==============================================================================
-# [OSINT NEXUS v25.0 - AUTOMATED HEURISTIC SECURITY COMPLIANCE ENGINE]
-# АВТОРСТВО: Модернизированное эвристическое ядро "Ghost Core - GOD MODE" 2026.
-# КЛАССИФИКАЦИЯ: Автономный сканер с адаптивным контролем блокировок периметра.
-# СТРАТЕГИЯ: Полная изоляция HTML-мусора, интеллектуальный обход триггеров защиты.
-# СТРУКТУРА: Развернутый детализированный код со всеми параметрами ротации.
+# [OSINT NEXUS v24.0 - AUTOMATED ULTRA-STEALTH SECURITY COMPLIANCE ENGINE]
+# АВТОРСТВО: Модернизированное эвристическое ядро "Ghost Core" 2026.
+# КЛАССИФИКАЦИЯ: Автономный, недетектируемый, высокоскоростной асинхронный сканер.
+# МЕТОДОЛОГИЯ: Динамическая подмена отпечатков, обход WAF, визуализация матричных утечек.
+# СТРАТЕГИЯ: Полное подавление сырого вывода (Zero-Leak), точечный аудит комплаенса.
 # ==============================================================================
 
 run_system_info() {
-    core_engine_ui "h" "NEXUS v25.0: HYPER-STEALTH HEURISTIC ENGINE (GOD MODE)"
+    core_engine_ui "h" "NEXUS v24.0: HYPER-STEALTH HEURISTIC GHOST ENGINE"
     
     local r_target=$(core_engine_input "text" "Enter Target Domain, Host or IP [default: localhost]")
     if [[ -z "$r_target" ]]; then
@@ -5680,7 +5680,7 @@ run_system_info() {
     core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
     echo -e "\n${Y}--- [STAGE 1: HEURISTIC INFRASTRUCTURE DETECTOR] ---${NC}"
     
-    # Снайперский резолвинг сетевого адреса без системного мусора
+    # Резолвинг целевого IP-адреса без вывода ошибок системных утилит
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
     echo -e "${W}Target Target Domain :${NC} ${Y}$r_target${NC}"
     echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
@@ -5691,19 +5691,19 @@ run_system_info() {
     local lang_pool=("en-US,en;q=0.9" "fr-FR,fr;q=0.8,en;q=0.7" "en-GB,en;q=0.9,de;q=0.7" "es-ES,es;q=0.9")
     local enc_pool=("gzip, deflate, br" "gzip, deflate" "identity")
     
-    # Безопасная генерация IP (Исключаем приватные сети 10.x, 127.x, 172.x, 192.x)
+    # Эвристическая генерация высоконадежного публичного IP (Исключаем 0.x, 127.x, 224.x)
     local block_a=$((RANDOM % 190 + 11))
     while [[ "$block_a" -eq 127 || "$block_a" -eq 10 || "$block_a" -eq 172 || "$block_a" -eq 192 ]]; do
         block_a=$((RANDOM % 190 + 11))
     done
     local fake_ip="${block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
 
-    # Вытаскиваем параметры маскировки из пула
+    # Случайные контекстные параметры из массивов
     local random_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
     local random_lang="${lang_pool[$((RANDOM % ${#lang_pool[@]}))]}"
     local random_enc="${enc_pool[$((RANDOM % ${#enc_pool[@]}))]}"
 
-    # Эвристическое определение протокола и корректная обработка SSL-редиректов
+    # Эвристическое определение доступности протокола (Умное переключение HTTP -> HTTPS)
     local base_url="http://$r_target"
     local probe_headers=$(curl -s -I --connect-timeout 4 -A "$random_ua" "$base_url" 2>/dev/null)
     
@@ -5712,7 +5712,7 @@ run_system_info() {
         echo -e "${Y}[i] Heuristic Engine: SSL/TLS Redirection Forced. Switching to Secure Base URL.${NC}"
     fi
 
-    # Сбор первичного слепка инфраструктуры. Строго изолируем вывод.
+    # Пассивный безопасный сбор первичного слепка инфраструктуры в оперативную память
     local full_payload=$(curl -s -i -L --connect-timeout 6 \
         -A "$random_ua" \
         -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
@@ -5727,7 +5727,7 @@ run_system_info() {
         -H "CF-Connecting-IP: $fake_ip" \
         "$base_url/")
 
-    # Хирургическое разделение пакета данных (Гарантия Zero-Leak сырого HTML)
+    # Хирургическая сепарация HTTP-пакета (Заголовки / Тело) без утечек кода в консоль
     local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
     local root_html=$(echo "$full_payload" | sed '1,/^$/d')
     
@@ -5737,7 +5737,7 @@ run_system_info() {
     echo -e "${W}Main Operational Code:${NC} ${G}${root_code:-UNKNOWN}${NC}"
     echo -e "${W}Identified Edge Server:${NC} ${Y}${root_srv:-COULD NOT PARSE / HIDDEN}${NC}"
     
-    # Разбор версий веб-обработчиков
+    # Снайперский разбор версий обработчиков (PHP)
     local root_php=""
     root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
     
@@ -5789,88 +5789,60 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (GOD MODE С АДАПТИВНЫМ ДРОССЕЛЕМ)
+    # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (GHOST ROUTER ACTIVE)
     # ==================================================================
-    core_engine_ui "w" "Launching Stage 3: Adaptive God-Mode Fuzzing (Anti-Trigger & Zero-Leak)..."
+    core_engine_ui "w" "Launching Stage 3: High-Stealth Heuristic Fuzzing (Strict 200 OK Mode)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     touch "$tmp_hits"
     
-    # Системные переменные адаптивного контроля нагрузки на WAF
-    local base_delay=0.15
-    local max_threads=4
-
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
         (
-            # Динамический расчет задержки (Увеличенный диапазон адаптивного смещения)
-            local jitter=$(awk -v base="$base_delay" 'BEGIN{srand(); print base + (rand() * 0.45)}')
+            # 1. Сверхточный Jitter Delay (Дробное случайное микро-смещение против ИИ-анализаторов WAF)
+            local jitter=$(awk -v min=0.08 -v max=0.35 'BEGIN{srand(); print min+rand()*(max-min)}')
             sleep "$jitter"
             
-            # Контекстные параметры текущего потока
+            # 2. Индивидуальный контекстный отпечаток для текущего потока
             local thread_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
             local thread_lang="${lang_pool[$((RANDOM % ${#lang_pool[@]}))]}"
             
-            # Генерация валидного клиентского IP
+            # 3. Генерация уникального IP происхождения для текущего запроса файла
             local t_block_a=$((RANDOM % 190 + 11))
             while [[ "$t_block_a" -eq 127 || "$t_block_a" -eq 10 || "$t_block_a" -eq 172 || "$t_block_a" -eq 192 ]]; do
                 t_block_a=$((RANDOM % 190 + 11))
             done
             local thread_ip="${t_block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
             
-            # Запрос только метаданных (-I), исключая просачивание HTML-страницы ошибки 500/403 в консоль
-            local ep_headers=$(curl -I -s -L --connect-timeout 4 \
+            # Выполнение точечного HEAD-запроса (-I) для исключения просачивания HTML/CSS в консоль
+            local ep_headers=$(curl -I -s -L --connect-timeout 3 \
                 -A "$thread_ua" \
-                -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
+                -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
                 -H "Accept-Language: $thread_lang" \
-                -H "Cache-Control: max-age=0" \
-                -H "Sec-Ch-Ua: \"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\"" \
-                -H "Sec-Ch-Ua-Mobile: ?0" \
-                -H "Sec-Ch-Ua-Platform: \"Windows\"" \
-                -H "Sec-Fetch-Site: none" \
-                -H "Sec-Fetch-Mode: navigate" \
-                -H "Sec-Fetch-Dest: document" \
                 -H "X-Forwarded-For: $thread_ip" \
                 -H "X-Real-IP: $thread_ip" \
                 -H "Client-IP: $thread_ip" \
                 -H "CF-Connecting-IP: $thread_ip" \
                 "$base_url/$hook" 2>/dev/null)
             
-            # Отрезаем любые остатки HTML, берем только чистую строку кода ответа HTTP
-            local code=$(echo "$ep_headers" | sed -n 's/^HTTP\/[12\.]* \([0-9][0-9][0-9]\).*/\1/p' | tail -n 1 | tr -d '\r' | awk '{print $1}')
+            local code=$(echo "$ep_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
             
-            if [[ "$code" == "500" || "$code" == "403" ]]; then
-                # Фиксируем срабатывание защитных систем в буфер без вывода мусора
+            if [[ "$code" == "500" || "$code" == "403" && "$hook" == *".env"* ]]; then
+                # Фиксируем попытку блокировки со стороны защитного экрана периметра
                 echo "WAF_BLOCK" >> "$tmp_hits"
-                
-                # Если WAF начал массово выдавать блокировки, динамически заставляем поток спать дольше
-                if [[ $([ -f "$tmp_hits" ] && grep -c "WAF_BLOCK" "$tmp_hits") -gt 5 ]]; then
-                    sleep 0.8
-                fi
             elif [[ "$code" == "200" ]]; then
-                # Проверяем, не является ли ответ ложной заглушкой WAF (сравниваем с размером или сигнатурой)
-                # Если файл критический — фиксируем уязвимость архитектуры
+                # Эвристическая проверка: является ли файл критической уязвимостью архитектуры
                 if [[ "$hook" =~ (\.env|\.git|\.hta|config|backup|wp-config|mysql|dump|setup|phpinfo|deploy) ]]; then
                     echo "ALERT:/$hook | Code: 200 | EXPOSED" >> "$tmp_hits"
-                    echo -e "${R}[ALERT: ARCHITECTURAL BREACH] /$hook is fully open (HTTP 200)!${NC}"
+                    echo -e "${R}[ALERT: GHOST BYPASS SUCCESS] /$hook is unprotected and accessible!${NC}"
                 else
+                    # Стандартный открытый публичный объект
                     echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
                     echo -e "${G}[!] FOUND: /$hook (200 OK)${NC}"
                 fi
             fi
         ) &
-        
-        # Интеллектуальный адаптивный троттлинг потоков. Если WAF лютует, снижаем параллельность.
-        local active_blocks=0
-        if [ -f "$tmp_hits" ]; then
-            active_blocks=$(grep -c "WAF_BLOCK" "$tmp_hits")
-        fi
-        
-        if (( active_blocks > 8 ]]; then
-            max_threads=2   # Автоматически зажимаем сканер, чтобы обойти бан по частоте
-            base_delay=0.45 # Увеличиваем базовый интервал покоя
-        fi
-        
-        while (( $(jobs -p | wc -l) >= max_threads )); do sleep 0.1; done
+        # Оптимальный лимит параллельных потоков для предотвращения деградации производительности WAF
+        while (( $(jobs -p | wc -l) >= 4 )); do sleep 0.05; done
     done
     wait
 
@@ -5881,24 +5853,23 @@ run_system_info() {
     echo -e "${W}Target Target :${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
     
     local has_waf=0
-    if [ -f "$tmp_hits" ] && grep -q "WAF_BLOCK" "$tmp_hits"; then
+    if grep -q "WAF_BLOCK" "$tmp_hits" 2>/dev/null; then
         has_waf=1
-        local total_blocks=$(grep -c "WAF_BLOCK" "$tmp_hits")
-        echo -e "${R}[!] WAF PERIMETER STATUS: Active Shielding Engaged (${total_blocks} requests intercepted & isolated).${NC}"
+        echo -e "${R}[!] WAF PERIMETER STATUS: Active Shielding Detected (Interceptions registered).${NC}"
     fi
 
-    # Блок 1: Анализ подтвержденных утечек (Только реальные 200 OK без ложных WAF-заглушек)
+    # Блок 1: Критические архитектурные прорехи (Незакрытые файлы конфигурации)
     local has_critical_leaks=0
-    if [ -f "$tmp_hits" ] && grep -q "^ALERT:" "$tmp_hits"; then
+    if grep -q "^ALERT:" "$tmp_hits" 2>/dev/null; then
         has_critical_leaks=1
         echo -e "\n${R}🚨 [CRITICAL INFRASTRUCTURE ALERTS - UNPROTECTED EXPOSED ASSETS]:${NC}"
         grep "^ALERT:" "$tmp_hits" | sed 's/^ALERT://' | while read -r line; do
-            echo -e "  ${R}-> $line (Immediate access remediation required!)${NC}"
+            echo -e "  ${R}-> $line (Stealth Bypass Confirmed. Restrict access immediately!)${NC}"
         done
     fi
 
-    # Блок 2: Легитимные открытые ресурсы
-    if [ -f "$tmp_hits" ] && grep -q "^HIT:" "$tmp_hits"; then
+    # Блок 2: Легитимные публичные файлы периметра
+    if grep -q "^HIT:" "$tmp_hits" 2>/dev/null; then
         echo -e "\n${G}✔️ [Exposed Standard Public Objects (Code: 200)]:${NC}"
         grep "^HIT:" "$tmp_hits" | sed 's/^HIT://' | while read -r line; do
             echo -e "  ${G}-> $line${NC}"
@@ -5912,19 +5883,21 @@ run_system_info() {
     echo -e "${Y}🛡️  [SECURITY ARCHITECTURE COMPLIANCE AUDIT]${NC}"
     echo -e "${Y}================================================================${NC}"
     
+    # 1. Контроль изоляции критических файлов
     if (( has_critical_leaks == 1 )); then
-        echo -e "  Sensitive Asset Isolation   : [${R}CRITICAL BREACH${NC}] - Internal configuration leaked!"
+        echo -e "  Sensitive Asset Isolation   : [${R}CRITICAL BREACH${NC}] - Internal files exposed!"
     else
-        echo -e "  Sensitive Asset Isolation   : [${G}PASSED${NC}] - All system variables securely isolated."
+        echo -e "  Sensitive Asset Isolation   : [${G}PASSED${NC}] - All core configurations securely hidden."
     fi
 
+    # 2. Статус защитного экрана
     if (( has_waf == 1 )); then
-        echo -e "  Intrusion Prevention & WAF  : [${G}ACTIVE${NC}] - Perimeter shield isolated successfully."
+        echo -e "  Intrusion Prevention & WAF  : [${G}ACTIVE${NC}] - Active traffic analysis modules detected."
     else
-        echo -e "  Intrusion Prevention & WAF  : [${Y}NOT DETECTED${NC}] - Perimeter open or complete stealth bypass achieved."
+        echo -e "  Intrusion Prevention & WAF  : [${Y}NOT DETECTED${NC}] - Perimeter open or stealth bypass achieved."
     fi
 
-    # Снайперский разбор матрицы утечек заголовков
+    # 3. Детализированный прецизионный визуализатор утечек по матрице заголовков
     local matrix_regex=$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")
     local leaked_headers=""
     
@@ -5945,15 +5918,16 @@ run_system_info() {
     fi
     echo -e "${Y}================================================================${NC}"
 
-    # Сохранение результатов в долгосрочный LOOT
-    if [ -f "$tmp_hits" ] && grep -Eq "^(HIT|ALERT):" "$tmp_hits"; then
-        core_engine_loot "recon" "Target: $r_target\nGod Mode Audit Completed.\n$(grep -E '^(HIT|ALERT):' "$tmp_hits")"
+    # Фиксация финальной сводки в хранилище LOOT
+    if grep -Eq "^(HIT|ALERT):" "$tmp_hits" 2>/dev/null; then
+        core_engine_loot "recon" "Target: $r_target\nGhost Core Audit Completed.\n$(grep -E '^(HIT|ALERT):' "$tmp_hits")"
     fi
 
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
+
 
 
 # ==============================================================================
