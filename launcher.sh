@@ -5761,14 +5761,20 @@ run_network_intelligence() {
 # ==============================================================================
 # ОСНОВНАЯ ИСПОЛНЯЕМАЯ ФУНКЦИЯ КОМПЛАЕНС-МОНИТОРИНГА ПЕРИМЕТРА
 # ==============================================================================
+/**
+ * Автономное эвристическое ядро "Ghost Core" для аудита внешнего и внутреннего периметра.
+ * Производит сбор слепков, сигнатурный анализ и дифференциальный фаззинг без утечки данных.
+ */
 run_system_info() {
-    core_engine_ui "h" "NEXUS v25.6: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
+    core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
     
+    # Запрос целевого адреса у оператора
     local r_target=$(core_engine_input "text" "Enter Target Domain, Host or IP [default: localhost]")
     if [[ -z "$r_target" ]]; then
         r_target="localhost"
     fi
     
+    # Возврат в главное меню при вводе команды Back
     [[ "$r_target" =~ ^[bB](ack)?$ ]] && return
     clear
 
@@ -5779,6 +5785,7 @@ run_system_info() {
         core_engine_ui "h" "INTERNAL COMPLIANCE: LOCAL SERVICE RUNTIMES"
         core_engine_ui "w" "Auditing active local socket listeners..."
         
+        # Сбор активных сетевых сокетов, запущенных на локальном хосте
         local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active web runtimes intercepted.")
         echo -e "\n${Y}--- [LOCAL EVENT LISTENERS] ---${NC}\n${W}$listeners${NC}"
         core_engine_wait
@@ -5791,22 +5798,23 @@ run_system_info() {
     core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
     echo -e "\n${Y}--- [STAGE 1: HEURISTIC INFRASTRUCTURE DETECTOR] ---${NC}"
     
+    # Прецизионный резолвинг доменного имени без вызова внешних утилит
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
-    echo -e "${W}Target Target Domain :${NC} ${Y}$r_target${NC}"
+    echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
     echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
 
-    # Безопасная эвристическая генерация базового IP подмены происхождения
+    # Безопасная эвристическая генерация базового фейкового IP-адреса
     local block_a=$((RANDOM % 190 + 11))
     while [[ "$block_a" -eq 127 || "$block_a" -eq 10 || "$block_a" -eq 172 || "$block_a" -eq 192 ]]; do
         block_a=$((RANDOM % 190 + 11))
     done
     local fake_ip="${block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
 
-    # Извлекаем случайный UA из твоего глобального ротатора для предварительной проверки редиректа
+    # Извлечение случайного User-Agent для первичной проверки протокола
     local random_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
     [[ -z "$random_ua" ]] && random_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-    # Эвристическое определение протокола и корректная обработка SSL-редиректов
+    # Определение базового протокола и обработка принудительных редиректов на HTTPS
     local base_url="http://$r_target"
     local probe_headers=$(curl -s -I --connect-timeout 4 -A "$random_ua" "$base_url" 2>/dev/null)
     
@@ -5815,28 +5823,29 @@ run_system_info() {
         echo -e "${Y}[i] Heuristic Engine: SSL/TLS Redirection Forced. Switching to Secure Base URL.${NC}"
     fi
 
-    # Инициализируем аргументы Глобальной Матрицы для съёма слепка
+    # Генерация аргументов глобальной матрицы для съёма первичного слепка
     generate_matrix_arguments "$fake_ip"
 
-    # Сбор первичного слепка инфраструктуры через Матрицу
+    # Запрос структуры главной страницы с полной изоляцией потока данных
     local full_payload=$(curl -s -i -L --connect-timeout 6 \
         "${CURL_MATRIX_ARGS[@]}" \
         -H "Pragma: no-cache" \
         "$base_url/")
 
-    # Хирургическое разделение пакета данных (Гарантия Zero-Leak сырого HTML)
+    # Разделение заголовков и тела ответа (Исключение просачивания HTML-разметки)
     local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
     local root_html=$(echo "$full_payload" | sed '1,/^$/d')
     
-    local root_code=$(echo "$root_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+    # Извлечение чистых HTTP-кодов и сигнатуры веб-сервера с удалением каретки \r
+    local root_code=$(echo "$root_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}' | tr -d '\r')
     local root_srv=$(echo "$root_headers" | grep -Ei "^Server:" | tail -n 1 | sed -E 's/^Server:[[:space:]]*//I' | awk '{print $1}' | tr -d '\r')
     
     echo -e "${W}Main Operational Code:${NC} ${G}${root_code:-UNKNOWN}${NC}"
     echo -e "${W}Identified Edge Server:${NC} ${Y}${root_srv:-COULD NOT PARSE / HIDDEN}${NC}"
     
-    # Разбор версий веб-обработчиков
+    # Определение версий серверных интерпретаторов (PHP и сопутствующие среды)
     local root_php=""
-    root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
+    root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/' | tr -d '\r')
     
     if [[ -z "$root_php" ]]; then
         local raw_version_match=$(echo "$full_payload" | grep -Eio "(PHP/[0-9.]+|PHP Version [0-9.]+|/php/[578]\.[0-9]\.[0-9]+)" | head -n 1)
@@ -5845,6 +5854,7 @@ run_system_info() {
         fi
     fi
     
+    # Пассивный анализ кук и структуры папок на случай скрытия заголовков
     if [[ -z "$root_php" ]]; then
         if echo "$root_headers" | grep -Ei "(PHPSESSID|pma_cookie)" >/dev/null 2>&1 || echo "$root_html" | grep -Ei "(/wp-includes/|/bitrix/)" >/dev/null 2>&1; then
             root_php="Exposed Signatures (PHP-Driven Architecture)"
@@ -5886,47 +5896,52 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (МАТРИЧНАЯ РОТАЦИЯ И ANTI-HTML LEAK)
+    # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (МАТРИЧНАЯ РОТАЦИЯ И АНТИ-БЛОК)
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Anti-HTML Leak & Traffic Shifter)..."
     
+    # Создание временного изолированного хранилища для сбора логов потоков
     local tmp_hits="/tmp/recon_hits_$$"
     touch "$tmp_hits"
     
+    # Базовые параметры управления конкурентностью и задержками
     local base_delay=0.20
     local max_threads=4
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
         (
-            # Динамический Jitter
+            # Расчет дробного интервала ожидания (Jitter) для сбивания таймингов WAF
             local jitter=$(awk -v base="$base_delay" 'BEGIN{srand(); print base + (rand() * 0.40)}')
             sleep "$jitter"
             
-            # Генерация уникального IP для текущей итерации потока
+            # Генерация уникального IP-адреса источника для текущей итерации потока
             local t_block_a=$((RANDOM % 190 + 11))
             while [[ "$t_block_a" -eq 127 || "$t_block_a" -eq 10 || "$t_block_a" -eq 172 || "$t_block_a" -eq 192 ]]; do
                 t_block_a=$((RANDOM % 190 + 11))
             done
             local thread_ip="${t_block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
             
-            # Пересобираем Глобальную Матрицу Контекста под текущий поток (Берется новый UA из ротатора)
+            # Пересборка Глобальной Матрицы под изолированный поток
             generate_matrix_arguments "$thread_ip"
             
-            # Перехват HTTP-кода напрямую из вывода curl с полным уничтожением входящего HTML-тела
+            # Исполнение HEAD-запроса с полным перенаправлением вывода контента в /dev/null
             local code=$(curl -s -I -L --connect-timeout 4 \
                 "${CURL_MATRIX_ARGS[@]}" \
                 -o /dev/null \
                 -w "%{http_code}" \
                 "$base_url/$hook" 2>/dev/null)
 
+            # Очистка HTTP-кода от скрытых символов возврата каретки
             code=$(echo "$code" | tr -d '\r' | awk '{print $1}')
             
+            # Анализ ответа и адаптивная реакция на фильтрацию периметра
             if [[ "$code" == "500" || "$code" == "403" ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
                 if [[ $([ -f "$tmp_hits" ] && grep -c "WAF_BLOCK" "$tmp_hits") -gt 4 ]]; then
                     sleep 0.6
                 fi
             elif [[ "$code" == "200" ]]; then
+                # Проверка объекта на принадлежность к критическим системным файлам
                 if [[ "$hook" =~ (\.env|\.git|\.hta|config|backup|wp-config|mysql|dump|setup|phpinfo|deploy) ]]; then
                     echo "ALERT:/$hook | Code: 200 | EXPOSED" >> "$tmp_hits"
                     echo -e "${R}[ALERT: CRITICAL LEAK] /$hook is fully open (HTTP 200)!${NC}"
@@ -5937,7 +5952,7 @@ run_system_info() {
             fi
         ) &
         
-        # Динамический контроль нагрузки ядра
+        # Динамический контроль нагрузки: если WAF агрессивен, зажимаем пул до 2 потоков
         local active_blocks=0
         if [ -f "$tmp_hits" ]; then
             active_blocks=$(grep -c "WAF_BLOCK" "$tmp_hits")
@@ -5948,6 +5963,7 @@ run_system_info() {
             base_delay=0.50
         fi
         
+        # Мониторинг заполнения пула дескрипторов задач Bash
         while (( $(jobs -p | wc -l) >= max_threads )); do sleep 0.1; done
     done
     wait
@@ -5958,6 +5974,7 @@ run_system_info() {
     echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
     echo -e "${W}Target Target :${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
     
+    # Проверка статуса наличия активного WAF-экрана
     local has_waf=0
     if [ -f "$tmp_hits" ] && grep -q "WAF_BLOCK" "$tmp_hits"; then
         has_waf=1
@@ -5965,6 +5982,7 @@ run_system_info() {
         echo -e "${R}[!] WAF PERIMETER STATUS: Active Shielding Engaged (${total_blocks} requests isolated via Sandbox).${NC}"
     fi
 
+    # Раздел критических алертов инфраструктуры
     local has_critical_leaks=0
     if [ -f "$tmp_hits" ] && grep -q "^ALERT:" "$tmp_hits"; then
         has_critical_leaks=1
@@ -5974,13 +5992,15 @@ run_system_info() {
         done
     fi
 
+    # Раздел стандартных публичных объектов
     if [ -f "$tmp_hits" ] && grep -q "^HIT:" "$tmp_hits"; then
-        echo -e "\n${G}✔️ [Exposed Standard Public Objects (Code: 200)]:${NC}"
+        echo -e "\n${G}擠 [Exposed Standard Public Objects (Code: 200)]:${NC}"
         grep "^HIT:" "$tmp_hits" | sed 's/^HIT://' | while read -r line; do
             echo -e "  ${G}-> $line${NC}"
         done
     fi
 
+    # Вывод итоговой таблицы стандартов безопасности архитектуры
     echo -e "\n${Y}================================================================${NC}"
     echo -e "${Y}🛡️  [SECURITY ARCHITECTURE COMPLIANCE AUDIT]${NC}"
     echo -e "${Y}================================================================${NC}"
@@ -5997,6 +6017,7 @@ run_system_info() {
         echo -e "  Intrusion Prevention & WAF  : [${Y}NOT DETECTED${NC}] - Perimeter open or complete stealth bypass achieved."
     fi
 
+    # Поиск утечек системных заголовков по регулярному выражению матрицы
     local matrix_regex=$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")
     local leaked_headers=""
     
@@ -6017,10 +6038,12 @@ run_system_info() {
     fi
     echo -e "${Y}================================================================${NC}"
 
+    # Фиксация полученных результатов в долгосрочное хранилище (LOOT)
     if [ -f "$tmp_hits" ] && grep -Eq "^(HIT|ALERT):" "$tmp_hits"; then
         core_engine_loot "recon" "Target: $r_target\nUltimate Audit Completed.\n$(grep -E '^(HIT|ALERT):' "$tmp_hits")"
     fi
 
+    # Санитарная очистка временных файлов
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
