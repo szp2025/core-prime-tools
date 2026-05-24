@@ -5865,7 +5865,7 @@ run_system_info() {
             active_blocks=$(grep -c "WAF_BLOCK" "$tmp_hits")
         fi
         
-        if (( active_blocks > 8 ]]; then
+       if (( active_blocks > 8 )); then
             max_threads=2   # Автоматически зажимаем сканер, чтобы обойти бан по частоте
             base_delay=0.45 # Увеличиваем базовый интервал покоя
         fi
