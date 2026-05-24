@@ -5769,7 +5769,6 @@ run_system_info() {
     echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
     echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
 
-    # Генерация матрицы аргументов
     local fake_ip="$((RANDOM % 190 + 11)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
     generate_matrix_arguments "$fake_ip" "$r_target"
 
@@ -5781,14 +5780,13 @@ run_system_info() {
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ОБНОВЛЕННЫЙ ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (БЕЗОПАСНЫЙ СИНТАКСИС)
+    # ОБНОВЛЕННЫЙ ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (ZSH-СОВМЕСТИМЫЙ)
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Stealth Mode Enabled)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     touch "$tmp_hits"
     
-    # Инициализация переменных для предотвращения арифметических ошибок
     local max_threads=3
     local base_delay=0.6
 
@@ -5808,14 +5806,9 @@ run_system_info() {
             fi
         ) &
         
-        # БЕЗОПАСНЫЙ ЦИКЛ УПРАВЛЕНИЯ ПОТОКАМИ
+        # БЕЗОПАСНЫЙ ЦИКЛ (Используем нативную переменную ZSH)
         while true; do
-            # Принудительно конвертируем вывод в число
-            local current_jobs=$(jobs -p | wc -l)
-            local current_num=$((10#$current_jobs))
-            local max_num=$((10#$max_threads))
-            
-            if [ $current_num -lt $max_num ]; then
+            if [ ${#jobstates} -lt $max_threads ]; then
                 break
             fi
             sleep 0.5
@@ -5823,8 +5816,10 @@ run_system_info() {
         
         # Динамическая корректировка
         if [[ -f "$tmp_hits" ]]; then
-            local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null || echo 0)
-            if [ $((10#$b_count)) -gt 8 ]; then
+            # Очищаем вывод от пробелов для чистого сравнения
+            local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
+            # Используем безопасное сравнение строк
+            if [ "$b_count" -gt 8 ]; then
                 max_threads=1
                 base_delay=2.0
             fi
@@ -5841,6 +5836,7 @@ run_system_info() {
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
+
 
 
 # ==============================================================================
