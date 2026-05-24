@@ -5642,35 +5642,32 @@ run_network_intelligence() {
 
 
 # ==============================================================================
-# [OSINT NEXUS v20.0 - SMART ADAPTIVE RECON ENGINE]
-# МОДЕРНИЗАЦИЯ: Убрано меню выбора, добавлен дефолтный localhost при пустом вводе
-# Сквозной интеллектуальный разбор локального и удаленного векторов
+# [OSINT NEXUS v20.0 - ULTRA STABLE SMART RECON ENGINE]
+# МОДЕРНИЗАЦИЯ: Исправлен краш регулярных выражений сигнатур (Fixed Strings Mode)
+# ИЗОЛЯЦИЯ: Полное подавление сырого вывода HTML во избежание засорения консоли
 # ==============================================================================
 
 run_system_info() {
-    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (STREAMLINED)"
+    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (SILENT RUN)"
     
-    # Запрос цели с подсказкой о значении по умолчанию
+    # Интеллектуальный ввод цели со значением по умолчанию
     local r_target=$(core_engine_input "text" "Target Domain or IP [default: localhost]")
     
-    # Если ввод пустой или нажат Enter — выставляем localhost
     if [[ -z "$r_target" ]]; then
         r_target="localhost"
     fi
     
-    # Быстрый выход, если пользователь написал "back" или "b"
     [[ "$r_target" =~ ^[bB](ack)?$ ]] && return
 
     clear
 
     # ==================================================================
-    # ВЕКТОР 1: ЛОКАЛЬНЫЙ АНАЛИЗ (LOCALHOST / 127.0.0.1)
+    # ВЕКТОР 1: ЛОКАЛЬНЫЙ АНАЛИЗ (LOCALHOST)
     # ==================================================================
     if [[ "$r_target" == "localhost" || "$r_target" == "127.0.0.1" ]]; then
         core_engine_ui "h" "RECON: LOCAL SERVICE INTELLIGENCE"
         core_engine_ui "w" "Analyzing local listeners on $r_target..."
         
-        # Анализ локальных процессов через ваши системные сигнатуры
         local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active local web runtimes detected.")
         echo -e "\n${Y}--- LOCAL EVENT LISTENERS ---${NC}\n${W}$listeners${NC}"
         
@@ -5681,19 +5678,19 @@ run_system_info() {
         core_engine_ui "h" "RECON: ADAPTIVE REMOTE MATRIX AUDIT"
         echo -e "\n${Y}--- [STAGE 1: PRIMARY INFRASTRUCTURE INFOCARD] ---${NC}"
         
-        # Разрешение IP-адреса цели
         local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
         echo -e "${W}Target Domain:${NC} ${Y}$r_target${NC}"
         echo -e "${W}Resolved IP:${NC} ${G}${target_ip:-UNKNOWN}${NC}"
         
-        # Запрашиваем полную страницу (заголовки + тело) одним стелс-пакетом под видом Android Chrome
+        # Скрытный запрос под видом Android Chrome Mobile
+        # Перенаправляем вывод в переменную, полностью изолируя консоль от мусора
         local full_payload=$(curl -s -i -L --connect-timeout 4 \
             -A "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" \
             -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
             -H "Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7" \
             "http://$r_target/")
 
-        # Сепарация данных пакета
+        # Точечная сепарация пакета на заголовки и тело без вывода на экран
         local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
         local root_html=$(echo "$full_payload" | sed '1,/^$/d')
         
@@ -5704,14 +5701,14 @@ run_system_info() {
         echo -e "${W}Core Server:${NC} ${Y}${root_srv:-N/A}${NC}"
         
         # ------------------------------------------------------------------
-        # ГЛУБОКИЙ АНАЛИЗ PHP ВЕРСИИ
+        # АДАПТИВНЫЙ ПОИСК ВЕРСИИ PHP
         # ------------------------------------------------------------------
         local root_php=""
         
-        # Поиск явного заголовка
+        # Проверка стандартного заголовка
         root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
         
-        # Поиск по текстовым утечкам в коде страницы
+        # Поиск цифровых совпадений в коде
         if [[ -z "$root_php" ]]; then
             local raw_version_match=$(echo "$full_payload" | grep -Eio "(PHP/[0-9.]+|PHP Version [0-9.]+|/php/[578]\.[0-9]\.[0-9]+)" | head -n 1)
             if [[ -n "$raw_version_match" ]]; then
@@ -5719,7 +5716,7 @@ run_system_info() {
             fi
         fi
         
-        # Косвенное сопоставление (Fallback на эталонную сигнатуру)
+        # Подстановка эталона (если сработал WAF или скрыто админом, но это PHP-стек)
         if [[ -z "$root_php" ]]; then
             if echo "$root_headers" | grep -Ei "(PHPSESSID|pma_cookie)" >/dev/null || echo "$root_html" | grep -Ei "(/wp-includes/|/bitrix/)" >/dev/null; then
                 root_php="7.0.3 (Forced via Matrix Signature Matching)"
@@ -5728,9 +5725,9 @@ run_system_info() {
         
         echo -e "${W}Identified PHP Version:${NC} ${G}${root_php:-NOT EXPOSED (Hidden by Admin)}${NC}"
         
-        # Вывод интерфейсов из GLOBAL_HTTP_MATRIX
+        # Анализ интерфейсов по GLOBAL_HTTP_MATRIX с фильтрацией дубликатов строк
         echo -e "${W}Detected Core Interfaces (GLOBAL_HTTP_MATRIX):${NC}"
-        local matrix_headers=$(echo "$root_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | sed 's/^/  -> /')
+        local matrix_headers=$(echo "$root_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | sort -u | sed 's/^/  -> /')
         if [[ -n "$matrix_headers" ]]; then
             echo -e "${G}$matrix_headers${NC}"
         else
@@ -5739,7 +5736,7 @@ run_system_info() {
         echo -e "--------------------------------------------------------"
 
         # ==================================================================
-        # ЭТАП 2: СКАНИРОВАНИЕ ПО МАТРИЦЕ ГЛОБАЛЬНЫХ СИГНАТУР
+        # ЭТАП 2: ИСПРАВЛЕННЫЙ АНАЛИЗ МАТРИЦЫ СИГНАТУР (CORE MATCHERS)
         # ==================================================================
         echo -e "${Y}--- [STAGE 2: GLOBAL INFRASTRUCTURE SIGNATURE MATCHING] ---${NC}"
         local matches_found=0
@@ -5752,7 +5749,10 @@ run_system_info() {
             
             for ((i=0; i<total_tokens-1; i++)); do
                 local token="${tokens[$i]}"
-                if echo "$full_payload" | grep -Ei "$token" >/dev/null; then
+                
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Использование grep -F (Fixed Strings)
+                # Это предотвращает краш интерпретатора на символах '(', ')' и кавычках
+                if echo "$full_payload" | grep -Fi "$token" >/dev/null; then
                     match_detected=1
                     break
                 fi
@@ -5770,7 +5770,7 @@ run_system_info() {
         echo -e "--------------------------------------------------------"
 
         # ==================================================================
-        # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ ПУТЕЙ И КОДОВ 500
+        # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ ПУТЕЙ
         # ==================================================================
         core_engine_ui "w" "Launching Stage 3: Stealth Directory Fuzzing..."
         local tmp_hits="/tmp/recon_hits_$$"
@@ -5798,7 +5798,7 @@ run_system_info() {
         wait
 
         # ==================================================================
-        # ЭТАП 4: СВОДНЫЙ ЛОГ И СОХРАНЕНИЕ
+        # ЭТАП 4: СВОДНЫЙ ЛОГ И СОХРАНЕНИЕ В ХРАНИЛИЩЕ
         # ==================================================================
         echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
         echo -e "${W}Target:${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
@@ -5816,6 +5816,7 @@ run_system_info() {
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
+
 
 
 
