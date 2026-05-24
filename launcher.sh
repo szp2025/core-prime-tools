@@ -4937,6 +4937,38 @@ EOF
 }
 
 # ==============================================================================
+# [CORE: STEALTH-STREAM-FORENSIC - UNIVERSAL EDITION]
+# Анализирует: Текст, Бинарники, Сжатые архивы, RAM-дампы
+# ==============================================================================
+
+run_stealth_stream_analyzer() {
+    # ИСПОЛЬЗУЕМ: 
+    # 1. 'strings -a -t x' - извлекает всё, включая бинарные строки и их смещения
+    # 2. Передаем всё в единый конвейер фильтрации
+    # Это позволяет читать любые форматы файлов, не распаковывая их
+    
+    strings -a /dev/stdin 2>/dev/null | while IFS= read -r line || [[ -n "$line" ]]; do
+        
+        # 1. Поиск секретов (Hash-Matrix)
+        for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
+            if [[ "$line" =~ $hsig ]]; then
+                # Вывод только самого пароля/ключа/хеша
+                echo "$line"
+            fi
+        done
+        
+        # 2. Поиск угроз (AV-Matrix)
+        for layer in "${GLOBAL_AV_MATRIX[@]}"; do
+            if [[ "$line" =~ $layer ]]; then
+                echo "[THREAT: $layer]"
+            fi
+        done
+        
+    done
+}
+
+
+# ==============================================================================
 # [INTEGRATED SECTOR C: CRYPTO-NEXUS ULTIMATE - FULL STREAMING EDITION]
 # ==============================================================================
 
