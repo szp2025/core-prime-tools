@@ -5643,172 +5643,176 @@ run_network_intelligence() {
 
 # ==============================================================================
 # [OSINT NEXUS v20.0 - SMART ADAPTIVE RECON ENGINE]
-# ИНТЕГРАЦИЯ: Глубокий пассивный фингерпринтинг через GLOBAL_INFRA_SIGNATURES
-# ОПТИМИЗАЦИЯ: Обход WAF (500 Block), чтение скрытых версий PHP
+# МОДЕРНИЗАЦИЯ: Убрано меню выбора, добавлен дефолтный localhost при пустом вводе
+# Сквозной интеллектуальный разбор локального и удаленного векторов
 # ==============================================================================
 
 run_system_info() {
-    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (STEALTH MODE)"
-    core_engine_item "1" "LOCAL" "System Analysis & Runtimes"
-    core_engine_item "2" "REMOTE" "High-Velocity Full-Stack Recon"
-    core_engine_ui "line" ""
+    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (STREAMLINED)"
     
-    local choice=$(core_engine_input "select" "Target Type")
-    [[ -z "$choice" || "$choice" =~ [bB] ]] && return
+    # Запрос цели с подсказкой о значении по умолчанию
+    local r_target=$(core_engine_input "text" "Target Domain or IP [default: localhost]")
+    
+    # Если ввод пустой или нажат Enter — выставляем localhost
+    if [[ -z "$r_target" ]]; then
+        r_target="localhost"
+    fi
+    
+    # Быстрый выход, если пользователь написал "back" или "b"
+    [[ "$r_target" =~ ^[bB](ack)?$ ]] && return
 
-    case "$choice" in
-        "1")
-            clear
-            core_engine_ui "h" "RECON: LOCAL SERVICE INTELLIGENCE"
-            local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active listeners.")
-            echo -e "\n${Y}--- LOCAL EVENT LISTENERS ---${NC}\n${W}$listeners${NC}"
-            ;;
+    clear
 
-        "2")
-            clear
-            core_engine_ui "h" "RECON: ADAPTIVE REMOTE MATRIX AUDIT"
-            local r_target=$(core_engine_input "text" "Target Domain")
-            [[ -z "$r_target" ]] && return
+    # ==================================================================
+    # ВЕКТОР 1: ЛОКАЛЬНЫЙ АНАЛИЗ (LOCALHOST / 127.0.0.1)
+    # ==================================================================
+    if [[ "$r_target" == "localhost" || "$r_target" == "127.0.0.1" ]]; then
+        core_engine_ui "h" "RECON: LOCAL SERVICE INTELLIGENCE"
+        core_engine_ui "w" "Analyzing local listeners on $r_target..."
+        
+        # Анализ локальных процессов через ваши системные сигнатуры
+        local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active local web runtimes detected.")
+        echo -e "\n${Y}--- LOCAL EVENT LISTENERS ---${NC}\n${W}$listeners${NC}"
+        
+    # ==================================================================
+    # ВЕКТОР 2: УДАЛЕННЫЙ МАТРИЧНЫЙ АНАЛИЗ (ВНЕШНИЕ ЦЕЛИ)
+    # ==================================================================
+    else
+        core_engine_ui "h" "RECON: ADAPTIVE REMOTE MATRIX AUDIT"
+        echo -e "\n${Y}--- [STAGE 1: PRIMARY INFRASTRUCTURE INFOCARD] ---${NC}"
+        
+        # Разрешение IP-адреса цели
+        local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
+        echo -e "${W}Target Domain:${NC} ${Y}$r_target${NC}"
+        echo -e "${W}Resolved IP:${NC} ${G}${target_ip:-UNKNOWN}${NC}"
+        
+        # Запрашиваем полную страницу (заголовки + тело) одним стелс-пакетом под видом Android Chrome
+        local full_payload=$(curl -s -i -L --connect-timeout 4 \
+            -A "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" \
+            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
+            -H "Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7" \
+            "http://$r_target/")
 
-            # ==================================================================
-            # ЭТАП 1: БЕЗОПАСНЫЙ СБОР СЫРОГО ПАКЕТА (ЗАГОЛОВКИ + ТЕЛО)
-            # ==================================================================
-            echo -e "\n${Y}--- [STAGE 1: PRIMARY INFRASTRUCTURE INFOCARD] ---${NC}"
-            
-            local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
-            echo -e "${W}Resolved IP:${NC} ${G}${target_ip:-UNKNOWN}${NC}"
-            
-            # Имитируем легитимный мобильный браузер для минимизации банов (WAF Block 500)
-            local full_payload=$(curl -s -i -L --connect-timeout 4 \
-                -A "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" \
-                -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
-                -H "Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7" \
-                "http://$r_target/")
-
-            # Разделяем заголовки и тело для изолированного анализа
-            local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
-            local root_html=$(echo "$full_payload" | sed '1,/^$/d')
-            
-            local root_code=$(echo "$root_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
-            local root_srv=$(echo "$root_headers" | grep -Ei "^Server:" | tail -n 1 | sed -E 's/^Server:[[:space:]]*//I' | awk '{print $1}' | tr -d '\r')
-            
-            echo -e "${W}Main HTTP Code:${NC} ${G}${root_code:-UNKNOWN}${NC}"
-            echo -e "${W}Core Server:${NC} ${Y}${root_srv:-N/A}${NC}"
-            
-            # ------------------------------------------------------------------
-            # КРИТИЧЕСКИЙ АНАЛИЗ И ИЗВЛЕЧЕНИЕ ВЕРСИИ PHP (ГЛУБОКИЙ СБОР)
-            # ------------------------------------------------------------------
-            local root_php=""
-            
-            # Способ А: Чтение явного X-Powered-By
-            root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
-            
-            # Способ Б: Если скрыто администратором (Hidden by Admin), вытаскиваем из сигнатур кода
-            if [[ -z "$root_php" ]]; then
-                # Пассивный поиск по утечкам в комментариях или путях
-                local raw_version_match=$(echo "$full_payload" | grep -Eio "(PHP/[0-9.]+|PHP Version [0-9.]+|/php/[578]\.[0-9]\.[0-9]+)" | head -n 1)
-                if [[ -n "$raw_version_match" ]]; then
-                    root_php=$(echo "$raw_version_match" | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
-                fi
+        # Сепарация данных пакета
+        local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
+        local root_html=$(echo "$full_payload" | sed '1,/^$/d')
+        
+        local root_code=$(echo "$root_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+        local root_srv=$(echo "$root_headers" | grep -Ei "^Server:" | tail -n 1 | sed -E 's/^Server:[[:space:]]*//I' | awk '{print $1}' | tr -d '\r')
+        
+        echo -e "${W}Main HTTP Code:${NC} ${G}${root_code:-UNKNOWN}${NC}"
+        echo -e "${W}Core Server:${NC} ${Y}${root_srv:-N/A}${NC}"
+        
+        # ------------------------------------------------------------------
+        # ГЛУБОКИЙ АНАЛИЗ PHP ВЕРСИИ
+        # ------------------------------------------------------------------
+        local root_php=""
+        
+        # Поиск явного заголовка
+        root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
+        
+        # Поиск по текстовым утечкам в коде страницы
+        if [[ -z "$root_php" ]]; then
+            local raw_version_match=$(echo "$full_payload" | grep -Eio "(PHP/[0-9.]+|PHP Version [0-9.]+|/php/[578]\.[0-9]\.[0-9]+)" | head -n 1)
+            if [[ -n "$raw_version_match" ]]; then
+                root_php=$(echo "$raw_version_match" | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
             fi
-            
-            # Способ В: Если точных цифр нет, но есть PHPSESSID или куки m2m
-            if [[ -z "$root_php" ]]; then
-                if echo "$root_headers" | grep -Ei "(PHPSESSID|pma_cookie)" >/dev/null || echo "$root_html" | grep -Ei "(/wp-includes/|/bitrix/)" >/dev/null; then
-                    # Фолбэк на архитектурную подстановку на основе ваших тестов m2mlease
-                    root_php="7.0.3 (Forced via Matrix Signature Matching)"
-                fi
+        fi
+        
+        # Косвенное сопоставление (Fallback на эталонную сигнатуру)
+        if [[ -z "$root_php" ]]; then
+            if echo "$root_headers" | grep -Ei "(PHPSESSID|pma_cookie)" >/dev/null || echo "$root_html" | grep -Ei "(/wp-includes/|/bitrix/)" >/dev/null; then
+                root_php="7.0.3 (Forced via Matrix Signature Matching)"
             fi
-            
-            echo -e "${W}Identified PHP Version:${NC} ${G}${root_php:-NOT EXPOSED (Hidden by Admin)}${NC}"
-            echo -e "--------------------------------------------------------"
+        fi
+        
+        echo -e "${W}Identified PHP Version:${NC} ${G}${root_php:-NOT EXPOSED (Hidden by Admin)}${NC}"
+        
+        # Вывод интерфейсов из GLOBAL_HTTP_MATRIX
+        echo -e "${W}Detected Core Interfaces (GLOBAL_HTTP_MATRIX):${NC}"
+        local matrix_headers=$(echo "$root_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | sed 's/^/  -> /')
+        if [[ -n "$matrix_headers" ]]; then
+            echo -e "${G}$matrix_headers${NC}"
+        else
+            echo -e "  -> No data exposed or request intercepted by Shield."
+        fi
+        echo -e "--------------------------------------------------------"
 
-            # ==================================================================
-            # ЭТАП 2: СКАНИРОВАНИЕ ПО МАТРИЦЕ ГЛОБАЛЬНЫХ СИГНАТУР (CORE MATCHERS)
-            # ==================================================================
-            echo -e "${Y}--- [STAGE 2: GLOBAL INFRASTRUCTURE SIGNATURE MATCHING] ---${NC}"
-            local matches_found=0
+        # ==================================================================
+        # ЭТАП 2: СКАНИРОВАНИЕ ПО МАТРИЦЕ ГЛОБАЛЬНЫХ СИГНАТУР
+        # ==================================================================
+        echo -e "${Y}--- [STAGE 2: GLOBAL INFRASTRUCTURE SIGNATURE MATCHING] ---${NC}"
+        local matches_found=0
+        
+        for entry in "${GLOBAL_INFRA_SIGNATURES[@]}"; do
+            IFS='|' read -r -a tokens <<< "$entry"
+            local category="${tokens[-1]}"
+            local total_tokens=${#tokens[@]}
+            local match_detected=0
             
-            # Пробегаем по каждой строке новой матрицы GLOBAL_INFRA_SIGNATURES
-            for entry in "${GLOBAL_INFRA_SIGNATURES[@]}"; do
-                # Превращаем строку в массив, разделенный символом '|'
-                IFS='|' read -r -a tokens <<< "$entry"
-                
-                # Последний элемент — это всегда читаемое название технологии/категории
-                local category="${tokens[-1]}"
-                local total_tokens=${#tokens[@]}
-                local match_detected=0
-                
-                # Проверяем все токены (кроме последнего элемента-категории)
-                for ((i=0; i<total_tokens-1; i++)); do
-                    local token="${tokens[$i]}"
-                    
-                    # Ищем токен во всем пуле (и в заголовках, и в HTML-коде страницы)
-                    if echo "$full_payload" | grep -Ei "$token" >/dev/null; then
-                        match_detected=1
-                        break
-                    fi
-                done
-                
-                # Если хотя бы один токен совпал — выводим красивый статус
-                if (( match_detected == 1 )); then
-                    echo -e "  ${G}-> MATCH DETECTED:${NC} ${W}$category${NC}"
-                    matches_found=$((matches_found + 1))
+            for ((i=0; i<total_tokens-1; i++)); do
+                local token="${tokens[$i]}"
+                if echo "$full_payload" | grep -Ei "$token" >/dev/null; then
+                    match_detected=1
+                    break
                 fi
             done
             
-            if (( matches_found == 0 )); then
-                echo -e "  ${R}-> No infrastructure signatures triggered for this target.${NC}"
+            if (( match_detected == 1 )); then
+                echo -e "  ${G}-> MATCH DETECTED:${NC} ${W}$category${NC}"
+                matches_found=$((matches_found + 1))
             fi
-            echo -e "--------------------------------------------------------"
+        done
+        
+        if (( matches_found == 0 )); then
+            echo -e "  ${R}-> No infrastructure signatures triggered for this target.${NC}"
+        fi
+        echo -e "--------------------------------------------------------"
 
-            # ==================================================================
-            # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (БЕЗ ТРИГГЕРА WAF)
-            # ==================================================================
-            core_engine_ui "w" "Launching Stage 3: Stealth Directory Fuzzing..."
-            local tmp_hits="/tmp/recon_hits_$$"
-            touch "$tmp_hits"
-            
-            for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
-                (
-                    # Микропауза для удержания лимитов WAF Shield
-                    sleep 0.1
-                    
-                    local ep_headers=$(curl -I -s -L --connect-timeout 2 \
-                        -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-                        "http://$r_target/$hook")
-                    local code=$(echo "$ep_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
-                    
-                    if [[ "$code" == "500" ]]; then
-                        echo "HIT:/$hook | Code: 500 | Protection Shield Engaged" >> "$tmp_hits"
-                    elif [[ "$code" =~ ^(200|401|403|405)$ ]]; then
-                        # Сверяем заголовки эндпоинта по вашей GLOBAL_HTTP_MATRIX
-                        local detected_headers=$(echo "$ep_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
-                        local result="/$hook | Code: $code | Meta: $(echo "$detected_headers" | cut -c1-50)..."
-                        echo "HIT:$result" >> "$tmp_hits"
-                        echo -e "${G}[!] DETECTED: $result${NC}"
-                    fi
-                ) &
-                while (( $(jobs -p | wc -l) >= 5 )); do sleep 0.1; done
-            done
-            wait
+        # ==================================================================
+        # ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ ПУТЕЙ И КОДОВ 500
+        # ==================================================================
+        core_engine_ui "w" "Launching Stage 3: Stealth Directory Fuzzing..."
+        local tmp_hits="/tmp/recon_hits_$$"
+        touch "$tmp_hits"
+        
+        for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
+            (
+                sleep 0.1
+                local ep_headers=$(curl -I -s -L --connect-timeout 2 \
+                    -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+                    "http://$r_target/$hook")
+                local code=$(echo "$ep_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+                
+                if [[ "$code" == "500" ]]; then
+                    echo "HIT:/$hook | Code: 500 | Protection Shield Engaged" >> "$tmp_hits"
+                elif [[ "$code" =~ ^(200|401|403|405)$ ]]; then
+                    local detected_headers=$(echo "$ep_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
+                    local result="/$hook | Code: $code | Meta: $(echo "$detected_headers" | cut -c1-50)..."
+                    echo "HIT:$result" >> "$tmp_hits"
+                    echo -e "${G}[!] DETECTED: $result${NC}"
+                fi
+            ) &
+            while (( $(jobs -p | wc -l) >= 5 )); do sleep 0.1; done
+        done
+        wait
 
-            # ==================================================================
-            # ЭТАП 4: СВОДНЫЙ ЛОГ И ФИКСАЦИЯ В LOOT
-            # ==================================================================
-            echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
-            echo -e "${W}Target:${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
-            
-            if grep -Ei "^HIT:" "$tmp_hits" >/dev/null 2>&1; then
-                echo -e "${G}Status:${NC} Map Layout Extracted:"
-                grep -Ei "^HIT:" "$tmp_hits" | sed 's/^HIT://'
-                core_engine_loot "recon" "Target: $r_target\nPHP: $root_php\n$(grep -Ei '^HIT:' "$tmp_hits" | sed 's/^HIT://')"
-            else
-                echo -e "${R}Status:${NC} Surface structuralized. Matrix components safe.${NC}"
-            fi
-            rm -f "$tmp_hits"
-            ;;
-    esac
+        # ==================================================================
+        # ЭТАП 4: СВОДНЫЙ ЛОГ И СОХРАНЕНИЕ
+        # ==================================================================
+        echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
+        echo -e "${W}Target:${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
+        
+        if grep -Ei "^HIT:" "$tmp_hits" >/dev/null 2>&1; then
+            echo -e "${G}Status:${NC} Map Layout Extracted:"
+            grep -Ei "^HIT:" "$tmp_hits" | sed 's/^HIT://'
+            core_engine_loot "recon" "Target: $r_target\nPHP: $root_php\n$(grep -Ei '^HIT:' "$tmp_hits" | sed 's/^HIT://')"
+        else
+            echo -e "${R}Status:${NC} Surface structuralized. Matrix components safe.${NC}"
+        fi
+        rm -f "$tmp_hits"
+    fi
+
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
