@@ -5761,7 +5761,7 @@ run_system_info() {
     fi
 
     # ==================================================================
-    # ВЕКТОР 2: УДАЛЕННЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ
+    # ВЕКТОР 2: УДАЛЕННЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ (РАСШИРЕННЫЙ)
     # ==================================================================
     core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
     
@@ -5769,62 +5769,59 @@ run_system_info() {
     echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
     echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
 
+    # Генерация матрицы для глубокого анализа
     local fake_ip="$((RANDOM % 190 + 11)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
     generate_matrix_arguments "$fake_ip" "$r_target"
 
-    local base_url="http://$r_target"
-    local full_payload=$(curl -s -i -L --connect-timeout 6 "${CURL_MATRIX_ARGS[@]}" "$base_url/" 2>/dev/null)
-    local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
+    # Выполняем HEAD запрос для получения полной инфо-карты
+    local info_payload=$(curl -s -I -L --connect-timeout 8 "${CURL_MATRIX_ARGS[@]}" "http://$r_target/" 2>/dev/null)
     
-    echo -e "${W}Main Operational Code:${NC} ${G}$(echo "$root_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}' | tr -d '\r')${NC}"
+    echo -e "\n${Y}--- [INFRASTRUCTURE INTELLIGENCE CARD] ---${NC}"
+    echo -e "${W}Server Software    :${NC} ${G}$(echo "$info_payload" | grep -Ei "^Server:" | cut -d' ' -f2-)${NC}"
+    echo -e "${W}PHP Version        :${NC} ${G}$(echo "$info_payload" | grep -Ei "^X-Powered-By:.*PHP" | grep -oE "PHP/[0-9.]+" || echo "HIDDEN/UNKNOWN")${NC}"
+    echo -e "${W}Cache/Proxy Layer  :${NC} ${G}$(echo "$info_payload" | grep -Ei "^Via:|^X-Cache:" | cut -d' ' -f2- || echo "NONE DETECTED")${NC}"
+    echo -e "${W}Security Headers   :${NC} ${G}$(echo "$info_payload" | grep -Ei "^Content-Security-Policy" | cut -d' ' -f2- || echo "DISABLED")${NC}"
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (СИНХРОННЫЙ РЕЖИМ ДЛЯ ВЫВОДА)
+    # ЭТАП 3: АГРЕССИВНЫЙ АДАПТИВНЫЙ ФАЗЗИНГ
     # ==================================================================
-    core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Synchronous Mode)..."
+    core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Deep Scan)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
-    
-    local base_delay=0.6
+    local base_delay=0.4 # Ускоренный темп для полного покрытия
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
-        # Выполняем генерацию аргументов для каждого запроса
         generate_matrix_arguments "$fake_ip" "$r_target"
         
-        # Задержка
-        sleep $(awk -v b="$base_delay" 'BEGIN{srand(); print b + (rand() * 1.2)}')
-        
-        # Выполняем запрос синхронно (без &)
-        local res_data=$(curl -sL --compressed --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
-        local code=$(curl -sI --compressed --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
+        # Получаем код и заголовки для каждого хука
+        local req_result=$(curl -sI -L --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" "http://$r_target/$hook" 2>/dev/null)
+        local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}' | tr -d '\r')
+        local server_type=$(echo "$req_result" | grep -Ei "^Server:" | cut -d' ' -f2-)
 
-        # Обработка результата
-        if [[ "$res_data" =~ "js-modal" || "$res_data" =~ "adgAccessBlocked" || "$res_data" =~ "captcha" ]]; then
-            echo "WAF_BLOCK" >> "$tmp_hits"
-        elif [ "$code" = "200" ]; then
-            # Этот вывод будет гарантированно отображаться на экране
-            echo -e "${G}[!] ALERT: TARGET EXPOSED AT /$hook (200 OK)${NC}"
+        if [ "$code" = "200" ]; then
+            echo -e "${G}[!] HIT: /$hook | Code: 200 | Server: ${server_type:-Unknown}${NC}"
             echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
+        elif [ "$code" = "403" ] || [ "$code" = "406" ]; then
+            echo -e "${R}[WAF] Blocked at /$hook${NC}"
+            echo "WAF_BLOCK" >> "$tmp_hits"
         fi
         
-        # Динамическая корректировка (простое сравнение строк)
+        # Динамическое замедление при жестком WAF
         local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
-        if [ "$b_count" -gt 8 ]; then
-            base_delay=2.0
+        if [ "$b_count" -gt 5 ]; then
+            sleep 1.5
+        else
+            sleep 0.2
         fi
     done
 
-    wait
-
-
-
     # ==================================================================
-    # ЭТАП 4: СВОДНЫЙ ОТЧЕТ
+    # ЭТАП 4: FINAL INTELLIGENCE REPORT
     # ==================================================================
-    echo -e "\n${Y}--- FINAL INTELLIGENCE SUMMARY ---${NC}"
-    [ -f "$tmp_hits" ] && grep "^HIT:" "$tmp_hits" | sed 's/^HIT://'
+    echo -e "\n${Y}--- [FINAL INTELLIGENCE SUMMARY] ---${NC}"
+    [ -s "$tmp_hits" ] && cat "$tmp_hits" || echo -e "${W}No additional endpoints discovered.${NC}"
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
