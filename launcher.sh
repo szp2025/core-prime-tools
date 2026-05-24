@@ -5728,20 +5728,15 @@ run_system_info() {
     core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
     
     local r_target=$(core_engine_input "text" "Enter Target Domain, Host or IP [default: localhost]")
-    if [[ -z "$r_target" ]]; then
-        r_target="localhost"
-    fi
-    
+    [[ -z "$r_target" ]] && r_target="localhost"
     [[ "$r_target" =~ ^[bB](ack)?$ ]] && return
     clear
 
     # ==================================================================
-    # ВЕКТОР 1: ЛОКАЛЬНЫЙ АНАЛИЗ (ВНУТРЕННИЙ ПЕРИМЕТР / LOCALHOST)
+    # ВЕКТОР 1: ЛОКАЛЬНЫЙ АНАЛИЗ
     # ==================================================================
     if [[ "$r_target" == "localhost" || "$r_target" == "127.0.0.1" ]]; then
         core_engine_ui "h" "INTERNAL COMPLIANCE: LOCAL SERVICE RUNTIMES"
-        core_engine_ui "w" "Auditing active local socket listeners..."
-        
         local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active web runtimes intercepted.")
         echo -e "\n${Y}--- [LOCAL EVENT LISTENERS] ---${NC}\n${W}$listeners${NC}"
         core_engine_wait
@@ -5749,148 +5744,70 @@ run_system_info() {
     fi
 
     # ==================================================================
-    # ВЕКТОР 2: УДАЛЕННЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ (ВНЕШНИЕ ЦЕЛИ)
+    # ВЕКТОР 2: УДАЛЕННЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ
     # ==================================================================
     core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
-    echo -e "\n${Y}--- [STAGE 1: HEURISTIC INFRASTRUCTURE DETECTOR] ---${NC}"
     
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
     echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
     echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
 
-    local block_a=$((RANDOM % 190 + 11))
-    while [[ "$block_a" -eq 127 || "$block_a" -eq 10 || "$block_a" -eq 172 || "$block_a" -eq 192 ]]; do
-        block_a=$((RANDOM % 190 + 11))
-    done
-    local fake_ip="${block_a}.$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
-
-    local random_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
-    [[ -z "$random_ua" ]] && random_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    # Генерация матрицы аргументов
+    local fake_ip="$((RANDOM % 190 + 11)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
+    generate_matrix_arguments "$fake_ip" "$r_target"
 
     local base_url="http://$r_target"
-    local probe_headers=$(curl -s -I --connect-timeout 4 -A "$random_ua" "$base_url" 2>/dev/null)
-    
-    if echo "$probe_headers" | grep -Ei "^Location: https://" >/dev/null 2>&1; then
-        base_url="https://$r_target"
-        echo -e "${Y}[i] Heuristic Engine: SSL/TLS Redirection Forced. Switching to Secure Base URL.${NC}"
-    fi
-
-    generate_matrix_arguments "$fake_ip"
-
-    local full_payload=$(curl -s -i -L --connect-timeout 6 \
-        "${CURL_MATRIX_ARGS[@]}" \
-        -H "Pragma: no-cache" \
-        "$base_url/")
-
+    local full_payload=$(curl -s -i -L --connect-timeout 6 "${CURL_MATRIX_ARGS[@]}" "$base_url/" 2>/dev/null)
     local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
-    local root_html=$(echo "$full_payload" | sed '1,/^$/d')
     
-    local root_code=$(echo "$root_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}' | tr -d '\r')
-    local root_srv=$(echo "$root_headers" | grep -Ei "^Server:" | tail -n 1 | sed -E 's/^Server:[[:space:]]*//I' | awk '{print $1}' | tr -d '\r')
-    
-    echo -e "${W}Main Operational Code:${NC} ${G}${root_code:-UNKNOWN}${NC}"
-    echo -e "${W}Identified Edge Server:${NC} ${Y}${root_srv:-COULD NOT PARSE / HIDDEN}${NC}"
-    
-    local root_php=""
-    root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/' | tr -d '\r')
-    
-    if [[ -z "$root_php" ]]; then
-        local raw_version_match=$(echo "$full_payload" | grep -Eio "(PHP/[0-9.]+|PHP Version [0-9.]+|/php/[578]\.[0-9]\.[0-9]+)" | head -n 1)
-        if [[ -n "$raw_version_match" ]]; then
-            root_php=$(echo "$raw_version_match" | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")
-        fi
-    fi
-    
-    if [[ -z "$root_php" ]]; then
-        if echo "$root_headers" | grep -Ei "(PHPSESSID|pma_cookie)" >/dev/null 2>&1 || echo "$root_html" | grep -Ei "(/wp-includes/|/bitrix/)" >/dev/null 2>&1; then
-            root_php="Exposed Signatures (PHP-Driven Architecture)"
-        fi
-    fi
-    
-    echo -e "${W}Detected Runtime Engine:${NC} ${G}${root_php:-NOT EXPOSED / SECURE}${NC}"
+    echo -e "${W}Main Operational Code:${NC} ${G}$(echo "$root_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}' | tr -d '\r')${NC}"
     echo -e "--------------------------------------------------------"
 
     # ==================================================================
-    # ЭТАП 2: АНАЛИЗ МАТРИЦЫ СИГНАТУР И СТЕКА ТЕХНОЛОГИЙ
-    # ==================================================================
-    echo -e "${Y}--- [STAGE 2: GLOBAL INFRASTRUCTURE SIGNATURE MATCHING] ---${NC}"
-    local matches_found=0
-    
-    for entry in "${GLOBAL_INFRA_SIGNATURES[@]}"; do
-        IFS='|' read -r -a tokens <<< "$entry"
-        local category="${tokens[-1]}"
-        local total_tokens=${#tokens[@]}
-        local match_detected=0
-        
-        for ((i=0; i<total_tokens-1; i++)); do
-            local token="${tokens[$i]}"
-            if echo "$full_payload" | grep -Fi "$token" >/dev/null 2>&1; then
-                match_detected=1
-                break
-            fi
-        done
-        
-        if (( match_detected == 1 )); then
-            echo -e "  ${G}-> СИГНАТУРА НАЙДЕНА:${NC} ${W}$category${NC}"
-            matches_found=$((matches_found + 1))
-        fi
-    done
-    
-    if (( matches_found == 0 )); then
-        echo -e "  ${W}-> Surface signature monitoring stable. No third-party trace found.${NC}"
-    fi
-    echo -e "--------------------------------------------------------"
-
-    # ==================================================================
-    # ОБНОВЛЕННЫЙ ЭТАП 3: АСИНХРОННЫЙ СТЕЛС-ФАЗЗИНГ (УЛЬТРА-АДАПТИВНЫЙ)
+    # ОБНОВЛЕННЫЙ ЭТАП 3: АДАПТИВНЫЙ ФАЗЗИНГ (БЕЗОПАСНЫЙ СИНТАКСИС)
     # ==================================================================
     core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Stealth Mode Enabled)..."
     
     local tmp_hits="/tmp/recon_hits_$$"
     touch "$tmp_hits"
     
-    local base_delay=0.6
+    # Инициализация переменных для предотвращения арифметических ошибок
     local max_threads=3
+    local base_delay=0.6
 
     for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
         (
             generate_matrix_arguments "$fake_ip" "$r_target"
-            
-            # Рандомизация паузы
             sleep $(awk -v b="$base_delay" 'BEGIN{srand(); print b + (rand() * 1.2)}')
             
-            # Выполняем запрос с параметром --compressed для имитации браузера
-            # и --next для полной очистки сессии curl
-            local res_data=$(curl -sL --compressed --connect-timeout 5 \
-                "${CURL_MATRIX_ARGS[@]}" \
-                "$base_url/$hook" 2>/dev/null)
-            
-            local code=$(curl -sI --compressed --connect-timeout 4 \
-                "${CURL_MATRIX_ARGS[@]}" \
-                -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
+            local res_data=$(curl -sL --compressed --connect-timeout 5 "${CURL_MATRIX_ARGS[@]}" "$base_url/$hook" 2>/dev/null)
+            local code=$(curl -sI --compressed --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" -w "%{http_code}" -o /dev/null "$base_url/$hook" 2>/dev/null | tr -d '\r')
 
-            # Фильтр: игнорируем страницы с ключевыми словами защиты
             if [[ "$res_data" =~ "js-modal" || "$res_data" =~ "adgAccessBlocked" || "$res_data" =~ "captcha" ]]; then
                 echo "WAF_BLOCK" >> "$tmp_hits"
             elif [[ "$code" == "200" ]]; then
                 echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
                 echo -e "${G}[!] FOUND: /$hook (200 OK)${NC}"
-            elif [[ "$code" =~ ^(403|500|503)$ ]]; then
-                echo "WAF_BLOCK" >> "$tmp_hits"
             fi
         ) &
         
-        # БЕЗОПАСНОЕ УПРАВЛЕНИЕ ПОТОКАМИ
-        local current_jobs=$(jobs -p | wc -l)
-        while [[ $current_jobs -ge $max_threads ]]; do
-            sleep 0.3
-            current_jobs=$(jobs -p | wc -l)
+        # БЕЗОПАСНЫЙ ЦИКЛ УПРАВЛЕНИЯ ПОТОКАМИ
+        while true; do
+            # Принудительно конвертируем вывод в число
+            local current_jobs=$(jobs -p | wc -l)
+            local current_num=$((10#$current_jobs))
+            local max_num=$((10#$max_threads))
+            
+            if [ $current_num -lt $max_num ]; then
+                break
+            fi
+            sleep 0.5
         done
         
-        # Динамическое замедление (без арифметических ошибок)
+        # Динамическая корректировка
         if [[ -f "$tmp_hits" ]]; then
             local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null || echo 0)
-            if [[ $b_count -gt 8 ]]; then
+            if [ $((10#$b_count)) -gt 8 ]; then
                 max_threads=1
                 base_delay=2.0
             fi
@@ -5898,79 +5815,11 @@ run_system_info() {
     done
     wait
 
-
-
     # ==================================================================
-    # ЭТАП 4: СВОДНЫЙ ИНТЕЛЛЕКТУАЛЬНЫЙ ОТЧЕТ И СИСТЕМНЫЙ КОМПЛАЕНС
+    # ЭТАП 4: СВОДНЫЙ ОТЧЕТ
     # ==================================================================
-    echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
-    echo -e "${W}Target Target :${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
-    
-    local has_waf=0
-    if [ -f "$tmp_hits" ] && grep -q "WAF_BLOCK" "$tmp_hits"; then
-        has_waf=1
-        local total_blocks=$(grep -c "WAF_BLOCK" "$tmp_hits")
-        echo -e "${R}[!] WAF PERIMETER STATUS: Active Shielding Engaged (${total_blocks} requests isolated via Sandbox).${NC}"
-    fi
-
-    local has_critical_leaks=0
-    if [ -f "$tmp_hits" ] && grep -q "^ALERT:" "$tmp_hits"; then
-        has_critical_leaks=1
-        echo -e "\n${R}🚨 [CRITICAL INFRASTRUCTURE ALERTS - UNPROTECTED EXPOSED ASSETS]:${NC}"
-        grep "^ALERT:" "$tmp_hits" | sed 's/^ALERT://' | while read -r line; do
-            echo -e "  ${R}-> $line (Action required: restrict public access!)${NC}"
-        done
-    fi
-
-    if [ -f "$tmp_hits" ] && grep -q "^HIT:" "$tmp_hits"; then
-        # ИСПРАВЛЕНО: Сбойный символ заменен на валидный маркер Юникода
-        echo -e "\n${G}✔️ [Exposed Standard Public Objects (Code: 200)]:${NC}"
-        grep "^HIT:" "$tmp_hits" | sed 's/^HIT://' | while read -r line; do
-            echo -e "  ${G}-> $line${NC}"
-        done
-    fi
-
-    echo -e "\n${Y}================================================================${NC}"
-    echo -e "${Y}🛡️  [SECURITY ARCHITECTURE COMPLIANCE AUDIT]${NC}"
-    echo -e "${Y}================================================================${NC}"
-    
-    if (( has_critical_leaks == 1 )); then
-        echo -e "  Sensitive Asset Isolation   : [${R}CRITICAL BREACH${NC}] - Internal configuration leaked!"
-    else
-        echo -e "  Sensitive Asset Isolation   : [${G}PASSED${NC}] - All system variables securely isolated."
-    fi
-
-    if (( has_waf == 1 )); then
-        echo -e "  Intrusion Prevention & WAF  : [${G}ACTIVE${NC}] - Perimeter shield isolated successfully."
-    else
-        echo -e "  Intrusion Prevention & WAF  : [${Y}NOT DETECTED${NC}] - Perimeter open or complete stealth bypass achieved."
-    fi
-
-    # ИСПРАВЛЕНО: Вычисляется строго по объявленному массиву GLOBAL_HTTP_MATRIX
-    local matrix_regex=$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")
-    local leaked_headers=""
-    
-    if [[ -n "$matrix_regex" ]]; then
-        leaked_headers=$(echo "$root_headers" | grep -Ei "$matrix_regex" | tr -d '\r' | sed 's/^[[:space:]]*//')
-    fi
-
-    if [[ -n "$leaked_headers" ]]; then
-        echo -e "  Information Leakage (Matrix): [${R}WARNING${NC}] - Internal system headers detected."
-        echo -e "                                 ${R}├─ Обнаружена утечка следующих системных сигнатур:${NC}"
-        while read -r bad_header; do
-            if [[ -n "$bad_header" ]]; then
-                echo -e "                                 ${R}│${NC}   ${W}» $bad_header${NC}"
-            fi
-        done <<< "$leaked_headers"
-    else
-        echo -e "  Information Leakage (Matrix): [${G}SECURE${NC}] - System backend variables fully masked."
-    fi
-    echo -e "${Y}================================================================${NC}"
-
-    if [ -f "$tmp_hits" ] && grep -Eq "^(HIT|ALERT):" "$tmp_hits"; then
-        core_engine_loot "recon" "Target: $r_target\nUltimate Audit Completed.\n$(grep -E '^(HIT|ALERT):' "$tmp_hits")"
-    fi
-
+    echo -e "\n${Y}--- FINAL INTELLIGENCE SUMMARY ---${NC}"
+    [ -f "$tmp_hits" ] && grep "^HIT:" "$tmp_hits" | sed 's/^HIT://'
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
