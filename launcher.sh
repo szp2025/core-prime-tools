@@ -5838,7 +5838,6 @@ run_system_info() {
 }
 
 
-
 # ==============================================================================
 # @description: OSINT NEXUS v22.0 - NEURAL BRIDGE ORCHESTRATOR [MONOLITH]
 # МОДЕРНИЗАЦИЯ: Полная синхронизация с GLOBAL_HASH_MATRIX v2.0 (Zero Loose Vars)
