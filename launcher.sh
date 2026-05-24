@@ -700,43 +700,56 @@ generate_matrix_arguments() {
     local target_ip="$1"
     local target_host="$2"
 
-    # --- АДАПТИВНЫЙ КОНТРОЛЛЕР (ЭВРИСТИКА) ---
-    # Считываем текущий уровень защиты из лога (количество блоков)
+    # --- АДАПТИВНЫЙ КОНТРОЛЛЕР ---
+    # Безопасное чтение счетчика: если файла нет, принудительно 0
     local block_count=0
-    [[ -f "/tmp/recon_hits_$$" ]] && block_count=$(grep -c "WAF_BLOCK" "/tmp/recon_hits_$$" 2>/dev/null || echo 0)
+    if [[ -f "/tmp/recon_hits_$$" ]]; then
+        block_count=$(grep -c "WAF_BLOCK" "/tmp/recon_hits_$$" 2>/dev/null || echo 0)
+    fi
+    # Убираем все пробелы, чтобы Zsh/Bash не ругались на форматирование
+    block_count=${block_count// /}
     
-    # Режим: 0 (Normal), 1 (Cautious), 2 (Stealth/Deep)
+    # Использование арифметического контекста (( )) - это стандарт для Zsh и Bash
     local mode=0
-    [[ $block_count -gt 3 ]] && mode=1
-    [[ $block_count -gt 8 ]] && mode=2
+    (( block_count > 3 )) && mode=1
+    (( block_count > 8 )) && mode=2
 
     # --- ГЕНЕРАЦИЯ ПРОФИЛЯ ---
-    local r_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
+    # Добавляем +1 для Zsh, так как массивы начинаются с 1
+    local r_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]} + 1))]}"
     [[ -z "$r_ua" ]] && r_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     # --- АДАПТАЦИЯ ЗАГОЛОВКОВ ---
-    local p_mobile="?0"; local p_platform="\"Windows\""
-    [[ "$r_ua" =~ iPhone|Android ]] && { p_mobile="?1"; p_platform="\"Android\""; }
-
-    # Если режим Stealth, убираем "палящие" заголовки Sec-Ch-Ua, которые часто вызывают блокировку
-    local sec_headers="-H Sec-Ch-Ua: \"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\" -H Sec-Ch-Ua-Mobile: $p_mobile -H Sec-Ch-Ua-Platform: $p_platform"
-    [[ $mode -eq 2 ]] && sec_headers="" # В глубоком стелсе минимизируем отпечаток
+    local p_mobile="?0"
+    local p_platform="\"Windows\""
+    # Регулярные выражения в Zsh требуют экранирования или группировки
+    if [[ "$r_ua" =~ (iPhone|Android) ]]; then
+        p_mobile="?1"
+        p_platform="\"Android\""
+    fi
 
     # --- СБОРКА МАТРИЦЫ ---
+    # Используем массив для сборки, чтобы избежать проблем с кавычками
     CURL_MATRIX_ARGS=(
         -A "$r_ua"
-        --http1.1 # Принудительно отключаем H2 при блокировках для стабильности
+        --http1.1
         -H "Accept: $GLOBAL_BASE_ACCEPT"
         -H "Referer: https://$target_host/"
         -H "Connection: close"
-        $sec_headers
         -H "Sec-Fetch-Site: same-origin"
         -H "X-Forwarded-For: $target_ip"
         -H "DNT: 1"
     )
 
+    # Если НЕ глубокий стелс, добавляем заголовки Sec-Ch-Ua
+    if (( mode < 2 )); then
+        CURL_MATRIX_ARGS+=(-H "Sec-Ch-Ua: \"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\"")
+        CURL_MATRIX_ARGS+=(-H "Sec-Ch-Ua-Mobile: $p_mobile")
+        CURL_MATRIX_ARGS+=(-H "Sec-Ch-Ua-Platform: $p_platform")
+    fi
+
     # --- АДАПТИВНОЕ УПРАВЛЕНИЕ ТЕМПОМ ---
-    # Записываем команду для вызывающего цикла: сколько ждать
+    # Арифметическая подстановка для Zsh
     local pause=$(( 1 + (mode * 3) + (RANDOM % 3) ))
     echo "$pause" > /tmp/current_adaptive_delay
 }
