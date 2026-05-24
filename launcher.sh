@@ -2959,6 +2959,37 @@ core_engine_progress() {
     local msg="${2:-PROCESS}"
     local width=15
     local steps=20
+    # Вычисляем задержку в секундах для команды sleep (float)
+    local sleep_time=$(awk "BEGIN {print $duration / $steps}")
+
+    printf "\e[?25l" # Скрытие курсора
+
+    for ((i=1; i<=steps; i++)); do
+        local pc=$(( i * 100 / steps ))
+        local fill=$(( i * width / steps ))
+        local empty=$(( width - fill ))
+        
+        # Генерируем строки блоков напрямую
+        local bar_fill=$(printf "%${fill}s" | tr ' ' '█')
+        local bar_empty=$(printf "%${empty}s" | tr ' ' '░')
+        
+        # Вывод без лишнего sed/pipe
+        printf "\r\e[K${NC}[i] %-12.12s ${B}[%s%s]${NC} %d%%" \
+            "$msg" "$bar_fill" "$bar_empty" "$pc"
+
+        sleep "$sleep_time"
+    done
+
+    printf "\r\e[K${G}[+] %-12.12s : SUCCESSFUL${NC}\n" "$msg"
+    printf "\e[?25h" # Возврат курсора
+}
+
+
+core_engine_progressold() {
+    local duration="${1:-1}"
+    local msg="${2:-PROCESS}"
+    local width=15
+    local steps=20
     # Вычисляем задержку в миллисекундах (целочисленная математика Bash)
     local sleep_ms=$(( (duration * 1000) / steps ))
 
@@ -2982,7 +3013,7 @@ core_engine_progress() {
 }
 
 # --- CORE ENGINE: PROGRESS v13.8.2 (Fixed Width Edition) ---
-core_engine_progressold() {
+core_engine_progressold1() {
     local duration="${1:-1}"
     local msg="${2:-PROCESS}"
     local width=15 # Уменьшил ширину, чтобы точно влезло на узкий экран Wiko
