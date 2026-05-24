@@ -1029,14 +1029,6 @@ GLOBAL_SIG_WHOIS_MATRIX="(registrar|reg-name|sponsoring|org|organization|registr
 # МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
 # ==============================================================================
 
-# 1. Инфраструктурный слой (Server/Proxy/CDN/Ingress)
-GLOBAL_REGEX_HTTP_SERVER="^(server|via|x-asf-by|x-powered-by-plesk|x-advertising|x-responder|x-served-by|x-cached-by|x-cache|x-edge-location|x-amz-server-side-encryption|x-kong-proxy-latency|x-envoy-upstream-service-time|cf-ray|kiwi-id)"
-
-# 2. Runtime слой (Frameworks/CMS/Languages)
-GLOBAL_REGEX_HTTP_RUNTIME="^(x-powered-by|x-runtime|x-version|x-aspnet-version|x-aspnetmvc-version|x-cocoa-version|x-generator|x-cms|x-nextjs-cache|x-nuxt-cache|x-redirected-by|x-framework|x-application-context|wp-super-cache|x-drupal-cache|x-varnish)"
-
-# 3. Security Shield (Заголовки безопасности)
-GLOBAL_REGEX_HTTP_SECURITY="^(content-security-policy|content-security-policy-report-only|x-frame-options|x-content-type-options|strict-transport-security|x-xss-protection|x-permitted-cross-domain-policies|referrer-policy|permissions-policy|clear-site-data|cross-origin-embedder-policy|cross-origin-opener-policy|cross-origin-resource-policy|expect-ct|access-control-allow-origin|access-control-allow-credentials|access-control-allow-headers|access-control-allow-methods)"
 
 # 4. Статус-коды
 GLOBAL_REGEX_HTTP_STATUS="^http/"
