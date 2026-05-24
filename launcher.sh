@@ -5782,79 +5782,66 @@ run_system_info() {
     clear
 
     # ==================================================================
-    # ВЕКТОР 1: ЛОКАЛЬНЫЙ АНАЛИЗ
+    # ВЕКТОР 1: FUSE-LAYER (ИНТЕГРИРОВАННЫЙ АНАЛИЗ СРЕДЫ)
     # ==================================================================
-    if [[ "$r_target" == "localhost" || "$r_target" == "127.0.0.1" ]]; then
-        core_engine_ui "h" "INTERNAL COMPLIANCE: LOCAL SERVICE RUNTIMES"
-        local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active web runtimes intercepted.")
-        echo -e "\n${Y}--- [LOCAL EVENT LISTENERS] ---${NC}\n${W}$listeners${NC}"
-        core_engine_wait
-        return
+    if [[ "$r_target" == "localhost" ]]; then
+        core_engine_ui "h" "FUSE-LAYER: SYSTEM INTEGRITY CHECK"
+        local anomalies=$(ps aux | grep -vE "${GLOBAL_SYSTEM_FUSE_MATRIX[0]}" | grep -E "[ZDTt]")
+        [[ -n "$anomalies" ]] && echo -e "${R}[!] ALERT: ANOMALOUS PROCESSES DETECTED:${NC}\n$anomalies" || echo -e "${G}[+] Integrity verified.${NC}"
     fi
 
     # ==================================================================
-    # ВЕКТОР 2: УДАЛЕННЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ
+    # ВЕКТОР 2: INFRASTRUCTURE & WHOIS NEXUS
     # ==================================================================
     core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT"
-    
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
-    echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
-    echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-UNKNOWN / CLOUDFLARE}${NC}"
-
-    local fake_ip="$((RANDOM % 190 + 11)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1)).$((RANDOM % 254 + 1))"
-    generate_matrix_arguments "$fake_ip" "$r_target"
-
-    local info_payload=$(curl -s -I -L --connect-timeout 8 "${CURL_MATRIX_ARGS[@]}" "http://$r_target/" 2>/dev/null)
     
-    echo -e "\n${Y}--- [INFRASTRUCTURE INTELLIGENCE CARD] ---${NC}"
-    echo -e "${W}Server Software    :${NC} ${G}$(echo "$info_payload" | grep -Ei "^Server:" | cut -d' ' -f2-)${NC}"
-    echo -e "${W}PHP Version        :${NC} ${G}$(echo "$info_payload" | grep -Ei "^X-Powered-By:.*PHP" | grep -oE "PHP/[0-9.]+" || echo "HIDDEN/UNKNOWN")${NC}"
-    echo -e "${W}Cache/Proxy Layer  :${NC} ${G}$(echo "$info_payload" | grep -Ei "^Via:|^X-Cache:" | cut -d' ' -f2- || echo "NONE DETECTED")${NC}"
-    echo -e "${W}Security Headers   :${NC} ${G}$(echo "$info_payload" | grep -Ei "^Content-Security-Policy" | cut -d' ' -f2- || echo "DISABLED")${NC}"
-    echo -e "--------------------------------------------------------"
+    # Расширенный парсинг заголовков по матрице
+    local info_payload=$(curl -s -I -L --connect-timeout 8 "http://$r_target/" 2>/dev/null)
+    for pattern in "${GLOBAL_HTTP_MATRIX[@]}"; do
+        local match=$(echo "$info_payload" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2-)
+        [[ -n "$match" ]] && echo -e "${W}Detected ${pattern//[^a-zA-Z]/} :${NC} ${G}${match}${NC}"
+    done
 
     # ==================================================================
-    # ЭТАП 3: АГРЕССИВНЫЙ АДАПТИВНЫЙ ФАЗЗИНГ
+    # ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING
     # ==================================================================
-    core_engine_ui "w" "Launching Stage 3: Adaptive Fuzzing (Deep Scan)..."
-    
+    core_engine_ui "w" "Launching Multi-Layer Fuzzing (Files + Webhooks)..."
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
-    local base_delay=0.4
     
-    # Запуск визуального прогресса в фоне (не блокирует вывод ALERT)
-    core_engine_progress "$(( ${#GLOBAL_FUZZ_WORDLIST[@]} / 2 ))" "FUZZING" &
+    # Объединяем оба словаря в один проход
+    local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
+    core_engine_progress "$(( ${#full_list[@]} / 10 ))" "FUZZING" &
     local prog_pid=$!
 
-    for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
-        generate_matrix_arguments "$fake_ip" "$r_target"
-        
-        local req_result=$(curl -sI -L --connect-timeout 4 "${CURL_MATRIX_ARGS[@]}" "http://$r_target/$hook" 2>/dev/null)
-        local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}' | tr -d '\r')
-        local server_type=$(echo "$req_result" | grep -Ei "^Server:" | cut -d' ' -f2-)
+    for hook in "${full_list[@]}"; do
+        local req_result=$(curl -sI -L --connect-timeout 3 "http://$r_target/$hook" 2>/dev/null)
+        local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
 
-        if [ "$code" = "200" ]; then
-            # Вывод критических находок в основной поток
-            echo -e "\r\e[K${G}[!] HIT: /$hook | Code: 200 | Server: ${server_type:-Unknown}${NC}"
+        if [[ "$code" == "200" ]]; then
+            echo -e "\r\e[K${G}[!] HIT: /$hook | Code: 200${NC}"
             echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
-        elif [ "$code" = "403" ] || [ "$code" = "406" ]; then
+            
+            # SAST-анализ при попадании
+            for sink in "${GLOBAL_SAST_MATRIX[@]}"; do
+                [[ "$hook" =~ .*\.(php|js|json|yml|env)$ ]] && echo -e "${Y}  -> SAST Potential Risk: $sink${NC}"
+            done
+        elif [[ "$code" =~ ^(403|406)$ ]]; then
             echo "WAF_BLOCK" >> "$tmp_hits"
         fi
         
-        local b_count=$(grep -c "WAF_BLOCK" "$tmp_hits" 2>/dev/null | tr -d ' ')
-        [ "$b_count" -gt 5 ] && sleep 1.5 || sleep 0.2
+        [[ $(grep -c "WAF_BLOCK" "$tmp_hits") -gt 5 ]] && sleep 1.5 || sleep 0.1
     done
-    
     wait $prog_pid 2>/dev/null
 
     # ==================================================================
     # ЭТАП 4: FINAL INTELLIGENCE REPORT
     # ==================================================================
     local total_duration=$(( $(date +%s) - start_time ))
-    
     echo -e "\n${Y}--- [FINAL INTELLIGENCE SUMMARY] ---${NC}"
-    echo -e "${W}Total Audit Time     :${NC} ${G}${total_duration}s${NC}"
-    [ -s "$tmp_hits" ] && cat "$tmp_hits" || echo -e "${W}No additional endpoints discovered.${NC}"
+    echo -e "${W}Total Audit Time : ${G}${total_duration}s${NC}"
+    [ -s "$tmp_hits" ] && cat "$tmp_hits" || echo -e "${W}No high-value endpoints discovered.${NC}"
     
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
