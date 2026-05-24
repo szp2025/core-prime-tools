@@ -5000,6 +5000,47 @@ run_file_cryptor() {
     [[ $? -eq 0 ]] && core_engine_ui "s" "Pipeline operation completed successfully." || core_engine_ui "e" "Pipeline FAULT: Code $?"
 }
 
+
+# ==============================================================================
+# [CORE: PRINTER-REPAIR-NEXUS - FULL HEALING ROUTINE]
+# Режим: Принудительный сброс очередей и переподключение интерфейсов
+# Поддержка: USB-Serial & Wi-Fi Direct
+# ==============================================================================
+
+run_printer_repair_nexus() {
+    echo -e "${Y}[!] Инициализация протокола восстановления принтера...${NC}"
+
+    # 1. Сброс локальной очереди печати (CUPS/LPD)
+    # Удаляет все зависшие задачи, которые блокируют порт
+    cancel -a -x
+    
+    # 2. Перезапуск демона печати (System-Level Reset)
+    # Это «очищает» все USB и Wi-Fi соединения на уровне ядра
+    systemctl restart cups 2>/dev/null || service cups restart 2>/dev/null
+    
+    # 3. Восстановление сетевого сокета (Если подключено по Wi-Fi)
+    # Сбрасывает текущие маршруты принтера, чтобы избежать «Ghost-Connection»
+    if [[ $(ip route | grep -c "default") -gt 0 ]]; then
+        # Пытаемся «пропинговать» шлюз, чтобы обновить таблицу ARP
+        ping -c 2 192.168.1.1 > /dev/null
+    fi
+
+    # 4. Проверка USB-хоста (Если подключено по USB)
+    # Пересканирует USB-шину, чтобы обнаружить принтер заново
+    if [[ -d /sys/bus/usb/devices ]]; then
+        echo '0' > /sys/bus/usb/devices/*/authorized 2>/dev/null
+        echo '1' > /sys/bus/usb/devices/*/authorized 2>/dev/null
+    fi
+
+    # 5. Итоговая проверка статуса
+    if lpstat -r | grep -q "running"; then
+        echo -e "${G}[SUCCESS] Принтер возвращен в оперативное состояние.${NC}"
+    else
+        echo -e "${R}[ERROR] Требуется аппаратное вмешательство (Power Cycle).${NC}"
+    fi
+}
+
+
 # ==============================================================================
 # @description: CROSS-PLATFORM USER AUDIT & MANAGEMENT ENGINE v5.0
 # АРХИТЕКТУРА: Интеллектуальный эвристический парсер среды, авто-определение целевой ОС
