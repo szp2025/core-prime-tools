@@ -5642,13 +5642,14 @@ run_network_intelligence() {
 
 
 # ==============================================================================
-# [OSINT NEXUS v20.0 - CRITICAL ALERTS ONLY ENGINE]
-# МОДЕРНИЗАЦИЯ: Логика прохода мимо всех кодов, кроме 200 OK
-# ИНТЕЛЛЕКТ: Выделение скрытых файлов в секцию ALERT в финальном сводном отчете
+# [OSINT NEXUS v21.0 - ULTRA CLEAN DEEP SILENCE ENGINE]
+# МОДЕРНИЗАЦИЯ: Полное подавление утечек сырого HTML/CSS кода в консоль.
+# СТРАТЕГИЯ: Сканирование строго по коду 200. Проход мимо ложных WAF и мусора.
+# ФИЛЬТРАЦИЯ: Выделение файлов, которые обязаны быть скрыты, в Alert-блоки.
 # ==============================================================================
 
 run_system_info() {
-    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (ALERT-DRIVEN)"
+    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v21.0 (SILENT ALERTS)"
     
     local r_target=$(core_engine_input "text" "Target Domain or IP [default: localhost]")
     if [[ -z "$r_target" ]]; then
@@ -5680,13 +5681,13 @@ run_system_info() {
         echo -e "${W}Target Domain:${NC} ${Y}$r_target${NC}"
         echo -e "${W}Resolved IP:${NC} ${G}${target_ip:-UNKNOWN}${NC}"
         
-        # Запрос основного пакета в переменную
+        # Запрашиваем только заголовки (или изолируем вывод), чтобы сырой HTML/CSS не летел в терминал
         local full_payload=$(curl -s -i -L --connect-timeout 4 \
-            -A "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" \
-            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
-            -H "Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7" \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
             "http://$r_target/")
 
+        # Изолируем заголовки и тело в переменные, исключая их вывод на экран
         local root_headers=$(echo "$full_payload" | sed -n '1,/^$/p')
         local root_html=$(echo "$full_payload" | sed '1,/^$/d')
         
@@ -5696,7 +5697,7 @@ run_system_info() {
         echo -e "${W}Main HTTP Code:${NC} ${G}${root_code:-UNKNOWN}${NC}"
         echo -e "${W}Core Server:${NC} ${Y}${root_srv:-N/A}${NC}"
         
-        # Детекция PHP
+        # Детекция версии PHP без вывода побочного мусора
         local root_php=""
         root_php=$(echo "$root_headers" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
         
@@ -5708,24 +5709,16 @@ run_system_info() {
         fi
         
         if [[ -z "$root_php" ]]; then
-            if echo "$root_headers" | grep -Ei "(PHPSESSID|pma_cookie)" >/dev/null || echo "$root_html" | grep -Ei "(/wp-includes/|/bitrix/)" >/dev/null; then
-                root_php="7.0.3 (Forced via Matrix Signature Matching)"
+            if echo "$root_headers" | grep -Ei "(PHPSESSID|pma_cookie)" >/dev/null 2>&1 || echo "$root_html" | grep -Ei "(/wp-includes/|/bitrix/)" >/dev/null 2>&1; then
+                root_php="Exposed Signatures Detected"
             fi
         fi
         
-        echo -e "${W}Identified PHP Version:${NC} ${G}${root_php:-NOT EXPOSED (Hidden by Admin)}${NC}"
-        
-        echo -e "${W}Detected Core Interfaces (GLOBAL_HTTP_MATRIX):${NC}"
-        local matrix_headers=$(echo "$root_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | sort -u | sed 's/^/  -> /')
-        if [[ -n "$matrix_headers" ]]; then
-            echo -e "${G}$matrix_headers${NC}"
-        else
-            echo -e "  -> No data exposed or request intercepted by Shield."
-        fi
+        echo -e "${W}Identified PHP Version:${NC} ${G}${root_php:-NOT EXPOSED}${NC}"
         echo -e "--------------------------------------------------------"
 
         # ==================================================================
-        # ЭТАП 2: АНАЛИЗ МАТРИЦЫ СИГНАТУР
+        # ЭТАП 2: АНАЛИЗ МАТРИЦЫ СИГНАТУР (СТРОГО БЕЗ GREP-ОШИБОК)
         # ==================================================================
         echo -e "${Y}--- [STAGE 2: GLOBAL INFRASTRUCTURE SIGNATURE MATCHING] ---${NC}"
         local matches_found=0
@@ -5738,7 +5731,7 @@ run_system_info() {
             
             for ((i=0; i<total_tokens-1; i++)); do
                 local token="${tokens[$i]}"
-                if echo "$full_payload" | grep -Fi "$token" >/dev/null; then
+                if echo "$full_payload" | grep -Fi "$token" >/dev/null 2>&1; then
                     match_detected=1
                     break
                 fi
@@ -5751,12 +5744,12 @@ run_system_info() {
         done
         
         if (( matches_found == 0 )); then
-            echo -e "  ${R}-> No infrastructure signatures triggered for this target.${NC}"
+            echo -e "  ${W}-> Surface signature monitoring stable.${NC}"
         fi
         echo -e "--------------------------------------------------------"
 
         # ==================================================================
-        # ЭТАП 3: СНАЙПЕРСКИЙ ФАЗЗИНГ (ТОЛЬКО КОД 200)
+        # ЭТАП 3: ЧИСТЫЙ СНАЙПЕРСКИЙ ФАЗЗИНГ (ПРОХОДИМ МИМО ВСЕГО, КРОМЕ 200)
         # ==================================================================
         core_engine_ui "w" "Launching Stage 3: Stealth Directory Fuzzing (Strict 200 OK Mode)..."
         local tmp_hits="/tmp/recon_hits_$$"
@@ -5765,68 +5758,63 @@ run_system_info() {
         for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
             (
                 sleep 0.1
+                # Запрашиваем строго заголовки (-I), чтобы не качать исходный код страниц в консоль
                 local ep_headers=$(curl -I -s -L --connect-timeout 2 \
                     -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-                    "http://$r_target/$hook")
+                    "http://$r_target/$hook" 2>/dev/null)
+                
                 local code=$(echo "$ep_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
                 
                 if [[ "$code" == "500" ]]; then
                     echo "WAF_BLOCK" >> "$tmp_hits"
                 elif [[ "$code" == "200" ]]; then
-                    # Извлекаем метаданные для верификации рантайма
-                    local detected_headers=$(echo "$ep_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
-                    
-                    # Интеллектуальный маркер: должен ли этот файл быть скрыт от посторонних глаз?
-                    # Если путь содержит критические паттерны конфигов, логов или бэкапов
-                    if [[ "$hook" =~ (\.env|\.git|\.hta|config|backup|wp-config|mysql|dump|setup|phpinfo) ]]; then
-                        echo "ALERT:/$hook | Code: 200 | SHOULD BE HIDDEN OR COMPLETELY INACCESSIBLE! Meta: $(echo "$detected_headers" | cut -c1-40)..." >> "$tmp_hits"
-                        echo -e "${R}[ALERT] EXPOSED CRITICAL OBJECT: /$hook (Code: 200)${NC}"
+                    # Файлы, которые по своей природе обязаны быть скрыты от внешних глаз
+                    if [[ "$hook" =~ (\.env|\.git|\.hta|config|backup|wp-config|mysql|dump|setup|phpinfo|deploy) ]]; then
+                        echo "ALERT:/$hook | Code: 200 | SHOULD BE HIDDEN!" >> "$tmp_hits"
+                        echo -e "${R}[ALERT: ARCHITECTURAL EXPOSURE] /$hook returned HTTP 200 OK!${NC}"
                     else
-                        echo "HIT:/$hook | Code: 200 | Meta: $(echo "$detected_headers" | cut -c1-40)..." >> "$tmp_hits"
-                        echo -e "${G}[!] FOUND: /$hook${NC}"
+                        # Стандартные публичные ресурсы
+                        echo "HIT:/$hook | Code: 200" >> "$tmp_hits"
+                        echo -e "${G}[!] FOUND: /$hook (200 OK)${NC}"
                     fi
                 fi
-                # Все остальные коды (401, 403, 404, 405) скрипт просто молча игнорирует
+                # Все остальные статус-коды (403, 401, 404) скрипт молча пропускает мимо периметра
             ) &
             while (( $(jobs -p | wc -l) >= 5 )); do sleep 0.1; done
         done
         wait
 
         # ==================================================================
-        # ЭТАП 4: СВОДНЫЙ ИДЕАЛЬНО ФИЛЬТРОВАННЫЙ ОТЧЕТ
+        # ЭТАП 4: ИТОГОВЫЙ ИНТЕЛЛЕКТУАЛЬНЫЙ ОТЧЕТ
         # ==================================================================
         echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
         echo -e "${W}Target:${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
         
-        # 1. Проверка защитных систем
-        if grep -q "WAF_BLOCK" "$tmp_hits"; then
-            echo -e "${R}[!] WAF STATUS: Active Cloud Shield detected (Intercepted requests via HTTP 500).${NC}"
+        if grep -q "WAF_BLOCK" "$tmp_hits" 2>/dev/null; then
+            echo -e "${R}[!] WAF STATUS: Active Perimeter Shield Detected (HTTP 500 Interceptions).${NC}"
         fi
 
-        # 2. Вывод КРИТИЧЕСКИХ уязвимостей (Файлы, которые обязаны быть закрыты, но отдали 200)
-        if grep -q "^ALERT:" "$tmp_hits"; then
-            echo -e "\n${R}🚨 [CRITICAL ARCHITECTURAL ALERTS]:${NC}"
+        # БЛОК 1: Вывод критических находок (Красный Alert)
+        if grep -q "^ALERT:" "$tmp_hits" 2>/dev/null; then
+            echo -e "\n${R}🚨 [ALERT: OBJECTS THAT MUST BE COMPLETELY HIDDEN]:${NC}"
             grep "^ALERT:" "$tmp_hits" | sed 's/^ALERT://' | while read -r line; do
                 echo -e "  ${R}-> $line${NC}"
             done
+        else
+            echo -e "\n${G}🛡️ [Security Status]: Critical structural objects properly hidden or blocked.${NC}"
         fi
 
-        # 3. Вывод стандартных найденных публичных файлов (200 OK)
-        if grep -q "^HIT:" "$tmp_hits"; then
-            echo -e "\n${G}✔️ [Exposed Valid Standard Objects (Code: 200)]:${NC}"
+        # БЛОК 2: Вывод стандартных легитимных публичных объектов с кодом 200 (Зеленый)
+        if grep -q "^HIT:" "$tmp_hits" 2>/dev/null; then
+            echo -e "\n${G}✔️ [Exposed Standard Public Objects (Code: 200)]:${NC}"
             grep "^HIT:" "$tmp_hits" | sed 's/^HIT://' | while read -r line; do
                 echo -e "  ${G}-> $line${NC}"
             done
         fi
 
-        # 4. Если ничего критического не найдено
-        if ! grep -q "^ALERT:" "$tmp_hits" && ! grep -q "^HIT:" "$tmp_hits"; then
-            echo -e "${G}Status: Surface sanitized. Zero assets leaked with HTTP 200.${NC}"
-        fi
-
-        # Логируем результаты в хранилище LOOT
-        if grep -Eq "^(HIT|ALERT):" "$tmp_hits"; then
-            core_engine_loot "recon" "Target: $r_target\nPHP: $root_php\n$(grep -E '^(HIT|ALERT):' "$tmp_hits")"
+        # Запись результатов сканирования в LOOT
+        if grep -Eq "^(HIT|ALERT):" "$tmp_hits" 2>/dev/null; then
+            core_engine_loot "recon" "Target: $r_target\n$(grep -E '^(HIT|ALERT):' "$tmp_hits")"
         fi
 
         rm -f "$tmp_hits"
@@ -5835,7 +5823,6 @@ run_system_info() {
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
-
 
 
 
