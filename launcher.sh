@@ -5483,13 +5483,14 @@ run_update_primeold() {
 
 
 # ==============================================================================
-# [OSINT NEXUS v20.0 - RECON & WEBHOOK ENGINE - REAL-TIME + SUMMARY REPORT]
+# [OSINT NEXUS v20.0 - ULTIMATE FULL-STACK RECON & WEBHOOK ENGINE]
+# Интегрировано: Фаззинг по словарю + Анализ заголовков (HTTP-MATRIX)
 # ==============================================================================
 
 run_system_info() {
-    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (GHOST-SPEED)"
+    core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (ULTIMATE MODE)"
     core_engine_item "1" "LOCAL" "System Analysis & Runtimes"
-    core_engine_item "2" "REMOTE" "High-Velocity Multi-Vector Recon"
+    core_engine_item "2" "REMOTE" "High-Velocity Full-Stack Recon"
     core_engine_ui "line" ""
     
     local choice=$(core_engine_input "select" "Target Type")
@@ -5499,40 +5500,53 @@ run_system_info() {
         "1")
             clear
             core_engine_ui "h" "RECON: LOCAL SERVICE INTELLIGENCE"
+            # Анализ локальных процессов через сигнатуры
             local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active listeners.")
             echo -e "\n${Y}--- LOCAL EVENT LISTENERS ---${NC}\n${W}$listeners${NC}"
             ;;
 
         "2")
             clear
-            core_engine_ui "h" "RECON: REMOTE INFRASTRUCTURE SURFACE (LIVE)"
+            core_engine_ui "h" "RECON: REMOTE FULL-STACK MATRIX AUDIT"
             local r_target=$(core_engine_input "text" "Target Domain")
             [[ -z "$r_target" ]] && return
 
-            core_engine_ui "w" "Scanning $r_target..."
+            core_engine_ui "w" "Auditing $r_target (Scanning & Fingerprinting)..."
             local tmp_hits="/tmp/recon_hits_$$"
             
-            # Асинхронный фаззинг
-            for hook in "${GLOBAL_WEBHOOK_WORDLIST[@]}"; do
+            # 1. Асинхронный фаззинг (используем GLOBAL_FUZZ_WORDLIST)
+            for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
                 (
-                    local code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout 2 -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook")
-                    [[ "$code" =~ ^(200|401|403|405)$ ]] && echo "/$hook | Status: $code" >> "$tmp_hits" && echo -e "${G}[!] DETECTED: /$hook (Status: $code)${NC}"
+                    local response_info=$(curl -I -s -L --connect-timeout 2 -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook")
+                    local code=$(echo "$response_info" | head -n 1 | awk '{print $2}')
+                    
+                    # 2. Анализ ответов через GLOBAL_HTTP_MATRIX
+                    if [[ "$code" =~ ^(200|401|403|405)$ ]]; then
+                        # Извлечение метаданных на основе ваших матриц
+                        local detected_headers=$(echo "$response_info" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")")
+                        local php_v=$(echo "$response_info" | grep -Ei "X-Powered-By:.*PHP" | sed -E 's/.*PHP\/([0-9.]+).*/PHP \1/')
+                        
+                        local result="/$hook | Code: $code | ${php_v:-PHP:N/A} | Meta: $(echo "$detected_headers" | tr '\n' ' ' | cut -c1-40)..."
+                        
+                        echo "$result" >> "$tmp_hits"
+                        echo -e "${G}[!] DETECTED: $result${NC}"
+                    fi
                 ) &
+                # Контроль нагрузки (Троттлинг)
                 while (( $(jobs -p | wc -l) >= 20 )); do sleep 0.05; done
             done
             wait
 
-            # Итоговый блок отчета
-            echo -e "\n${Y}--- FINAL INTELLIGENCE SUMMARY ---${NC}"
-            echo -e "${W}Target Analysis:${NC} $r_target"
-            echo -e "${W}Scan Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
+            # 3. Формирование итогового отчета (с сохранением в LOOT)
+            echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
+            echo -e "${W}Target:${NC} $r_target | ${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
             
             if [[ -s "$tmp_hits" ]]; then
-                echo -e "${G}Status:${NC} Vulnerable/Exposed Endpoints Found:"
+                echo -e "${G}Status:${NC} Artifacts identified (Matrix Match):"
                 cat "$tmp_hits"
                 core_engine_loot "recon" "Target: $r_target\n$(cat "$tmp_hits")"
             else
-                echo -e "${R}Status:${NC} Surface area clean. No endpoints discovered."
+                echo -e "${R}Status:${NC} Surface area clean: No matches against registry."
             fi
             rm -f "$tmp_hits"
             ;;
