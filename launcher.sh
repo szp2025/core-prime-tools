@@ -5643,7 +5643,7 @@ run_network_intelligence() {
 
 # ==============================================================================
 # [OSINT NEXUS v20.0 - ULTIMATE FULL-STACK RECON & WEBHOOK ENGINE]
-# МОДЕРНИЗАЦИЯ: Принудительное извлечение точной версии PHP (Active Fingerprint)
+# МОДЕРНИЗАЦИЯ: Расширенный парсинг PHP и глубокий контентный аудит
 # ==============================================================================
 
 run_system_info() {
@@ -5677,12 +5677,22 @@ run_system_info() {
             local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
             echo -e "${W}Resolved IP:${NC} ${G}${target_ip:-UNKNOWN}${NC}"
             
-            local root_response=$(curl -I -s -L --connect-timeout 3 -A "$GLOBAL_NETWORK_UA" "http://$r_target/")
+            # Запрашиваем заголовки + тело главной страницы для глубокого поиска
+            local root_full=$(curl -s -i -L --connect-timeout 3 -A "$GLOBAL_NETWORK_UA" "http://$r_target/")
+            local root_response=$(echo "$root_full" | sed -n '1,/^$/p')
+            
             local root_code=$(echo "$root_response" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
             local root_srv=$(echo "$root_response" | grep -Ei "^Server:" | tail -n 1 | sed -E 's/^Server:[[:space:]]*//I' | awk '{print $1}' | tr -d '\r')
             
-            # 1. Первичная проверка PHP через стандартный заголовок
-            local root_php=$(echo "$root_response" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
+            # Глубокий поиск версии PHP в заголовках и мета-тегах HTML
+            local root_php=$(echo "$root_full" | grep -Ei "(X-Powered-By:.*PHP|Set-Cookie:.*PHP[-_ ]?Version|meta.*generator.*PHP)" | head -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/I')
+            
+            # Дополнительный анализ кук на случай скрытых метаданных
+            if [[ -z "$root_php" ]]; then
+                if echo "$root_response" | grep -Ei "PHPSESSID" > /dev/null; then
+                    root_php="PHP (Active Session Detected)"
+                fi
+            fi
             
             echo -e "${W}Main HTTP Code:${NC} ${G}${root_code:-UNKNOWN}${NC}"
             echo -e "${W}Core Server:${NC} ${Y}${root_srv:-N/A}${NC}"
@@ -5705,31 +5715,23 @@ run_system_info() {
             
             for hook in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
                 (
-                    # Для файлов-индикаторов запрашиваем тело (первые 50 строк), чтобы вытащить версию
-                    if [[ "$hook" =~ (phpinfo|info|test)\.php ]]; then
-                        local file_body=$(curl -s -L --connect-timeout 2 -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook" | head -n 50)
-                        # Ищем классический паттерн "PHP Version X.X.X" внутри html кода phpinfo
-                        local parsed_v=$(echo "$file_body" | grep -Ei "PHP Version" | sed -E 's/.*PHP Version ([0-9.]+).*/\1/' | head -n 1)
-                        if [[ -n "$parsed_v" ]]; then
-                            echo "FOUND_PHP_V:$parsed_v" >> "$tmp_hits"
-                        fi
-                    fi
-
-                    # Стандартный параллельный опрос эндпоинтов
-                    local response_info=$(curl -I -s -L --connect-timeout 2 -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook")
-                    local code=$(echo "$response_info" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+                    # Сканируем заголовки эндпоинта
+                    local ep_full=$(curl -s -i -L --connect-timeout 2 -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook")
+                    local ep_headers=$(echo "$ep_full" | sed -n '1,/^$/p')
+                    local code=$(echo "$ep_headers" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
                     
                     if [[ "$code" =~ ^(200|401|403|405)$ ]]; then
-                        local detected_headers=$(echo "$response_info" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
-                        local php_v=$(echo "$response_info" | grep -Ei "^X-Powered-By:.*PHP" | tail -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/')
+                        local detected_headers=$(echo "$ep_headers" | grep -Ei "$(IFS='|'; echo "${GLOBAL_HTTP_MATRIX[*]}")" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')
                         
-                        # Если нашли версию во вложенном файле — сохраняем её
-                        if [[ -n "$php_v" ]]; then
+                        # Проверяем заголовки и тело ответа на точную версию
+                        local php_v=$(echo "$ep_full" | grep -Ei "(X-Powered-By:.*PHP|PHP Version|/php/[0-9])" | head -n 1 | sed -E 's/.*PHP\/([0-9.]+).*/\1/I; s/.*PHP Version ([0-9.]+).*/\1/I')
+                        
+                        if [[ -n "$php_v" && "$php_v" =~ ^[0-9] ]]; then
                             echo "FOUND_PHP_V:$php_v" >> "$tmp_hits"
                         fi
 
                         if [[ -z "$php_v" && "$detected_headers" =~ "PHPSESSID" ]]; then
-                            php_v="Detected(Session)"
+                            php_v="PHP(Session)"
                         fi
                         
                         local result="/$hook | Code: $code | PHP: ${php_v:-N/A} | Meta: $(echo "$detected_headers" | cut -c1-50)..."
@@ -5742,11 +5744,12 @@ run_system_info() {
             wait
 
             # ==================================================================
-            # ЭТАП 3: ФИНАЛЬНЫЙ АНАЛИЗ И СВОДНЫЙ ОТЧЕТ
+            # ЭТАП 3: ФИНАЛЬНЫЙ СВОДНЫЙ ОТЧЕТ
             # ==================================================================
-            # Если на этапе 1 версия была скрыта, проверяем, не вытащили ли мы её во время фаззинга
-            if [[ -z "$root_php" ]]; then
-                root_php=$(grep -Ei "^FOUND_PHP_V:" "$tmp_hits" | head -n 1 | cut -d':' -f2)
+            # Проверяем, не удалось ли извлечь точную версию в процессе фаззинга
+            local extracted_php=$(grep -Ei "^FOUND_PHP_V:" "$tmp_hits" | head -n 1 | cut -d':' -f2)
+            if [[ -n "$extracted_php" ]]; then
+                root_php="$extracted_php"
             fi
 
             echo -e "\n${Y}--- FINAL FULL-STACK INTELLIGENCE SUMMARY ---${NC}"
@@ -5754,7 +5757,6 @@ run_system_info() {
             echo -e "${W}Identified PHP Version:${NC} ${G}${root_php:-NOT EXPOSED (Hidden by Admin)}${NC}"
             echo -e "${W}Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
             
-            # Выводим чистые хиты (убирая технические маркеры версии)
             if grep -Ei "^HIT:" "$tmp_hits" > /dev/null; then
                 echo -e "${G}Status:${NC} Vulnerable/Exposed Endpoints Identified:"
                 grep -Ei "^HIT:" "$tmp_hits" | sed 's/^HIT://'
@@ -5768,7 +5770,6 @@ run_system_info() {
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
-
 
 
 
