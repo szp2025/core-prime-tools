@@ -701,35 +701,38 @@ generate_matrix_arguments() {
     local target_host="$2"
 
     # --- АДАПТИВНЫЙ КОНТРОЛЛЕР ---
-    # Безопасное чтение счетчика: если файла нет, принудительно 0
-    local block_count=0
-    if [[ -f "/tmp/recon_hits_$$" ]]; then
-        block_count=$(grep -c "WAF_BLOCK" "/tmp/recon_hits_$$" 2>/dev/null || echo 0)
-    fi
-    # Убираем все пробелы, чтобы Zsh/Bash не ругались на форматирование
-    block_count=${block_count// /}
+    # Принудительно приводим к целому числу, игнорируя ошибки
+    local raw_count=0
+    [[ -f "/tmp/recon_hits_$$" ]] && raw_count=$(grep -c "WAF_BLOCK" "/tmp/recon_hits_$$" 2>/dev/null || echo 0)
     
-    # Использование арифметического контекста (( )) - это стандарт для Zsh и Bash
+    # Очистка от любых символов кроме цифр
+    local block_count=${raw_count//[^0-9]/}
+    [[ -z "$block_count" ]] && block_count=0
+    
+    # Использование [ ] вместо (( )) для максимальной совместимости
     local mode=0
-    (( block_count > 3 )) && mode=1
-    (( block_count > 8 )) && mode=2
+    if [ "$block_count" -gt 8 ]; then
+        mode=2
+    elif [ "$block_count" -gt 3 ]; then
+        mode=1
+    fi
 
     # --- ГЕНЕРАЦИЯ ПРОФИЛЯ ---
-    # Добавляем +1 для Zsh, так как массивы начинаются с 1
-    local r_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]} + 1))]}"
+    # Безопасный выбор элемента массива (с учетом индексации zsh/bash)
+    local len=${#GLOBAL_NETWORK_UA[@]}
+    local idx=$(( (RANDOM % len) + 1 ))
+    local r_ua="${GLOBAL_NETWORK_UA[$idx]}"
     [[ -z "$r_ua" ]] && r_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     # --- АДАПТАЦИЯ ЗАГОЛОВКОВ ---
     local p_mobile="?0"
     local p_platform="\"Windows\""
-    # Регулярные выражения в Zsh требуют экранирования или группировки
-    if [[ "$r_ua" =~ (iPhone|Android) ]]; then
+    if [[ "$r_ua" =~ "iPhone" || "$r_ua" =~ "Android" ]]; then
         p_mobile="?1"
         p_platform="\"Android\""
     fi
 
     # --- СБОРКА МАТРИЦЫ ---
-    # Используем массив для сборки, чтобы избежать проблем с кавычками
     CURL_MATRIX_ARGS=(
         -A "$r_ua"
         --http1.1
@@ -741,15 +744,15 @@ generate_matrix_arguments() {
         -H "DNT: 1"
     )
 
-    # Если НЕ глубокий стелс, добавляем заголовки Sec-Ch-Ua
-    if (( mode < 2 )); then
+    # Используем [ "$mode" -lt 2 ] для проверки уровня защиты
+    if [ "$mode" -lt 2 ]; then
         CURL_MATRIX_ARGS+=(-H "Sec-Ch-Ua: \"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\"")
         CURL_MATRIX_ARGS+=(-H "Sec-Ch-Ua-Mobile: $p_mobile")
         CURL_MATRIX_ARGS+=(-H "Sec-Ch-Ua-Platform: $p_platform")
     fi
 
     # --- АДАПТИВНОЕ УПРАВЛЕНИЕ ТЕМПОМ ---
-    # Арифметическая подстановка для Zsh
+    # Обычный арифметический подстановочный блок
     local pause=$(( 1 + (mode * 3) + (RANDOM % 3) ))
     echo "$pause" > /tmp/current_adaptive_delay
 }
