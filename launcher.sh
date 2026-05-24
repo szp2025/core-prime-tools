@@ -696,7 +696,7 @@ GLOBAL_HTTP_MATRIX=("X-Powered-By" "Server" "X-AspNet-Version" "X-Runtime" "X-Ve
 
 
 
-Generate_matrix_arguments() {
+generate_matrix_arguments() {
     local target_ip="$1"
     local target_host="$2"
 
