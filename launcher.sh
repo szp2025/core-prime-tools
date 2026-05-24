@@ -5509,14 +5509,11 @@ run_update_primeold() {
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - HIGH-VELOCITY RECON & WEBHOOK ENGINE
-# МОДЕРНИЗАЦИЯ: Асинхронный параллельный фаззинг (Sliding Window), 
-# защита от RAM-переполнения, атомарная обработка потоков.
-# @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | RECON LIMIT
+# [OSINT NEXUS v20.0 - RECON & WEBHOOK ENGINE - REAL-TIME + SUMMARY REPORT]
 # ==============================================================================
+
 run_system_info() {
     core_engine_ui "h" "PRIME INTELLIGENCE & RECON v20.0 (GHOST-SPEED)"
-
     core_engine_item "1" "LOCAL" "System Analysis & Runtimes"
     core_engine_item "2" "REMOTE" "High-Velocity Multi-Vector Recon"
     core_engine_ui "line" ""
@@ -5528,57 +5525,48 @@ run_system_info() {
         "1")
             clear
             core_engine_ui "h" "RECON: LOCAL SERVICE INTELLIGENCE"
-            # Оптимизированный запрос через lsof
             local listeners=$(lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E "$GLOBAL_SIG_WEB_RUNTIMES" || echo "No active listeners.")
             echo -e "\n${Y}--- LOCAL EVENT LISTENERS ---${NC}\n${W}$listeners${NC}"
             ;;
 
         "2")
             clear
-            core_engine_ui "h" "RECON: REMOTE INFRASTRUCTURE SURFACE"
-            core_engine_validator "pkg" "curl" "curl" || return
-            
+            core_engine_ui "h" "RECON: REMOTE INFRASTRUCTURE SURFACE (LIVE)"
             local r_target=$(core_engine_input "text" "Target Domain")
             [[ -z "$r_target" ]] && return
 
-            core_engine_ui "w" "Deploying GHOST-SPEED Recon on $r_target..."
-            local tmp_results="/tmp/recon_hits_$$"
-            local max_jobs=20 # Параллельный пул
+            core_engine_ui "w" "Scanning $r_target..."
+            local tmp_hits="/tmp/recon_hits_$$"
             
-            # Асинхронный фаззинг (Sliding Window)
-            {
-                for hook in "${GLOBAL_WEBHOOK_WORDLIST[@]}"; do
-                    (
-                        local code=$(curl -o /dev/null -s -w "%{http_code}" \
-                            --connect-timeout 2 --max-time 3 \
-                            -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook")
-                        
-                        # Валидация по статус-кодам (успех или активный ответ)
-                        if [[ "$code" =~ ^(200|401|403|405)$ ]]; then
-                            echo "[!] DETECTED: /$hook (Status: $code)"
-                        fi
-                    ) &
-                    
-                    # Контроллер троттлинга
-                    while (( $(jobs -p | wc -l) >= max_jobs )); do sleep 0.05; done
-                done
-                wait
-            } > "$tmp_results"
+            # Асинхронный фаззинг
+            for hook in "${GLOBAL_WEBHOOK_WORDLIST[@]}"; do
+                (
+                    local code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout 2 -A "$GLOBAL_NETWORK_UA" "http://$r_target/$hook")
+                    [[ "$code" =~ ^(200|401|403|405)$ ]] && echo "/$hook | Status: $code" >> "$tmp_hits" && echo -e "${G}[!] DETECTED: /$hook (Status: $code)${NC}"
+                ) &
+                while (( $(jobs -p | wc -l) >= 20 )); do sleep 0.05; done
+            done
+            wait
 
-            # Анализ и вывод
-            if [[ -s "$tmp_results" ]]; then
-                echo -e "\n${Y}--- REMOTE INTELLIGENCE REPORT ---${NC}"
-                cat "$tmp_results"
-                core_engine_loot "recon" "Target: $r_target\n$(cat "$tmp_results")"
+            # Итоговый блок отчета
+            echo -e "\n${Y}--- FINAL INTELLIGENCE SUMMARY ---${NC}"
+            echo -e "${W}Target Analysis:${NC} $r_target"
+            echo -e "${W}Scan Timestamp:${NC} $(date +'%Y-%m-%d %H:%M:%S')"
+            
+            if [[ -s "$tmp_hits" ]]; then
+                echo -e "${G}Status:${NC} Vulnerable/Exposed Endpoints Found:"
+                cat "$tmp_hits"
+                core_engine_loot "recon" "Target: $r_target\n$(cat "$tmp_hits")"
             else
-                core_engine_ui "e" "Surface area clean: No endpoints discovered."
+                echo -e "${R}Status:${NC} Surface area clean. No endpoints discovered."
             fi
-            rm -f "$tmp_results"
+            rm -f "$tmp_hits"
             ;;
     esac
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
+
 
 
 # ==============================================================================
