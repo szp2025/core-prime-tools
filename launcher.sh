@@ -698,68 +698,74 @@ GLOBAL_HTTP_MATRIX=("X-Powered-By" "Server" "X-AspNet-Version" "X-Runtime" "X-Ve
 
 generate_matrix_arguments() {
     local target_ip="$1"
+    local target_host="$2" # Добавлен параметр для формирования правильного Referer
     
+    # 1. Выбор базового профиля
     local r_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
-    if [[ -z "$r_ua" ]]; then
-        r_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    fi
+    [[ -z "$r_ua" ]] && r_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
+    # 2. Адаптивные параметры (UA-String-to-Fingerprint Mapping)
     local p_ch_ua="\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\""
+    local p_full_version="\"124.0.6367.119\""
     local p_platform="\"Windows\""
     local p_mobile="?0"
     local p_arch="\"x86\""
+    local p_model="\"\""
 
-    # ИСПРАВЛЕНО: Удалены внутренние кавычки из регулярных выражений Bash
-    if [[ "$r_ua" =~ Macintosh || "$r_ua" =~ iPhone ]]; then
+    if [[ "$r_ua" =~ Macintosh ]]; then
         p_platform="\"macOS\""
-        [[ "$r_ua" =~ iPhone ]] && p_platform="\"iOS\""
-    elif [[ "$r_ua" =~ Linux || "$r_ua" =~ Ubuntu ]]; then
-        p_platform="\"Linux\""
-        [[ "$r_ua" =~ Android ]] && p_platform="\"Android\""
+    elif [[ "$r_ua" =~ iPhone ]]; then
+        p_platform="\"iOS\""; p_mobile="?1"; p_arch="\"arm\""; p_model="\"iPhone 15\""
+    elif [[ "$r_ua" =~ Android ]]; then
+        p_platform="\"Android\""; p_mobile="?1"; p_arch="\"arm\""; p_model="\"SM-G991B\""
     fi
 
-    if [[ "$r_ua" =~ Mobile || "$r_ua" =~ Android || "$r_ua" =~ iPhone ]]; then
-        p_mobile="?1"
-        p_arch="\"arm\""
-    fi
-
-    if [[ "$r_ua" =~ Edge/ ]]; then
-        p_ch_ua="\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\""
-    elif [[ "$r_ua" =~ Firefox/ ]]; then
-        p_ch_ua="\"Not-A.Brand\";v=\"99\", \"Firefox\";v=\"125\""
-    fi
-
+    # 3. Дополнительные заголовки для маскировки под реальный "чистый" браузер
     local r_lang="${GLOBAL_LANG_POOL[$((RANDOM % ${#GLOBAL_LANG_POOL[@]}))]}"
     local r_enc="${GLOBAL_ENC_POOL[$((RANDOM % ${#GLOBAL_ENC_POOL[@]}))]}"
     local r_gpc=$((RANDOM % 2))
+    
+    # Рандомизация порядка заголовков (имитация разного сетевого стека)
+    local sec_fetch_site="same-origin"
+    [[ $((RANDOM % 3)) -eq 0 ]] && sec_fetch_site="cross-site"
 
+    # Итоговая сборка матрицы
     CURL_MATRIX_ARGS=(
         -A "$r_ua"
         -H "Accept: $GLOBAL_BASE_ACCEPT"
         -H "Accept-Language: $r_lang"
         -H "Accept-Encoding: $r_enc"
-        -H "Cache-Control: max-age=0"
         -H "Connection: keep-alive"
+        -H "Upgrade-Insecure-Requests: 1"
+        -H "Cache-Control: no-cache"
+        -H "Pragma: no-cache"
+        # -- Секция Chromium/Blink Fingerprint --
         -H "Sec-Ch-Ua: $p_ch_ua"
         -H "Sec-Ch-Ua-Mobile: $p_mobile"
         -H "Sec-Ch-Ua-Platform: $p_platform"
         -H "Sec-Ch-Ua-Arch: $p_arch"
+        -H "Sec-Ch-Ua-Model: $p_model"
+        -H "Sec-Ch-Ua-Full-Version-List: $p_ch_ua;v=$p_full_version"
         -H "Sec-Ch-Ua-Bitness: \"64\""
-        -H "Sec-Fetch-Site: none"
+        -H "Sec-Ch-Ua-Platform-Version: \"15.0.0\""
+        # -- Секция Stealth Session --
+        -H "Sec-Fetch-Site: $sec_fetch_site"
         -H "Sec-Fetch-Mode: navigate"
         -H "Sec-Fetch-User: ?1"
         -H "Sec-Fetch-Dest: document"
-        -H "Upgrade-Insecure-Requests: 1"
         -H "Sec-GPC: $r_gpc"
+        # -- Имитация прохождения через WAF/CDN --
         -H "X-Forwarded-For: $target_ip"
         -H "X-Real-IP: $target_ip"
         -H "Client-IP: $target_ip"
         -H "CF-Connecting-IP: $target_ip"
         -H "True-Client-IP: $target_ip"
-        -H "X-Client-IP: $target_ip"
         -H "Forwarded: for=$target_ip;proto=https"
+        # -- Доп. параметры для обхода поведенческих фильтров --
+        -H "DNT: 1"
     )
 }
+
 
 
 # ==============================================================================
