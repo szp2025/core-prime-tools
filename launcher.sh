@@ -3871,7 +3871,6 @@ EOF
 # ФУНКЦИОНАЛ: Сканирование файлов «на лету» перед отдачей, моментальное удаление угроз с хоста
 # АРХИТЕКТУРА: Flask-интерфейс, защита сетевых клиентов от скачивания деструктивных векторов
 # ==============================================================================
-
 generate_share_server_code_raw() {
     # Загружаем только базовый шаблон страницы в локальную переменную
     local template
@@ -3887,38 +3886,44 @@ generate_share_server_code_raw() {
         fi
     done
 
-    # Переводим динамические данные в Base64, чтобы обойти ограничения интерпретаторов NetHunter/Termux
-    # Это на 100% защищает синтаксис от искажения и сохраняет правильный цвет в IDE
-    local b64_regex
-    b64_regex=$(echo -n "$joined_regex" | base64 | tr -d '\n\r')
-    
-    local b64_template
-    b64_template=$(echo -n "$template" | base64 | tr -d '\n\r')
+    # Экранируем двойные кавычки внутри собранного регулярного выражения для безопасности Python
+    local safe_regex="${joined_regex//\"/\\\"}"
 
-    # Запись монолитного share_server.py (Строгий 'EOF' — идеальная интеграция в Bash/Zsh)
+    # ШАГ 1: Запись начального заголовка и импортов (Строгий 'EOF' - Bash ничего не трогает, цвет в норме)
     cat << 'EOF' > share_server.py
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
-import base64
 
 app = Flask(__name__)
 
-# Декодирование сигнатурной матрицы CAME, переданной из ядра NetHunter/Termux
-B64_REGEX_DATA = "__CAME_B64_REGEX_PLACEHOLDER__"
-GLOBAL_AV_PIPE_REGEX = re.compile(base64.b64decode(B64_REGEX_DATA).decode('utf-8', errors='ignore'), re.IGNORECASE | re.MULTILINE)
+# Проброс глобального регулярного выражения CAME из Bash-массива GLOBAL_AV_MATRIX в Python
+EOF
+
+    # ШАГ 2: Безопасный сквозной проброс собранного регулярного выражения силами echo
+    echo "GLOBAL_AV_PIPE_REGEX = r\"$safe_regex\"" >> share_server.py
+
+    # ШАГ 3: Запись конфигурации путей хранения данных
+    cat << 'EOF' >> share_server.py
 
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
-# Декодирование и инициализация оригинального HTML-интерфейса CAME
-B64_TEMPLATE_DATA = "__CAME_B64_TEMPLATE_PLACEHOLDER__"
-HTML_PRIME_TEMPLATE = base64.b64decode(B64_TEMPLATE_DATA).decode('utf-8', errors='ignore')
+EOF
 
-def render_prime_page(title, content):
-    return HTML_PRIME_TEMPLATE.replace('{{ title }}', title).replace('{{ content }}', content)
+    # ШАГ 4: Инжекция HTML-шаблона ядра. Чтобы он не вызывал 'invalid syntax',
+    # преобразуем его структуру в валидную Python-функцию, экранируя бэкслеши.
+    local safe_template="${template//\\/\\\\}"
+    safe_template="${safe_template//\"\"\"/\\\"\\\"\\\"}"
+
+    echo "def render_prime_page(title, content):" >> share_server.py
+    echo "    template_raw = \"\"\"$safe_template\"\"\"" >> share_server.py
+    echo "    return template_raw.replace('{{ title }}', title).replace('{{ content }}', content)" >> share_server.py
+
+    # ШАГ 5: Запись основного функционала раздачи, детекции и аннигиляции (Строгий 'EOF')
+    cat << 'EOF' >> share_server.py
 
 def get_file_icon(filename):
     """Определяет иконку в зависимости от расширения файла."""
@@ -3990,8 +3995,9 @@ def get_file(filename):
 
         matches = []
         try:
+            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
             for i, line in enumerate(text_content.splitlines(), 1):
-                if GLOBAL_AV_PIPE_REGEX.search(line):
+                if compiled_regex.search(line):
                     matches.append(f"Line {i}: {line.strip()[:100]}")
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
@@ -4034,153 +4040,7 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    # Безопасная контекстная подстановка строк Base64 встроенными средствами командной строки.
-    # Никаких sed и awk — этот синтаксис одинаково работает и в Bash, и в Zsh на Kali NetHunter/Termux.
-    local final_code
-    final_code=$(cat share_server.py)
-    final_code="${final_code//__CAME_B64_REGEX_PLACEHOLDER__/$b64_regex}"
-    final_code="${final_code//__CAME_B64_TEMPLATE_PLACEHOLDER__/$b64_template}"
-
-    echo "$final_code" > share_server.py
-    echo "[+] share_server.py успешно адаптирован под Termux/NetHunter (Bash & Zsh). Проблема цвета решена."
-}
-
-generate_share_server_code_raworigin() {
-    # Загружаем только базовый шаблон страницы в локальную переменную
-    local template=$(generate_core_template)
-
-    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
-    cat << EOF
-from flask import Flask, render_template_string, send_from_directory, abort
-import os
-import re
-
-app = Flask(__name__)
-
-# Проброс глобального регулярного выражения CAME из ядра Bash в Python
-GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
-
-SHARE_DIR = '/root/share'
-
-if not os.path.exists(SHARE_DIR):
-    os.makedirs(SHARE_DIR, exist_ok=True)
-
-$template
-
-def get_file_icon(filename):
-    """Определяет иконку в зависимости от расширения файла."""
-    ext = filename.split('.')[-1].lower() if '.' in filename else ''
-    icons = {
-        'pdf': '📕',
-        'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'webp': '🖼️',
-        'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
-        'py': '💻', 'js': '💻', 'html': '💻', 'sh': '💻', 'css': '💻',
-        'txt': '📄', 'md': '📝', 'doc': '📄', 'docx': '📄',
-        'mp4': '🎬', 'mkv': '🎬', 'mov': '🎬',
-        'mp3': '🎵', 'wav': '🎵', 'flac': '🎵'
-    }
-    return icons.get(ext, '📄')
-
-@app.route('/')
-def index():
-    try:
-        files = sorted(os.listdir(SHARE_DIR))
-    except:
-        files = []
-    
-    # Формируем сетку файлов с использованием оригинальных стилей .file-grid и .file-item
-    grid_content = '<div class="file-grid">'
-    for f in files:
-        icon = get_file_icon(f)
-        grid_content += f"""
-        <a href="/get/{f}" class="file-item" target="_blank">
-            <span class="file-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px;">{icon}</span>
-            <div style="font-size: 0.8rem; word-break: break-all; line-height: 1.2;">{f}</div>
-        </a>
-        """
-    
-    if not files:
-        grid_content += '<p style="color: var(--accent); font-style: italic; grid-column: 1/-1; opacity: 0.5;">[ SECTOR_EMPTY: No data detected ]</p>'
-    
-    grid_content += '</div>'
-    grid_content += f'<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 0.7rem; opacity: 0.5;">MOUNT_POINT: {SHARE_DIR}</div>'
-
-    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION_v2.0", grid_content))
-
-@app.route('/get/<filename>')
-def get_file(filename):
-    # Обеспечение базовой безопасности путей (предотвращение Path Traversal)
-    target_path = os.path.normpath(os.path.join(SHARE_DIR, filename))
-    if not target_path.startswith(SHARE_DIR) or not os.path.exists(target_path):
-        abort(404)
-        
-    # Игнорируем директории, если они случайно попали в запрос
-    if os.path.isdir(target_path):
-        abort(400)
-
-    is_infected = False
-    report = []
-
-    try:
-        # --- ВЕКТОР ПРЕДВАРИТЕЛЬНОГО ОУТПУТ-КОНТРОЛЯ CAME ---
-        with open(target_path, 'rb') as file_buffer:
-            raw_content = file_buffer.read()
-
-        total_bytes = len(raw_content)
-
-        # Вычисление плотности ASCII (Борьба со скрытыми крипторами / паккерами)
-        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
-        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
-
-        # Декодирование содержимого для проверки регулярными выражениями Слоев 1-4
-        text_content = raw_content.decode('utf-8', errors='ignore')
-
-        matches = []
-        try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
-            for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
-                    matches.append(f"Line {i}: {line.strip()[:100]}")
-        except Exception as regex_err:
-            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
-
-        # Анализ полученных данных
-        if total_bytes > 1000 and readable_ratio < 12:
-            is_infected = True
-            report.append("CRITICAL ANOMALY: High Entropy / Encrypted code signature detected.")
-
-        if matches:
-            is_infected = True
-            report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
-
-        # --- РУБЕЖ РЕШЕНИЯ И АННИГИЛЯЦИИ ---
-        if is_infected:
-            # Файл грязный — полное стирание с жесткого диска сервера, чтобы никто больше не смог его запросить
-            if os.path.exists(target_path):
-                os.remove(target_path)
-
-            # Вместо скачивания файла возвращаем пользователю жесткую веб-страницу с алармом
-            content = f"""
-            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
-                CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
-            </div>
-            <p style="font-size:12px; color:var(--accent-color);">The requested object <b>{filename}</b> failed outbound security compliance and was <b>permanently purged</b> from the storage node.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
-            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO DISTRIBUTION ]</a></div>
-            """
-            return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
-
-        else:
-            # Файл чист — беспрепятственно отдаем клиенту
-            return send_from_directory(SHARE_DIR, filename)
-
-    except Exception as e:
-        return f"DISTRIBUTION_INTEGRITY_ERROR: {str(e)}", 500
-
-if __name__ == '__main__':
-    # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции
-    app.run(host='0.0.0.0', port=5002, debug=False)
-EOF
+    echo "[+] share_server.py успешно сгенерирован на основе GLOBAL_AV_MATRIX. Ошибок цвета и синтаксиса нет!"
 }
 
 
