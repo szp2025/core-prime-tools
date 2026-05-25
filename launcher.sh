@@ -3912,7 +3912,7 @@ SHARE_DIR = '/root/share'
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
-# Декодирование и инициализация оригинального HTML-интерфейса CAME
+# Декодирование и微инициализация оригинального HTML-интерфейса CAME
 B64_TEMPLATE_DATA = "__CAME_B64_TEMPLATE_PLACEHOLDER__"
 HTML_PRIME_TEMPLATE = base64.b64decode(B64_TEMPLATE_DATA).decode('utf-8', errors='ignore')
 
@@ -4010,13 +4010,16 @@ def get_file(filename):
             if os.path.exists(target_path):
                 os.remove(target_path)
 
+            # Выносим \n из фигурных скобок f-строки для полной кроссплатформенности Python
+            report_output = "\n".join(report)
+
             # Отрисовка страницы блокировки CAME
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
             </div>
             <p style="font-size:12px; color:var(--accent-color);">The requested object <b>{filename}</b> failed outbound security compliance and was <b>permanently purged</b> from the storage node.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\\n".join(report)}</pre>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{report_output}</pre>
             <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO DISTRIBUTION ]</a></div>
             """
             return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
@@ -4034,15 +4037,15 @@ if __name__ == '__main__':
 EOF
 
     # Безопасная контекстная подстановка строк Base64 встроенными средствами командной строки.
-    # Никаких sed и awk — этот синтаксис одинаково работает и в Bash, и в Zsh на Kali NetHunter/Termux.
     local final_code
     final_code=$(cat share_server.py)
     final_code="${final_code//__CAME_B64_REGEX_PLACEHOLDER__/$b64_regex}"
     final_code="${final_code//__CAME_B64_TEMPLATE_PLACEHOLDER__/$b64_template}"
 
     echo "$final_code" > share_server.py
-    echo "[+] share_server.py успешно адаптирован под Termux/NetHunter (Bash & Zsh). Проблема цвета решена."
+    echo "[+] share_server.py успешно адаптирован под Termux/NetHunter (Bash & Zsh). Проблема синтаксиса f-строк решена."
 }
+
 
 generate_share_server_code_raworigin() {
     # Загружаем только базовый шаблон страницы в локальную переменную
