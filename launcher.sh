@@ -3483,12 +3483,12 @@ EOF
 # ==============================================================================
 
 generate_av_server_code_raw() {
+    # 1. Генерируем шаблоны в переменную
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
-    # Используем cat без кавычек вокруг EOF, чтобы Bash раскрыл переменные шаблонов
-    # Экранируем спецсимволы $ в Python, где это необходимо
-    cat << EOF > server.py
+    # 2. Создаем начало файла
+    cat << 'EOF' > server.py
 from flask import Flask, request, render_template_string
 import re
 import os
@@ -3515,19 +3515,23 @@ GLOBAL_HASH_MATRIX = [
 ]
 
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
-GLOBAL_AV_PROC_REGEX = r"$GLOBAL_AV_ACTIVE_MALWARE_PROCS"
-GLOBAL_AV_SOCKET_REGEX = r"$GLOBAL_AV_SOCKET_STATES"
+EOF
 
-WIN_PAYLOAD = "$(echo "${GLOBAL_FIX_WIN_REG[@]}")"
-LINUX_PAYLOAD = "$(echo "${GLOBAL_FIX_LINUX[@]}")"
-MACOS_PAYLOAD = "$(echo "${GLOBAL_FIX_MACOS[@]}")"
+    # 3. Дописываем динамические переменные (безопасно)
+    {
+        echo "GLOBAL_AV_PROC_REGEX = r\"$GLOBAL_AV_ACTIVE_MALWARE_PROCS\""
+        echo "GLOBAL_AV_SOCKET_REGEX = r\"$GLOBAL_AV_SOCKET_STATES\""
+        echo "WIN_PAYLOAD = \"$(echo "${GLOBAL_FIX_WIN_REG[@]}")\""
+        echo "LINUX_PAYLOAD = \"$(echo "${GLOBAL_FIX_LINUX[@]}")\""
+        echo "MACOS_PAYLOAD = \"$(echo "${GLOBAL_FIX_MACOS[@]}")\""
+        echo "$templates"
+    } >> server.py
 
-$templates
-
+    # 4. Дописываем остальную логику
+    cat << 'EOF' >> server.py
 @app.route('/')
 def index():
     form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
-    
     current_os = platform.system().lower()
     btn_map = {
         "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
@@ -3535,9 +3539,7 @@ def index():
         "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
     }
     label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
-    
-    body = form_html + f"""
-    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
+    body = form_html + f"""<div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
         <h3 style="color: var(--accent-color);">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
         <div style="display: flex; gap: 10px;">
             <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
@@ -3545,8 +3547,7 @@ def index():
         </div>
         <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
         <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
-    </div>
-    """
+    </div>"""
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 @app.route('/scan', methods=['POST'])
@@ -3785,201 +3786,6 @@ EOF
 
 }
 
-
-
-generate_av_server_code_rawold1() {
-
-    local templates="$(generate_core_template)
-
-$(generate_core_form_template)"
-
-
-
-    cat << EOF
-
-from flask import Flask, request, render_template_string
-
-import re
-
-import os
-
-import shutil
-
-import subprocess
-
-import platform
-
-
-
-app = Flask(__name__)
-
-
-
-# [КОНФИГУРАЦИЯ ЯДРА]
-
-GLOBAL_HASH_MATRIX = [r"AIza[0-9A-Za-z-_]{35}", r"sk_live_[0-9a-zA-Z]{24}"]
-
-GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
-
-GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
-
-GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
-
-
-
-WIN_PAYLOAD = """#{" ".join(GLOBAL_FIX_WIN_REG)}"""
-
-LINUX_PAYLOAD = """#{" ".join(GLOBAL_FIX_LINUX)}"""
-
-MACOS_PAYLOAD = """#{" ".join(GLOBAL_FIX_MACOS)}"""
-
-
-
-$templates
-
-
-
-@app.route('/')
-
-def index():
-
-    form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
-
-    
-
-    current_os = platform.system().lower()
-
-    btn_map = {
-
-        "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
-
-        "linux": ("INJECT LINUX PURGE", "/inject/linux", "#e91e63"),
-
-        "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
-
-    }
-
-    label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
-
-    
-
-    body = form_html + f"""
-
-    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
-
-        <h3 style="color: var(--accent-color);">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
-
-        <div style="display: flex; gap: 10px;">
-
-            <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
-
-            <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
-
-        </div>
-
-        <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
-
-        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
-
-    </div>
-
-    """
-
-    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
-
-
-
-@app.route('/scan', methods=['POST'])
-
-def scan():
-
-    f = request.files.get('file')
-
-    if not f: return "Empty Payload", 400
-
-    tmp = os.path.join('/tmp', f.filename)
-
-    f.save(tmp)
-
-    report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
-
-    threat_count = 0
-
-    try:
-
-        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
-
-        for line in proc.stdout:
-
-            offset, content = line.split(' ', 1)
-
-            for hsig in GLOBAL_HASH_MATRIX:
-
-                if re.search(hsig, content): report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
-
-            for layer in GLOBAL_AV_MATRIX:
-
-                if re.search(layer, content, re.I):
-
-                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
-
-                    threat_count += 1
-
-        report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
-
-    except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
-
-    finally: os.remove(tmp)
-
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
-
-
-
-@app.route('/sys-audit/<mode>')
-
-def system_audit(mode):
-
-    report = []
-
-    try:
-
-        if mode == "ram":
-
-            lines = subprocess.run(['ps', '-ef'], capture_output=True, text=True).stdout.splitlines()
-
-            report = [l for l in lines if re.search(GLOBAL_AV_PROC_REGEX, l, re.I)]
-
-        else:
-
-            cmd = ['ss', '-antup'] if shutil.which('ss') else ['netstat', '-antp']
-
-            lines = subprocess.run(cmd, capture_output=True, text=True).stdout.splitlines()
-
-            report = [l for l in lines if re.search(GLOBAL_AV_SOCKET_REGEX, l, re.I)]
-
-    except Exception as e: report = [f"EXEC_ERROR: {e}"]
-
-    return render_template_string(render_prime_page("SYSTEM_REPORT", f"<pre>{chr(10).join(report or ['CLEAN'])}</pre><a href='/'>RETURN</a>"))
-
-
-
-@app.route('/inject/<os_type>')
-
-def inject_payload(os_type):
-
-    pl = {"windows": WIN_PAYLOAD, "linux": LINUX_PAYLOAD, "macos": MACOS_PAYLOAD}
-
-    return render_template_string(render_prime_page("INJECTOR", f"<textarea style='width:100%; height:300px;'>{pl.get(os_type, 'ERROR')}</textarea>"))
-
-
-
-if __name__ == '__main__':
-
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
-EOF
-
-}
 
 
 
