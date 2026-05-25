@@ -4161,33 +4161,17 @@ EOF
 # ФУНКЦИОНАЛ: Потоковый анализ файлов в /tmp, моментальное стирание зараженных объектов
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
+
+
 generate_upload_server_code_raw() {
-    # 1. Загружаем UI шаблоны лаунчера в локальные переменные
-    local template_core
-    template_core=$(generate_core_template)
+    # 1. Формируем регулярку из массива (без внешних переменных)
+    local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
     
-    local template_form
-    template_form=$(generate_core_form_template)
+    # 2. Загружаем шаблоны
+    local template_core=$(generate_core_template)
+    local template_form=$(generate_core_form_template)
 
-    # 2. Динамически объединяем все элементы Bash-массива GLOBAL_AV_MATRIX в одну регулярную строку
-    local j_regex=""
-    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-        if [ -z "$j_regex" ]; then
-            j_regex="$layer"
-        else
-            j_regex="$j_regex|$layer"
-        fi
-    done
-
-    # 3. Подготавливаем шаблоны для безопасной вставки в Python (экранируем только кавычки)
-    template_core="${template_core//\\/\\\\}"
-    template_core="${template_core//\"\"\"/\\\"\\\"\\\"}"
-    
-    template_form="${template_form//\\/\\\\}"
-    template_form="${template_form//\"\"\"/\\\"\\\"\\\"}"
-
-    # 4. Запись монолитного Python-кода. 
-    # Одинарные кавычки 'EOF' гарантируют, что Bash не трогает код, и IDE подсвечивает его идеально!
+    # 3. Пишем монолитный Python-код в файл через 'EOF'
     cat << 'EOF' > upload_server.py
 from flask import Flask, request, render_template_string
 import os
@@ -4196,139 +4180,77 @@ import shutil
 
 app = Flask(__name__)
 
-# Маркеры для последующей подстановки данных из Bash
-GLOBAL_AV_PIPE_REGEX = r"""__DYNAMIC_MATRIX_REGEX__"""
-CORE_TEMPLATE_RAW = """__DYNAMIC_CORE_TEMPLATE__"""
-FORM_TEMPLATE_RAW = """__DYNAMIC_FORM_TEMPLATE__"""
+# Маркеры для инъекции данных
+GLOBAL_AV_PIPE_REGEX = r"__REGEX_MARKER__"
+CORE_TEMPLATE_RAW = """__CORE_MARKER__"""
+FORM_TEMPLATE_RAW = """__FORM_MARKER__"""
 
 def render_prime_page(title, content):
     return CORE_TEMPLATE_RAW.replace('{{ title }}', title).replace('{{ content }}', content)
 
 def render_prime_form(action, fields, btn_text):
-    fields_html = ""
-    for field in fields:
-        fields_html += f'<input type="{field["type"]}" name="{field["name"]}" placeholder="{field["label"]}" class="form-input" required><br>'
-    
-    form_built = FORM_TEMPLATE_RAW.replace('{{ action }}', action)
-    form_built = form_built.replace('{{ fields }}', fields_html)
-    form_built = form_built.replace('{{ btn_text }}', btn_text)
-    return form_built
+    fields_html = "".join([f'<input type="{f["type"]}" name="{f["name"]}" placeholder="{f["label"]}" class="form-input" required><br>' for f in fields])
+    return FORM_TEMPLATE_RAW.replace('{{ action }}', action).replace('{{ fields }}', fields_html).replace('{{ btn_text }}', btn_text)
 
-# Сохраняем во входящую папку внутри PRIME_LOOT
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
-
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+if not os.path.exists(UPLOAD_DIR): os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.route('/')
 def index():
-    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
-    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
+    form_html = render_prime_form("/upload", [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}], "INITIATE SECURE UPLOAD")
     return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files: 
-        return "TRANSFER_ERROR", 400
-        
+    if 'file' not in request.files: return "TRANSFER_ERROR", 400
     f = request.files['file']
-    if f.filename == '': 
-        return "EMPTY_FILENAME", 400
+    if f.filename == '': return "EMPTY_FILENAME", 400
     
     tmp_path = os.path.join('/tmp', f.filename)
     f.save(tmp_path)
     
-    is_infected = False
-    report = []
-    
     try:
-        with open(tmp_path, 'rb') as file_buffer:
-            raw_content = file_buffer.read()
-            
-        total_bytes = len(raw_content)
+        with open(tmp_path, 'rb') as b: raw_content = b.read()
+        text = raw_content.decode('utf-8', errors='ignore')
         
-        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
-        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
+        matches = [f"Line {i}: {line.strip()[:100]}" for i, line in enumerate(text.splitlines(), 1) if re.search(GLOBAL_AV_PIPE_REGEX, line, re.IGNORECASE | re.MULTILINE)]
         
-        text_content = raw_content.decode('utf-8', errors='ignore')
+        if matches or (len(raw_content) > 1000 and (len([b for b in raw_content if 32 <= b <= 126]) * 100 / len(raw_content)) < 12):
+            if os.path.exists(tmp_path): os.remove(tmp_path)
+            report = "\n".join(matches if matches else ["CRITICAL: High Entropy Detected"])
+            content = f'<div class="status-box infected">THREAT DESTROYED</div><pre>{report}</pre><a href="/" class="btn">[ RETURN ]</a>'
+            return render_template_string(render_prime_page("GATEWAY_BLOCK", content))
         
-        matches = []
-        try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
-            for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
-                    matches.append(f"Line {i}: {line.strip()[:100]}")
-        except Exception as regex_err:
-            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
-            
-        if total_bytes > 1000 and readable_ratio < 12:
-            is_infected = True
-            report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
-            
-        if matches:
-            is_infected = True
-            report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
-            
-        if is_infected:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            
-            # Чистый фикс синтаксиса: перевод строки собран отдельно, без бэкслешей
-            report_output = "\n".join(report)
-            
-            content = f"""
-            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
-                CRITICAL DETECTION: THREAT TOTALLY DESTROYED
-            </div>
-            <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{report_output}</pre>
-            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
-            """
-            return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
-            
-        else:
-            final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
-            
-            if os.path.exists(final_dest_path):
-                os.remove(final_dest_path)
-                
-            shutil.move(tmp_path, final_dest_path)
-            
-            content = f"""
-            <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">
-                SUCCESS: UPLOAD VERIFIED
-            </div>
-            <p style="font-size:12px;">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
-            <div style="margin-top:20px;"><a href="/" class="btn">[ UPLOAD ANOTHER FILE ]</a></div>
-            """
-            return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
+        dest = os.path.join(UPLOAD_DIR, f.filename)
+        if os.path.exists(dest): os.remove(dest)
+        shutil.move(tmp_path, dest)
+        return render_template_string(render_prime_page("TRANSFER_COMPLETE", "SUCCESS: UPLOAD VERIFIED"))
             
     except Exception as e:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
+        if os.path.exists(tmp_path): os.remove(tmp_path)
+        return f"GATEWAY_ERROR: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 
-    # 5. БЕЗОПАСНАЯ ИНЖЕКЦИЯ: Считываем записанный файл в переменную шелла
-    local final_code
-    final_code=$(cat upload_server.py)
-
-    # Делаем замену текстовых маркеров на реальные Bash-переменные на уровне памяти шелла.
-    # Это на 100% сохраняет синтаксис Python и убирает сбой цветов в редакторе.
-    final_code="${final_code//__DYNAMIC_MATRIX_REGEX__/$j_regex}"
-    final_code="${final_code//__DYNAMIC_CORE_TEMPLATE__/$template_core}"
-    final_code="${final_code//__DYNAMIC_FORM_TEMPLATE__/$template_form}"
-
-    # Перезаписываем готовый рабочий код обратно в файл
-    echo "$final_code" > upload_server.py
-    echo "[+] upload_server.py успешно стабилизирован. Цвета IDE в норме, SyntaxError ликвидирован."
+    # 4. Безопасная инъекция через sed
+    sed -i "s|__REGEX_MARKER__|$regex_pattern|g" upload_server.py
+    
+    echo "$template_core" > tmp_core.py
+    sed -i "/__CORE_MARKER__/r tmp_core.py" upload_server.py
+    sed -i "/__CORE_MARKER__/d" upload_server.py
+    
+    echo "$template_form" > tmp_form.py
+    sed -i "/__FORM_MARKER__/r tmp_form.py" upload_server.py
+    sed -i "/__FORM_MARKER__/d" upload_server.py
+    
+    rm tmp_core.py tmp_form.py
+    echo "[+] upload_server.py успешно скомпилирован."
 }
 
 
-generate_upload_server_code_raw() {
+generate_upload_server_code_raworigin() {
     # Загружаем UI шаблоны лаунчера в локальные переменные
     local template_core
     template_core=$(generate_core_template)
