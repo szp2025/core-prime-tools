@@ -4334,10 +4334,11 @@ EOF
 
 generate_upload_server_code_raw() {
     # Загружаем UI шаблоны лаунчера в локальные переменные
-    local templates="$(generate_core_template)
+    local templates
+    templates="$(generate_core_template)
 $(generate_core_form_template)"
 
-    # Корректно собираем массив матриц в единую строку регулярного выражения на уровне Bash
+    # Собираем массив матриц в единую строку через пайп | на уровне ядра Bash
     local joined_regex=""
     for layer in "${GLOBAL_AV_MATRIX[@]}"; do
         if [ -z "$joined_regex" ]; then
@@ -4347,8 +4348,11 @@ $(generate_core_form_template)"
         fi
     done
 
-    # Запись серверного скрипта (Символ \ перед EOF отключает раскрытие 
-    # внутренних переменных Python силами Bash/Zsh, сохраняя исходный код)
+    # ЭКСПОРТ В ОКРУЖЕНИЕ: передаем данные в процесс Python через переменные среды OS
+    export CAME_EXPORTED_REGEX="$joined_regex"
+
+    # ШАГ 1: Записываем чистый Python-код. Кавычки 'EOF' гарантируют, 
+    # что Bash/Zsh не изменят ни одного символа, и подсветка IDE будет идеальной.
     cat << 'EOF' > upload_server.py
 from flask import Flask, request, render_template_string
 import os
@@ -4357,28 +4361,33 @@ import shutil
 
 app = Flask(__name__)
 
-# Проброс скомпилированного регулярного выражения CAME (Слои MATRIX) из Bash в Python
-GLOBAL_AV_PIPE_REGEX = r"""__CAME_DYNAMIC_REGEX_PLACEHOLDER__"""
+# Безопасное чтение регулярного выражения CAME из окружения операционной системы
+GLOBAL_AV_PIPE_REGEX = os.environ.get('CAME_EXPORTED_REGEX', '')
 
 # Сохраняем во входящую папку внутри PRIME_LOOT
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
-# Инициализация безопасной структуры каталогов
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-__CAME_DYNAMIC_TEMPLATES_PLACEHOLDER__
+# Сюда будут добавлены функции шаблонов ядра CAME
+EOF
+
+    # ШАГ 2: Безопасно дописываем сырые HTML-шаблоны из локальной переменной в конец файла
+    echo "$templates" >> upload_server.py
+
+    # ШАГ 3: Дописываем оставшуюся логику роутов во Flask (снова защищенный 'EOF')
+    cat << 'EOF' >> upload_server.py
 
 @app.route('/')
 def index():
-    # Главная страница: Интуитивная защищенная форма загрузки данных в Drop-Box
+    # Главная страница: Форма загрузки в drop-box
     fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
     form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
     return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    # --- ВЕКТОР ПРОВЕРКИ И БЕССЛЕДНОГО УНИЧТОЖЕНИЯ (PRE-UPLOAD TOTAL PURGE) ---
     if 'file' not in request.files: 
         return "TRANSFER_ERROR", 400
         
@@ -4386,7 +4395,6 @@ def upload():
     if f.filename == '': 
         return "EMPTY_FILENAME", 400
     
-    # 1. Первичный прием потока данных во временную буферную зону /tmp
     tmp_path = os.path.join('/tmp', f.filename)
     f.save(tmp_path)
     
@@ -4394,21 +4402,17 @@ def upload():
     report = []
     
     try:
-        # 2. Чтение бинарного дампа загруженного объекта для структурного аудита CAME
         with open(tmp_path, 'rb') as file_buffer:
             raw_content = file_buffer.read()
             
         total_bytes = len(raw_content)
         
-        # Анализ плотности ASCII (Выявление обфускации / Высокой энтропии)
         printable_chars = len([b for b in raw_content if 32 <= b <= 126])
         readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
         
-        # Декодирование в текстовый стрим для сигнатурного матчинга
         text_content = raw_content.decode('utf-8', errors='ignore')
         
         matches = []
-        # Запуск сканирования по Слоям скомпилированной матрицы
         try:
             compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
             for i, line in enumerate(text_content.splitlines(), 1):
@@ -4417,7 +4421,6 @@ def upload():
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
             
-        # 3. Принятие решения на основе полученных эвристических метрик
         if total_bytes > 1000 and readable_ratio < 12:
             is_infected = True
             report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
@@ -4426,16 +4429,13 @@ def upload():
             is_infected = True
             report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
             
-        # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
         if is_infected:
-            # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
             
-            # Фикс SyntaxError: Объединяем логи до f-строки, убирая слэш из фигурных скобок
+            # Фикс синтаксиса f-строк Python (выносим слэш наружу)
             report_output = "\n".join(report)
             
-            # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL DETECTION: THREAT TOTALLY DESTROYED
@@ -4447,7 +4447,6 @@ def upload():
             return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
             
         else:
-            # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
             final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
             
             if os.path.exists(final_dest_path):
@@ -4473,16 +4472,9 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 
-    # Точечная инжекция динамических данных силами чистого Bash/Zsh без использования внешних утилит (sed/awk)
-    # Это на 100% сохраняет работоспособность на Kali NetHunter и Termux
-    local final_code
-    final_code=$(cat upload_server.py)
-    final_code="${final_code//__CAME_DYNAMIC_REGEX_PLACEHOLDER__/$joined_regex}"
-    final_code="${final_code//__CAME_DYNAMIC_TEMPLATES_PLACEHOLDER__/$templates}"
-
-    echo "$final_code" > upload_server.py
-    echo "[+] upload_server.py успешно сгенерирован на базе исходного рабочего кода с интеграцией GLOBAL_AV_MATRIX."
+    echo "[+] upload_server.py успешно сгенерирован раздельными блоками без конфликтов шелла."
 }
+
 
 
 generate_upload_server_code_raworigin() {
