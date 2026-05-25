@@ -4163,6 +4163,135 @@ EOF
 # ==============================================================================
 
 
+generate_upload_server_code_raw() {
+    # Загружаем UI шаблоны лаунчера в локальные переменные
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    # Генерируем файл, используя 'EOF' (в одинарных кавычках), чтобы Bash не ломал Python-код
+    cat << 'EOF' > /root/upload_server.py
+from flask import Flask, request, render_template_string
+import os
+import re
+import shutil
+
+app = Flask(__name__)
+
+# Маркер для вставки регулярного выражения
+GLOBAL_AV_PIPE_REGEX = r"""__REGEX_INSERT_MARKER__"""
+
+# Сохраняем во входящую папку внутри PRIME_LOOT
+UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
+
+# Инициализация безопасной структуры каталогов
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+__TEMPLATES_INSERT_MARKER__
+
+@app.route('/')
+def index():
+    # Главная страница: Интуитивная защищенная форма загрузки данных в Drop-Box
+    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    # --- ВЕКТОР ПРОВЕРКИ И БЕССЛЕДНОГО УНИЧТОЖЕНИЯ (PRE-UPLOAD TOTAL PURGE) ---
+    if 'file' not in request.files: 
+        return "TRANSFER_ERROR", 400
+        
+    f = request.files['file']
+    if f.filename == '': 
+        return "EMPTY_FILENAME", 400
+    
+    # 1. Первичный прием потока данных во временную буферную зону /tmp
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    
+    is_infected = False
+    report = []
+    
+    try:
+        # 2. Чтение бинарного дампа загруженного объекта для структурного аудита CAME
+        with open(tmp_path, 'rb') as file_buffer:
+            raw_content = file_buffer.read()
+            
+        total_bytes = len(raw_content)
+        
+        # Анализ плотности ASCII (Выявление обфускации / Высокой энтропии)
+        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
+        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
+        
+        # Декодирование в текстовый стрим для сигнатурного матчинга
+        text_content = raw_content.decode('utf-8', errors='ignore')
+        
+        matches = []
+        # Запуск сканирования по Слоям 1-4
+        try:
+            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
+            for i, line in enumerate(text_content.splitlines(), 1):
+                if compiled_regex.search(line):
+                    matches.append(f"Line {i}: {line.strip()[:100]}")
+        except Exception as regex_err:
+            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
+            
+        # 3. Принятие решения на основе полученных эвристических метрик
+        if total_bytes > 1000 and readable_ratio < 12:
+            is_infected = True
+            report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
+            
+        if matches:
+            is_infected = True
+            report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
+            
+        # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
+        if is_infected:
+            # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            
+            content = f"""
+            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
+                CRITICAL DETECTION: THREAT TOTALLY DESTROYED
+            </div>
+            <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
+            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
+            """
+            return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
+            
+        else:
+            # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
+            final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
+            if os.path.exists(final_dest_path):
+                os.remove(final_dest_path)
+            shutil.move(tmp_path, final_dest_path)
+            
+            content = f"""
+            <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">
+                SUCCESS: UPLOAD VERIFIED
+            </div>
+            <p style="font-size:12px;">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
+            <div style="margin-top:20px;"><a href="/" class="btn">[ UPLOAD ANOTHER FILE ]</a></div>
+            """
+            return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
+            
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=False)
+EOF
+
+    # Впрыскиваем значения в созданный файл
+    sed -i "s|__REGEX_INSERT_MARKER__|$GLOBAL_AV_ENGINE_PIPE|g" /root/upload_server.py
+    sed -i "s|__TEMPLATES_INSERT_MARKER__|$templates|g" /root/upload_server.py
+}
+
 
 generate_upload_server_code_raworigin() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
