@@ -8628,7 +8628,7 @@ run_live_service() {
     export PRIME_LOOT PRIME_SHARE
     
     # Генерируем код сразу в файл
-    "$code_gen_func" > "$temp_service_file"
+   # "$code_gen_func" > "$temp_service_file"
     
     # Запускаем Python из созданного файла (это предотвращает Killed)
     python3 "$temp_service_file" > "$log_file" 2>&1 &
