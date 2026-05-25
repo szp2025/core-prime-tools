@@ -4162,104 +4162,9 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
 
+
+
 generate_upload_server_code_raw() {
-    # 1. Формируем данные
-    local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
-    local template_core="$(generate_core_template)"
-    local template_form="$(generate_core_form_template)"
-
-    # 2. Пишем файл. Используем EOF (без кавычек), но аккуратно
-    # Чтобы Python не спотыкался, мы вставляем переменные напрямую в нужные места
-    cat << EOF > /root/upload_server.py
-from flask import Flask, request, render_template_string
-import os
-import re
-import shutil
-
-app = Flask(__name__)
-
-GLOBAL_AV_PIPE_REGEX = r"""$regex_pattern"""
-CORE_TEMPLATE_RAW = """$template_core"""
-FORM_TEMPLATE_RAW = """$template_form"""
-
-def render_prime_page(title, content):
-    return CORE_TEMPLATE_RAW.replace('{{ title }}', title).replace('{{ content }}', content)
-
-def render_prime_form(action, fields, btn_text):
-    fields_html = ""
-    for field in fields:
-        fields_html += f'<input type="{field["type"]}" name="{field["name"]}" placeholder="{field["label"]}" class="form-input" required><br>'
-    
-    form_built = FORM_TEMPLATE_RAW.replace('{{ action }}', action)
-    form_built = form_built.replace('{{ fields }}', fields_html)
-    form_built = form_built.replace('{{ btn_text }}', btn_text)
-    return form_built
-
-UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-@app.route('/')
-def index():
-    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
-    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
-    return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
-
-@app.route('/upload', methods=['POST'])
-def upload():
-    if 'file' not in request.files: return "TRANSFER_ERROR", 400
-    f = request.files['file']
-    if f.filename == '': return "EMPTY_FILENAME", 400
-    
-    tmp_path = os.path.join('/tmp', f.filename)
-    f.save(tmp_path)
-    
-    is_infected = False
-    report = []
-    
-    try:
-        with open(tmp_path, 'rb') as file_buffer:
-            raw_content = file_buffer.read()
-        
-        text_content = raw_content.decode('utf-8', errors='ignore')
-        matches = []
-        try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
-            for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
-                    matches.append(f"Line {i}: {line.strip()[:100]}")
-        except Exception as regex_err:
-            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
-            
-        if matches:
-            is_infected = True
-            report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
-            
-        if is_infected:
-            if os.path.exists(tmp_path): os.remove(tmp_path)
-            content = f"""<div style="padding:15px; border:1px dashed;">THREAT DESTROYED</div><pre>{"\n".join(report)}</pre><a href="/">[ RETURN ]</a>"""
-            return render_template_string(render_prime_page("GATEWAY_BLOCK", content))
-            
-        else:
-            final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
-            if os.path.exists(final_dest_path): os.remove(final_dest_path)
-            shutil.move(tmp_path, final_dest_path)
-            content = f"""<div>SUCCESS: UPLOAD VERIFIED</div><a href="/">[ UPLOAD ANOTHER ]</a>"""
-            return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
-            
-    except Exception as e:
-        if os.path.exists(tmp_path): os.remove(tmp_path)
-        return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
-EOF
-    echo "[+] upload_server.py стабилизирован."
-}
-
-
-
-generate_upload_server_code_raworigin() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
@@ -8725,12 +8630,6 @@ run_live_service() {
     core_engine_progress 2 "NODE_STABILIZATION"
 
     # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
-    # Запускаем в фоне
-    python3 "$service_file" > "$log_file" 2>&1 &
-    
-    # ДАЕМ СЕРВЕРУ ВРЕМЯ НА ИНИЦИАЛИЗАЦИЮ (ключевой момент)
-    sleep 2 
-
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local final_url="$protocol://$service_name:$port"
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
