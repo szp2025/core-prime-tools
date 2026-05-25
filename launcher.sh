@@ -4163,7 +4163,7 @@ EOF
 # ==============================================================================
 
 
-ggenerate_upload_server_code_raw() {
+generate_upload_server_code_raw() {
     # 1. Формируем строку регулярки из массива
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
     
