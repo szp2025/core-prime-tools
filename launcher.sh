@@ -4339,33 +4339,75 @@ EOF
 # ==========================================
 # 2. РАБОЧИЕ ФУНКЦИИ (Используют ядро)
 # ==========================================
+run_system_info() {
+    local start_time=$(date +%s)
+    core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
+    
+    # 1. Сбор и нормализация цели
+    local r_input=$(core_engine_input "text" "Enter Target URL, Domain or IP [default: localhost]")
+    [[ -z "$r_input" ]] && r_input="http://localhost"
+    
+    # УНИВЕРСАЛЬНЫЙ ПАРСЕР
+    # Если введен полный URL (с http), очищаем, если домен - добавляем схему
+    [[ ! "$r_input" =~ ^http ]] && r_input="http://$r_input"
+    local r_target=$(echo "$r_input" | awk -F/ '{print $3}')
+    local r_base_url=$(echo "$r_input" | cut -d'/' -f1-3)
+    
+    local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
+    local info_payload=$(curl -s -I -L --connect-timeout 5 "$r_input" 2>/dev/null)
+    local whois_data=$(whois "$r_target" 2>/dev/null)
+    
+    clear
+    # ЭТАП 1: КАРТОЧКА ЦЕЛИ И ИНФРАСТРУКТУРА
+    core_engine_ui "h" "AUDIT TARGET: ${r_target}"
+    echo -e "${W}Target Domain  :${NC} ${Y}${r_target}${NC}"
+    echo -e "${W}Resolved IP    :${NC} ${G}${target_ip:-LOCAL}${NC}"
+    echo -e "${W}Server Software:${NC} ${G}$(echo "$info_payload" | grep -Ei "^Server:" | cut -d' ' -f2- || echo "HIDDEN")${NC}"
+    
+    # ЭТАП 2: WHOIS & IDENTIFICATION
+    echo -e "\n${Y}--- [WHOIS & IDENTITY] ---${NC}"
+    for pattern in "${GLOBAL_WHOIS_MATRIX[@]}"; do
+        local match=$(echo "$whois_data" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2- | xargs)
+        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
+    done
 
-run_system_pulse() {
-    core_engine_ui "h" "SECTOR Z: AUTONOMOUS PULSE v2.0 [LIMIT REACHED]"
+    # ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING (С прогресс-баром)
+    local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
+    local total=${#full_list[@]}
+    local tmp_hits="/tmp/recon_hits_$$"
+    : > "$tmp_hits"
+
+    core_engine_ui "w" "Scanning $total endpoints..."
+    echo "" 
+
+    for i in "${!full_list[@]}"; do
+        local hook="${full_list[$i]}"
+        # Убираем лишние слэши при склейке
+        local target_url="${r_base_url}/${hook#/}"
+        
+        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$((i+1))/$total${NC}] [Time: $(( $(date +%s) - start_time ))s] Scanning: /$hook          \n"
+        
+        local req_result=$(curl -sI -L --connect-timeout 2 "$target_url" 2>/dev/null)
+        local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+        
+        if [[ "$code" == "200" ]]; then
+            echo -e "${G}[!] HIT FOUND: /$hook (200 OK)${NC}"
+            echo "HIT: /$hook" >> "$tmp_hits"
+        fi
+    done
+
+    # ЭТАП 4: SECURITY HEADERS & FINAL SUMMARY
+    echo -e "\n\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
+    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection")
+    for h in "${sec_headers[@]}"; do
+        echo -e "${W}$h :${NC} $(echo "$info_payload" | grep -Ei "^$h:" >/dev/null && echo -e "${G}Present" || echo -e "${R}Missing")"
+    done
     
-    # 1. Интеграция: вместо тяжелого watch используем системный событийный поток
-    # Это потребляет в 100 раз меньше CPU
-    core_engine_ui "i" "Initializing High-Speed Event Stream..."
+    echo -e "\n${Y}--- [FINAL INTELLIGENCE REPORT] ---${NC}"
+    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo -e "${W}No endpoints discovered.${NC}"
     
-    # Запуск параллельного потока (Background Pipeline)
-    # Используем неблокирующий вывод для сохранения контроля над UI
-    (
-        inotifywait -mq -e modify,create,delete /tmp "$BASE_DIR/prime_loot" --format '%e: %f' | \
-        while read line; do
-            core_engine_ui "w" "PULSE EVENT: $line"
-        done
-    ) &
-    local pulse_pid=$!
-    
-    # 2. Сетевая пульсация (Net-Socket Streaming)
-    core_engine_ui "i" "Streaming network telemetry..."
-    ss -tunp | grep -vE "127.0.0.1|ESTAB" | head -n 10
-    
-    core_engine_ui "+" "Pulse stream active. PID: $pulse_pid"
-    core_engine_ui "!" "Ctrl+C to terminate background pulse."
-    
-    # 3. Финальный лимит: автономная очистка событий
-    trap "kill $pulse_pid; core_engine_ui 's' 'Pulse terminated';" SIGINT
+    rm -f "$tmp_hits"
+    core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
 
