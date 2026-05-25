@@ -8614,18 +8614,24 @@ run_live_service() {
     pkill -9 -f "python3" >/dev/null 2>&1
     sleep 1.2
 
-    # --- 4. SMART IGNITION (Запуск через пайп) ---
+    # --- 4. SMART IGNITION (Запуск через файл в /tmp) ---
     local code_gen_func="generate_${service_type}_server_code_raw"
     if ! command -v "$code_gen_func" >/dev/null; then
         core_engine_ui "e" "Fatal: $code_gen_func not found."
         core_engine_wait; return
     fi
 
+    # Определяем путь к временному серверному файлу
+    local temp_service_file="/tmp/${service_type}_server.py"
+    
     core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
     export PRIME_LOOT PRIME_SHARE
     
-    # Адаптивный запуск: Python подхватит PRIME_CERT, если он экспортирован
-    "$code_gen_func" | python3 - > "$log_file" 2>&1 &
+    # Генерируем код сразу в файл
+    "$code_gen_func" > "$temp_service_file"
+    
+    # Запускаем Python из созданного файла (это предотвращает Killed)
+    python3 "$temp_service_file" > "$log_file" 2>&1 &
     
     core_engine_progress 2 "NODE_STABILIZATION"
 
