@@ -8614,40 +8614,40 @@ run_live_service() {
     pkill -9 -f "python3" >/dev/null 2>&1
     sleep 1.2
 
-    # --- 4. SMART IGNITION (Запуск через физический файл) ---
+    # --- 4. SMART IGNITION (Запуск через пайп) ---
     local code_gen_func="generate_${service_type}_server_code_raw"
     if ! command -v "$code_gen_func" >/dev/null; then
         core_engine_ui "e" "Fatal: $code_gen_func not found."
         core_engine_wait; return
     fi
 
-    # Сначала ГЕНЕРИРУЕМ файл в конкретное место
     core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
     export PRIME_LOOT PRIME_SHARE
-    "$code_gen_func" # Эта функция должна создавать /root/service_server.py
     
-    # Теперь ЗАПУСКАЕМ этот файл (используем полный путь)
-    local service_path="/root/${service_type}_server.py"
-    python3 "$service_path" > "$log_file" 2>&1 &
+    # Адаптивный запуск: Python подхватит PRIME_CERT, если он экспортирован
+    "$code_gen_func" | python3 - > "$log_file" 2>&1 &
     
     core_engine_progress 2 "NODE_STABILIZATION"
 
     # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
-    # Ждем инициализацию (Flask должен успеть привязаться к порту)
-    sleep 3 
+    # Запускаем в фоне
+    python3 "$service_file" > "$log_file" 2>&1 &
+    
+    # ДАЕМ СЕРВЕРУ ВРЕМЯ НА ИНИЦИАЛИЗАЦИЮ (ключевой момент)
+    sleep 2 
 
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local final_url="$protocol://$service_name:$port"
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
+        
+        # Авто-регистрация в луте
         core_engine_loot "node_startup" "Service ${service_type} deployed at $final_url"
     else
         core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
         core_engine_ui "line"
-        # Выводим содержимое файла лога, если он не пуст
-        [[ -s "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty. Check file existence at $service_path"
+        [[ -f "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty."
         core_engine_ui "line"
     fi
-
 
     core_engine_wait
 }
