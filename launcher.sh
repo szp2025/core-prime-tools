@@ -3874,57 +3874,25 @@ EOF
 
 generate_share_server_code_raw() {
     # Загружаем только базовый шаблон страницы в локальную переменную
-    local template
-    template=$(generate_core_template)
+    local template=$(generate_core_template)
 
-    # Динамически объединяем все элементы Bash-массива GLOBAL_AV_MATRIX в одну регулярную строку
-    local joined_regex=""
-    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-        if [ -z "$joined_regex" ]; then
-            joined_regex="$layer"
-        else
-            joined_regex="$joined_regex|$layer"
-        fi
-    done
-
-    # Экранируем двойные кавычки внутри собранного регулярного выражения для безопасности Python
-    local safe_regex="${joined_regex//\"/\\\"}"
-
-    # ШАГ 1: Запись начального заголовка и импортов (Строгий 'EOF' - Bash ничего не трогает, цвет в норме)
-    cat << 'EOF' > share_server.py
+    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
+    cat << EOF
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
 
 app = Flask(__name__)
 
-# Проброс глобального регулярного выражения CAME из Bash-массива GLOBAL_AV_MATRIX в Python
-EOF
-
-    # ШАГ 2: Безопасный сквозной проброс собранного регулярного выражения силами echo
-    echo "GLOBAL_AV_PIPE_REGEX = r\"$safe_regex\"" >> share_server.py
-
-    # ШАГ 3: Запись конфигурации путей хранения данных
-    cat << 'EOF' >> share_server.py
+# Проброс глобального регулярного выражения CAME из ядра Bash в Python
+GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
 
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
-EOF
-
-    # ШАГ 4: Инжекция HTML-шаблона ядра. Чтобы он не вызывал 'invalid syntax',
-    # преобразуем его структуру в валидную Python-функцию, экранируя бэкслеши.
-    local safe_template="${template//\\/\\\\}"
-    safe_template="${safe_template//\"\"\"/\\\"\\\"\\\"}"
-
-    echo "def render_prime_page(title, content):" >> share_server.py
-    echo "    template_raw = \"\"\"$safe_template\"\"\"" >> share_server.py
-    echo "    return template_raw.replace('{{ title }}', title).replace('{{ content }}', content)" >> share_server.py
-
-    # ШАГ 5: Запись основного функционала раздачи, детекции и аннигиляции (Строгий 'EOF')
-    cat << 'EOF' >> share_server.py
+$template
 
 def get_file_icon(filename):
     """Определяет иконку в зависимости от расширения файла."""
@@ -3991,7 +3959,7 @@ def get_file(filename):
         printable_chars = len([b for b in raw_content if 32 <= b <= 126])
         readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
 
-        # Декодирование содержимого для проверки регулярными выражениями
+        # Декодирование содержимого для проверки регулярными выражениями Слоев 1-4
         text_content = raw_content.decode('utf-8', errors='ignore')
 
         matches = []
@@ -4014,17 +3982,17 @@ def get_file(filename):
 
         # --- РУБЕЖ РЕШЕНИЯ И АННИГИЛЯЦИИ ---
         if is_infected:
-            # Полное стирание опасного объекта с диска
+            # Файл грязный — полное стирание с жесткого диска сервера, чтобы никто больше не смог его запросить
             if os.path.exists(target_path):
                 os.remove(target_path)
 
-            # Отрисовка страницы блокировки CAME
+            # Вместо скачивания файла возвращаем пользователю жесткую веб-страницу с алармом
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
             </div>
             <p style="font-size:12px; color:var(--accent-color);">The requested object <b>{filename}</b> failed outbound security compliance and was <b>permanently purged</b> from the storage node.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\\n".join(report)}</pre>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
             <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO DISTRIBUTION ]</a></div>
             """
             return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
@@ -4040,8 +4008,6 @@ if __name__ == '__main__':
     # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
-
-    echo "[+] share_server.py успешно сгенерирован на основе GLOBAL_AV_MATRIX. Ошибок цвета и синтаксиса нет!"
 }
 
 
