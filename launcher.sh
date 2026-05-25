@@ -3887,9 +3887,13 @@ generate_share_server_code_raw() {
         fi
     done
 
-    # Использование 'EOF' в кавычках гарантирует, что Bash не будет трогать внутренний код Python.
-    # Мы оставляем жесткий маркер __CAME_TARGET_PIPE_REGEX__ для безопасной замены.
-    cat << 'EOF' > share_server.py
+    # Чтобы Python не ругался на незаэкранированные спецсимволы в обычной строке, 
+    # мы преобразуем регулярку в безопасный для Python вид (экранируем внутренние кавычки)
+    local safe_python_regex="${joined_regex//\"/\\\"}"
+
+    # Запись основного каркаса во временный файл с использованием строгого 'EOF'
+    # Это защищает код от искажения интерпретатором Bash
+    cat << 'EOF' > share_server.tmp
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
@@ -3897,14 +3901,12 @@ import re
 app = Flask(__name__)
 
 # Скомпилированная матрица сигнатурного оутпут-контроля CAME (Слои 1-8)
-GLOBAL_AV_PIPE_REGEX = r"__CAME_TARGET_PIPE_REGEX__"
+GLOBAL_AV_PIPE_REGEX = re.compile(r"__CAME_TARGET_PIPE_REGEX__", re.IGNORECASE | re.MULTILINE)
 
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
-
-__CAME_CORE_TEMPLATE_PLACEHOLDER__
 
 def get_file_icon(filename):
     """Определяет маркер типа данных по расширению."""
@@ -3958,13 +3960,11 @@ def get_file(filename):
     report = []
 
     try:
-        # Чтение файлового буфера
         with open(target_path, 'rb') as file_buffer:
             raw_content = file_buffer.read()
 
         total_bytes = len(raw_content)
 
-        # Вычисление плотности печатных символов
         printable_chars = len([b for b in raw_content if 32 <= b <= 126])
         readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
 
@@ -3972,9 +3972,8 @@ def get_file(filename):
 
         matches = []
         try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
             for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
+                if GLOBAL_AV_PIPE_REGEX.search(line):
                     matches.append(f"Line {i}: {line.strip()[:100]}")
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
@@ -3987,7 +3986,6 @@ def get_file(filename):
             is_infected = True
             report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
 
-        # --- ТОТАЛЬНАЯ АННИГИЛЯЦИЯ ПРИ ОБНАРУЖЕНИИ УГРОЗЫ ---
         if is_infected:
             if os.path.exists(target_path):
                 os.remove(target_path)
@@ -4012,14 +4010,21 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    # Проводим точечную бинарно-безопасную замену маркеров на реальное содержимое переменных.
-    # Это полностью исключает поломку синтаксиса и появление синего/голубого цвета.
-    sed -i "s|__CAME_TARGET_PIPE_REGEX__|$joined_regex|g" share_server.py
-    
-    # Для вставки многострочного шаблона используем awk, чтобы избежать проблем со спецсимволами
-    awk -v r="$template" '{gsub(/__CAME_CORE_TEMPLATE_PLACEHOLDER__/,r)}1' share_server.py > share_server.tmp && mv share_server.tmp share_server.py
+    # Безопасное чтение созданного каркаса в память Bash для чистой склейки
+    local server_core
+    server_core=$(cat share_server.tmp)
+    rm share_server.tmp
 
-    echo "[+] share_server.py успешно сгенерирован. Подсветка кода и синтаксис восстановлены."
+    # Делаем точечную и 100% бинарно-безопасную замену маркеров силами самого Bash
+    # Ни одна сторонняя утилита (sed/awk) больше не вызывается!
+    server_core="${server_core//__CAME_TARGET_PIPE_REGEX__/$safe_python_regex}"
+    
+    # Записываем итоговый файл и добавляем функцию шаблона, переданную из ядра
+    echo "$server_core" > share_server.py
+    echo -e "\n\n# --- ИНЖЕКТИРОВАННЫЙ ШАБЛОН ИНТЕРФЕЙСА CAME ---" >> share_server.py
+    echo "$template" >> share_server.py
+
+    echo "[+] share_server.py успешно сгенерирован. Ошибки запуска устранены."
 }
 
 generate_share_server_code_raworigin() {
