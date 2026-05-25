@@ -926,7 +926,6 @@ GLOBAL_STATIC_SIGNATURES="(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(pass
 # @description: Ультимативный паттерн для потокового поиска пар email:pass и login:pass
 # МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под POSIX ERE
 # ==============================================================================
-
 GLOBAL_HASH_MATRIX=(
     # --- 1. MD5 / CRC32 (32 символа) ---
     '\b[a-fA-F0-9]{32}\b'
@@ -941,8 +940,42 @@ GLOBAL_HASH_MATRIX=(
     '\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b'
     # --- 6. Контекстные маркеры ---
     '\b(md5|sha1|sha256|sha512|password_hash|wp_|user_pass|pwd|hash|secret|token)[[:space:]]*[:=]{1,2}[[:space:]]*[a-fA-F0-9]{32,128}\b'
-    # --- 7. SQL-контекст (Исправленное экранирование) ---
+    # --- 7. SQL-контекст ---
     '\b(VALUES|SET|WHERE)[[:space:]]+[\x27\x22]{0,1}[a-fA-F0-9]{32,128}[\x27\x22]{0,1}\b'
+
+    # --- 8. УСИЛЕНИЕ: Структуры данных (JSON/XML) ---
+    '\"(password|pwd|hash|secret|token)\"[[:space:]]*:[[:space:]]*\"[a-fA-F0-9]{32,128}\"'
+    '<[^>]+>(password|pwd|hash|secret|token)<\/[^>]+>[[:space:]]*[a-fA-F0-9]{32,128}'
+    
+    # --- 9. УСИЛЕНИЕ: Переменные окружения и конфиги ---
+    '\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[[:space:]]*[:=]{1,2}[[:space:]]*[\x27\x22]{0,1}[A-Za-z0-9\-_]{20,}[\x27\x22]{0,1}\b'
+    
+    # --- 10. УСИЛЕНИЕ: "Hardcoded" пароли в коде (assigns) ---
+    # Ищет конструкции типа password = '...' или secret = "..."
+    '\b(password|pwd|secret|key|access_token)[[:space:]]*=[[:space:]]*[\x27\x22][a-zA-Z0-9!@#$%^&*()_+]{8,32}[\x27\x22]'
+
+    # AWS Access Key ID
+    '\bAKIA[0-9A-Z]{16}\b'
+    # Google Service Account Private Key ID
+    '\b[0-9a-fA-F]{40}\b'
+    # Azure Storage Account Key
+    '\b[a-zA-Z0-9+/]{86}==\b'
+
+# SSH Private Key Header
+'-----BEGIN[[:space:]]+[A-Z[:space:]]+PRIVATE[[:space:]]+KEY-----'
+# RSA/ECC Private Key
+'-----BEGIN[[:space:]]+(RSA|EC|DSA|OPENSSH)[[:space:]]+PRIVATE[[:space:]]+KEY-----'
+
+# Telegram Bot Token
+'\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b'
+# Discord Bot Token
+'\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b'
+
+# --- 11. УСИЛЕНИЕ: Абсолютный захват (От 1 символа до предела) ---
+    # ВАЖНО: При использовании этого правила в Flask, 
+    # рекомендуется использовать его с осторожностью, 
+    # чтобы не получить слишком много ложноположительных результатов.
+    '\b[A-Za-z0-9!@#$%^&*()_+]{1,}\b'
 )
 
 # ==============================================================================
@@ -3448,6 +3481,7 @@ EOF
 # ФУНКЦИОНАЛ: Статический анализ файлов + удаленный мониторинг системных угроз в один клик
 # АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
 # ==============================================================================
+
 
 
 generate_av_server_code_raw() {
