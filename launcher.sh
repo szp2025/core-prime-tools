@@ -4332,7 +4332,6 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
 
-
 generate_upload_server_code_raw() {
     # Загружаем UI шаблоны лаунчера в локальные переменные
     local template_core
@@ -4393,7 +4392,6 @@ def render_prime_page(title, content):
     return CORE_TEMPLATE_RAW.replace('{{ title }}', title).replace('{{ content }}', content)
 
 def render_prime_form(action, fields, btn_text):
-    # Базовая сборка полей формы, если оригинальный шаблонизатор требует подстановки
     fields_html = ""
     for field in fields:
         fields_html += f'<input type="{field["type"]}" name="{field["name"]}" placeholder="{field["label"]}" class="form-input" required><br>'
@@ -4464,12 +4462,15 @@ def upload():
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
             
+            # Фикс синтаксиса: собираем лог отдельно, чтобы избежать бэкслеша внутри f-строки
+            report_str = "\n".join(report)
+            
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL DETECTION: THREAT TOTALLY DESTROYED
             </div>
             <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\\n".join(report)}</pre>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{report_str}</pre>
             <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
             """
             return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
@@ -4509,8 +4510,9 @@ EOF
     final_code="${final_code//__CAME_B64_FORM_HTML__/$b64_form}"
 
     echo "$final_code" > upload_server.py
-    echo "[+] upload_server.py успешно стабилизирован под Android (Termux/NetHunter). Запускай."
+    echo "[+] upload_server.py успешно стабилизирован. Конфликт f-string и бэкслеша устранён."
 }
+
 
 generate_upload_server_code_raworigin() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
