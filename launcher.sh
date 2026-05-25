@@ -3599,16 +3599,25 @@ def scan():
 
         for line in proc.stdout:
 
-            offset, content = line.split(' ', 1)
+            parts = line.split(' ', 1)
 
-           for hsig in GLOBAL_HASH_MATRIX:
+            if len(parts) < 2: continue
+
+            offset, content = parts
+
+            
+
+            # Обновленный цикл поиска секретов
+
+            for hsig in GLOBAL_HASH_MATRIX:
+
                 match = re.search(hsig, content)
+
                 if match:
-                    # Берем группу 1, если она есть (это ваш "чистый" пароль в скобках), 
-                    # если скобок нет в шаблоне — берем всё совпадение (group 0)
-                    secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
-                    report.append(f"[SECRET FOUND] [Offset {offset}]: {secret.strip()}")
-                    
+
+                    clean_secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                    report.append(f"[SECRET FOUND] [Offset {offset}]: {clean_secret.strip()}")
+            
 
             for layer in GLOBAL_AV_MATRIX:
 
@@ -3625,6 +3634,7 @@ def scan():
     finally: os.remove(tmp)
 
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+
 
 
 
