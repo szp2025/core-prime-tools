@@ -4165,7 +4165,7 @@ EOF
 
 
 
-generate_upload_server_code_raworigin() {
+generate_upload_server_code_raw() {
     # Загружаем UI шаблоны лаунчера в локальные переменные
     local template_core
     template_core=$(generate_core_template)
