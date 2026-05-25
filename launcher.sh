@@ -3871,12 +3871,11 @@ EOF
 # ФУНКЦИОНАЛ: Сканирование файлов «на лету» перед отдачей, моментальное удаление угроз с хоста
 # АРХИТЕКТУРА: Flask-интерфейс, защита сетевых клиентов от скачивания деструктивных векторов
 # ==============================================================================
+
 generate_share_server_code_raw() {
-    # Загружаем только базовый шаблон страницы в локальную переменную
     local template
     template=$(generate_core_template)
 
-    # Динамически объединяем все элементы Bash-массива GLOBAL_AV_MATRIX в одну регулярную строку
     local joined_regex=""
     for layer in "${GLOBAL_AV_MATRIX[@]}"; do
         if [ -z "$joined_regex" ]; then
@@ -3886,14 +3885,13 @@ generate_share_server_code_raw() {
         fi
     done
 
-    # Переводим динамические данные в Base64, чтобы обойти ограничения интерпретаторов NetHunter/Termux
+    # tr -d '[:space:]' гарантирует 100% монолитную строку Base64 без разрывов
     local b64_regex
-    b64_regex=$(echo -n "$joined_regex" | base64 | tr -d '\n\r')
+    b64_regex=$(echo -n "$joined_regex" | base64 | tr -d '[:space:]')
     
     local b64_template
-    b64_template=$(echo -n "$template" | base64 | tr -d '\n\r')
+    b64_template=$(echo -n "$template" | base64 | tr -d '[:space:]')
 
-    # Запись монолитного share_server.py (Строгий 'EOF' — идеальный цвет в IDE и защита от Zsh-конфликтов)
     cat << 'EOF' > share_server.py
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
@@ -3902,9 +3900,7 @@ import base64
 
 app = Flask(__name__)
 
-# Декодирование сигнатурной матрицы CAME, переданной из ядра NetHunter/Termux
 B64_REGEX_DATA = "__CAME_B64_REGEX_PLACEHOLDER__"
-# Сохраняем как сырую строку, чтобы избежать ошибок компиляции при инициализации Flask
 GLOBAL_AV_RAW_REGEX = base64.b64decode(B64_REGEX_DATA).decode('utf-8', errors='ignore')
 
 SHARE_DIR = '/root/share'
@@ -3912,7 +3908,6 @@ SHARE_DIR = '/root/share'
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
-# Декодирование и инициализация оригинального HTML-интерфейса CAME
 B64_TEMPLATE_DATA = "__CAME_B64_TEMPLATE_PLACEHOLDER__"
 HTML_PRIME_TEMPLATE = base64.b64decode(B64_TEMPLATE_DATA).decode('utf-8', errors='ignore')
 
@@ -3920,7 +3915,6 @@ def render_prime_page(title, content):
     return HTML_PRIME_TEMPLATE.replace('{{ title }}', title).replace('{{ content }}', content)
 
 def get_file_icon(filename):
-    """Определяет иконку в зависимости от расширения файла."""
     ext = filename.split('.')[-1].lower() if '.' in filename else ''
     icons = {
         'pdf': '📕',
@@ -3940,7 +3934,6 @@ def index():
     except:
         files = []
     
-    # Формируем сетку файлов с использованием оригинальных стилей .file-grid и .file-item
     grid_content = '<div class="file-grid">'
     for f in files:
         icon = get_file_icon(f)
@@ -3961,7 +3954,6 @@ def index():
 
 @app.route('/get/<filename>')
 def get_file(filename):
-    # Обеспечение базовой безопасности путей (предотвращение Path Traversal)
     target_path = os.path.normpath(os.path.join(SHARE_DIR, filename))
     if not target_path.startswith(SHARE_DIR) or not os.path.exists(target_path):
         abort(404)
@@ -3973,22 +3965,16 @@ def get_file(filename):
     report = []
 
     try:
-        # --- ВЕКТОР ПРЕДВАРИТЕЛЬНОГО ОУТПУТ-КОНТРОЛЯ CAME ---
         with open(target_path, 'rb') as file_buffer:
             raw_content = file_buffer.read()
 
         total_bytes = len(raw_content)
-
-        # Вычисление плотности ASCII (Борьба со скрытыми крипторами / паккерами)
         printable_chars = len([b for b in raw_content if 32 <= b <= 126])
         readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
-
-        # Декодирование содержимого для проверки регулярными выражениями
         text_content = raw_content.decode('utf-8', errors='ignore')
 
         matches = []
         try:
-            # Безопасная компиляция внутри контекста функции (как в upload_server)
             if GLOBAL_AV_RAW_REGEX.strip():
                 compiled_regex = re.compile(GLOBAL_AV_RAW_REGEX, re.IGNORECASE | re.MULTILINE)
                 for i, line in enumerate(text_content.splitlines(), 1):
@@ -3997,7 +3983,6 @@ def get_file(filename):
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
 
-        # Анализ полученных данных
         if total_bytes > 1000 and readable_ratio < 12:
             is_infected = True
             report.append("CRITICAL ANOMALY: High Entropy / Encrypted code signature detected.")
@@ -4006,15 +3991,12 @@ def get_file(filename):
             is_infected = True
             report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
 
-        # --- РУБЕЖ РЕШЕНИЯ И АННИГИЛЯЦИИ ---
         if is_infected:
             if os.path.exists(target_path):
                 os.remove(target_path)
 
-            # Выносим \n из фигурных скобок f-строки для полной кроссплатформенности Python
             report_output = "\n".join(report)
 
-            # Отрисовка страницы блокировки CAME
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
@@ -4032,18 +4014,16 @@ def get_file(filename):
         return f"DISTRIBUTION_INTEGRITY_ERROR: {str(e)}", 500
 
 if __name__ == '__main__':
-    # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    # Безопасная контекстная подстановка строк Base64 встроенными средствами командной строки.
     local final_code
     final_code=$(cat share_server.py)
     final_code="${final_code//__CAME_B64_REGEX_PLACEHOLDER__/$b64_regex}"
     final_code="${final_code//__CAME_B64_TEMPLATE_PLACEHOLDER__/$b64_template}"
 
     echo "$final_code" > share_server.py
-    echo "[+] share_server.py успешно адаптирован и запущен. Ошибки инициализации устранены."
+    echo "[+] share_server.py сформирован успешно."
 }
 
 
