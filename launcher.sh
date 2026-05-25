@@ -93,6 +93,15 @@ GLOBAL_MENU_REGISTRY=(
 
     "NEXUS:Full_Pipeline|run_nexus_full_pipeline"
 )
+# ==============================================================================
+# GLOBAL OSINT & RECON MATRIX (EXTENDED DATA SOURCES)
+# ==============================================================================
+GLOBAL_OSINT_SERVICES=(
+    "https://api.viewdns.info/whois/?domain=%TARGET%&output=json"
+    "https://api.ipapi.com/%IP%?access_key=YOUR_KEY" # Пример с API-ключом
+    "https://rdap.arin.net/registry/ip/%IP%"           # Для глубокой IP-инфо
+    "https://dns.google/resolve?name=%TARGET%&type=A"
+)
 
 
 # ==============================================================================
@@ -4371,22 +4380,31 @@ run_system_info() {
         [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
     done
 
-    # ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING (С прогресс-баром)
-    local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
-    local total=${#full_list[@]}
-    local tmp_hits="/tmp/recon_hits_$$"
-    : > "$tmp_hits"
-
+# ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING (С расчетом ETA)
     core_engine_ui "w" "Scanning $total endpoints..."
-    echo "" 
+    echo "" # Строка для прогресса
 
     for i in "${!full_list[@]}"; do
         local hook="${full_list[$i]}"
-        # Убираем лишние слэши при склейке
+        local current=$((i + 1))
+        local start_iter=$(date +%s) # Засекаем время начала итерации
+        
+        # Обновление прогресса
+        local elapsed=$(( $(date +%s) - start_time ))
+        
+        # Расчет ETA
+        # Среднее время итерации = общее прошедшее время / кол-во выполненных
+        local avg_time=$(( elapsed / current ))
+        local remaining_iters=$(( total - current ))
+        local eta=$(( avg_time * remaining_iters ))
+        
+        # Форматирование ETA
+        local eta_fmt=$(printf "%02d:%02d" $((eta/60)) $((eta%60)))
+        
+        # Вывод в одну строку
+        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Elapsed: ${elapsed}s] [ETA: ${eta_fmt}] Scanning: /${hook:0:20}          \n"
+        
         local target_url="${r_base_url}/${hook#/}"
-        
-        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$((i+1))/$total${NC}] [Time: $(( $(date +%s) - start_time ))s] Scanning: /$hook          \n"
-        
         local req_result=$(curl -sI -L --connect-timeout 2 "$target_url" 2>/dev/null)
         local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
         
@@ -4395,7 +4413,10 @@ run_system_info() {
             echo "HIT: /$hook" >> "$tmp_hits"
         fi
     done
-
+    
+    # Очищаем строку прогресса после завершения цикла
+    echo -ne "\r                                                                         \r"
+    
     # ЭТАП 4: SECURITY HEADERS & FINAL SUMMARY
     echo -e "\n\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
     local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection")
@@ -5783,77 +5804,77 @@ run_network_intelligence() {
 
 run_system_info() {
     local start_time=$(date +%s)
-    core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
+    core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE OSINT)"
     
-    local r_input=$(core_engine_input "text" "Enter Target URL [default: http://localhost]")
+    # 1. Нормализация цели
+    local r_input=$(core_engine_input "text" "Enter Target (IP, Domain or URL)")
     [[ -z "$r_input" ]] && r_input="http://localhost"
+    [[ ! "$r_input" =~ ^http ]] && r_input="http://$r_input"
     
-    local r_target=$(echo "$r_input" | sed -e 's|^[^/]*//||' -e 's|/.*||')
-    local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
+    local r_target=$(echo "$r_input" | awk -F/ '{print $3}')
+    local r_nick=$(echo "$r_target" | cut -d'.' -f1) # Извлекаем имя для поиска
+    local r_base_url=$(echo "$r_input" | cut -d'/' -f1-3)
+    
     local info_payload=$(curl -s -I -L --connect-timeout 5 "$r_input" 2>/dev/null)
     local whois_data=$(whois "$r_target" 2>/dev/null)
-    
-    clear
-    # 1. КАРТОЧКА ЦЕЛИ
-    core_engine_ui "h" "AUDIT TARGET: ${r_target}"
-    echo -e "${W}Target Domain  :${NC} ${Y}${r_target}${NC}"
-    echo -e "${W}Resolved IP    :${NC} ${G}${target_ip:-LOCAL}${NC}"
-    echo -e "${W}Start Time     :${NC} ${Y}$(date +%H:%M:%S)${NC}"
-    
-    echo -e "\n${Y}--- [INFRASTRUCTURE & RUNTIME] ---${NC}"
-    echo -e "${W}Server Software:${NC} ${G}$(echo "$info_payload" | grep -Ei "^Server:" | cut -d' ' -f2- || echo "HIDDEN")${NC}"
-    echo -e "${W}PHP Version    :${NC} ${G}$(echo "$info_payload" | grep -Ei "PHP/" | grep -oE "PHP/[0-9.]+" || echo "N/A")${NC}"
-    
-    echo -e "\n${Y}--- [WHOIS DATA: IDENTITY & LIFECYCLE] ---${NC}"
-    for pattern in "${GLOBAL_WHOIS_MATRIX[@]}"; do
-        local match=$(echo "$whois_data" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2- | xargs)
-        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
-    done
-    echo -e "---------------------------------------------------"
-
-    # 2. ФАЗЗИНГ С ПРОГРЕСС-БАРОМ
     local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
     local total=${#full_list[@]}
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
+    
+    clear
+    core_engine_ui "h" "AUDIT TARGET: ${r_target}"
+    
+    # ЭТАП 1: WHOIS & IDENTIFICATION
+    echo -e "${Y}--- [WHOIS & IDENTITY] ---${NC}"
+    for pattern in "${GLOBAL_WHOIS_MATRIX[@]}"; do
+        local match=$(echo "$whois_data" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2- | xargs)
+        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
+    done
 
+    # ЭТАП 2: CROSS-REFERENCE OSINT (Использование матрицы)
+    echo -e "\n${Y}--- [OSINT: DIGITAL FOOTPRINT ANALYSIS] ---${NC}"
+    for site_entry in "${GLOBAL_OSINT_SITES[@]}"; do
+        IFS='|' read -r prefix check_type err_marker category service <<< "$site_entry"
+        local full_url="${prefix}${r_nick}"
+        
+        if [[ "$check_type" == "HTTP_CODE" ]]; then
+            local code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 1 "$full_url")
+            [[ "$code" != "$err_marker" ]] && echo -e "${G}[+] FOUND ON ${service}: ${W}${full_url}${NC}"
+        elif [[ "$check_type" == "TEXT_ABSENT" ]]; then
+            local content=$(curl -s --connect-timeout 1 "$full_url")
+            [[ ! "$content" =~ "$err_marker" ]] && echo -e "${G}[+] FOUND ON ${service}: ${W}${full_url}${NC}"
+        fi
+    done
+
+    # ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING
     core_engine_ui "w" "Scanning $total endpoints..."
     echo "" 
-
     for i in "${!full_list[@]}"; do
         local hook="${full_list[$i]}"
         local current=$((i + 1))
         local elapsed=$(( $(date +%s) - start_time ))
+        local eta=$(( ( (total - current) * elapsed ) / (current + 1) ))
         
-        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Time: ${elapsed}s] Scanning: /$hook          \n"
+        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Time: ${elapsed}s] [ETA: ${eta}s] Scanning: /${hook:0:20}          \n"
         
-        local req_result=$(curl -sI -L --connect-timeout 2 "http://${r_target}/${hook}" 2>/dev/null)
-        local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
-        
-        if [[ "$code" == "200" ]]; then
-            echo -e "${G}[!] HIT FOUND: /$hook (200 OK)${NC}"
-            echo "HIT: /$hook | Server: $(echo "$req_result" | grep -Ei '^Server:' | cut -d' ' -f2-)" >> "$tmp_hits"
-        fi
-    done
-
-    # 3. ФИНАЛЬНЫЙ ОТЧЕТ + АНАЛИЗ ЗАГОЛОВКОВ БЕЗОПАСНОСТИ
-    echo -e "\n\n${Y}--- [FINAL INTELLIGENCE REPORT] ---${NC}"
-    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo -e "${W}No high-value endpoints discovered.${NC}"
-    
-    echo -e "\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
-    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection")
-    for h in "${sec_headers[@]}"; do
-        local val=$(echo "$info_payload" | grep -Ei "^$h:" | cut -d':' -f2-)
-        [[ -n "$val" ]] && echo -e "${G}[+] $h : Present${NC}" || echo -e "${R}[-] $h : Missing${NC}"
+        local code=$(curl -sI -L --connect-timeout 2 "${r_base_url}/${hook#/}" 2>/dev/null | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+        [[ "$code" == "200" ]] && { echo -e "${G}[!] HIT: /$hook (200 OK)${NC}"; echo "HIT: /$hook" >> "$tmp_hits"; }
     done
     
-    local final_time=$(( $(date +%s) - start_time ))
-    echo -e "\n${W}Total Audit Duration: ${G}${final_time}s${NC}"
+    # ЭТАП 4: SECURITY & SUMMARY
+    echo -e "\n\n${Y}--- [SECURITY HEADERS & REPORT] ---${NC}"
+    for h in "Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection"; do
+        echo -e "${W}$h :${NC} $(echo "$info_payload" | grep -Ei "^$h:" >/dev/null && echo -e "${G}Present" || echo -e "${R}Missing")"
+    done
+    
+    [[ -s "$tmp_hits" ]] && { echo -e "\n${Y}--- [DISCOVERED ENDPOINTS] ---${NC}"; cat "$tmp_hits"; }
     
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v22.0 - NEURAL BRIDGE ORCHESTRATOR [MONOLITH]
