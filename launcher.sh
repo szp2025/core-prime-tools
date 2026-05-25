@@ -3873,7 +3873,7 @@ EOF
 # ==============================================================================
 
 
-generate_share_server_code_raworigin() {
+generate_share_server_code_raw() {
 # 1. Собираем регулярку из массива прямо здесь
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
     
