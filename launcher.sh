@@ -4045,7 +4045,6 @@ EOF
     echo "[+] share_server.py успешно адаптирован под Termux/NetHunter (Bash & Zsh). Проблема цвета решена."
 }
 
-
 generate_share_server_code_raworigin() {
     # Загружаем только базовый шаблон страницы в локальную переменную
     local template=$(generate_core_template)
