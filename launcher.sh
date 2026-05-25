@@ -3482,7 +3482,181 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
 # ==============================================================================
 
-generate_av_server_code_raw() {
+generate_av_server_code_rawok1() {
+
+    local templates="$(generate_core_template)
+
+$(generate_core_form_template)"
+
+
+
+    cat << EOF
+
+from flask import Flask, request, render_template_string
+
+import re
+
+import os
+
+import shutil
+
+import subprocess
+
+import platform
+app = Flask(__name__)
+# [КОНФИГУРАЦИЯ ЯДРА]
+GLOBAL_HASH_MATRIX = [
+    r"\b[a-fA-F0-9]{32}\b", r"\b[a-fA-F0-9]{40}\b", r"\b[a-fA-F0-9]{64}\b", r"\b[a-fA-F0-9]{128}\b",
+    r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b", r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b",
+    r"\b(md5|sha1|sha256|sha512|password_hash|wp_|user_pass|pwd|hash|secret|token)[ \t]*[:=]{1,2}[ \t]*[a-fA-F0-9]{32,128}\b",
+    r"\b(VALUES|SET|WHERE)[ \t]+['\"]?[a-fA-F0-9]{32,128}['\"]?\b",
+    r'\"(password|pwd|hash|secret|token)\"[ \t]*:[ \t]*\"[a-fA-F0-9]{32,128}\"',
+    r'<[^>]+>(password|pwd|hash|secret|token)<\/[^>]+>[ \t]*[a-fA-F0-9]{32,128}',
+    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?[A-Za-z0-9\-_]{20,}['\"]?\b",
+    r"\b(password|pwd|secret|key|access_token)[ \t]*=[ \t]*['\"][A-Za-z0-9!@#$%^&*()_+]{8,32}['\"]",
+    r"\bAKIA[0-9A-Z]{16}\b", r"\b[0-9a-fA-F]{40}\b", r"\b[a-zA-Z0-9+/]{86}==\b",
+    r"-----BEGIN[ \t]+[A-Z \t]+PRIVATE[ \t]+KEY-----", r"-----BEGIN[ \t]+(RSA|EC|DSA|OPENSSH)[ \t]+PRIVATE[ \t]+KEY-----",
+    r"\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b", r"\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b",
+    r"\b[A-Za-z0-9!@#$%^&*()_+]{1,}\b"
+]
+
+GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
+GLOBAL_AV_PROC_REGEX = r"$GLOBAL_AV_ACTIVE_MALWARE_PROCS"
+GLOBAL_AV_SOCKET_REGEX = r"$GLOBAL_AV_SOCKET_STATES"
+WIN_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_WIN_REG[@]}")"""
+LINUX_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_LINUX[@]}")"""
+MACOS_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_MACOS[@]}")"""
+$templates
+
+@app.route('/')
+
+def index():
+
+    form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
+ 
+
+    current_os = platform.system().lower()
+
+    btn_map = {
+
+        "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
+
+        "linux": ("INJECT LINUX PURGE", "/inject/linux", "#e91e63"),
+
+        "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
+
+    }
+
+    label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
+
+    
+
+    body = form_html + f"""
+
+    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
+
+        <h3 style="color: var(--accent-color);">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
+
+        <div style="display: flex; gap: 10px;">
+
+            <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
+
+            <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
+
+        </div>
+
+        <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
+
+        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
+
+    </div>
+
+    """
+
+    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
+
+
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    tmp = os.path.join('/tmp', f.filename)
+    f.save(tmp)
+    report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
+    threat_count = 0
+    try:
+        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
+        for line in proc.stdout:
+            parts = line.split(' ', 1)
+            if len(parts) < 2: continue
+            offset, content = parts
+            
+            # Обновленный цикл поиска секретов
+            for hsig in GLOBAL_HASH_MATRIX:
+                match = re.search(hsig, content)
+                if match:
+                    report.append(f"[SECRET FOUND] [Offset {offset}]: {match.group(0).strip()}")
+            
+            for layer in GLOBAL_AV_MATRIX:
+                if re.search(layer, content, re.I):
+                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                    threat_count += 1
+        report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
+    except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
+    finally: os.remove(tmp)
+    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+
+
+@app.route('/sys-audit/<mode>')
+
+def system_audit(mode):
+
+    report = []
+
+    try:
+
+        if mode == "ram":
+
+            lines = subprocess.run(['ps', '-ef'], capture_output=True, text=True).stdout.splitlines()
+
+            report = [l for l in lines if re.search(GLOBAL_AV_PROC_REGEX, l, re.I)]
+
+        else:
+
+            cmd = ['ss', '-antup'] if shutil.which('ss') else ['netstat', '-antp']
+
+            lines = subprocess.run(cmd, capture_output=True, text=True).stdout.splitlines()
+
+            report = [l for l in lines if re.search(GLOBAL_AV_SOCKET_REGEX, l, re.I)]
+
+    except Exception as e: report = [f"EXEC_ERROR: {e}"]
+
+    return render_template_string(render_prime_page("SYSTEM_REPORT", f"<pre>{chr(10).join(report or ['CLEAN'])}</pre><a href='/'>RETURN</a>"))
+
+
+
+@app.route('/inject/<os_type>')
+
+def inject_payload(os_type):
+
+    pl = {"windows": WIN_PAYLOAD, "linux": LINUX_PAYLOAD, "macos": MACOS_PAYLOAD}
+
+    return render_template_string(render_prime_page("INJECTOR", f"<textarea style='width:100%; height:300px;'>{pl.get(os_type, 'ERROR')}</textarea>"))
+
+
+
+if __name__ == '__main__':
+
+    app.run(host='0.0.0.0', port=5000, debug=False)
+
+EOF
+
+}
+
+
+
+generate_av_server_code_rawok1() {
 
     local templates="$(generate_core_template)
 
