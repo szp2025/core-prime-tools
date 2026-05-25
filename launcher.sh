@@ -8643,7 +8643,6 @@ run_live_service() {
         core_engine_ui "line"
     fi
 
-
     core_engine_wait
 }
 
