@@ -3887,13 +3887,11 @@ generate_share_server_code_raw() {
         fi
     done
 
-    # Чтобы Python не ругался на незаэкранированные спецсимволы в обычной строке, 
-    # мы преобразуем регулярку в безопасный для Python вид (экранируем внутренние кавычки)
+    # Экранируем двойные кавычки внутри регулярного выражения для безопасности Python
     local safe_python_regex="${joined_regex//\"/\\\"}"
 
-    # Запись основного каркаса во временный файл с использованием строгого 'EOF'
-    # Это защищает код от искажения интерпретатором Bash
-    cat << 'EOF' > share_server.tmp
+    # Шаг 1: Записываем верхнюю часть сервера (строгий 'EOF' — Bash ничего не испортит)
+    cat << 'EOF' > share_server.py
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
@@ -3901,12 +3899,26 @@ import re
 app = Flask(__name__)
 
 # Скомпилированная матрица сигнатурного оутпут-контроля CAME (Слои 1-8)
-GLOBAL_AV_PIPE_REGEX = re.compile(r"__CAME_TARGET_PIPE_REGEX__", re.IGNORECASE | re.MULTILINE)
+EOF
+
+    # Шаг 2: Безопасно вшиваем саму строку регулярного выражения силами echo
+    echo "GLOBAL_AV_PIPE_REGEX = re.compile(r\"$safe_python_regex\", re.IGNORECASE | re.MULTILINE)" >> share_server.py
+
+    # Шаг 3: Вшиваем базовые параметры путей
+    cat << 'EOF' >> share_server.py
 
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
+
+EOF
+
+    # Шаг 4: Вшиваем динамический шаблон страницы, переданный из ядра
+    echo "$template" >> share_server.py
+
+    # Шаг 5: Дописываем всю оставшуюся логику Flask-сервера (строгий 'EOF')
+    cat << 'EOF' >> share_server.py
 
 def get_file_icon(filename):
     """Определяет маркер типа данных по расширению."""
@@ -4010,22 +4022,9 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    # Безопасное чтение созданного каркаса в память Bash для чистой склейки
-    local server_core
-    server_core=$(cat share_server.tmp)
-    rm share_server.tmp
-
-    # Делаем точечную и 100% бинарно-безопасную замену маркеров силами самого Bash
-    # Ни одна сторонняя утилита (sed/awk) больше не вызывается!
-    server_core="${server_core//__CAME_TARGET_PIPE_REGEX__/$safe_python_regex}"
-    
-    # Записываем итоговый файл и добавляем функцию шаблона, переданную из ядра
-    echo "$server_core" > share_server.py
-    echo -e "\n\n# --- ИНЖЕКТИРОВАННЫЙ ШАБЛОН ИНТЕРФЕЙСА CAME ---" >> share_server.py
-    echo "$template" >> share_server.py
-
-    echo "[+] share_server.py успешно сгенерирован. Ошибки запуска устранены."
+    echo "[+] share_server.py успешно собран поблочно. Конфликты разметки полностью решены."
 }
+
 
 generate_share_server_code_raworigin() {
     # Загружаем только базовый шаблон страницы в локальную переменную
