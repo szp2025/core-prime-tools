@@ -3886,44 +3886,38 @@ generate_share_server_code_raw() {
         fi
     done
 
-    # Экранируем двойные кавычки внутри собранного регулярного выражения для безопасности Python
-    local safe_regex="${joined_regex//\"/\\\"}"
+    # Переводим динамические данные в Base64, чтобы обойти ограничения интерпретаторов NetHunter/Termux
+    # Это на 100% защищает синтаксис от искажения и сохраняет правильный цвет в IDE
+    local b64_regex
+    b64_regex=$(echo -n "$joined_regex" | base64 | tr -d '\n\r')
+    
+    local b64_template
+    b64_template=$(echo -n "$template" | base64 | tr -d '\n\r')
 
-    # ШАГ 1: Запись начального заголовка и импортов (Строгий 'EOF' - Bash ничего не трогает, цвет в норме)
+    # Запись монолитного share_server.py (Строгий 'EOF' — идеальная интеграция в Bash/Zsh)
     cat << 'EOF' > share_server.py
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
+import base64
 
 app = Flask(__name__)
 
-# Проброс глобального регулярного выражения CAME из Bash-массива GLOBAL_AV_MATRIX в Python
-EOF
-
-    # ШАГ 2: Безопасный сквозной проброс собранного регулярного выражения силами echo
-    echo "GLOBAL_AV_PIPE_REGEX = r\"$safe_regex\"" >> share_server.py
-
-    # ШАГ 3: Запись конфигурации путей хранения данных
-    cat << 'EOF' >> share_server.py
+# Декодирование сигнатурной матрицы CAME, переданной из ядра NetHunter/Termux
+B64_REGEX_DATA = "__CAME_B64_REGEX_PLACEHOLDER__"
+GLOBAL_AV_PIPE_REGEX = re.compile(base64.b64decode(B64_REGEX_DATA).decode('utf-8', errors='ignore'), re.IGNORECASE | re.MULTILINE)
 
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
-EOF
+# Декодирование и инициализация оригинального HTML-интерфейса CAME
+B64_TEMPLATE_DATA = "__CAME_B64_TEMPLATE_PLACEHOLDER__"
+HTML_PRIME_TEMPLATE = base64.b64decode(B64_TEMPLATE_DATA).decode('utf-8', errors='ignore')
 
-    # ШАГ 4: Инжекция HTML-шаблона ядра. Чтобы он не вызывал 'invalid syntax',
-    # преобразуем его структуру в валидную Python-функцию, экранируя бэкслеши.
-    local safe_template="${template//\\/\\\\}"
-    safe_template="${safe_template//\"\"\"/\\\"\\\"\\\"}"
-
-    echo "def render_prime_page(title, content):" >> share_server.py
-    echo "    template_raw = \"\"\"$safe_template\"\"\"" >> share_server.py
-    echo "    return template_raw.replace('{{ title }}', title).replace('{{ content }}', content)" >> share_server.py
-
-    # ШАГ 5: Запись основного функционала раздачи, детекции и аннигиляции (Строгий 'EOF')
-    cat << 'EOF' >> share_server.py
+def render_prime_page(title, content):
+    return HTML_PRIME_TEMPLATE.replace('{{ title }}', title).replace('{{ content }}', content)
 
 def get_file_icon(filename):
     """Определяет иконку в зависимости от расширения файла."""
@@ -3995,9 +3989,8 @@ def get_file(filename):
 
         matches = []
         try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
             for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
+                if GLOBAL_AV_PIPE_REGEX.search(line):
                     matches.append(f"Line {i}: {line.strip()[:100]}")
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
@@ -4040,9 +4033,16 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    echo "[+] share_server.py успешно сгенерирован на основе GLOBAL_AV_MATRIX. Ошибок цвета и синтаксиса нет!"
-}
+    # Безопасная контекстная подстановка строк Base64 встроенными средствами командной строки.
+    # Никаких sed и awk — этот синтаксис одинаково работает и в Bash, и в Zsh на Kali NetHunter/Termux.
+    local final_code
+    final_code=$(cat share_server.py)
+    final_code="${final_code//__CAME_B64_REGEX_PLACEHOLDER__/$b64_regex}"
+    final_code="${final_code//__CAME_B64_TEMPLATE_PLACEHOLDER__/$b64_template}"
 
+    echo "$final_code" > share_server.py
+    echo "[+] share_server.py успешно адаптирован под Termux/NetHunter (Bash & Zsh). Проблема цвета решена."
+}
 
 generate_share_server_code_raworigin() {
     # Загружаем только базовый шаблон страницы в локальную переменную
