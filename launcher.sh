@@ -785,28 +785,9 @@ generate_matrix_arguments() {
 }
 
 
-
-
 # ==============================================================================
 # МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
 # ==============================================================================
-# ==============================================================================
-# @description: Ультимативный паттерн поиска веб-документов и системных секретов
-# ==============================================================================
-GLOBAL_REGEX_WEB_EXTENSIONS='\b[a-zA-Z0-9_\/\.-]+\.(php|php[0-9]|aspx?|jspx?|pdf|docx?|xlsx?|zip|gz|tar\.gz|tgz|rar|sql|db|sqlite|env|htaccess|htpasswd|bak|old|swp|log|conf|ini|json|ya?ml|git|key|pem|crt)\b'
-
-# Точечный паттерн для мгновенной классификации критических утечек и секретов
-GLOBAL_REGEX_CRITICAL_EXTS="\.(env|bak|sql|htaccess|git|conf|key|pem|htpasswd|old|swp|db|sqlite)$"
-
-# ==============================================================================
-# МАТРИЦЫ ДЛЯ АНАЛИЗА ИНФРАСТРУКТУРЫ И АРТЕФАКТОВ (INFRASTRUCTURE & STATIC CORE)
-# ==============================================================================
-
-# 1. Максимальный паттерн детекции исполняемых веб-скриптов и динамических страниц
-GLOBAL_REGEX_WEB_SCRIPTS="\.(php[0-9]?|phtml|phar|aspx?|ashx|asmx|axd|jspx?|do|action|cgi|pl|pyc?|rb|sh|bat|cmd|go|rs|js|ts|xsjs|pws|cfm|dll|so|exe)$"
-
-# 2. Сигнатурная матрица детекции заглушек хостинга, стандартных ошибок и ложных ответов (Анти-Мусор)
-GLOBAL_REGEX_HOSTING_WASTE="(<html>|40[0-9] (Forbidden|Not Found|Bad Request|Unauthorized)|50[0-9] (Bad Gateway|Internal Server Error|Service Unavailable)|InfinityFree|Hostinger|Cloudflare|Cloudfront|Sucuri|Incapsula|Under Construction|Site Built With|Powered by cPanel|Plesk|Default Web Site|Welcome to nginx|Apache/|LiteSpeed|IIS/|Tomcat|Jetty|WebSphere|Oracle-HTTP-Server|Phusion Passenger|404 Page)"
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР АРТЕФАКТОВ И ХОСТИНГ-ОКРУЖЕНИЯ (ARTIFACT-CORE-NEXUS: ULTIMATE)
@@ -829,7 +810,6 @@ GLOBAL_ARTIFACT_MATRIX=(
     # --- 5. Скрытые административные артефакты ---
     '\b(adminer|phpmyadmin|wp-admin|dashboard|cpanel|webmail|composer\.json|package\.json|node_modules|vendor|__pycache__)\b'
 )
-
 
 # ==============================================================================
 # 5. СЛОВАРЬ ФАЗЗИНГА ЧУВСТВИТЕЛЬНЫХ ТОЧЕК И АРТЕФАКТОВ (ULTIMATE FUZZ WORDLIST)
@@ -933,12 +913,6 @@ GLOBAL_HASH_MATRIX=(
     '\b(VALUES|SET|WHERE)[[:space:]]+[\x27\x22]{0,1}[a-fA-F0-9]{32,128}[\x27\x22]{0,1}\b'
 )
 
-
-# ==============================================================================
-# @description: Ультимативные паттерны криптографии, бот-менеджмента и JWT Intel
-# ==============================================================================
-
-
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР КРИПТОГРАФИИ И СЕРВИСНЫХ КЛЮЧЕЙ (CRYPTO-NEXUS: ULTIMATE)
 # ==============================================================================
@@ -981,24 +955,6 @@ GLOBAL_SUPER_REGEX_TOKENS="($GLOBAL_REGEX_TG_TOKEN|$GLOBAL_REGEX_JWT)"
 # Объединенный сетевой стек (IPv4 / IPv6 / MAC / Domain)
 # Настраивается путем слияния твоих базовых сетевых регулярных выражений
 GLOBAL_SUPER_REGEX_INFRA="($GLOBAL_REGEX_IP|$GLOBAL_REGEX_MAC|$GLOBAL_REGEX_DOMAIN)"
-
-
-# ==============================================================================
-# @description: ГЛОБАЛЬНЫЕ СИГНАТУРЫ ЭВРИСТИЧЕСКОГО ДВИЖКА (POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
-# ==============================================================================
-
-# 6. СИГНАЛЫ WAF И ЗАЩИТНЫХ СИСТЕМ
-GLOBAL_SIG_WAF="(cloudflare|akamai|sucuri|incapsula|imperva|barracuda|f5_big-ip|mod_security|comodo|radware|fortigate|wordfence|asm|citrix|aws-waf|cloudfront|edgesuite|fastly|stackpath|__cfuid|cf-ray|cf-cache-status|x-sucuri-id|x-protected-by|x-waf-|x-cdn|err_connection_refused|captcha-bypass|challenge-platform|429[[:space:]]+too[[:space:]]+many[[:space:]]+requests|block_id|security_challenge)"
-
-# 7. СИГНАЛЫ СТРУКТУРЫ SQL/API-ENGINE
-GLOBAL_SIG_WEB_STRUCTURE="([[:<:]](id|uid|uuid|p|page|cat|category|sec|section|art|article|post|prod|product|item|file|doc|lang|action|act|mode|view|search|q|query|sort|order|by|limit|offset|from|to|start|end|file_id|user_id|group_id|token_id|hash|data|payload|json|xml|ajax)[[:>:]][[:space:]]*=|(/api/(v[0-9]|v1|v2|v3)/[a-zA-Z0-9_-]+/[0-9]+)|[[:<:]](select|insert|update|delete|drop|alter|union|where|having|orderby|groupby|into|load_file|benchmark|sleep|md5|sha1|concat)[[:>:]]|[[:<:]](graphql|query[[:space:]]*\{|\"query\"[[:space:]]*:|mutation|\\$gql)[[:>:]])"
-
-# 8. СИГНАЛЫ АНОМАЛИЙ И УЯЗВИМОСТЕЙ
-GLOBAL_SIG_VULN_ALERTS="([[:<:]](vulnerable|exploit_matched|rce_triggered|shell_spawned|privilege_escalation|unauthenticated|auth_bypass|remote_code_execution|buffer_overflow|segmentation_fault|core_dumped|access_denied|permission_denied)[[:>:]]|[[:<:]]cve-[0-9]{4}-[0-9]{4,7}[[:>:]]|[[:<:]](sql_error|syntax_error|mariadb|postgresql|sqlite|oracle_error|unhandled_exception|stack_trace|fatal_error|null_pointer)[[:>:]]|[[:<:]](lfi|rfi|ssrf|xxe|deserialization|command_injection|path_traversal)[[:>:]])"
-
-# 9. СИГНАТУРЫ ИНТЕРПРЕТАТОРОВ И СЛУЖБ
-GLOBAL_SIG_WEB_RUNTIMES="[[:<:]](python([0-9](\.[0-9]+)?)?|node([0-9]+)?|php(-fpm)?([0-9](\.[0-9]+)?)?|go|ruby([0-9](\.[0-9]+)?)?|java|perl|dotnet|nginx|apache[0-9]?|httpd|lighttpd|caddy|traefik|gunicorn|uwsgi|puma|unicorn|passenger|tomcat|jetty|wildfly|glassfish|docker(-containerd|-current)?|dockerd|podman|containerd|kubelet|hypercorn|uvicorn|daphne)[[:>:]]"
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР СИСТЕМНОЙ БЕЗОПАСНОСТИ И ЭВРИСТИКИ (SIG-NEXUS: ULTIMATE FULL)
@@ -1119,49 +1075,6 @@ GLOBAL_REGEX_DARKWEB="([[:<:]][a-z2-7]{56}\.onion[[:>:]]|[[:<:]][a-z0-9]{52}\.b3
 # Динамический регулятор числовых диапазонов меню (Лимит по умолчанию)
 # Используется как дефолтный extra-параметр для валидатора "range"
 GLOBAL_CORE_MENU_MAX_LIMIT=99
-
-# ==============================================================================
-# @description: УЛЬТИМАТИВНАЯ МАТРИЦА ВАЛИДАЦИИ ЗАЩИЩЕННЫХ ИНТЕРФЕЙСОВ (POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
-# ==============================================================================
-# Паттерн охватывает стек VPN, туннелей и защищенных соединений 2026 года
-GLOBAL_REGEX_PRIVACY_INTERFACES="([[:<:]](tun[0-9]*|ppp[0-9]*|wg[0-9]*|wireguard[0-9]*|tap[0-9]*|csc[0-9]*|fct[0-9]*|forti[a-z]*|nordlynx|xvpn|tailscale[0-9]*|zt[0-9]*|zerotier|proton[a-z]*|anyconnect|sing-?tun|clash-?tun|xray-?tun|vtun[0-9]*)[[:>:]])"
-
-# ==============================================================================
-# SYSTEM CORE: АТОМАРНЫЕ СИСТЕМНЫЕ И ЛОГИЧЕСКИЕ ВАЛИДАТОРЫ
-# ==============================================================================
-# Строгая проверка на чистое положительное целое число (Integer)
-GLOBAL_REGEX_DIGIT="^[0-9]+$"
-
-
-
-# ==============================================================================
-# @description: УЛЬТИМАТИВНАЯ МАТРИЦА ИНФРАСТРУКТУРНОЙ РАЗВЕДКИ (POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
-# ==============================================================================
-# Мультиязычный бронированный композит для парсинга WHOIS-данных
-GLOBAL_SIG_WHOIS_MATRIX="(registrar|reg-name|sponsoring|org|organization|registrant|admin[[:space:]-_]city|admin[[:space:]-_]country|country|c:|co:|expires|expired|exp-date|paid-till|validity|free-date|created|creation[[:space:]-_]date|registered|reg-date|changed|modified|updated|nserver|name[[:space:]-_]server|ns[0-9]*|person|descr|tech-id|mnt-by|status|state|registrant[[:space:]-_]email|e-mail|privat[a-z]*|protect[a-z]*|gdpr|redacted|anonymous)"
-
-
-# ==============================================================================
-# @description: ГЛОБАЛЬНЫЕ СИГНАЛЫ HTTP/HTTPS ИНФРАСТРУКТУРЫ (POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
-# ==============================================================================
-
-
-# 4. Статус-коды
-GLOBAL_REGEX_HTTP_STATUS="^http/"
-
-
-# ==============================================================================
-# @description: ГЛОБАЛЬНЫЕ СИГНАЛЫ СЕССИОННЫХ ДЕСКРИПТОРОВ (POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
-# ==============================================================================
-
-# Сессионный слой: Cookies, JWT, OAuth, токены защиты WAF
-GLOBAL_REGEX_HTTP_COOKIE="^(set-cookie|cookie|cookie2|x-xsrf-token|x-csrf-token|authorization|proxy-authorization|x-auth-token|x-session-id|x-request-id|cf-mitm-auth|cf-access-authenticated-user-email|x-amz-security-token|x-amzn-trace-id|ak_bmsc|bm_sv)"
-
-
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР HTTP-ИНТЕРФЕЙСОВ (HTTP-NEXUS: ULTIMATE FULL-STACK)
@@ -1296,23 +1209,6 @@ GLOBAL_NET_AUTONOMOUS_DELAY=300
 GLOBAL_REGEX_NET_REPORT="Nmap[[:space:]]+scan[[:space:]]+report[[:space:]]+for"
 GLOBAL_REGEX_NET_PORT_LINE="^[0-9]+/(tcp|udp)"
 
-
-# ==============================================================================
-# NETWORK & FORENSIC FILTERS: ГЛОБАЛЬНЫЕ МАТРИЦЫ ИЗОЛЯЦИИ ТРАФИКА
-# ==============================================================================
-
-# Ультимативная маска для детекции и отсечения всего диапазона Loopback (Localhost)
-# Блокирует адреса от 127.0.0.1 до 127.255.255.255 на любых интерфейсах
-GLOBAL_REGEX_NET_LOOPBACK="127\.[0-9]+\.[0-9]+\.[0-9]+"
-
-# Строгие маски для детекции частных (серых) подсетей согласно стандартам RFC 1918
-GLOBAL_REGEX_NET_PRIVATE_10="10\.[0-9]+\.[0-9]+\.[0-9]+"
-GLOBAL_REGEX_NET_PRIVATE_172="172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]+\.[0-9]+"
-GLOBAL_REGEX_NET_PRIVATE_192="192\.168\.[0-9]+\.[0-9]+"
-
-# Кросс-платформенные локальные алиасы имен хостов
-GLOBAL_REGEX_NET_LOCAL_NAMES="^(localhost|localhost\.localdomain|0\.0\.0\.0)$"
-
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР СЕТЕВОЙ ИЗОЛЯЦИИ (NET-NEXUS: ULTIMATE FULL-STACK v2.0)
 # ==============================================================================
@@ -1337,24 +1233,6 @@ GLOBAL_NET_MATRIX=(
     '\b(::1|::)\b'
 )
 
-
-# ==============================================================================
-# Сигнатуры для глубокого анализа исходного кода и веб-артефактов (SAST CORE)
-# ==============================================================================
-# 1. Максимальный контур детекции утечек конфигураций, СУБД и секретов доступа
-GLOBAL_REGEX_DB_LEAKS="\b(mysqli?_connect|PDO\s*\(|db_(password|user|pass|name|host|uri)|mysql_(connect|query)|pg_(connect|query)|connect_to_db|createConnection|MongoClient|mongoose\.connect|sqlite3\.Database|dotenv|config\.(json|yaml|ini)|DATABASE_URL|DB_(USERNAME|PASSWORD|DATABASE|HOST|PORT|CONN))\b"
-
-# 2. Максимальный контур детекции входящих веб-параметров, суперглобальных массивов и API-запросов
-GLOBAL_REGEX_WEB_INPUTS="\b(_POST|_GET|_REQUEST|_SERVER|_COOKIE|_FILES|POST\[|GET\[|REQUEST\[|req\.(body|query|params|cookies)|request\.(form|args|json|get_json)|ServletActionContext|@RequestParam|@RequestBody|@PathVariable|ParamUtil|r\.FormValue|r\.PostForm)\b"
-
-
-# 3. Максимальный контур детекции выполнения системных команд (RCE Риски)
-GLOBAL_REGEX_RCE_RISKS="\b(exec(ve|lp|p)?|system|passthru|shell_exec|popen|pclose|proc_open|subprocess\.(run|Popen|call|check_output)|child_process\.(exec|spawn|fork)|os\.(system|popen|spawn)|Runtime\.getRuntime\(\)\.exec|ProcessBuilder|syscall\.Exec)\b\s*\(?"
-
-# 4. Максимальный контур детекции файловых операций и динамического подключения (LFI/Path Traversal Риски)
-GLOBAL_REGEX_LFI_RISKS="\b(fopen|file_get_contents|include(_once)?|require(_once)?|readfile|file|parse_ini_file|open|read|fs\.(readFile|readFileSync|createReadStream)|io\.ReadFile|ioutil\.ReadFile|os\.Open|fs\.file_System|FileInputStream|FileReader)\b\s*\(?"
-
-
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР АНАЛИЗА ИСХОДНОГО КОДА (SAST-NEXUS: ULTIMATE FULL-STACK v2.0)
 # ==============================================================================
@@ -1377,22 +1255,6 @@ GLOBAL_SAST_MATRIX=(
     # --- 6. XSS и Инъекционные Sink-функции ---
     '\b(eval\(|base64_decode|innerHTML|outerHTML|document\.write|dangerouslySetInnerHTML|v-html|triple-curly|htmlspecialchars|strip_tags)\b'
 )
-
-
-# ==============================================================================
-# СИГНАТУРЫ ПОДСВЕТКИ И ВИЗУАЛИЗАЦИИ КОНТЕНТА (UI/UX HIGHLIGHT CORE)
-# ==============================================================================
-
-# 1. Максимальный паттерн детекции IPv4-адресов, сетевых сокетов и масок подсетей
-GLOBAL_SED_HIGHLIGHT_IP="-e s/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}\(:[0-9]\{1,5\}\)\?/${C}&${NC}/g"
-
-# 2. Ультимативный кросс-платформенный паттерн детекции учетных данных, секретов и API-ключей
-# Перекрывает любые комбинации: Password, Pass, Secret, Token, Key, Auth, User, Login, Root, Credentials, DB_
-GLOBAL_SED_HIGHLIGHT_SECRETS="-e s/\([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]\|[Pp][Aa][Ss][Ss]\|[Ss][Ee][Cc][Rr][Ee][Tt]\|[Tt][Oo][Kk][Ee][Nn]\|[Kk][Ee][Yy]\|[Aa][Uu][Tt][Hh]\|[Uu][Ss][Ee][Rr]\|[Ll][Oo][Gg][Ii][Nn]\|[Rr][Oo][Oo][Tt]\|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll][Ss]\|[Dd][Bb]_[Pp][Aa][Ss][Ss]\)[\"']\?[[:space:]]*[:==>-][\"']\?[[:space:]]*[^[:space:]\"\']*/${Y}&${NC}/g"
-
-# 3. Ультимативный кросс-платформенный паттерн детекции успешных триггеров, уязвимостей и полезных нагрузок
-# Перекрывает любые комбинации: BRUTE_SUCCESS, EXPLOIT_SUCCESS, Payload, SUCCESS, VULNERABLE, EXPLOIT, HIT, FOUND
-GLOBAL_SED_HIGHLIGHT_SUCCESS="-e s/\([Bb][Rr][Uu][Tt][Ee]_[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]_[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Pp][Aa][Yy][Ll][Oo][Aa][Dd]\|[Ss][Uu][Cc][Cc][Ee][Ss][Ss]\|[Vv][Uu][Ll][Nn][Ee][Rr][Aa][Bb][Ll][Ee]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]\|[Hh][Ii][Tt]\|[Ff][Oo][Uu][Nn][Dd]\)[\"']\?[[:space:]]*[:==>-]*\(.*\)/${G}&${NC}/g"
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР ВИЗУАЛИЗАЦИИ СИГНАЛОВ (UI-NEXUS: ULTIMATE v3.0)
@@ -1425,35 +1287,6 @@ GLOBAL_UI_MATRIX=(
     # Добавлены паттерны SQL-инъекций и критических сбоев ядра
     '-e s/\([Vv][Uu][Ll][Nn][Ee][Rr][Aa][Bb][Ll][Ee]\|[Ee][Xx][Pp][Ll][Oo][Ii][Tt]\|[Cc][Vv][Ee]-[0-9]\{4\}-[0-9]\{4,7\}\|[Ss][Qq][Ll]_[Ee][Rr][Rr][Oo][Rr]\|[Aa][Ll][Ee][Rr][Tt]\|[Dd][Rr][Oo][Pp]\|[Uu][Nn][Ii][Oo][Nn]\|[Ss][Ee][Ll][Ee][Cc][Tt]\)/'$R'&'$NC'/g'
 )
-
-
-
-# ==============================================================================
-# FORENSIC & KERNEL MATRIX: СИГНАТУРЫ ДЕ ТЕКЦИИ РУТКИТОВ И АНОМАЛИЙ ЯДРА
-# ==============================================================================
-# Ультимативный кросс-платформенный паттерн форензик-детекции ядерных и системных угроз.
-# Покрывает: eBPF-руткиты, LKM-бэкдоры, User-land инжекты (LD_PRELOAD) и известные APT-модули.
-GLOBAL_REGEX_KERNEL_ROOTKITS="([Rr][Oo][Oo][Tt][Kk][Ii][Tt]\|[Ss][Tt][Ee][Aa][Ll][Tt][Hh]\|[Hh][Ii][Dd][Ee]_[Pp][Rr][Oo][Cc]\|[Hh][Oo][Oo][Kk]_[Ss][Yy][Ss]\|[Dd][Ii][Aa][Mm][Oo][Rr][Pp][Hh][Ii][Nn][Ee]\|[Rr][Ee][Pp][Tt][Ii][Ll][Ee]\|[Ss][Uu][Tt][Ee][Rr][Uu][Ss][Uu]\|[Kk][Bb][Ee][Aa][Ss][Tt]\|[Vv][Ll][Aa][Nn][Yy]\|[Aa][Dd][Oo][Rr][Ee]\|[Ee][Nn][Ll][Ii][Gg][Hh][Tt]\|[Mm][Aa][Ff][Aa][Ll][Dd][Aa]\|[Bb][Aa][Cc][Kk][Dd][Oo][Oo][Rr]\|[Rr][Kk][Ss][Tt][Uu][Bb]\|[Aa][Dd][Oo][Rr][Ee]_[Nn][Gg]\|[Hh][Pp][Oo][Rr][Kk]\|[Kk][Bb][Dd][Vv]\|[Kk][Nn][Aa][Rr][Kk]\|[Oo][Vv][Ee][Rr][Rr][Ii][Dd][Ee]\|[Pp][Rr][Ii][Dd][Ee][Ll][Ss]\|[Rr][Ii][Aa][Ll][Tt][Oo]\|[Ss][Uu][Cc][Ii][Kk][Ii][Tt]\|[Tt][Cc][Uu][Nn][Yy][Cc]\|[Zz][Aa][Uu][Rr][Uu][Ss]\|[Mm]0[Nn][Aa][Dd]\|[Ww][Nn][Pp][Ss]\|[Ff][Cc][Oo][Mm][Mm]\|[Jy][Nn][Xx]\|[Bb][Dd][Ff][Ll][Uu][Ss][Hh]\|[Ss][Kk][Ii][Dd][Mm][Aa][Pp]\|[Ee][Bb][Pp][Ff]_[Cc][Oo][Nn][Tt][Rr][Oo][Ll]\|[Kk][Nn][Ee][Ee][Dd][Ee][Ee][Pp]\|[TripleCross]\|[Jeefo]\|[Umbreon]\|[Azazel]\|[Bedep]\|[Volcani]\|[Kinsing]\|[Sysrv]\|[Tsunami]\|[Muhstik]\|[sys_call_table]\|[wp_page_fault]\|[kprobe]\|[ftrace_lookup]\|[module_layout])"
-
-
-# ==============================================================================
-# FORENSIC CORE MATRIX: МАТРИЦЫ АНАЛИЗА АРТЕФАКТОВ И КРИМИНАЛИСТИКИ ФАЙЛОВ
-# ==============================================================================
-
-# 1. Ультимативная матрица детекции активных объектов, JS-инъекций и OLE-эксплоитов в PDF и документах
-GLOBAL_REGEX_PDF_THREATS="(\/([Jj][Ss]|[Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt]|[Oo][Pp][Ee][Nn][Aa][Cc][Tt][Ii][Oo][Nn]|[Aa][Aa]|[Aa][Cc][Rr][Oo][Ff][Oo][Rr][Mm]|[Jj][Bb][Ii][Gg]2[Dd][Ee][Cc][Oo][Dd][Ee]|[Rr][Ii][Cc][Hh][Mm][Ee][Dd][Ii][Aa]|[Ll][Aa][Uu][Nn][Cc][Hh]|[Ee][Mm][Bb][Ee][Dd][Dd][Ee][Dd][Ff][Ii][Ll][Ee]|[Vv][Bb][Aa][Mm][Aa][Cc][Rr][Oo]|[Oo][Cc][Xx]|[Cc][Mm][Dd]))"
-
-# 2. Ультимативная матрица детекции опасных, исполняемых и триггерных файлов внутри контейнеров/архивов
-GLOBAL_REGEX_CONTAINER_THREATS="\.(exe|scr|vbs|bat|ps1|js|vbe|cmd|jar|lnk|hta|cpl|inf|wsf|sh|py|pl|rb|msi|vba|ws|scf|com|pif|gadget|iso|vhd|img)$"
-
-# 3. Ультимативная кросс-платформенная матрица детекции сетевых маркеров, шелл-кодов и системных утилит компрометации (LOLBAS)
-GLOBAL_REGEX_BINARY_NETCMD="(([Hh][Tt][Tt][Pp][Ss]\?:\/\/|[Ff][Tt][Pp]:\/\/|[Ww][Ss][Ss]\?:\/\/).+\|/etc/passwd\|cmd\.exe\|powershell\|/bin/sh\|/bin/bash\|[Ww][Mm][Ii][Cc]\|[Cc][Mm][Dd][Ll][Ee][Tt]\|[A][P][I]_[S][T][R][I][N][G]\|bitsadmin\|certutil\|rundll32\|regsvr32\|curl\|wget\|bash\|nc\|netcat\|socat\|/dev/tcp)"
-
-# 4. Ультимативная матрица сигнатур продвинутых коммерческих упаковщиков, обфускаторов и крипторов малвари
-GLOBAL_REGEX_BINARY_PACKERS="(UPX!|ASPack|Enigma|Themida|MPRESS|VMProtect|PECompact|Petite|FSG!|PESpin|ConfuserEx|Dotfuscator|SmartAssembly|Yano|Goliath|Babel|CryptoObfuscator|Spox|Obsidium|Armadillo)"
-
-# 5. Ультимативная матрица эвристического обнаружения скрытых скриптовых угроз, шелл-кодов и техник обфускации
-GLOBAL_REGEX_HEURISTIC_SCRIPTS="([Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Gg][Zz][Ii][Nn][Ff][Ll][Aa][Tt][Ee]\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Ss][Tt][Rr]_[Rr][Oo][Tt]13\|[Ee][Vv][Aa][Ll][[:space:]]*(\|\|[[:space:]]*)[Dd][Ee][Cc][Oo][Dd][Ee][Uu][Rr][Ii][Cc][Oo][Mm][Pp][Oo][Nn][Ee][Nn][Tt]\|[Ss][Tt][Rr][Ii][Nn][Gg]\.[Ff][Rr][Oo][Mm][Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee]\|[Ww][Rr][Ii][Tt][Ee][[:space:]]*[\"']<[Ss][Cc][Rr][Ii][Pp][Tt]\|[Ee][Xx][Ee][Cc][[:space:]]*(\|\|[[:space:]]*)[Bb][Aa][Ss][Ee]64\|[Bb][Aa][Ss][Ee]64_[Dd][Ee][Cc][Oo][Dd][Ee]\|[Cc][Oo][Mm][Pp][Ii][Ll][Ee][Ss][Tt][Rr][Ii][Nn][Gg]\|[Aa][Ss][Cc][Ii][Ii]2[Cc][Hh][Aa][Rr]\|[Cc][Hh][Aa][Rr][Cc][Oo][Dd][Ee][Aa][Tt])"
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР ФОРЕНЗИКИ И АНАЛИЗА ЯДРА (FORENSIC-NEXUS: ULTIMATE FULL-STACK v3.0)
@@ -1493,23 +1326,6 @@ GLOBAL_PLATFORM_IDENTIFIERS=(
     "GitHub|(?:https?://)?(?:www\.)?github\.com/([a-zA-Z0-9-]+)|1"
     "LinkedIn|(?:https?://)?(?:www\.)?linkedin\.com/in/([a-zA-Z0-9_-]+)|1"
 )
-
-
-# ==============================================================================
-# GLOBAL OSINT PARSING & FILTRATION PATTERNS
-# ==============================================================================
-
-# ==============================================================================
-# @description: ГЛОБАЛЬНЫЕ ЧЕРНЫЕ СПИСКИ (OSINT FILTRATION MATRIX - POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
-# ==============================================================================
-
-# 1. Черный список Email (Отсечение мусорных и системных адресов)
-GLOBAL_OSINT_EMAIL_BLACKLIST="(google|duckduckgo|bing|yahoo|yandex|baidu|w3\.org|schema\.org|ietf\.org|githubusercontent|cloudfront|amazonaws|akamai|gtech|adsystem|doubleclick|analytics|crashlytics|sentry|facebook|twitter|instagram|tiktok|pinterest|linkedin|reply|noreply|support|admin|info|contact|feedback|marketing|sales|billing|jobs|careers|privacy|terms|abuse|postmaster|root|webmaster|localhost|example|test|domain|\.(png|jpg|jpeg|gif|ico|svg|webp|css|js|json|xml|pdf|zip|tar|gz|exe|dmg|mp4|mp3|woff|woff2|ttf|eot|wasm|manifest))$"
-
-# 2. Черный список URL-паттернов (Фильтрация Social Graph и системных путей)
-GLOBAL_OSINT_URL_BLACKLIST="/(search|html|privacy|help|login|signin|signup|logout|register|accounts|account|status|sharer|share|cookie|cookies|settings|preferences|tos|terms|legal|about|contact|support|faq|feedback|explore|trending|notifications|messages|direct|inbox|chat|feed|rss|atoms|tags|tag|category|categories|archive|archives|pages|page|blog|posts|articles|reels|reel|stories|story|highlights|shorts|video|videos|photo|photos|albums|album|audio|music|maps|places|events|groups|community|marketplace|ads|advertising|analytics|developer|developers|api|manage|dashboard|billing|security|privacy-policy|terms-of-service|forgot-password|reset-password|verify|captcha|oauth|callback|redirect|goto|exit|out|click|track|iframe|embed|widget|assets|static|media|download|upload|view|preview|print|checkout|cart|shop|store|buy|purchase|subscribe|unsubscribe|newsletter|jobs|careers|press|news|identity|checkpoint|legal|compliance|accessibility|lang|locale|en|ru|fr|es|de|it|pt|zh|ja|ko)$"
-
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР ФИЛЬТРАЦИИ И OSINT-ГИГИЕНЫ (OSINT-NEXUS: ULTIMATE v2.0)
@@ -1569,8 +1385,6 @@ GLOBAL_FALLBACK_SEARCH_GATES=(
 # Покрывает: соцсети, мобильные deep-links, био-агрегаторы и коммерческие shorteners
 GLOBAL_SHORT_LINK_REDIRECT_REGEX="(facebook\.com/share/|fb\.(watch|me)|vt\.tiktok\.com|instagram\.com/share|t\.(co|me/share)|youtu\.be/|lnkd\.in/|wa\.me/|vk\.cc|goo\.su|clck\.ru|bit\.ly|tinyurl\.com|cutt\.ly|shorturl\.at|linktr\.ee|lnk\.bio|ow\.ly|buff\.ly|rebrand\.ly|is\.gd|u\.to|shrtco\.de|viber\.click|tt\.me|line\.me|pin\.it|snapchat\.com/add/|bl\.ink|t2m\.io|adf\.ly|b23\.tv|gg\.gg|v\.gd|urlshrt\.me|click\.ru|ok\.me)"
 
-
-
 # ==============================================================================
 # GLOBAL MULTI-ENGINE SEARCH MATRIX (OSINT BROADCAST STRATEGY v20.0 COMPLETE)
 # ==============================================================================
@@ -1605,39 +1419,43 @@ GLOBAL_SEARCH_ENGINES=(
     "Baidu|https://www.baidu.com/s?wd=%VECTOR%&rn=30&cl=3&tn=baidulocal"
 )
 
-
 # ==============================================================================
-# @description: ГЛОБАЛЬНАЯ МАТРИЦА ДЕТЕКЦИИ БЛОКИРОВОК (POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
+# РЕЕСТР ДЕТЕКЦИИ БЛОКИРОВОК И WAF-ПОДАВЛЕНИЯ (ANTI-FLOOD-NEXUS: ULTIMATE FULL)
 # ==============================================================================
-# Покрывает: Английский, Русский, Французский сегменты и специфичные маркеры WAF
-GLOBAL_SEARCH_ANTI_FLOOD_REGEX="(detected[[:space:]]+unusual[[:space:]]+traffic|captcha|forbidden|automated[[:space:]]+requests|access[[:space:]]+denied|robot\.txt|unusual[[:space:]]+activities|подозрительный[[:space:]]+запрос|доступ[[:space:]]+ограничен|робот|вы[[:space:]]+робот|ошибка[[:space:]]+403|error[[:space:]]+403|action[[:space:]]+required|cf-chk-wrapper|cloudflare|turnstile|hcaptcha|recaptcha|security[[:space:]]+check|sucuri|ddos-guard|blocked[[:space:]]+by|ip[[:space:]]+blocked|checking[[:space:]]+your[[:space:]]+browser)"
-
+GLOBAL_ANTI_FLOOD_MATRIX=(
+    # --- 1. Linguistic & Logic Blocks (En/Ru/Fr/De/Es) ---
+    '\b(detected unusual traffic|access denied|подозрительный запрос|доступ ограничен|accès refusé|zugriff verweigert|acceso denegado)\b'
+    '\b(captcha|robot|робот|вы робот|êtes-vous un robot|sind sie ein roboter|es usted un robot)\b'
+    
+    # --- 2. HTTP/WAF Protocol Blocks ---
+    '\b(403|406|429|451|error 403|error 429|forbidden|not acceptable|blocked by|ip blocked|too many requests|rate limit exceeded)\b'
+    
+    # --- 3. Vendor-Specific WAF & CDN Fingerprints ---
+    '\b(cloudflare|turnstile|hcaptcha|recaptcha|sucuri|ddos-guard|akamai|gslb|f5_big-ip|imperva|incapsula|aws-waf|cloudfront|fastly|barracuda|citrix|perimeterx)\b'
+    
+    # --- 4. Browser/Behavioral Challenge Indicators ---
+    '\b(checking your browser|security check|action required|verify identity|prove you are human|js-challenge|waf-challenge|challenge-platform|threat-score)\b'
+    
+    # --- 5. System/Debug/Internal Signals (WAF Leaks) ---
+    '\b(block_id|cf-chk-wrapper|x-waf-block|request-id-blocked|security_challenge|waf-bypass|threat-detection|suspicious-user-agent)\b'
+)
 
 
 # ==============================================================================
 # GLOBAL OSINT CORE CONSTANTS & NETWORK PROFILE (v17.5)
 # ==============================================================================
-# Тайм-ауты и сетевые лимиты для curl (подключение и максимальное время сессии)
-GLOBAL_NET_CONNECT_TIMEOUT=5
-GLOBAL_NET_MAX_TIME=12
-GLOBAL_RESOLVER_CONNECT_TIMEOUT=5
-GLOBAL_RESOLVER_MAX_TIME=8
-
 
 # ==============================================================================
-# @description: ГЛОБАЛЬНЫЕ OSINT-ФИЛЬТРЫ И ШЛЮЗОВЫЕ СИГНАТУРЫ (POSIX ERE)
-# МОДЕРНИЗАЦИЯ: Исправлен синтаксис (удален (?i)), адаптирован под grep -Ei
+# ЕДИНЫЙ РЕЕСТР СЕТЕВЫХ КОНФИГУРАЦИЙ (NET-CONFIG-NEXUS: ULTIMATE)
 # ==============================================================================
-
-# 1. Системные роуты социальных платформ (Исключение ложных срабатываний)
-GLOBAL_PLATFORM_SYSTEM_ROUTES="^(p|reel|reels|stories|share|messages|photo|photos|videos|watch|search|explore|shorts|status|trending|clips|live|about|legal|terms|privacy|help|settings|notifications|messages|bookmark|bookmarks|lists|profile|analytics|ads|advertising|campaign|monetization|creators|creator-academy|community|channels|featured|playlists|subscriptions|store|podcasts|gaming|news|sports|fashion|beauty|learning|maps|hashtag|tags|category|posts|pages|groups|events|marketplace|jobs|companies|school|alumni|feed|following|followers|mutual|history|saved|archive|activity|digest|insights|verify|verification|badge|security|login|signin|signup|register|logout)$"
-
-# 2. Шлюзы (вектор классического сложения)
-GLOBAL_GATEWAY_RAW_VECTOR_SIGNATURES="(yahoo\.(com|co|fr|de|it|es|ca|co\.uk)|aol\.(com|co\.uk)|ask\.com|excite\.com|search-results\.com|info\.com|gibiru\.com)"
-
-# 3. Шлюзы (вектор строгого URL-кодирования)
-GLOBAL_GATEWAY_ENCODED_VECTOR_SIGNATURES="(html\.duckduckgo\.com|search\.brave\.com|mojeek\.com|searx\.(be|fmac|me|space|info|link|work|xyz|org|net)|priv\.au|ononoki\.org)"
+GLOBAL_NET_CONFIG_MATRIX=(
+    "CONNECT_TIMEOUT=5"
+    "MAX_SESSION_TIME=12"
+    "RESOLVER_CONNECT_TIMEOUT=5"
+    "RESOLVER_MAX_TIME=8"
+    "RETRY_ATTEMPTS=3"
+    "USER_AGENT_MODE=STEALTH"
+)
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР ШЛЮЗОВ И ПЛАТФОРМЕННЫХ РОУТОВ (GATEWAY-NEXUS: ULTIMATE FULL-STACK)
@@ -1655,7 +1473,6 @@ GLOBAL_GATEWAY_MATRIX=(
     # --- 4. Deep Web Gateway (Tor2Web/Onion Proxies) ---
     '\b([a-z0-9]+\.(onion|tor2web\.(org|me|to|cf|li|it)))\b'
 )
-
 
 # ==============================================================================
 # GLOBAL CORE NETWORK DNS INFRASTRUCTURE MATRIX (v22.0 INDUSTRIAL COMPLETE)
@@ -1706,17 +1523,6 @@ GLOBAL_DNS_CONFIG_MATRIX=(
 # ==============================================================================
 # 5. МАТРИЦЫ ПАРОЛЬНОЙ ЭНТРОПИИ И СИСТЕМНОГО АУДИТА (PRIME SECURITY LAB CORE)
 # ==============================================================================
-# Слой символьных пулов для вычисления математической стойкости
-GLOBAL_LAB_CHARSET_ALPHA="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-GLOBAL_LAB_CHARSET_NUM="0123456789"
-GLOBAL_LAB_CHARSET_SPEC="!@#$%^&*()_+=-[]{}|;:,.<>?"
-
-# Строгая валидирующая матрица для проверки вводимых паролей на лету
-GLOBAL_REGEX_PASS_LOW="[a-z]"
-GLOBAL_REGEX_PASS_UP="[A-Z]"
-GLOBAL_REGEX_PASS_NUM="[0-9]"
-GLOBAL_REGEX_PASS_SPEC="[^A-Za-z0-9]"
-
 
 # ==============================================================================
 # ЕДИНЫЙ РЕЕСТР КРИПТО-ЭНТРОПИИ И АУДИТА (PRIME-NEXUS: ULTIMATE INTEGRATED)
@@ -1758,8 +1564,6 @@ GLOBAL_PASS_PREFIXES=(
 # Жесткие лимиты безопасности ядра для защиты флеш-памяти устройства
 PASS_LAB_DEFAULT_LEN=20
 PASS_LAB_MAX_DIGITS=6
-
-
 
 # ==============================================================================
 # 7. ГЛОБАЛЬНЫЕ СИГНАТУРЫ ДЛЯ АНТИВИРУСНОГО ДВИЖКА (ANTI-MALWARE CORE PATTERNS)
@@ -2101,6 +1905,17 @@ GLOBAL_FILTER_MATRIX=(
     # --------------------------------------------------------------------------
     'RECURSIVE|EXTRACTED|HARVESTED|CRAWLER|PARSED|EXT_IP|EXT_EMAIL|DEEP_HUNT|BRIDGE|SIGNAL'
 )
+
+# Функция-детектор: проверяет наличие блокировки в ответе
+check_for_waf_blocks() {
+    local response_content="$1"
+    for pattern in "${GLOBAL_ANTI_FLOOD_MATRIX[@]}"; do
+        if echo "$response_content" | grep -Ei "$pattern" > /dev/null; then
+            return 0 # Блокировка найдена
+        fi
+    done
+    return 1 # Всё чисто
+}
 
 
 # ==============================================================================
@@ -9781,101 +9596,82 @@ run_osint_custom_leaks() {
 # ==============================================================================
 run_osint_custom_ignorant() {
     local phone="$1"
-    local raw_log="$2" # Принимает путь к логу для записи результатов
+    local raw_log="$2"
 
-    # 1. Автономная инициализация сессионного таргета
     [[ -z "$phone" ]] && phone="$target_user"
     [[ -z "$phone" ]] && return 1
 
-    # 2. Первичная валидация исходного формата
+    # 1. Нормализация (очистка вектора)
+    phone=$(echo "$phone" | tr -dc '0-9')
+    
+    # 2. Валидация
     if ! is_valid "$phone" "GLOBAL_REGEX_PHONE_VALID"; then
         return 1
     fi
 
-    # 3. Санитарная нормализация номера (приведение к чистому цифровому вектору)
-    phone="${phone//+/}"; phone="${phone// /}"; phone="${phone//-/}"
-    phone="${phone//(/}"; phone="${phone//)/}"; phone="${phone//./}"
-    phone=$(echo "$phone" | tr -d '[:space:]')
+    core_engine_ui "i" "Nexus PhoneResolver: Parallel Multi-Vector Audit for [+$phone]..."
 
-    core_engine_ui "i" "Nexus PhoneResolver: Launching Parallel Multi-Vector Audit for [+$phone]..."
-
-    # Создание изолированной песочницы для параллельных потоков
     local sandbox_dir="/tmp/nexus_resolver_$$"
     mkdir -p "$sandbox_dir"
 
-    # --- ЗАПУСК ПАРАЛЛЕЛЬНОГО СКАНИРОВАНИЯ МАТРИЦЫ ---
+    # --- ЗАПУСК ПАРАЛЛЕЛЬНОГО СКАНИРОВАНИЯ ---
     for service_entry in "${GLOBAL_PHONE_SERVICES[@]}"; do
         [[ "$service_entry" != *"|"* ]] && continue
         
-        # Асинхронный подпроцесс для каждого сервиса
         (
-            # Развертывание пятислойной матрицы
-            local base_url="${service_entry%%|*}"; local remaining="${service_entry#*|}"
-            local check_type="${remaining%%|*}"; remaining="${remaining#*|}"
-            local criteria="${remaining%%|*}"; remaining="${remaining#*|}"
-            local category="${remaining%%|*}"; local service_name="${remaining#*|}"
+            IFS='|' read -r base_url check_type criteria category service_name <<< "$service_entry"
             local full_url="${base_url}${phone}"
-            
-            local service_confirmed=0
             local selected_ua="${GLOBAL_NETWORK_UA[$(( RANDOM % ${#GLOBAL_NETWORK_UA[@]} ))]}"
+            local service_confirmed=0
 
-            # Диспетчеризация векторов верификации
-            if [[ "$check_type" == "HTTP_CODE" ]]; then
-                local http_code=$(curl -s -o /dev/null -I -L -A "$selected_ua" --connect-timeout 4 -w "%{http_code}" "$full_url" 2>/dev/null)
-                [[ "$http_code" == "$criteria" ]] && service_confirmed=1
+            # Запрос с проверкой на WAF (Адаптировано под новую матрицу)
+            local page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 5 "$full_url" 2>/dev/null)
             
-            elif [[ "$check_type" == "DOM_MATCH" ]]; then
-                local page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 5 "$full_url" 2>/dev/null)
-                # Проверка, что это не WAF-экран и текст присутствует
-                if [[ -n "$page_body" ]] && ! is_valid "$page_body" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
-                    [[ "$page_body" == *"$criteria"* ]] && service_confirmed=1
-                fi
-            
-            elif [[ "$check_type" == "DOM_ABSENT" ]]; then
-                local page_body=$(curl -s -L -A "$selected_ua" --connect-timeout 5 "$full_url" 2>/dev/null)
-                if [[ -n "$page_body" ]] && ! is_valid "$page_body" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
-                    [[ ! "$page_body" == *"$criteria"* ]] && service_confirmed=1
-                fi
-            fi
-
-            # Обработка успешного нахождения связи
-            if (( service_confirmed == 1 )); then
-                echo "[MATCH_PHONE] $service_name -> $full_url" >> "$sandbox_dir/results.log"
+            # Используем ваш новый реестр блокировок
+            if [[ -n "$page_body" ]] && ! check_for_waf_blocks "$page_body"; then
                 
-                # Глубокий рекурсивный анализ метаданных Telegram
-                if [[ "$service_name" == "Telegram" ]]; then
-                    local page_data=$(curl -s -L -A "$selected_ua" "$full_url" 2>/dev/null)
-                    if [[ -n "$page_data" ]] && ! is_valid "$page_data" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
-                        local meta_name=$(echo "$page_data" | grep -oP "meta property=\"og:title\" content=\"\K[^\"]+" 2>/dev/null)
-                        if [[ -n "$meta_name" ]]; then
-                            echo "[PHONE_META] Telegram_Name -> $meta_name" >> "$sandbox_dir/results.log"
-                        fi
-                        # Экстракция почт во временный системный кэш
-                        echo "$page_data" | grep -oE "$GLOBAL_REGEX_EMAIL" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
+                # Логика диспетчеризации
+                case "$check_type" in
+                    "HTTP_CODE")
+                        local http_code=$(curl -s -o /dev/null -I -L -A "$selected_ua" --connect-timeout 4 -w "%{http_code}" "$full_url" 2>/dev/null)
+                        [[ "$http_code" == "$criteria" ]] && service_confirmed=1
+                        ;;
+                    "DOM_MATCH")
+                        [[ "$page_body" == *"$criteria"* ]] && service_confirmed=1
+                        ;;
+                    "DOM_ABSENT")
+                        [[ ! "$page_body" == *"$criteria"* ]] && service_confirmed=1
+                        ;;
+                esac
+
+                if (( service_confirmed == 1 )); then
+                    echo "[MATCH_PHONE] $service_name -> $full_url" >> "$sandbox_dir/results.log"
+                    
+                    # Глубокий анализ Telegram
+                    if [[ "$service_name" == "Telegram" ]]; then
+                        local meta_name=$(echo "$page_body" | grep -oP "meta property=\"og:title\" content=\"\K[^\"]+" 2>/dev/null)
+                        [[ -n "$meta_name" ]] && echo "[PHONE_META] Telegram_Name -> $meta_name" >> "$sandbox_dir/results.log"
+                        echo "$page_body" | grep -oE "$GLOBAL_REGEX_EMAIL" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
                     fi
                 fi
+            else
+                # Если сработал WAF — помечаем в лог для контроля "здоровья" сети
+                echo "[WAF_ALERT] $service_name blocked connection." >> "$sandbox_dir/results.log"
             fi
-        ) & # Фоновый режим
+        ) &
     done
 
-    # Ожидание завершения всех сетевых потоков
     wait
 
-    # --- СБОР РЕЗУЛЬТАТОВ И ВЫВОД ИНТЕРФЕЙСА ---
+    # --- СБОР РЕЗУЛЬТАТОВ ---
     if [[ -f "$sandbox_dir/results.log" ]]; then
-        # Переносим всё в глобальный лог
         cat "$sandbox_dir/results.log" >> "$raw_log"
-        
-        # Красивый вывод в UI найденных связей
         while IFS= read -r line; do
-            if [[ "$line" == *"[MATCH_PHONE]"* ]]; then
-                local s_name=$(echo "$line" | awk '{print $2}')
-                core_engine_ui "s" "[+] Linked: $s_name (Artifacts saved)"
-            fi
+            [[ "$line" == *"[MATCH_PHONE]"* ]] && core_engine_ui "s" "[+] Linked: $(echo "$line" | awk '{print $2}') (Artifacts saved)"
+            [[ "$line" == *"[WAF_ALERT]"* ]] && core_engine_ui "w" "[!] WAF prevented scan on: $(echo "$line" | awk '{print $2}')"
         done < "$sandbox_dir/results.log"
     fi
 
-    # Зачистка временной песочницы
     rm -rf "$sandbox_dir"
     core_engine_ui "s" "[+] PhoneResolver: Multi-vector audit cycle finished."
 }
@@ -9889,27 +9685,21 @@ run_osint_omni_crawler() {
     local user_input="$1"
     local raw_log="$2"
 
-    # 1. Инициализация цели
+    # 1. Инициализация и нормализация
     [[ -z "$user_input" ]] && user_input="$target_user"
     [[ -z "$user_input" ]] && return 1
 
-    # 2. RESOLVER: Авто-раскрытие коротких ссылок
+    # RESOLVER: Раскрытие коротких ссылок
     if echo "$user_input" | grep -qP "$GLOBAL_SHORT_LINK_REDIRECT_REGEX" 2>/dev/null; then
-        user_input=$(curl -s -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 "$user_input" 2>/dev/null | grep -i "^location:" 2>/dev/null | tail -n 1 | awk '{print $2}' | tr -d '\r')
+        user_input=$(curl -s -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 "$user_input" 2>/dev/null | grep -i "^location:" | tail -n 1 | awk '{print $2}' | tr -d '\r')
     fi
 
-    # 3. Изоляция ID
     local target_user=$(echo "$user_input" | cut -d'?' -f1 | cut -d'/' -f1 | tr -d '[:space:]@')
-    
-    if [[ -z "$target_user" ]] || is_valid "$target_user" "GLOBAL_PLATFORM_SYSTEM_ROUTES"; then
-        return 1
-    fi
+    [[ -z "$target_user" ]] || is_valid "$target_user" "GLOBAL_PLATFORM_SYSTEM_ROUTES" && return 1
 
     core_engine_ui "i" "Nexus OmniCrawler: Launching Parallel Multithreaded Scan..."
 
     local query_vectors=("${target_user}+phone" "${target_user}+contact" "${target_user}+gmail" "site:facebook.com+${target_user}")
-    
-    # Создание изолированной песочницы для потоков
     local sandbox_dir="/tmp/nexus_threads_$$"
     mkdir -p "$sandbox_dir"
 
@@ -9918,51 +9708,41 @@ run_osint_omni_crawler() {
         for engine_entry in "${GLOBAL_SEARCH_ENGINES[@]}"; do
             [[ "$engine_entry" != *"|"* ]] && continue
             
-            # Запускаем каждый движок в отдельном фоновом процессе (Асинхронный контур)
             (
                 local engine_name="${engine_entry%%|*}"
                 local request_url="${engine_entry#*|}"
                 request_url="${request_url//%VECTOR%/$vector}"
                 
-                # Имитация живого профиля сети
-                local raw_data=$(curl -s -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 "$request_url" 2>/dev/null)
+                # Запрос с использованием вашего реестра анти-флуда
+                local raw_data=$(curl -s -A "$GLOBAL_NETWORK_UA" --connect-timeout 5 "$request_url" 2>/dev/null)
                 
-                # Валидация через Perl-контур
-                if [[ -n "$raw_data" ]] && ! is_valid "$raw_data" "GLOBAL_SEARCH_ANTI_FLOOD_REGEX"; then
-                    # Экстракция во временные файлы конкретного потока
+                # Интеллектуальная проверка: не является ли ответ блокировкой
+                if [[ -n "$raw_data" ]] && ! check_for_waf_blocks "$raw_data"; then
+                    # Экстракция данных в изолированный файл потока
                     echo "$raw_data" | grep -oE "$GLOBAL_REGEX_PHONE_SEARCH" >> "$sandbox_dir/phones.raw" 2>/dev/null
                     echo "$raw_data" | grep -oP "$GLOBAL_REGEX_EMAIL" >> "$sandbox_dir/emails.raw" 2>/dev/null
                     
-                    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-                    echo "[$timestamp] [MATCH_CRAWLER] Engine:$engine_name -> Found in vector:$vector" >> "$raw_log"
+                    echo "[$(date "+%Y-%m-%d %H:%M:%S")] [MATCH_CRAWLER] Engine:$engine_name -> Vector:$vector" >> "$raw_log"
+                else
+                    echo "[$(date "+%Y-%m-%d %H:%M:%S")] [WAF_BLOCK] Engine:$engine_name -> Vector:$vector" >> "$raw_log"
                 fi
-            ) & # <--- Символ '&' отправляет этот контур выполняться параллельно
+            ) &
         done
     done
 
-    # Ожидание завершения работы ВСЕХ параллельных движков
     wait
     
-    # --- СБОР, САНАТИЗАЦИЯ И ПОДЧЕТ АНАЛИТИКИ ---
+    # --- СБОР И АНАЛИТИКА ---
     local unique_phones=0
     local unique_emails=0
 
-    if [[ -f "$sandbox_dir/phones.raw" ]]; then
-        sort -u "$sandbox_dir/phones.raw" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null
-        unique_phones=$(sort -u "$sandbox_dir/phones.raw" | wc -l)
-    fi
+    [[ -f "$sandbox_dir/phones.raw" ]] && { sort -u "$sandbox_dir/phones.raw" >> "/tmp/nexus_found_phones.tmp" 2>/dev/null; unique_phones=$(sort -u "$sandbox_dir/phones.raw" | wc -l); }
+    [[ -f "$sandbox_dir/emails.raw" ]] && { sort -u "$sandbox_dir/emails.raw" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null; unique_emails=$(sort -u "$sandbox_dir/emails.raw" | wc -l); }
 
-    if [[ -f "$sandbox_dir/emails.raw" ]]; then
-        sort -u "$sandbox_dir/emails.raw" >> "/tmp/nexus_found_emails.tmp" 2>/dev/null
-        unique_emails=$(sort -u "$sandbox_dir/emails.raw" | wc -l)
-    fi
-
-    # Полная очистка песочницы
     rm -rf "$sandbox_dir"
-
-    # Вывод финального статуса с метриками эффективности
     core_engine_ui "s" "[+] OmniCrawler: Parallel scan complete. Extracted: $unique_phones phones, $unique_emails emails."
 }
+
 
 
 
