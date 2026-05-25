@@ -3874,13 +3874,13 @@ EOF
 
 
 generate_share_server_code_raw() {
-# 1. Собираем регулярку из массива прямо здесь
+    # 1. Собираем регулярку из массива прямо здесь
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
-    
-    # Загружаем только базовый шаблон страницы в локальную переменную
+
+    # 2. Загружаем шаблон
     local template=$(generate_core_template)
 
-    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
+    # 3. Твой оригинальный код (теперь используем сформированную строку)
     cat << EOF
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
@@ -3888,7 +3888,7 @@ import re
 
 app = Flask(__name__)
 
-# Проброс глобального регулярного выражения CAME из ядра Bash в Python
+# Регулярка встроена прямо в код
 GLOBAL_AV_PIPE_REGEX = r"""$regex_pattern"""
 
 SHARE_DIR = '/root/share'
@@ -3897,7 +3897,6 @@ if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
 $template
-
 def get_file_icon(filename):
     """Определяет иконку в зависимости от расширения файла."""
     ext = filename.split('.')[-1].lower() if '.' in filename else ''
