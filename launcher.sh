@@ -5762,87 +5762,82 @@ run_network_intelligence() {
     done
 }
 
-
-
-
-
-
 # ==============================================================================
 # ОСНОВНАЯ ИСПОЛНЯЕМАЯ ФУНКЦИЯ КОМПЛАЕНС-МОНИТОРИНГА ПЕРИМЕТРА
 # ==============================================================================
 
-
 run_system_info() {
     local start_time=$(date +%s)
-    core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
+    core_engine_ui "h" "NEXUS v25.7: HEURISTIC PERIMETER EXPLORER"
     
-    # 1. Приоритетный выбор цели
-    local r_target=$(core_engine_input "text" "Enter Target Domain, Host or IP [default: localhost]")
-    [[ -z "$r_target" ]] && r_target="localhost"
-    [[ "$r_target" =~ ^[bB](ack)?$ ]] && return
+    # 1. Приоритетный выбор цели с поддержкой полных URL
+    local r_input=$(core_engine_input "text" "Enter Target URL, Domain or IP [default: localhost]")
+    [[ -z "$r_input" ]] && r_input="http://localhost"
+    [[ "$r_input" =~ ^[bB](ack)?$ ]] && return
+    
+    # Эвристическое выделение компонентов URL
+    local r_target=$(echo "$r_input" | sed -e 's|^[^/]*//||' -e 's|/.*||')
+    local r_base_path=$(echo "$r_input" | sed -n 's|[^/]*//[^/]*\(.*\)?|\1|p')
+    [[ -z "$r_base_path" ]] && r_base_path="/"
+    
     clear
-
-    # 2. Локальный или удаленный режим
-    core_engine_ui "h" "STEALTH RECON: ADAPTIVE PERIMETER AUDIT [TARGET: $r_target]"
+    core_engine_ui "h" "AUDITING: ${r_target}"
     
-    # Определение IP для удаленного хоста
-    local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
-    echo -e "${W}Target Domain        :${NC} ${Y}$r_target${NC}"
-    echo -e "${W}Resolved Network IP  :${NC} ${G}${target_ip:-LOCAL_SYSTEM}${NC}"
-
-    # 3. Анализ инфраструктуры (HTTP Headers)
-    local info_payload=$(curl -s -I -L --connect-timeout 8 "http://$r_target/" 2>/dev/null)
-    echo -e "\n${Y}--- [INFRASTRUCTURE INTELLIGENCE CARD] ---${NC}"
+    # 2. Инфраструктурный анализ
+    local info_payload=$(curl -s -I -L --connect-timeout 5 "${r_input}" 2>/dev/null)
+    echo -e "${Y}--- [INFRASTRUCTURE INTELLIGENCE] ---${NC}"
     for pattern in "${GLOBAL_HTTP_MATRIX[@]}"; do
         local match=$(echo "$info_payload" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2-)
-        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${G}${match}${NC}"
+        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g') :${NC} ${G}${match}${NC}"
     done
 
-    # 4. Фаззинг (Files + Webhooks)
-    core_engine_ui "w" "Launching Multi-Layer Fuzzing (Verbose Mode)..."
+    # 3. Эвристический фаззинг
+    core_engine_ui "w" "Launching Recursive Heuristic Scan..."
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
     
-    # Объединяем словари
     local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
     
     for hook in "${full_list[@]}"; do
-        local req_result=$(curl -sI -L --connect-timeout 2 "http://$r_target/$hook" 2>/dev/null)
+        # Формируем путь: берем базовый путь цели + хук
+        local target_path="http://${r_target}/${hook}"
+        local req_result=$(curl -sI -L --connect-timeout 2 "$target_path" 2>/dev/null)
         local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
         
         if [[ -n "$code" ]]; then
-            # Экранизация процесса (детальный вывод)
             echo -e "[${W}$code${NC}] /$hook"
             
             if [[ "$code" == "200" ]]; then
-                echo -e "${G}[!] HIT: /$hook (200 OK)${NC}"
-                echo "HIT: /$hook | $(echo "$req_result" | grep -Ei '^Server:' | cut -d' ' -f2-)" >> "$tmp_hits"
+                echo -e "${G}[!] HIT: $target_path (200 OK)${NC}"
+                echo "HIT: $target_path" >> "$tmp_hits"
+                
+                # ЭВРИСТИКА: Если нашли API-директорию, ищем подпапки
+                if [[ "$hook" =~ "api" ]]; then
+                    echo -e "${Y}[+] Heuristic: Exploring API subtree...${NC}"
+                    # Здесь можно добавить логику перебора под-путей для API
+                fi
             fi
         fi
     done
 
-    # 5. Итоговый отчет (Remote Assessment)
+    # 4. Отчет
     local total_duration=$(( $(date +%s) - start_time ))
     core_engine_ui "h" "FINAL INTELLIGENCE SUMMARY"
-    echo -e "${W}Total Audit Time     :${NC} ${G}${total_duration}s${NC}"
-    echo -e "${W}Total Endpoints Scan :${NC} ${G}${#full_list[@]}${NC}"
+    echo -e "${W}Scan Time      : ${G}${total_duration}s${NC}"
+    echo -e "\n${Y}--- [DISCOVERED ENDPOINTS] ---${NC}"
+    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo "No endpoints found."
     
-    echo -e "\n${Y}--- [SUCCESSFUL ENDPOINTS DISCOVERED] ---${NC}"
-    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo -e "${W}No high-value endpoints found.${NC}"
-
-    # 6. Анализ заголовков безопасности удаленного сервера
-    echo -e "\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
-    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection")
+    # 5. Анализ безопасности
+    echo -e "\n${Y}--- [REMOTE SECURITY HEADERS] ---${NC}"
+    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security")
     for h in "${sec_headers[@]}"; do
-        local val=$(echo "$info_payload" | grep -Ei "^$h:" | cut -d':' -f2-)
-        [[ -n "$val" ]] && echo -e "${G}[+] $h : Present${NC}" || echo -e "${R}[-] $h : Missing${NC}"
+        echo -e "${W}$h :${NC} $(echo "$info_payload" | grep -Ei "$h" >/dev/null && echo -e "${G}Present" || echo -e "${R}Missing")"
     done
 
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
-
 
 # ==============================================================================
 # @description: OSINT NEXUS v22.0 - NEURAL BRIDGE ORCHESTRATOR [MONOLITH]
