@@ -3523,9 +3523,9 @@ GLOBAL_HASH_MATRIX = [
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
 GLOBAL_AV_PROC_REGEX = r"$GLOBAL_AV_ACTIVE_MALWARE_PROCS"
 GLOBAL_AV_SOCKET_REGEX = r"$GLOBAL_AV_SOCKET_STATES"
-WIN_PAYLOAD = "$(echo "${GLOBAL_FIX_WIN_REG[@]}")"
-LINUX_PAYLOAD = "$(echo "${GLOBAL_FIX_LINUX[@]}")"
-MACOS_PAYLOAD = "$(echo "${GLOBAL_FIX_MACOS[@]}")"
+WIN_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_WIN_REG[@]}")"""
+LINUX_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_LINUX[@]}")"""
+MACOS_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_MACOS[@]}")"""
 $templates
 
 @app.route('/')
