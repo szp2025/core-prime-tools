@@ -3887,14 +3887,13 @@ generate_share_server_code_raw() {
     done
 
     # Переводим динамические данные в Base64, чтобы обойти ограничения интерпретаторов NetHunter/Termux
-    # Это на 100% защищает синтаксис от искажения и сохраняет правильный цвет в IDE
     local b64_regex
     b64_regex=$(echo -n "$joined_regex" | base64 | tr -d '\n\r')
     
     local b64_template
     b64_template=$(echo -n "$template" | base64 | tr -d '\n\r')
 
-    # Запись монолитного share_server.py (Строгий 'EOF' — идеальная интеграция в Bash/Zsh)
+    # Запись монолитного share_server.py (Строгий 'EOF' — идеальный цвет в IDE и защита от Zsh-конфликтов)
     cat << 'EOF' > share_server.py
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
@@ -3905,14 +3904,15 @@ app = Flask(__name__)
 
 # Декодирование сигнатурной матрицы CAME, переданной из ядра NetHunter/Termux
 B64_REGEX_DATA = "__CAME_B64_REGEX_PLACEHOLDER__"
-GLOBAL_AV_PIPE_REGEX = re.compile(base64.b64decode(B64_REGEX_DATA).decode('utf-8', errors='ignore'), re.IGNORECASE | re.MULTILINE)
+# Сохраняем как сырую строку, чтобы избежать ошибок компиляции при инициализации Flask
+GLOBAL_AV_RAW_REGEX = base64.b64decode(B64_REGEX_DATA).decode('utf-8', errors='ignore')
 
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
-# Декодирование и微инициализация оригинального HTML-интерфейса CAME
+# Декодирование и инициализация оригинального HTML-интерфейса CAME
 B64_TEMPLATE_DATA = "__CAME_B64_TEMPLATE_PLACEHOLDER__"
 HTML_PRIME_TEMPLATE = base64.b64decode(B64_TEMPLATE_DATA).decode('utf-8', errors='ignore')
 
@@ -3966,7 +3966,6 @@ def get_file(filename):
     if not target_path.startswith(SHARE_DIR) or not os.path.exists(target_path):
         abort(404)
         
-    # Игнорируем директории, если они случайно попали в запрос
     if os.path.isdir(target_path):
         abort(400)
 
@@ -3989,9 +3988,12 @@ def get_file(filename):
 
         matches = []
         try:
-            for i, line in enumerate(text_content.splitlines(), 1):
-                if GLOBAL_AV_PIPE_REGEX.search(line):
-                    matches.append(f"Line {i}: {line.strip()[:100]}")
+            # Безопасная компиляция внутри контекста функции (как в upload_server)
+            if GLOBAL_AV_RAW_REGEX.strip():
+                compiled_regex = re.compile(GLOBAL_AV_RAW_REGEX, re.IGNORECASE | re.MULTILINE)
+                for i, line in enumerate(text_content.splitlines(), 1):
+                    if compiled_regex.search(line):
+                        matches.append(f"Line {i}: {line.strip()[:100]}")
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
 
@@ -4006,7 +4008,6 @@ def get_file(filename):
 
         # --- РУБЕЖ РЕШЕНИЯ И АННИГИЛЯЦИИ ---
         if is_infected:
-            # Полное стирание опасного объекта с диска
             if os.path.exists(target_path):
                 os.remove(target_path)
 
@@ -4025,7 +4026,6 @@ def get_file(filename):
             return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
 
         else:
-            # Файл чист — беспрепятственно отдаем клиенту
             return send_from_directory(SHARE_DIR, filename)
 
     except Exception as e:
@@ -4043,8 +4043,9 @@ EOF
     final_code="${final_code//__CAME_B64_TEMPLATE_PLACEHOLDER__/$b64_template}"
 
     echo "$final_code" > share_server.py
-    echo "[+] share_server.py успешно адаптирован под Termux/NetHunter (Bash & Zsh). Проблема синтаксиса f-строк решена."
+    echo "[+] share_server.py успешно адаптирован и запущен. Ошибки инициализации устранены."
 }
+
 
 
 generate_share_server_code_raworigin() {
