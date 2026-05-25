@@ -3482,7 +3482,7 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
 # ==============================================================================
 
-generate_av_server_code_rawok1() {
+generate_av_server_code_raw() {
 
     local templates="$(generate_core_template)
 
@@ -3587,16 +3587,28 @@ def scan():
     threat_count = 0
     try:
         proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
-        for line in proc.stdout:
+       for line in proc.stdout:
+            # 1. Более надежный разбор строки
+            line = line.strip()
+            if not line: continue
+            
+            # Разделяем на offset (HEX) и само содержимое
             parts = line.split(' ', 1)
             if len(parts) < 2: continue
             offset, content = parts
             
-            # Обновленный цикл поиска секретов
+            # 2. Очистка контента от непечатных символов, которые мешают регуляркам
+            clean_content = re.sub(r'[^\x20-\x7E]', '', content)
+            
+            # 3. Ищем секреты
             for hsig in GLOBAL_HASH_MATRIX:
-                match = re.search(hsig, content)
+                match = re.search(hsig, clean_content)
                 if match:
-                    report.append(f"[SECRET FOUND] [Offset {offset}]: {match.group(0).strip()}")
+                    found = match.group(0).strip()
+                    # Добавляем фильтр: если нашли секрет, он должен быть длиннее 4 символов,
+                    # чтобы отсеять случайные символы
+                    if len(found) > 4:
+                        report.append(f"[SECRET FOUND] [Offset {offset}]: {found}")
             
             for layer in GLOBAL_AV_MATRIX:
                 if re.search(layer, content, re.I):
