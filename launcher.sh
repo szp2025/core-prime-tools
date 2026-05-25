@@ -3451,7 +3451,6 @@ EOF
 
 
 generate_av_server_code_raw() {
-    # Загружаем UI шаблоны лаунчера
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
@@ -3465,8 +3464,9 @@ import platform
 
 app = Flask(__name__)
 
-# [ЯДЕРНЫЕ СИГНАТУРЫ CAME]
-GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
+# [КОНФИГУРАЦИЯ ЯДРА]
+GLOBAL_HASH_MATRIX = [r"AIza[0-9A-Za-z-_]{35}", r"sk_live_[0-9a-zA-Z]{24}"]
+GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
 GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
 GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
 
@@ -3478,7 +3478,6 @@ $templates
 
 @app.route('/')
 def index():
-    # Главная страница: Консоль мониторинга
     form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
     
     current_os = platform.system().lower()
@@ -3508,15 +3507,21 @@ def scan():
     if not f: return "Empty Payload", 400
     tmp = os.path.join('/tmp', f.filename)
     f.save(tmp)
+    report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
+    threat_count = 0
     try:
-        with open(tmp, 'rb') as b: content = b.read().decode('utf-8', errors='ignore')
-        matches = [f"Line {i}: {line.strip()[:100]}" for i, line in enumerate(content.splitlines(), 1) if re.search(GLOBAL_AV_PIPE_REGEX, line, re.I)]
-        report = [f"=== AUDIT: {f.filename} ===", f"Matches found: {len(matches)}"] + matches
-        is_inf = len(matches) > 0
-    except Exception as e: report = [f"ERROR: {e}"]; is_inf = False
-    finally:
-        if is_inf: shutil.move(tmp, f"{tmp}.quarantine")
-        else: os.remove(tmp)
+        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
+        for line in proc.stdout:
+            offset, content = line.split(' ', 1)
+            for hsig in GLOBAL_HASH_MATRIX:
+                if re.search(hsig, content): report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
+            for layer in GLOBAL_AV_MATRIX:
+                if re.search(layer, content, re.I):
+                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                    threat_count += 1
+        report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
+    except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
+    finally: os.remove(tmp)
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
 
 @app.route('/sys-audit/<mode>')
@@ -3542,7 +3547,6 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 EOF
 }
-
 
 
 
