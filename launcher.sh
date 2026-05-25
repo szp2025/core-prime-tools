@@ -95,15 +95,32 @@ GLOBAL_MENU_REGISTRY=(
 )
 
 # ==============================================================================
-# GLOBAL OSINT & RECON MATRIX (EXTENDED DATA SOURCES)
+# ULTIMATE OSINT & RECON MATRIX (OPEN & AUTH-FREE SOURCES)
 # ==============================================================================
+# Формат: "URL|ТИП_ДАННЫХ|КАТЕГОРИЯ|ОПИСАНИЕ"
 GLOBAL_OSINT_SERVICES=(
-    "https://api.viewdns.info/whois/?domain=%TARGET%&output=json"
-    "https://api.ipapi.com/%IP%?access_key=YOUR_KEY" # Пример с API-ключом
-    "https://rdap.arin.net/registry/ip/%IP%"           # Для глубокой IP-инфо
-    "https://dns.google/resolve?name=%TARGET%&type=A"
+    # --- Инфраструктура и Геолокация ---
+    "https://rdap.arin.net/registry/ip/%IP%|IP_DATA|NET|ASN/ISP Registration"
+    "https://ipapi.co/%IP%/json/|GEO_DATA|NET|Geolocation & Provider"
+    "https://ip-api.com/json/%IP%|GEO_DATA|NET|Full Geo Details"
+    
+    # --- DNS и WAF детекция ---
+    "https://dns.google/resolve?name=%TARGET%&type=A|DNS_DATA|INFRA|IPv4 Records"
+    "https://dns.google/resolve?name=%TARGET%&type=TXT|DNS_DATA|INFRA|TXT/SPF/DKIM"
+    "https://dns.google/resolve?name=%TARGET%&type=MX|DNS_DATA|INFRA|Mail Servers"
+    
+    # --- WHOIS и История домена ---
+    "https://api.viewdns.info/whois/?domain=%TARGET%&output=json|WHOIS_DATA|DOMAIN|Whois JSON"
+    "https://api.viewdns.info/iphistory/?domain=%TARGET%&output=json|HISTORY_DATA|DOMAIN|IP History"
+    "https://api.viewdns.info/dnsrecord/?domain=%TARGET%&output=json|DNS_DATA|INFRA|Deep DNS Records"
+    
+    # --- Безопасность и Репутация ---
+    "https://check.spamhaus.org/ip/%IP%/|REPUTATION_DATA|SEC|Spamhaus Reputation"
+    "https://otx.alienvault.com/api/v1/indicators/IPv4/%IP%/general|THREAT_DATA|SEC|AlienVault OTX (Public)"
+    
+    # --- SSL/TLS Инфо ---
+    "https://crt.sh/?q=%TARGET%&output=json|CERT_DATA|DOMAIN|Certificate Transparency Logs"
 )
-
 
 # ==============================================================================
 # 1. ГЛОБАЛЬНАЯ МАТРИЦА ПЛАТФОРМ ДЛЯ КРОСС-СПРАВОК (ULTIMATE OSINT CORE)
@@ -4349,11 +4366,12 @@ EOF
 # ==========================================
 # 2. РАБОЧИЕ ФУНКЦИИ (Используют ядро)
 # ==========================================
+
 run_system_info() {
     local start_time=$(date +%s)
     core_engine_ui "h" "NEXUS v25.7: HEURISTIC PERIMETER EXPLORER"
     
-    # 1. Сбор и нормализация
+    # 1. Сбор и нормализация цели
     local r_input=$(core_engine_input "text" "Enter Target (IP, Domain or URL)")
     [[ -z "$r_input" ]] && r_input="http://localhost"
     [[ ! "$r_input" =~ ^http ]] && r_input="http://$r_input"
@@ -4362,78 +4380,68 @@ run_system_info() {
     local r_base_url=$(echo "$r_input" | cut -d'/' -f1-3)
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
     
+    # Инициализация словарей
+    local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
+    local total=${#full_list[@]}
+    local tmp_hits="/tmp/recon_hits_$$"
+    : > "$tmp_hits"
+    
     clear
     core_engine_ui "h" "AUDIT TARGET: ${r_target}"
-
-    # ЭТАП 2: ВЫПОЛНЕНИЕ ВАШЕЙ GLOBAL_OSINT_SERVICES
-    echo -e "${Y}--- [OSINT: EXTERNAL INTELLIGENCE SOURCES] ---${NC}"
-    for service_url in "${GLOBAL_OSINT_SERVICES[@]}"; do
-        # Игнорируем строки с комментариями или пустышки
-        [[ "$service_url" =~ ^# ]] || [[ -z "$service_url" ]] && continue
-        
-        # Подставляем переменные в ваш URL
-        local request_url="${service_url//%TARGET%/$r_target}"
+    
+    # ЭТАП 1: OSINT & INFRASTRUCTURE (Использование вашей матрицы)
+    echo -e "${Y}--- [OSINT: ADVANCED INTELLIGENCE SOURCES] ---${NC}"
+    for entry in "${GLOBAL_OSINT_SERVICES[@]}"; do
+        # Парсинг строки: URL|TYPE|CAT|DESC
+        IFS='|' read -r url type cat desc <<< "$entry"
+        local request_url="${url//%TARGET%/$r_target}"
         request_url="${request_url//%IP%/$target_ip}"
         
-        echo -e "${W}[*] Querying:${NC} ${service_url}"
+        echo -ne "${W}[*] Fetching ${cat} (${desc})...${NC}"
         local response=$(curl -s --connect-timeout 3 "$request_url")
-        
-        # Вывод результата (обрезаем для чистоты экрана)
-        echo -e "${G}    Result:${NC} ${response:0:80}..."
+        [[ -n "$response" ]] && echo -e " ${G}DONE${NC}" || echo -e " ${R}FAILED${NC}"
+        [[ -n "$response" ]] && echo -e "    ${C}> ${response:0:80}..."
     done
 
-    
-# ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING (С расчетом ETA)
-    core_engine_ui "w" "Scanning $total endpoints..."
-    echo "" # Строка для прогресса
+    # ЭТАП 2: WHOIS & IDENTITY
+    echo -e "\n${Y}--- [WHOIS & IDENTITY] ---${NC}"
+    local whois_data=$(whois "$r_target" 2>/dev/null)
+    for pattern in "${GLOBAL_WHOIS_MATRIX[@]}"; do
+        local match=$(echo "$whois_data" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2- | xargs)
+        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
+    done
 
+    # ЭТАП 3: AGGRESSIVE FUZZING (С расчетом ETA)
+    core_engine_ui "w" "Scanning $total endpoints..."
+    echo "" 
     for i in "${!full_list[@]}"; do
         local hook="${full_list[$i]}"
         local current=$((i + 1))
-        local start_iter=$(date +%s) # Засекаем время начала итерации
-        
-        # Обновление прогресса
         local elapsed=$(( $(date +%s) - start_time ))
+        local eta=$(( ( (total - current) * elapsed ) / (current + 1) ))
         
-        # Расчет ETA
-        # Среднее время итерации = общее прошедшее время / кол-во выполненных
-        local avg_time=$(( elapsed / current ))
-        local remaining_iters=$(( total - current ))
-        local eta=$(( avg_time * remaining_iters ))
+        # Динамическое обновление строки
+        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Time: ${elapsed}s] [ETA: ${eta}s] Scanning: /${hook:0:20}          \n"
         
-        # Форматирование ETA
-        local eta_fmt=$(printf "%02d:%02d" $((eta/60)) $((eta%60)))
-        
-        # Вывод в одну строку
-        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Elapsed: ${elapsed}s] [ETA: ${eta_fmt}] Scanning: /${hook:0:20}          \n"
-        
-        local target_url="${r_base_url}/${hook#/}"
-        local req_result=$(curl -sI -L --connect-timeout 2 "$target_url" 2>/dev/null)
-        local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
-        
-        if [[ "$code" == "200" ]]; then
-            echo -e "${G}[!] HIT FOUND: /$hook (200 OK)${NC}"
-            echo "HIT: /$hook" >> "$tmp_hits"
-        fi
+        local code=$(curl -sI -L --connect-timeout 2 "${r_base_url}/${hook#/}" 2>/dev/null | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+        [[ "$code" == "200" ]] && { echo -e "${G}[!] HIT FOUND: /$hook (200 OK)${NC}"; echo "HIT: /$hook" >> "$tmp_hits"; }
     done
-    
-    # Очищаем строку прогресса после завершения цикла
     echo -ne "\r                                                                         \r"
-    
+
     # ЭТАП 4: SECURITY HEADERS & FINAL SUMMARY
+    local info_payload=$(curl -s -I -L --connect-timeout 5 "$r_input" 2>/dev/null)
     echo -e "\n\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
-    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection")
-    for h in "${sec_headers[@]}"; do
+    for h in "Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection"; do
         echo -e "${W}$h :${NC} $(echo "$info_payload" | grep -Ei "^$h:" >/dev/null && echo -e "${G}Present" || echo -e "${R}Missing")"
     done
     
-    echo -e "\n${Y}--- [FINAL INTELLIGENCE REPORT] ---${NC}"
-    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo -e "${W}No endpoints discovered.${NC}"
+    [[ -s "$tmp_hits" ]] && { echo -e "\n${Y}--- [FINAL INTELLIGENCE REPORT] ---${NC}"; cat "$tmp_hits"; }
     
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
+
 
 # Редиректы на существующие модули, чтобы не дублировать код
 pc_steal_creds() { run_pc_recovery_ultimate; }
