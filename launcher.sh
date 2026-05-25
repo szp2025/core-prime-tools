@@ -4163,13 +4163,16 @@ EOF
 # ==============================================================================
 
 
-generate_upload_server_code_raw() {
-    # Загружаем UI шаблоны лаунчера в локальные переменные
+ggenerate_upload_server_code_raw() {
+    # 1. Формируем строку регулярки из массива
+    local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
+    
+    # Загружаем UI шаблоны
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
-    # Генерируем файл, используя 'EOF' (в одинарных кавычках), чтобы Bash не ломал Python-код
-    cat << 'EOF' > /root/upload_server.py
+    # 2. Оригинальный код с заменой маркера
+    cat << EOF > /root/upload_server.py
 from flask import Flask, request, render_template_string
 import os
 import re
@@ -4177,17 +4180,17 @@ import shutil
 
 app = Flask(__name__)
 
-# Маркер для вставки регулярного выражения
-GLOBAL_AV_PIPE_REGEX = r"""__REGEX_INSERT_MARKER__"""
+# Проброс глобального регулярного выражения CAME из ядра Bash в Python
+GLOBAL_AV_PIPE_REGEX = r"""$regex_pattern"""
 
 # Сохраняем во входящую папку внутри PRIME_LOOT
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
-# Инициализация безопасной структуры каталогов
+# Инициализация безопасной структуры каталогов (только папка для чистых файлов)
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-__TEMPLATES_INSERT_MARKER__
+$templates
 
 @app.route('/')
 def index():
@@ -4249,9 +4252,11 @@ def upload():
         # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
         if is_infected:
             # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
+            # Файл ЗАРАЖЕН — Полное удаление с диска без создания карантинных копий
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
             
+            # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL DETECTION: THREAT TOTALLY DESTROYED
@@ -4265,8 +4270,11 @@ def upload():
         else:
             # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
             final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
+            
+            # На случай, если файл с таким именем уже существовал, безопасно перезаписываем его
             if os.path.exists(final_dest_path):
                 os.remove(final_dest_path)
+                
             shutil.move(tmp_path, final_dest_path)
             
             content = f"""
@@ -4279,6 +4287,7 @@ def upload():
             return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
             
     except Exception as e:
+        # Гарантированная зачистка временного буфера в случае критического сбоя выполнения
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
@@ -4286,11 +4295,8 @@ def upload():
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
-
-    # Впрыскиваем значения в созданный файл
-    sed -i "s|__REGEX_INSERT_MARKER__|$GLOBAL_AV_ENGINE_PIPE|g" /root/upload_server.py
-    sed -i "s|__TEMPLATES_INSERT_MARKER__|$templates|g" /root/upload_server.py
 }
+
 
 
 generate_upload_server_code_raworigin() {
