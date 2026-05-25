@@ -4332,86 +4332,100 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
 
-generate_upload_server_code_raw() {
-    # Загружаем UI шаблоны лаунчера в локальные переменные
-    local templates
-    templates="$(generate_core_template)
-$(generate_core_form_template)"
+generate_share_server_code_raw() {
+    # Загружаем базовый шаблон страницы в локальную переменную
+    local template_core
+    template_core=$(generate_core_template)
 
-    # Собираем массив матриц в единую строку через пайп | на уровне ядра Bash
-    local joined_regex=""
+    # Динамически объединяем все элементы Bash-массива GLOBAL_AV_MATRIX в одну регулярную строку
+    local j_regex=""
     for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-        if [ -z "$joined_regex" ]; then
-            joined_regex="$layer"
+        if [ -z "$j_regex" ]; then
+            j_regex="$layer"
         else
-            joined_regex="$joined_regex|$layer"
+            j_regex="$j_regex|$layer"
         fi
     done
 
-    # ЭКСПОРТ В ОКРУЖЕНИЕ: передаем данные в процесс Python через переменные среды OS
-    export CAME_EXPORTED_REGEX="$joined_regex"
+    # Экранируем разметку шаблона
+    template_core="${template_core//\\/\\\\}"
+    template_core="${template_core//\"\"\"/\\\"\\\"\\\"}"
 
-    # ШАГ 1: Записываем чистый Python-код. Кавычки 'EOF' гарантируют, 
-    # что Bash/Zsh не изменят ни одного символа, и подсветка IDE будет идеальной.
-    cat << 'EOF' > upload_server.py
-from flask import Flask, request, render_template_string
+    cat << \EOF > share_server.py
+from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
-import shutil
 
 app = Flask(__name__)
 
-# Безопасное чтение регулярного выражения CAME из окружения операционной системы
-GLOBAL_AV_PIPE_REGEX = os.environ.get('CAME_EXPORTED_REGEX', '')
+# Проброс регулярных выражений из массива GLOBAL_AV_MATRIX
+GLOBAL_AV_PIPE_REGEX = r"""__DYNAMIC_MATRIX_REGEX__"""
 
-# Сохраняем во входящую папку внутри PRIME_LOOT
-UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
+# Хранение структуры страницы
+CORE_TEMPLATE_RAW = """__DYNAMIC_CORE_TEMPLATE__"""
 
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+def render_prime_page(title, content):
+    return CORE_TEMPLATE_RAW.replace('{{ title }}', title).replace('{{ content }}', content)
 
-# Сюда будут добавлены функции шаблонов ядра CAME
-EOF
+SHARE_DIR = '/root/share'
 
-    # ШАГ 2: Безопасно дописываем сырые HTML-шаблоны из локальной переменной в конец файла
-    echo "$templates" >> upload_server.py
+if not os.path.exists(SHARE_DIR):
+    os.makedirs(SHARE_DIR, exist_ok=True)
 
-    # ШАГ 3: Дописываем оставшуюся логику роутов во Flask (снова защищенный 'EOF')
-    cat << 'EOF' >> upload_server.py
+def get_file_icon(filename):
+    ext = filename.split('.')[-1].lower() if '.' in filename else ''
+    icons = {
+        'pdf': '📕', 'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 
+        'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
+        'py': '💻', 'js': '💻', 'html': '💻', 'sh': '💻', 'css': '💻',
+        'txt': '📄', 'md': '📝', 'doc': '📄', 'docx': '📄'
+    }
+    return icons.get(ext, '📄')
 
 @app.route('/')
 def index():
-    # Главная страница: Форма загрузки в drop-box
-    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
-    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
-    return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
+    try:
+        files = sorted(os.listdir(SHARE_DIR))
+    except:
+        files = []
+    
+    grid_content = '<div class="file-grid">'
+    for f in files:
+        icon = get_file_icon(f)
+        grid_content += f"""
+        <a href="/get/{f}" class="file-item" target="_blank">
+            <span class="file-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px;">{icon}</span>
+            <div style="font-size: 0.8rem; word-break: break-all; line-height: 1.2;">{f}</div>
+        </a>
+        """
+    if not files:
+        grid_content += '<p style="color: var(--accent); font-style: italic; grid-column: 1/-1; opacity: 0.5;">[ SECTOR_EMPTY: No data detected ]</p>'
+    
+    grid_content += '</div>'
+    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION_v2.0", grid_content))
 
-@app.route('/upload', methods=['POST'])
-def upload():
-    if 'file' not in request.files: 
-        return "TRANSFER_ERROR", 400
+@app.route('/get/<filename>')
+def get_file(filename):
+    target_path = os.path.normpath(os.path.join(SHARE_DIR, filename))
+    if not target_path.startswith(SHARE_DIR) or not os.path.exists(target_path):
+        abort(404)
         
-    f = request.files['file']
-    if f.filename == '': 
-        return "EMPTY_FILENAME", 400
-    
-    tmp_path = os.path.join('/tmp', f.filename)
-    f.save(tmp_path)
-    
+    if os.path.isdir(target_path):
+        abort(400)
+
     is_infected = False
     report = []
-    
+
     try:
-        with open(tmp_path, 'rb') as file_buffer:
+        with open(target_path, 'rb') as file_buffer:
             raw_content = file_buffer.read()
-            
+
         total_bytes = len(raw_content)
-        
         printable_chars = len([b for b in raw_content if 32 <= b <= 126])
         readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
-        
+
         text_content = raw_content.decode('utf-8', errors='ignore')
-        
+
         matches = []
         try:
             compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
@@ -4420,61 +4434,45 @@ def upload():
                     matches.append(f"Line {i}: {line.strip()[:100]}")
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
-            
+
         if total_bytes > 1000 and readable_ratio < 12:
             is_infected = True
-            report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
-            
+            report.append("CRITICAL ANOMALY: High Entropy signature detected.")
+
         if matches:
             is_infected = True
-            report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
-            
+            report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
+
         if is_infected:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            
-            # Фикс синтаксиса f-строк Python (выносим слэш наружу)
+            if os.path.exists(target_path):
+                os.remove(target_path)
+
             report_output = "\n".join(report)
-            
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
-                CRITICAL DETECTION: THREAT TOTALLY DESTROYED
+                CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
             </div>
-            <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
             <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{report_output}</pre>
             <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
             """
-            return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
-            
+            return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
         else:
-            final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
-            
-            if os.path.exists(final_dest_path):
-                os.remove(final_dest_path)
-                
-            shutil.move(tmp_path, final_dest_path)
-            
-            content = f"""
-            <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">
-                SUCCESS: UPLOAD VERIFIED
-            </div>
-            <p style="font-size:12px;">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
-            <div style="margin-top:20px;"><a href="/" class="btn">[ UPLOAD ANOTHER FILE ]</a></div>
-            """
-            return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
-            
+            return send_from_directory(SHARE_DIR, filename)
     except Exception as e:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
+        return f"DISTRIBUTION_INTEGRITY_ERROR: {str(e)}", 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    echo "[+] upload_server.py успешно сгенерирован раздельными блоками без конфликтов шелла."
-}
+    local final_code
+    final_code=$(cat share_server.py)
+    final_code="${final_code//__DYNAMIC_MATRIX_REGEX__/$j_regex}"
+    final_code="${final_code//__DYNAMIC_CORE_TEMPLATE__/$template_core}"
 
+    echo "$final_code" > share_server.py
+    echo "[+] share_server.py успешно сгенерирован на базе GLOBAL_AV_MATRIX."
+}
 
 
 generate_upload_server_code_raworigin() {
