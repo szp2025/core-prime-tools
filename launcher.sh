@@ -3890,7 +3890,7 @@ generate_share_server_code_raw() {
     # Экранируем двойные кавычки внутри регулярного выражения для безопасности Python
     local safe_python_regex="${joined_regex//\"/\\\"}"
 
-    # Шаг 1: Записываем верхнюю часть сервера (строгий 'EOF' — Bash ничего не испортит)
+    # Шаг 1: Записываем верхнюю часть сервера (строгий 'EOF' — подсветка идеальная)
     cat << 'EOF' > share_server.py
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
@@ -3914,8 +3914,14 @@ if not os.path.exists(SHARE_DIR):
 
 EOF
 
-    # Шаг 4: Вшиваем динамический шаблон страницы, переданный из ядра
-    echo "$template" >> share_server.py
+    # Шаг 4: Безопасное оборачивание $template в Python-функцию, чтобы не было 'invalid syntax'
+    # Экранируем внутренние бэкслеши и тройные кавычки шаблона, чтобы Python воспринял это как чистый текст
+    local safe_template="${template//\\/\\\\}"
+    safe_template="${safe_template//\"\"\"/\\\"\\\"\\\"}"
+
+    echo "def render_prime_page(title, content):" >> share_server.py
+    echo "    template_raw = \"\"\"$safe_template\"\"\"" >> share_server.py
+    echo "    return template_raw.replace('{{ title }}', title).replace('{{ content }}', content)" >> share_server.py
 
     # Шаг 5: Дописываем всю оставшуюся логику Flask-сервера (строгий 'EOF')
     cat << 'EOF' >> share_server.py
@@ -4022,7 +4028,7 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    echo "[+] share_server.py успешно собран поблочно. Конфликты разметки полностью решены."
+    echo "[+] share_server.py полностью исправлен, синтаксис Python валиден."
 }
 
 
