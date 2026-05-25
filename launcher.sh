@@ -3587,28 +3587,32 @@ def scan():
     threat_count = 0
     try:
         proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
-       for line in proc.stdout:
-            # 1. Более надежный разбор строки
+     for line in proc.stdout:
             line = line.strip()
             if not line: continue
             
-            # Разделяем на offset (HEX) и само содержимое
+            # Разделяем только первый пробел после offset
             parts = line.split(' ', 1)
             if len(parts) < 2: continue
             offset, content = parts
             
-            # 2. Очистка контента от непечатных символов, которые мешают регуляркам
-            clean_content = re.sub(r'[^\x20-\x7E]', '', content)
+            # ВМЕСТО РЕЗКОЙ ОЧИСТКИ используем strip() и проверяем исходный контент
+            # Непечатные символы могут быть частью пароля, но их надо просто убрать по краям
+            clean_content = content.strip()
             
-            # 3. Ищем секреты
             for hsig in GLOBAL_HASH_MATRIX:
+                # Используем поиск с игнорированием регистра, если это уместно
                 match = re.search(hsig, clean_content)
                 if match:
                     found = match.group(0).strip()
-                    # Добавляем фильтр: если нашли секрет, он должен быть длиннее 4 символов,
-                    # чтобы отсеять случайные символы
-                    if len(found) > 4:
-                        report.append(f"[SECRET FOUND] [Offset {offset}]: {found}")
+                    # Убираем проверку на длину > 4, так как пароль может быть коротким
+                    # Если нашли - пишем в отчет
+                    report.append(f"[SECRET FOUND] [Offset {offset}]: {found}")
+                else:
+                    # ОТЛАДКА: если строка очень похожа на пароль, но не прошла
+                    if len(clean_content) > 8 and "pass" in clean_content.lower():
+                        report.append(f"[DEBUG: POSSIBLY MISSED] [Offset {offset}]: {clean_content}")
+                        
             
             for layer in GLOBAL_AV_MATRIX:
                 if re.search(layer, content, re.I):
