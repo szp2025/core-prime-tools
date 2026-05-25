@@ -8630,12 +8630,6 @@ run_live_service() {
     core_engine_progress 2 "NODE_STABILIZATION"
 
     # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
-    # Запускаем в фоне
-    python3 "$service_file" > "$log_file" 2>&1 &
-    
-    # ДАЕМ СЕРВЕРУ ВРЕМЯ НА ИНИЦИАЛИЗАЦИЮ (ключевой момент)
-    sleep 2 
-
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local final_url="$protocol://$service_name:$port"
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
@@ -8648,6 +8642,7 @@ run_live_service() {
         [[ -f "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty."
         core_engine_ui "line"
     fi
+
 
     core_engine_wait
 }
