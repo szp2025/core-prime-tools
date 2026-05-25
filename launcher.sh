@@ -4369,33 +4369,6 @@ run_system_pulse() {
     core_engine_wait
 }
 
-run_system_pulseold() {
-    # Слой 1: Заголовок и статус через Голос [1]
-    core_engine_ui "SECTOR Z: LIVE SYSTEM PULSE"
-    core_engine_ui "Monitoring filesystem events and net-connections..."
-    
-    # Слой 2: Сетевые соединения
-    # Используем узел [12] для акцента на NET
-    echo -e "${Y}[NETWORK CONNECTIONS]:${NC}"
-    # Очищаем вывод через sed, сохраняя твой фильтр
-    ss -tunp | grep -v "127.0.0.1" | head -n 10 | sed 's/^/  /'
-    
-    # Слой 3: Визуальный разделитель [9]
-    core_engine_wait "L" # Рисуем линию
-    
-    # Слой 4: Живой мониторинг
-    core_engine_ui "w" "Watching file activity (Ctrl+C to stop)"
-    
-    # Используем переменную из нашей структуры (PRIME_LOOT -> из конфига или локальная)
-    local loot_path="${BASE_DIR:-./}/prime_loot"
-    
-    # Запускаем мониторинг
-    watch -n 2 "ls -lt /tmp $loot_path 2>/dev/null | head -n 15"
-}
-
-
-
-
 # Редиректы на существующие модули, чтобы не дублировать код
 pc_steal_creds() { run_pc_recovery_ultimate; }
 pc_post_exploit() { run_forensic_scanner; }
@@ -5770,19 +5743,16 @@ run_system_info() {
     local start_time=$(date +%s)
     core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
     
-    # 1. Приоритетный выбор цели
-    local r_input=$(core_engine_input "text" "Enter Target URL [default: localhost]")
+    local r_input=$(core_engine_input "text" "Enter Target URL [default: http://localhost]")
     [[ -z "$r_input" ]] && r_input="http://localhost"
     
-    # Парсинг URL
     local r_target=$(echo "$r_input" | sed -e 's|^[^/]*//||' -e 's|/.*||')
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
     local info_payload=$(curl -s -I -L --connect-timeout 5 "$r_input" 2>/dev/null)
     local whois_data=$(whois "$r_target" 2>/dev/null)
     
     clear
-    
-    # 2. ВЫВОД ИНТЕЛЛЕКТУАЛЬНОЙ КАРТОЧКИ
+    # 1. КАРТОЧКА ЦЕЛИ
     core_engine_ui "h" "AUDIT TARGET: ${r_target}"
     echo -e "${W}Target Domain  :${NC} ${Y}${r_target}${NC}"
     echo -e "${W}Resolved IP    :${NC} ${G}${target_ip:-LOCAL}${NC}"
@@ -5799,37 +5769,44 @@ run_system_info() {
     done
     echo -e "---------------------------------------------------"
 
-    # 3. АДАПТИВНЫЙ ФАЗЗИНГ С ПРОГРЕСС-БАРОМ
+    # 2. ФАЗЗИНГ С ПРОГРЕСС-БАРОМ
     local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
     local total=${#full_list[@]}
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
 
     core_engine_ui "w" "Scanning $total endpoints..."
+    echo "" 
 
     for i in "${!full_list[@]}"; do
         local hook="${full_list[$i]}"
         local current=$((i + 1))
         local elapsed=$(( $(date +%s) - start_time ))
         
-        # Динамический прогресс
-        echo -ne "\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Time: ${elapsed}s] Scanning: /$hook          "
+        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Time: ${elapsed}s] Scanning: /$hook          \n"
         
         local req_result=$(curl -sI -L --connect-timeout 2 "http://${r_target}/${hook}" 2>/dev/null)
         local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
         
         if [[ "$code" == "200" ]]; then
-            echo -e "\n${G}[!] HIT FOUND: /$hook (200 OK)${NC}"
+            echo -e "${G}[!] HIT FOUND: /$hook (200 OK)${NC}"
             echo "HIT: /$hook | Server: $(echo "$req_result" | grep -Ei '^Server:' | cut -d' ' -f2-)" >> "$tmp_hits"
         fi
     done
 
-    # 4. ФИНАЛЬНЫЙ ОТЧЕТ
+    # 3. ФИНАЛЬНЫЙ ОТЧЕТ + АНАЛИЗ ЗАГОЛОВКОВ БЕЗОПАСНОСТИ
     echo -e "\n\n${Y}--- [FINAL INTELLIGENCE REPORT] ---${NC}"
-    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo "No high-value endpoints discovered."
+    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo -e "${W}No high-value endpoints discovered.${NC}"
+    
+    echo -e "\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
+    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection")
+    for h in "${sec_headers[@]}"; do
+        local val=$(echo "$info_payload" | grep -Ei "^$h:" | cut -d':' -f2-)
+        [[ -n "$val" ]] && echo -e "${G}[+] $h : Present${NC}" || echo -e "${R}[-] $h : Missing${NC}"
+    done
     
     local final_time=$(( $(date +%s) - start_time ))
-    echo -e "${W}Total Audit Duration: ${G}${final_time}s${NC}"
+    echo -e "\n${W}Total Audit Duration: ${G}${final_time}s${NC}"
     
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
