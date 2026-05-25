@@ -3504,6 +3504,7 @@ import subprocess
 
 import platform
 app = Flask(__name__)
+
 # [КОНФИГУРАЦИЯ ЯДРА]
 GLOBAL_HASH_MATRIX = [
     # Токены и секреты (группа захвата во 2-й скобке)
@@ -3526,6 +3527,8 @@ WIN_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_WIN_REG[@]}")"""
 LINUX_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_LINUX[@]}")"""
 MACOS_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_MACOS[@]}")"""
 
+app.secret_key = 'super_secret_key_for_came_gateway' # Обязательно для работы сессий
+
 # Интеллектуальный детектор зашифрованных контейнеров
 def is_encrypted_container(file_path):
     try:
@@ -3539,52 +3542,38 @@ def is_encrypted_container(file_path):
 $templates
 
 @app.route('/')
-
 def index():
-
     form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
- 
 
     current_os = platform.system().lower()
-
     btn_map = {
-
         "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
-
         "linux": ("INJECT LINUX PURGE", "/inject/linux", "#e91e63"),
-
         "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
-
     }
-
     label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
 
+    # Логика: показываем кнопку только если в сессии статус INFECTED
+    verdict = session.get('last_verdict', 'CLEAN')
+    injection_kit_html = ""
     
+    if verdict == 'INFECTED':
+        injection_kit_html = f"""
+        <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
+        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
+        """
 
     body = form_html + f"""
-
     <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
-
         <h3 style="color: var(--accent-color);">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
-
         <div style="display: flex; gap: 10px;">
-
             <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
-
             <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
-
         </div>
-
-        <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
-
-        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
-
+        {injection_kit_html}
     </div>
-
     """
-
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
-
 
 
 @app.route('/scan', methods=['POST'])
@@ -3597,9 +3586,12 @@ def scan():
     
     report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
     threat_count = 0
+    
+    # По умолчанию считаем объект чистым
+    session['last_verdict'] = 'CLEAN'
 
     try:
-        # Умная проверка: если файл контейнер, пропускаем strings, чтобы убрать шум
+        # Умная проверка: если файл контейнер, пропускаем strings
         if is_encrypted_container(tmp) and not any(ext in f.filename.lower() for ext in ['.txt', '.log']):
             report.append("[STATUS]: Encrypted container detected.")
             report.append("[INFO]: Deep analysis bypassed to prevent noise.")
@@ -3623,14 +3615,19 @@ def scan():
                         report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
                         threat_count += 1
             
-            report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
+            # Устанавливаем вердикт в сессию
+            verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
+            session['last_verdict'] = verdict
+            
+            report.append(f"\nVERDICT: {verdict}")
 
-    except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
+    except Exception as e: 
+        report.append(f"ENGINE_FAILURE: {e}")
+        session['last_verdict'] = 'CLEAN' # Сброс при ошибке
     finally:
         if os.path.exists(tmp): os.remove(tmp)
 
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
-    
+    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))    
 
 
 
