@@ -69,6 +69,8 @@ GLOBAL_MENU_REGISTRY=(
     "SYSTEM:System_Info|run_system_info" "SYSTEM:Sync_DNS|core_network_dns_sync"
     "SYSTEM:Update_OS|run_sys_update" "SYSTEM:Update_Launcher|run_update_prime"
     "SYSTEM:Clean_Logs|run_logs_cleaner" "SYSTEM:System_Pulse|run_system_pulse"
+    "SYSTEM:Printer_Repaire|run_printer_repair_nexus"
+    
 
     "FORENSICS:ADAPTIVE_ANALYZE|run_auto_forensics" "FORENSICS:Disk_Raw_Recovery|run_raw_recovery"
     "FORENSICS:Document_Sanitizer|run_doc_cleaner" "FORENSICS:Forensic_Loot|run_loot_viewer"
@@ -672,6 +674,36 @@ GLOBAL_FINANCE_MATRIX=(
 
 # Сигнатурный разделитель метаданных в системных логах (Loot Splitting Pattern)
 GLOBAL_REGEX_BRIDGE_DELIMITER=" -> "
+
+
+GLOBAL_ENTITY_MATRIX=(
+    # [0] Регистрационные номера компаний (Франция - SIREN/SIRET)
+    '\b[0-9]{3}[[:space:].-]?[0-9]{3}[[:space:].-]?[0-9]{3}([[:space:].-]?[0-9]{5})?\b'
+    # [1] VAT (НДС) номера Евросоюза
+    '\b[A-Z]{2}[0-9]{2,12}\b'
+    # [2] LEI (Legal Entity Identifier) - глобальный код идентификации юрлиц
+    '\b[A-Z0-9]{4}00[A-Z0-9]{12}[0-9]{2}\b'
+)
+
+# Инфраструктурные матрицы (используем публичные API без API-KEY)
+GLOBAL_INFRA_HIDDEN_MATRIX=(
+    "https://api.viewdns.info/reverseip/?host=%IP%&output=json|API|NET|Reverse IP Infrastructure"
+    "https://api.securitytrails.com/v1/history/%DOMAIN%/dns/a|API|DNS|SecurityTrails History"
+)
+
+GLOBAL_DUMP_INDICATORS=(
+    # Идентификатор дампа (часто встречается в заголовках файлов или именах папок)
+    '\b(combo|db|dump|leaked|private|fullz|userpass)\.txt\b'
+    # Специфические для Telegram форматы пересылки дампов
+    '\b(tg://privatepost/|t\.me/c/[0-9]+/)\b'
+)
+
+
+GLOBAL_API_FRAUD_NODES=(
+    "https://api.gravatar.com/v3/profiles/%EMAIL_HASH%|GET|JSON|USER|Gravatar Profile Intel"
+)
+
+
 
 
 # ==============================================================================
