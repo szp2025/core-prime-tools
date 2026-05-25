@@ -3506,23 +3506,17 @@ import platform
 app = Flask(__name__)
 # [КОНФИГУРАЦИЯ ЯДРА]
 GLOBAL_HASH_MATRIX = [
-    # Хэши (оставляем как есть, если нужно видеть полный хэш)
-    r"\b[a-fA-F0-9]{32}\b", r"\b[a-fA-F0-9]{40}\b", r"\b[a-fA-F0-9]{64}\b", r"\b[a-fA-F0-9]{128}\b",
+    # Токены и секреты (группа захвата во 2-й скобке)
+    r"\b(password|pwd|hash|secret|token|access_token)[ \t]*[:=]{1,2}[ \t]*['\"]?([a-fA-F0-9]{32,128})['\"]?",
     
-    # КЛЮЧИ-ЗНАЧЕНИЯ: добавляем скобки вокруг [a-fA-F0-9]{32,128}
-    r"\b(md5|sha1|sha256|sha512|password_hash|wp_|user_pass|pwd|hash|secret|token)[ \t]*[:=]{1,2}[ \t]*([a-fA-F0-9]{32,128})\b",
+    # API ключи (группа захвата во 2-й скобке)
+    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?([A-Za-z0-9\-_]{20,})['\"]?",
     
-    # SQL-подобные выражения
-    r"\b(VALUES|SET|WHERE)[ \t]+['\"]?([a-fA-F0-9]{32,128})['\"]?\b",
+    # Обычные текстовые пароли (группа захвата во 2-й скобке)
+    r"\b(password|pwd|secret|key)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#$%^&*()_+]{8,32})['\"]",
     
-    # JSON-подобные (пароль в кавычках)
-    r'\"(password|pwd|hash|secret|token)\"[ \t]*:[ \t]*\"([a-fA-F0-9]{32,128})\"',
-    
-    # API-ключи (выделяем значение внутри кавычек или без)
-    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?([A-Za-z0-9\-_]{20,})['\"]?\b",
-    
-    # ОБЫЧНЫЕ ПАРОЛИ: самое важное для чистых результатов
-    r"\b(password|pwd|secret|key|access_token)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#$%^&*()_+]{8,32})['\"]"
+    # AWS ключи
+    r"\b(AKIA[0-9A-Z]{16})\b"
 ]
 
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
