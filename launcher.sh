@@ -5768,72 +5768,69 @@ run_network_intelligence() {
 
 run_system_info() {
     local start_time=$(date +%s)
-    core_engine_ui "h" "NEXUS v25.7: HEURISTIC PERIMETER EXPLORER"
+    core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
     
-    # 1. Приоритетный выбор цели с поддержкой полных URL
-    local r_input=$(core_engine_input "text" "Enter Target URL, Domain or IP [default: localhost]")
+    # 1. Приоритетный выбор цели
+    local r_input=$(core_engine_input "text" "Enter Target URL [default: localhost]")
     [[ -z "$r_input" ]] && r_input="http://localhost"
-    [[ "$r_input" =~ ^[bB](ack)?$ ]] && return
     
-    # Эвристическое выделение компонентов URL
+    # Парсинг URL
     local r_target=$(echo "$r_input" | sed -e 's|^[^/]*//||' -e 's|/.*||')
-    local r_base_path=$(echo "$r_input" | sed -n 's|[^/]*//[^/]*\(.*\)?|\1|p')
-    [[ -z "$r_base_path" ]] && r_base_path="/"
+    local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
+    local info_payload=$(curl -s -I -L --connect-timeout 5 "$r_input" 2>/dev/null)
+    local whois_data=$(whois "$r_target" 2>/dev/null)
     
     clear
-    core_engine_ui "h" "AUDITING: ${r_target}"
     
-    # 2. Инфраструктурный анализ
-    local info_payload=$(curl -s -I -L --connect-timeout 5 "${r_input}" 2>/dev/null)
-    echo -e "${Y}--- [INFRASTRUCTURE INTELLIGENCE] ---${NC}"
-    for pattern in "${GLOBAL_HTTP_MATRIX[@]}"; do
-        local match=$(echo "$info_payload" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2-)
-        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g') :${NC} ${G}${match}${NC}"
+    # 2. ВЫВОД ИНТЕЛЛЕКТУАЛЬНОЙ КАРТОЧКИ
+    core_engine_ui "h" "AUDIT TARGET: ${r_target}"
+    echo -e "${W}Target Domain  :${NC} ${Y}${r_target}${NC}"
+    echo -e "${W}Resolved IP    :${NC} ${G}${target_ip:-LOCAL}${NC}"
+    echo -e "${W}Start Time     :${NC} ${Y}$(date +%H:%M:%S)${NC}"
+    
+    echo -e "\n${Y}--- [INFRASTRUCTURE & RUNTIME] ---${NC}"
+    echo -e "${W}Server Software:${NC} ${G}$(echo "$info_payload" | grep -Ei "^Server:" | cut -d' ' -f2- || echo "HIDDEN")${NC}"
+    echo -e "${W}PHP Version    :${NC} ${G}$(echo "$info_payload" | grep -Ei "PHP/" | grep -oE "PHP/[0-9.]+" || echo "N/A")${NC}"
+    
+    echo -e "\n${Y}--- [WHOIS DATA: IDENTITY & LIFECYCLE] ---${NC}"
+    for pattern in "${GLOBAL_WHOIS_MATRIX[@]}"; do
+        local match=$(echo "$whois_data" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2- | xargs)
+        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
     done
+    echo -e "---------------------------------------------------"
 
-    # 3. Эвристический фаззинг
-    core_engine_ui "w" "Launching Recursive Heuristic Scan..."
+    # 3. АДАПТИВНЫЙ ФАЗЗИНГ С ПРОГРЕСС-БАРОМ
+    local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
+    local total=${#full_list[@]}
     local tmp_hits="/tmp/recon_hits_$$"
     : > "$tmp_hits"
-    
-    local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
-    
-    for hook in "${full_list[@]}"; do
-        # Формируем путь: берем базовый путь цели + хук
-        local target_path="http://${r_target}/${hook}"
-        local req_result=$(curl -sI -L --connect-timeout 2 "$target_path" 2>/dev/null)
+
+    core_engine_ui "w" "Scanning $total endpoints..."
+
+    for i in "${!full_list[@]}"; do
+        local hook="${full_list[$i]}"
+        local current=$((i + 1))
+        local elapsed=$(( $(date +%s) - start_time ))
+        
+        # Динамический прогресс
+        echo -ne "\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Time: ${elapsed}s] Scanning: /$hook          "
+        
+        local req_result=$(curl -sI -L --connect-timeout 2 "http://${r_target}/${hook}" 2>/dev/null)
         local code=$(echo "$req_result" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
         
-        if [[ -n "$code" ]]; then
-            echo -e "[${W}$code${NC}] /$hook"
-            
-            if [[ "$code" == "200" ]]; then
-                echo -e "${G}[!] HIT: $target_path (200 OK)${NC}"
-                echo "HIT: $target_path" >> "$tmp_hits"
-                
-                # ЭВРИСТИКА: Если нашли API-директорию, ищем подпапки
-                if [[ "$hook" =~ "api" ]]; then
-                    echo -e "${Y}[+] Heuristic: Exploring API subtree...${NC}"
-                    # Здесь можно добавить логику перебора под-путей для API
-                fi
-            fi
+        if [[ "$code" == "200" ]]; then
+            echo -e "\n${G}[!] HIT FOUND: /$hook (200 OK)${NC}"
+            echo "HIT: /$hook | Server: $(echo "$req_result" | grep -Ei '^Server:' | cut -d' ' -f2-)" >> "$tmp_hits"
         fi
     done
 
-    # 4. Отчет
-    local total_duration=$(( $(date +%s) - start_time ))
-    core_engine_ui "h" "FINAL INTELLIGENCE SUMMARY"
-    echo -e "${W}Scan Time      : ${G}${total_duration}s${NC}"
-    echo -e "\n${Y}--- [DISCOVERED ENDPOINTS] ---${NC}"
-    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo "No endpoints found."
+    # 4. ФИНАЛЬНЫЙ ОТЧЕТ
+    echo -e "\n\n${Y}--- [FINAL INTELLIGENCE REPORT] ---${NC}"
+    [[ -s "$tmp_hits" ]] && cat "$tmp_hits" || echo "No high-value endpoints discovered."
     
-    # 5. Анализ безопасности
-    echo -e "\n${Y}--- [REMOTE SECURITY HEADERS] ---${NC}"
-    local sec_headers=("Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security")
-    for h in "${sec_headers[@]}"; do
-        echo -e "${W}$h :${NC} $(echo "$info_payload" | grep -Ei "$h" >/dev/null && echo -e "${G}Present" || echo -e "${R}Missing")"
-    done
-
+    local final_time=$(( $(date +%s) - start_time ))
+    echo -e "${W}Total Audit Duration: ${G}${final_time}s${NC}"
+    
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
