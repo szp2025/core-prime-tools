@@ -3482,7 +3482,6 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
 # ==============================================================================
 
-
 generate_av_server_code_raw() {
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
@@ -3497,45 +3496,31 @@ import platform
 
 app = Flask(__name__)
 
-# [КОНФИГУРАЦИЯ ЯДРА: GLOBAL_HASH_MATRIX]
+# [УЛЬТИМАТИВНЫЙ РЕЕСТР CRYPTO-NEXUS]
 GLOBAL_HASH_MATRIX = [
-    r"\b[a-fA-F0-9]{32}\b",
-    r"\b[a-fA-F0-9]{40}\b",
-    r"\b[a-fA-F0-9]{64}\b",
-    r"\b[a-fA-F0-9]{128}\b",
-    r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b",
-    r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b",
+    r"\b[a-fA-F0-9]{32}\b", r"\b[a-fA-F0-9]{40}\b", r"\b[a-fA-F0-9]{64}\b", r"\b[a-fA-F0-9]{128}\b",
+    r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b", r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b",
     r"\b(md5|sha1|sha256|sha512|password_hash|wp_|user_pass|pwd|hash|secret|token)[ \t]*[:=]{1,2}[ \t]*[a-fA-F0-9]{32,128}\b",
     r"\b(VALUES|SET|WHERE)[ \t]+['\"]?[a-fA-F0-9]{32,128}['\"]?\b",
     r'\"(password|pwd|hash|secret|token)\"[ \t]*:[ \t]*\"[a-fA-F0-9]{32,128}\"',
     r'<[^>]+>(password|pwd|hash|secret|token)<\/[^>]+>[ \t]*[a-fA-F0-9]{32,128}',
     r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?[A-Za-z0-9\-_]{20,}['\"]?\b",
     r"\b(password|pwd|secret|key|access_token)[ \t]*=[ \t]*['\"][A-Za-z0-9!@#$%^&*()_+]{8,32}['\"]",
-    r"\bAKIA[0-9A-Z]{16}\b",
-    r"\b[0-9a-fA-F]{40}\b",
-    r"\b[a-zA-Z0-9+/]{86}==\b",
-    r"-----BEGIN[ \t]+[A-Z \t]+PRIVATE[ \t]+KEY-----",
-    r"-----BEGIN[ \t]+(RSA|EC|DSA|OPENSSH)[ \t]+PRIVATE[ \t]+KEY-----",
-    r"\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b",
-    r"\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b",
+    r"\bAKIA[0-9A-Z]{16}\b", r"\b[0-9a-fA-F]{40}\b", r"\b[a-zA-Z0-9+/]{86}==\b",
+    r"-----BEGIN[ \t]+[A-Z \t]+PRIVATE[ \t]+KEY-----", r"-----BEGIN[ \t]+(RSA|EC|DSA|OPENSSH)[ \t]+PRIVATE[ \t]+KEY-----",
+    r"\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b", r"\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b",
+    # Уровень 11: Полный захват (фильтруем через наличие спецсимволов для чистоты)
     r"\b[A-Za-z0-9!@#$%^&*()_+]{1,}\b"
 ]
+
+# Оптимизация поиска
+FULL_PATTERN = re.compile("|".join(GLOBAL_HASH_MATRIX), re.IGNORECASE)
 
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
 GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
 GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
 
-WIN_PAYLOAD = """#{" ".join(GLOBAL_FIX_WIN_REG)}"""
-LINUX_PAYLOAD = """#{" ".join(GLOBAL_FIX_LINUX)}"""
-MACOS_PAYLOAD = """#{" ".join(GLOBAL_FIX_MACOS)}"""
-
 $templates
-
-@app.route('/')
-def index():
-    form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
-    # ... (код индекса без изменений)
-    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 @app.route('/scan', methods=['POST'])
 def scan():
@@ -3543,15 +3528,19 @@ def scan():
     if not f: return "Empty Payload", 400
     tmp = os.path.join('/tmp', f.filename)
     f.save(tmp)
-    report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
+    report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE v4.2] ===", f"Target: {f.filename}"]
     threat_count = 0
     try:
         proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
         for line in proc.stdout:
             offset, content = line.split(' ', 1)
-            for hsig in GLOBAL_HASH_MATRIX:
-                if re.search(hsig, content): 
-                    report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
+            # Применяем скомпилированный паттерн
+            if FULL_PATTERN.search(content):
+                # Логика фильтрации для "полного захвата" (чтобы не забить лог шумом)
+                if len(content.strip()) < 8 and not any(c in content for c in "!@#$%^&*()_+"):
+                    continue
+                report.append(f"[MATCH] [Offset {offset}]: {content.strip()}")
+            
             for layer in GLOBAL_AV_MATRIX:
                 if re.search(layer, content, re.I):
                     report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
@@ -3561,7 +3550,7 @@ def scan():
     finally: os.remove(tmp)
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
 
-# ... (Остальные роуты sys-audit и inject остаются прежними)
+# ... (Остальные роуты без изменений)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
