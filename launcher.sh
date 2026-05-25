@@ -4369,9 +4369,10 @@ EOF
 
 run_system_info() {
     local start_time=$(date +%s)
+    local r_nick=$(echo "$r_target" | cut -d'.' -f1) # Никнейм для поиска
     core_engine_ui "h" "NEXUS v25.7: HEURISTIC PERIMETER EXPLORER"
     
-    # 1. Сбор и нормализация цели
+    # 1. Сбор и нормализация
     local r_input=$(core_engine_input "text" "Enter Target (IP, Domain or URL)")
     [[ -z "$r_input" ]] && r_input="http://localhost"
     [[ ! "$r_input" =~ ^http ]] && r_input="http://$r_input"
@@ -4380,7 +4381,6 @@ run_system_info() {
     local r_base_url=$(echo "$r_input" | cut -d'/' -f1-3)
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
     
-    # Инициализация словарей
     local full_list=("${GLOBAL_FUZZ_WORDLIST[@]}" "${GLOBAL_WEBHOOK_WORDLIST[@]}")
     local total=${#full_list[@]}
     local tmp_hits="/tmp/recon_hits_$$"
@@ -4389,59 +4389,83 @@ run_system_info() {
     clear
     core_engine_ui "h" "AUDIT TARGET: ${r_target}"
     
-    # ЭТАП 1: OSINT & INFRASTRUCTURE (Использование вашей матрицы)
-    echo -e "${Y}--- [OSINT: ADVANCED INTELLIGENCE SOURCES] ---${NC}"
+    # ЭТАП 1: INFRASTRUCTURE (OSINT Matrix)
+    echo -e "${Y}--- [OSINT: ADVANCED INFRASTRUCTURE] ---${NC}"
     for entry in "${GLOBAL_OSINT_SERVICES[@]}"; do
-        # Парсинг строки: URL|TYPE|CAT|DESC
         IFS='|' read -r url type cat desc <<< "$entry"
-        local request_url="${url//%TARGET%/$r_target}"
-        request_url="${request_url//%IP%/$target_ip}"
-        
-        echo -ne "${W}[*] Fetching ${cat} (${desc})...${NC}"
-        local response=$(curl -s --connect-timeout 3 "$request_url")
-        [[ -n "$response" ]] && echo -e " ${G}DONE${NC}" || echo -e " ${R}FAILED${NC}"
-        [[ -n "$response" ]] && echo -e "    ${C}> ${response:0:80}..."
+        local req_url="${url//%TARGET%/$r_target}"; req_url="${req_url//%IP%/$target_ip}"
+        local res=$(curl -s --connect-timeout 2 "$req_url")
+        [[ -n "$res" ]] && echo -e "${W}* ${cat} (${desc}) :${NC} ${C}${res:0:60}...${NC}"
     done
 
-    # ЭТАП 2: WHOIS & IDENTITY
-    echo -e "\n${Y}--- [WHOIS & IDENTITY] ---${NC}"
-    local whois_data=$(whois "$r_target" 2>/dev/null)
-    for pattern in "${GLOBAL_WHOIS_MATRIX[@]}"; do
-        local match=$(echo "$whois_data" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2- | xargs)
-        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
+    # ЭТАП 2: DIGITAL FOOTPRINT (Без пелены и ложных позитивов)
+    echo -e "\n${Y}--- [OSINT: DIGITAL FOOTPRINT ANALYSIS] ---${NC}"
+    local ref_size=500 # Базовый порог для отсечения пустых страниц
+    for site_entry in "${GLOBAL_OSINT_SITES[@]}"; do
+        IFS='|' read -r prefix check_type err_marker category service <<< "$site_entry"
+        local full_url="${prefix}${r_nick}"
+        local headers=$(curl -s -I --connect-timeout 1 "$full_url")
+        local code=$(echo "$headers" | grep "HTTP/" | tail -n 1 | awk '{print $2}')
+        local size=$(echo "$headers" | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
+        
+        if [[ "$code" == "200" && "${size:-0}" -gt "$ref_size" ]]; then
+            echo -e "${G}[+] FOUND ON ${service}: ${W}${full_url}${NC}"
+        fi
     done
 
-    # ЭТАП 3: AGGRESSIVE FUZZING (С расчетом ETA)
-    core_engine_ui "w" "Scanning $total endpoints..."
-    echo "" 
-    for i in "${!full_list[@]}"; do
-        local hook="${full_list[$i]}"
-        local current=$((i + 1))
-        local elapsed=$(( $(date +%s) - start_time ))
-        local eta=$(( ( (total - current) * elapsed ) / (current + 1) ))
-        
-        # Динамическое обновление строки
-        echo -ne "\033[A\r${W}[Progress:${NC} ${G}$current/$total${NC}] [Time: ${elapsed}s] [ETA: ${eta}s] Scanning: /${hook:0:20}          \n"
-        
-        local code=$(curl -sI -L --connect-timeout 2 "${r_base_url}/${hook#/}" 2>/dev/null | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
-        [[ "$code" == "200" ]] && { echo -e "${G}[!] HIT FOUND: /$hook (200 OK)${NC}"; echo "HIT: /$hook" >> "$tmp_hits"; }
+    # ЭТАП 3: STEALTH RECURSIVE FUZZING
+    local discovered_paths=("/")
+    local depth=0
+    local max_depth=2 # Глубина рекурсии (для незаметности)
+
+    while [[ $depth -lt $max_depth ]]; do
+        local next_level_paths=()
+        for path in "${discovered_paths[@]}"; do
+            for hook in "${full_list[@]}"; do
+                # Формируем путь (избегаем двойных слэшей)
+                local target_url="${r_base_url}${path}${hook#/}"
+                
+                # STEALTH: Рандомная задержка от 1 до 3 секунд (Jitter)
+                sleep $((RANDOM % 3 + 1))
+                
+                local response=$(curl -sI -L --connect-timeout 2 "$target_url" 2>/dev/null)
+                local code=$(echo "$response" | grep -Ei "^HTTP/" | tail -n 1 | awk '{print $2}')
+                
+                if [[ "$code" == "200" ]]; then
+                    echo -e "${G}[!] HIT FOUND: $target_url (200 OK)${NC}"
+                    echo "HIT: $target_url" >> "$tmp_hits"
+                    
+                    # Если нашли директорию, добавляем в очередь для рекурсии
+                    [[ "$hook" == */ ]] && next_level_paths+=("${path}${hook}")
+                fi
+            done
+        done
+        discovered_paths=("${next_level_paths[@]}")
+        ((depth++))
     done
     echo -ne "\r                                                                         \r"
 
-    # ЭТАП 4: SECURITY HEADERS & FINAL SUMMARY
-    local info_payload=$(curl -s -I -L --connect-timeout 5 "$r_input" 2>/dev/null)
-    echo -e "\n\n${Y}--- [REMOTE SECURITY HEADERS ASSESSMENT] ---${NC}"
-    for h in "Content-Security-Policy" "X-Frame-Options" "Strict-Transport-Security" "X-XSS-Protection"; do
-        echo -e "${W}$h :${NC} $(echo "$info_payload" | grep -Ei "^$h:" >/dev/null && echo -e "${G}Present" || echo -e "${R}Missing")"
+    # ЭТАП 4: SECURITY HEADERS & SENSITIVE FILE LEAK CHECK
+    echo -e "\n${Y}--- [SENSITIVE FILE ACCESS ASSESSMENT] ---${NC}"
+    local sensitive_files=(".env" "config.php" "db.sql" "wp-config.php" "settings.json")
+    
+    for f in "${sensitive_files[@]}"; do
+        local file_url="${r_base_url}/$f"
+        local content=$(curl -s --connect-timeout 2 "$file_url")
+        
+        # Проверяем, не содержит ли ответ признаки конфигурационного файла
+        if [[ "$content" =~ "DB_PASSWORD" || "$content" =~ "<?php" || "$content" =~ "{" ]]; then
+            echo -e "${R}[!] ALERT: SENSITIVE FILE EXPOSED: $f${NC}"
+            echo -e "    ${W}Preview:${NC} ${C}${content:0:50}...${NC}"
+        fi
     done
     
-    [[ -s "$tmp_hits" ]] && { echo -e "\n${Y}--- [FINAL INTELLIGENCE REPORT] ---${NC}"; cat "$tmp_hits"; }
     
+    [[ -s "$tmp_hits" ]] && { echo -e "\n${Y}--- [FINAL REPORT] ---${NC}"; cat "$tmp_hits"; }
     rm -f "$tmp_hits"
     core_engine_ui "s" "Diagnostic complete."
     core_engine_wait
 }
-
 
 # Редиректы на существующие модули, чтобы не дублировать код
 pc_steal_creds() { run_pc_recovery_ultimate; }
