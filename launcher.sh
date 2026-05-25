@@ -3481,8 +3481,78 @@ EOF
 # ФУНКЦИОНАЛ: Статический анализ файлов + удаленный мониторинг системных угроз в один клик
 # АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
 # ==============================================================================
-
 generate_av_server_code_raw() {
+    local templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    cat << 'EOF' > server.py
+from flask import Flask, request, render_template_string
+import re
+import os
+import shutil
+import subprocess
+import platform
+
+app = Flask(__name__)
+
+# [КОНФИГУРАЦИЯ ЯДРА: ПОЛНАЯ МАТРИЦА]
+GLOBAL_HASH_MATRIX = [
+    r"\b[a-fA-F0-9]{32}\b", r"\b[a-fA-F0-9]{40}\b", r"\b[a-fA-F0-9]{64}\b", r"\b[a-fA-F0-9]{128}\b",
+    r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b", r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b",
+    r"\b(md5|sha1|sha256|sha512|password_hash|wp_|user_pass|pwd|hash|secret|token)[ \t]*[:=]{1,2}[ \t]*[a-fA-F0-9]{32,128}\b",
+    r"\b(VALUES|SET|WHERE)[ \t]+['\"]?[a-fA-F0-9]{32,128}['\"]?\b",
+    r'\"(password|pwd|hash|secret|token)\"[ \t]*:[ \t]*\"[a-fA-F0-9]{32,128}\"',
+    r'<[^>]+>(password|pwd|hash|secret|token)<\/[^>]+>[ \t]*[a-fA-F0-9]{32,128}',
+    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?[A-Za-z0-9\-_]{20,}['\"]?\b",
+    r"\b(password|pwd|secret|key|access_token)[ \t]*=[ \t]*['\"][A-Za-z0-9!@#$%^&*()_+]{8,32}['\"]",
+    r"\bAKIA[0-9A-Z]{16}\b", r"\b[0-9a-fA-F]{40}\b", r"\b[a-zA-Z0-9+/]{86}==\b",
+    r"-----BEGIN[ \t]+[A-Z \t]+PRIVATE[ \t]+KEY-----", r"-----BEGIN[ \t]+(RSA|EC|DSA|OPENSSH)[ \t]+PRIVATE[ \t]+KEY-----",
+    r"\b[0-9]{8,15}:[A-Za-z0-9_-]{35}\b", r"\b[A-Za-z0-9_-]{24}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}\b",
+    r"\b[A-Za-z0-9!@#$%^&*()_+]{1,}\b"
+]
+
+GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
+
+# ... (далее ваш код индексов, шаблонов и прочего) ...
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    tmp = os.path.join('/tmp', f.filename)
+    f.save(tmp)
+    report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
+    threat_count = 0
+    try:
+        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
+        for line in proc.stdout:
+            try:
+                # Безопасный сплит
+                parts = line.split(' ', 1)
+                if len(parts) < 2: continue
+                offset, content = parts
+                
+                for hsig in GLOBAL_HASH_MATRIX:
+                    if re.search(hsig, content): 
+                        report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
+                
+                for layer in GLOBAL_AV_MATRIX:
+                    if re.search(layer, content, re.I):
+                        report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                        threat_count += 1
+            except: continue
+        report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
+    except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
+    finally: os.remove(tmp)
+    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)
+EOF
+}
+
+
+generate_av_server_code_rawold1() {
 
     local templates="$(generate_core_template)
 
