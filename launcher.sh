@@ -3481,10 +3481,12 @@ EOF
 # ФУНКЦИОНАЛ: Статический анализ файлов + удаленный мониторинг системных угроз в один клик
 # АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
 # ==============================================================================
+
 generate_av_server_code_raw() {
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
+    # Используем 'EOF' с кавычками, чтобы Bash не трогал спецсимволы (\, $) внутри Python
     cat << 'EOF' > server.py
 from flask import Flask, request, render_template_string
 import re
@@ -3512,8 +3514,33 @@ GLOBAL_HASH_MATRIX = [
 ]
 
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
+GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
+GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
 
-# ... (далее ваш код индексов, шаблонов и прочего) ...
+WIN_PAYLOAD = """#{" ".join(GLOBAL_FIX_WIN_REG)}"""
+LINUX_PAYLOAD = """#{" ".join(GLOBAL_FIX_LINUX)}"""
+MACOS_PAYLOAD = """#{" ".join(GLOBAL_FIX_MACOS)}"""
+
+$templates
+
+@app.route('/')
+def index():
+    form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
+    current_os = platform.system().lower()
+    btn_map = {
+        "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
+        "linux": ("INJECT LINUX PURGE", "/inject/linux", "#e91e63"),
+        "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
+    }
+    label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
+    body = form_html + f"""<div style="margin-top: 30px;"><h3 style="color: var(--accent-color);">[ SYSTEM LIVE SCANNER ]</h3>
+        <div style="display: flex; gap: 10px;">
+            <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
+            <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
+        </div>
+        <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
+        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a></div>"""
+    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 @app.route('/scan', methods=['POST'])
 def scan():
@@ -3527,15 +3554,11 @@ def scan():
         proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
         for line in proc.stdout:
             try:
-                # Безопасный сплит
                 parts = line.split(' ', 1)
                 if len(parts) < 2: continue
                 offset, content = parts
-                
                 for hsig in GLOBAL_HASH_MATRIX:
-                    if re.search(hsig, content): 
-                        report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
-                
+                    if re.search(hsig, content): report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
                 for layer in GLOBAL_AV_MATRIX:
                     if re.search(layer, content, re.I):
                         report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
@@ -3545,6 +3568,25 @@ def scan():
     except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
     finally: os.remove(tmp)
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+
+@app.route('/sys-audit/<mode>')
+def system_audit(mode):
+    report = []
+    try:
+        if mode == "ram":
+            lines = subprocess.run(['ps', '-ef'], capture_output=True, text=True).stdout.splitlines()
+            report = [l for l in lines if re.search(GLOBAL_AV_PROC_REGEX, l, re.I)]
+        else:
+            cmd = ['ss', '-antup'] if shutil.which('ss') else ['netstat', '-antp']
+            lines = subprocess.run(cmd, capture_output=True, text=True).stdout.splitlines()
+            report = [l for l in lines if re.search(GLOBAL_AV_SOCKET_REGEX, l, re.I)]
+    except Exception as e: report = [f"EXEC_ERROR: {e}"]
+    return render_template_string(render_prime_page("SYSTEM_REPORT", f"<pre>{chr(10).join(report or ['CLEAN'])}</pre><a href='/'>RETURN</a>"))
+
+@app.route('/inject/<os_type>')
+def inject_payload(os_type):
+    pl = {"windows": WIN_PAYLOAD, "linux": LINUX_PAYLOAD, "macos": MACOS_PAYLOAD}
+    return render_template_string(render_prime_page("INJECTOR", f"<textarea style='width:100%; height:300px;'>{pl.get(os_type, 'ERROR')}</textarea>"))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
@@ -3746,232 +3788,6 @@ EOF
 
 }
 
-generate_av_server_code_rawold() {
-    # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
-    local templates="$(generate_core_template)
-$(generate_core_form_template)"
-
-    # Экранируем и пробрасываем глобальные матрицы и сигнатурные слои Bash внутрь Python кода
-    cat << EOF
-from flask import Flask, request, render_template_string
-import re
-import os
-import shutil
-import subprocess
-
-app = Flask(__name__)
-
-# [ПРОБРОС СИГНАТУРНЫХ СЛОЕВ ЯДРА CAME ИЗ BASH В PYTHON]
-# Слои 1-4: Статический супер-конвейер для файлов
-GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
-# Слой 5: Паттерны вредоносных процессов в ОЗУ
-GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
-# Слой 6: Паттерны опасных состояний сетевых сокетов
-GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
-
-# [ОБНОВЛЕННЫЙ ПРОБРОС МАТРИЦ В AV-SERVER]
-# Массивы теперь упаковываются через join для корректной передачи в веб-интерфейс
-WIN_PAYLOAD = """#{" ".join(GLOBAL_FIX_WIN_REG)}"""
-LINUX_PAYLOAD = """#{" ".join(GLOBAL_FIX_LINUX)}"""
-MACOS_PAYLOAD = """#{" ".join(GLOBAL_FIX_MACOS)}"""
-
-$templates
-
-@app.route('/')
-def index():
-    # Главная страница: Двойной контур управления (Сканирование файлов + Мониторинг Системы)
-    fields = [
-        {"type": "file", "name": "file", "label": "TARGET_OBJECT_FOR_HEURISTIC_ANALYSIS"}
-    ]
-    
-    form_html = render_prime_form("/scan", fields=fields, btn_text="INITIATE CAME DEEP SCAN")
-    
-    # Добавляем блок интерактивного аудита текущей запущенной системы (RAM/NET)
-    system_audit_block = """
-    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
-        <h3 style="color: var(--accent-color); font-family: monospace; letter-spacing: 1px;">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
-        <p style="font-size: 11px; opacity: 0.7;">Directly analyze volatile memory, active processes, and open network tunnels on this host machine.</p>
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <a href="/sys-audit/ram" class="btn" style="background: #2196f3; color: #fff; text-align: center; flex: 1; padding: 10px 0;">SCAN RAM PROCESSES</a>
-            <a href="/sys-audit/network" class="btn" style="background: #009688; color: #fff; text-align: center; flex: 1; padding: 10px 0;">SCAN NETWORK SOCKETS</a>
-        </div>
-    </div>
-    """
-    
-    # Добавляем блок удаленной инъекции матриц реанимации ПК
-    reanimate_block = """
-    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
-        <h3 style="color: var(--accent-color); font-family: monospace; letter-spacing: 1px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
-        <p style="font-size: 11px; opacity: 0.7;">Execute non-file real-time purge of target computer configurations over active control channel.</p>
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <a href="/inject/windows" class="btn" style="background: #9c27b0; color: #fff; text-align: center; flex: 1; padding: 10px 0;">INJECT WINDOWS FIXED</a>
-            <a href="/inject/linux" class="btn" style="background: #e91e63; color: #fff; text-align: center; flex: 1; padding: 10px 0;">INJECT LINUX PURGE</a>
-            <a href="/inject/macos" class="btn" style="background: #673ab7; color: #fff; text-align: center; flex: 1; padding: 10px 0;">INJECT MACOS UNLOAD</a>
-        </div>
-    </div>
-    """
-    
-    full_body = form_html + system_audit_block + reanimate_block
-    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", full_body))
-
-@app.route('/scan', methods=['POST'])
-def scan():
-    # --- ВЕКТОР 1: СТАТИЧЕСКИЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ ЗАГРУЖАЕМЫХ ФАЙЛОВ ---
-    f = request.files.get('file')
-    if not f: return "Empty Payload Data", 400
-    
-    tmp_path = os.path.join('/tmp', f.filename)
-    f.save(tmp_path)
-    
-    try:
-        with open(tmp_path, 'rb') as file_buffer:
-            raw_content = file_buffer.read()
-            
-        total_bytes = len(raw_content)
-        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
-        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
-        
-        text_content = raw_content.decode('utf-8', errors='ignore')
-        
-        matches = []
-        try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
-            for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
-                    matches.append(f"Line {i}: {line.strip()[:100]}")
-        except Exception as regex_err:
-            matches.append(f"REGEX_COMPILE_ERROR: {str(regex_err)}")
-
-        report = []
-        report.append(f"=== METADATA STRUCTURAL AUDIT ===")
-        report.append(f"Target Object Name : {f.filename}")
-        report.append(f"Total File Footprint: {total_bytes} bytes")
-        report.append(f"Structural Density  : {readable_ratio}% printable ASCII")
-        report.append(f"=================================\n")
-        
-        is_infected = False
-        if total_bytes > 1000 and readable_ratio < 12:
-            report.append("![CRITICAL WARNING]: High Entropy Level Detected!")
-            report.append("![ALERT]: Code is heavily packed or obfuscated (Zero-Day Vector).\n")
-            is_infected = True
-            
-        if matches:
-            is_infected = True
-            report.append(f"Found {len(matches)} Destructive Signatures/Intents:")
-            report.extend(matches[:40])
-        else:
-            report.append("Verdict: CLEAN. No malicious intentions or LOLBAS vectors matched.")
-
-        scan_output = "\n".join(report)
-        if is_infected:
-            os.chmod(tmp_path, 0)
-            
-    except Exception as e:
-        scan_output = f"CORE_SYSTEM_ERROR: {str(e)}"
-    finally:
-        if os.path.exists(tmp_path):
-            if is_infected:
-                shutil.move(tmp_path, f"{tmp_path}.quarantine")
-            else:
-                os.remove(tmp_path)
-
-    status_msg = "!!! THREAT ISOLATED PROTOCOL ACTIVATED !!!" if is_infected else "SECURE_VERIFIED"
-    status_class = "infected" if is_infected else "clean"
-
-    content = f"""
-    <div class="status-box {status_class}" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">{status_msg}</div>
-    <pre style="background:#111; color:#0f0; padding:15px; border-radius:5px; max-height:500px; overflow-y:auto; font-family:monospace; font-size:12px;">{{{{ output }}}}</pre>
-    <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO GATEWAY ]</a></div>
-    """
-    return render_template_string(render_prime_page("CAME_HEURISTIC_REPORT", content), output=scan_output)
-
-@app.route('/sys-audit/<mode>')
-def system_audit(mode):
-    # --- ВЕКТОР 2 И 3: ДИНАМИЧЕСКИЙ АУДИТ ЖИВОЙ СИСТЕМЫ (ПРОЦЕССЫ И СЕТЬ) ---
-    report = []
-    is_infected = False
-    
-    try:
-        if mode == "ram":
-            report.append("=== LIVE VOLATILE MEMORY INTEGRITY AUDIT ===")
-            # Извлекаем дерево процессов хоста
-            ps_proc = subprocess.run(['ps', 'aux'], capture_output=True, text=True, check=True)
-            proc_lines = ps_proc.stdout.splitlines()
-            report.append(f"Total active tasks in user space: {len(proc_lines)}")
-            
-            # Сверяем по Слою 5 (Вредоносные процессы в памяти)
-            compiled_regex = re.compile(GLOBAL_AV_PROC_REGEX, re.IGNORECASE)
-            suspicious_found = []
-            
-            for line in proc_lines:
-                if compiled_regex.search(line) and "grep" not in line and "av_server" not in line:
-                    suspicious_found.append(line)
-                    
-            if suspicious_found:
-                is_infected = True
-                report.append("\n[ALERT: UNTRUSTED PROCESSES IDENTIFIED IN RAM]:")
-                report.extend(suspicious_found[:30])
-            else:
-                report.append("\nVerdict: RAM Landscape Stable. No active mining or reverse-shells detected.")
-                
-        elif mode == "network":
-            report.append("=== LIVE NETWORK SOCKET MATRIX AUDIT ===")
-            # Проверяем доступность утилиты ss или netstat
-            cmd = ['ss', '-antup'] if shutil.which('ss') else ['netstat', '-antp']
-            net_proc = subprocess.run(cmd, capture_output=True, text=True)
-            socket_lines = net_proc.stdout.splitlines()
-            
-            # Сверяем по Слою 6 (Опасные сокеты и внешние соединения)
-            compiled_regex = re.compile(GLOBAL_AV_SOCKET_REGEX, re.IGNORECASE)
-            suspicious_gates = []
-            
-            for line in socket_lines:
-                if compiled_regex.search(line):
-                    suspicious_gates.append(line)
-                    
-            if suspicious_gates:
-                is_infected = True
-                report.append("\n[CRITICAL TELEMETRY: UNAUTHORIZED EXTERNAL TUNNELS DETECTED]:")
-                report.extend(suspicious_gates[:30])
-            else:
-                report.append("\nVerdict: Network Core Clean. Gateways match internal routing policy.")
-                
-    except Exception as err:
-        report.append(f"AUDIT_EXECUTION_FAILED: {str(err)}")
-
-    scan_output = "\n".join(report)
-    status_msg = "!!! HOT ENVIRONMENT THREAT ALERT !!!" if is_infected else "ENVIRONMENT_INTEGRITY_PASS"
-    status_class = "infected" if is_infected else "clean"
-
-    content = f"""
-    <div class="status-box {status_class}" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">{status_msg}</div>
-    <pre style="background:#111; color:#0f0; padding:15px; border-radius:5px; max-height:500px; overflow-y:auto; font-family:monospace; font-size:12px;">{{{{ output }}}}</pre>
-    <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO GATEWAY ]</a></div>
-    """
-    return render_template_string(render_prime_page("SYSTEM_INTEGRITY_REPORT", content), output=scan_output)
-
-@app.route('/inject/<os_type>')
-def inject_payload(os_type):
-    # --- ВЕКТОР 4: ГЕНЕРАЦИЯ БЕСФАЙЛОВЫХ МАТРИЦ ДЛЯ РЕАНИМАЦИИ СИСТЕМ ---
-    payload_map = {
-        "windows": WIN_PAYLOAD,
-        "linux": LINUX_PAYLOAD,
-        "macos": MACOS_PAYLOAD
-    }
-    selected_payload = payload_map.get(os_type.lower(), "echo 'Invalid OS Type Selected'")
-    
-    content = f"""
-    <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">PAYLOAD INJECTION GENERATED</div>
-    <p style="font-size:12px;">Copy this monolithic shell string and pipe it into target root console via active USB-bridge link:</p>
-    <textarea style="width:100%; height:250px; background:#111; color:#fff; font-family:monospace; padding:10px; border-radius:5px;" readonly>{selected_payload}</textarea>
-    <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
-    """
-    return render_template_string(render_prime_page("INJECTION_CONSOLE", content))
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
-EOF
-}
 
 
 # ==============================================================================
