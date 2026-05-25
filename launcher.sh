@@ -3872,15 +3872,12 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, защита сетевых клиентов от скачивания деструктивных векторов
 # ==============================================================================
 
-# ==============================================================================
-# @description: Интегрированный кросс-платформенный генератор веб-панели Share-Server v2.0
-# МОДЕРНИЗАЦИЯ: Динамическая склейка GLOBAL_AV_MATRIX во Flask без loose-переменных
-# ==============================================================================
 generate_share_server_code_raw() {
-    # Сборка шаблона интерфейса
-    local template=$(generate_core_template)
+    # Сборка шаблона интерфейса во внешнюю переменную
+    local template
+    template=$(generate_core_template)
 
-    # Динамически объединяем все элементы Bash-массива в один пайп-лайн регулярного выражения
+    # Динамически объединяем все элементы Bash-массива в одну регулярную строку
     local joined_regex=""
     for layer in "${GLOBAL_AV_MATRIX[@]}"; do
         if [ -z "$joined_regex" ]; then
@@ -3890,26 +3887,27 @@ generate_share_server_code_raw() {
         fi
     done
 
-    # Запись в файл share_server.py с жестким экранированием внутренней структуры
-    cat << EOF > share_server.py
+    # Использование 'EOF' в кавычках гарантирует, что Bash не будет трогать внутренний код Python.
+    # Мы оставляем жесткий маркер __CAME_TARGET_PIPE_REGEX__ для безопасной замены.
+    cat << 'EOF' > share_server.py
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
 
 app = Flask(__name__)
 
-# Сквозной суперинжект скомпилированной матрицы CAME (Слои 1-8)
-GLOBAL_AV_PIPE_REGEX = r"""$joined_regex"""
+# Скомпилированная матрица сигнатурного оутпут-контроля CAME (Слои 1-8)
+GLOBAL_AV_PIPE_REGEX = r"__CAME_TARGET_PIPE_REGEX__"
 
 SHARE_DIR = '/root/share'
 
 if not os.path.exists(SHARE_DIR):
     os.makedirs(SHARE_DIR, exist_ok=True)
 
-$template
+__CAME_CORE_TEMPLATE_PLACEHOLDER__
 
 def get_file_icon(filename):
-    """Определяет визуальный маркер типа данных."""
+    """Определяет маркер типа данных по расширению."""
     ext = filename.split('.')[-1].lower() if '.' in filename else ''
     icons = {
         'pdf': '📕',
@@ -3960,17 +3958,16 @@ def get_file(filename):
     report = []
 
     try:
-        # Чтение буфера для сигнатурного и энтропийного анализа
+        # Чтение файлового буфера
         with open(target_path, 'rb') as file_buffer:
             raw_content = file_buffer.read()
 
         total_bytes = len(raw_content)
 
-        # Вычисление коэффициента читаемости (выявление обфускации)
+        # Вычисление плотности печатных символов
         printable_chars = len([b for b in raw_content if 32 <= b <= 126])
         readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
 
-        # Декодирование потока
         text_content = raw_content.decode('utf-8', errors='ignore')
 
         matches = []
@@ -3982,7 +3979,6 @@ def get_file(filename):
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
 
-        # Анализ плотности распределения и совпадений из GLOBAL_AV_MATRIX
         if total_bytes > 1000 and readable_ratio < 12:
             is_infected = True
             report.append("CRITICAL ANOMALY: High Entropy / Encrypted code signature detected.")
@@ -3991,7 +3987,7 @@ def get_file(filename):
             is_infected = True
             report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
 
-        # --- КРИТИЧЕСКИЙ РУБЕЖ ОУТПУТ-КОНТРОЛЯ И АННИГИЛЯЦИИ ---
+        # --- ТОТАЛЬНАЯ АННИГИЛЯЦИЯ ПРИ ОБНАРУЖЕНИИ УГРОЗЫ ---
         if is_infected:
             if os.path.exists(target_path):
                 os.remove(target_path)
@@ -4016,9 +4012,15 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
 
-    echo "[+] share_server.py успешно сгенерирован с поддержкой 8 слоев контроля."
-}
+    # Проводим точечную бинарно-безопасную замену маркеров на реальное содержимое переменных.
+    # Это полностью исключает поломку синтаксиса и появление синего/голубого цвета.
+    sed -i "s|__CAME_TARGET_PIPE_REGEX__|$joined_regex|g" share_server.py
+    
+    # Для вставки многострочного шаблона используем awk, чтобы избежать проблем со спецсимволами
+    awk -v r="$template" '{gsub(/__CAME_CORE_TEMPLATE_PLACEHOLDER__/,r)}1' share_server.py > share_server.tmp && mv share_server.tmp share_server.py
 
+    echo "[+] share_server.py успешно сгенерирован. Подсветка кода и синтаксис восстановлены."
+}
 
 generate_share_server_code_raworigin() {
     # Загружаем только базовый шаблон страницы в локальную переменную
