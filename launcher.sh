@@ -4331,7 +4331,174 @@ EOF
 # ФУНКЦИОНАЛ: Потоковый анализ файлов в /tmp, моментальное стирание зараженных объектов
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
+
+
 generate_upload_server_code_raw() {
+    # Загружаем UI шаблоны лаунчера в локальную переменную
+    local templates
+    templates="$(generate_core_template)
+$(generate_core_form_template)"
+
+    # Динамически объединяем все элементы Bash-массива GLOBAL_AV_MATRIX в одну регулярную строку
+    local joined_regex=""
+    for layer in "${GLOBAL_AV_MATRIX[@]}"; do
+        if [ -z "$joined_regex" ]; then
+            joined_regex="$layer"
+        else
+            joined_regex="$joined_regex|$layer"
+        fi
+    done
+
+    # Переводим динамические данные в чистый Base64 (буквы и цифры).
+    # Интерпретаторы NetHunter/Termux (как bash, так и zsh) не увидят спецсимволов и ничего не испортят.
+    local b64_regex
+    b64_regex=$(echo -n "$joined_regex" | base64 | tr -d '\n\r')
+    
+    local b64_templates
+    b64_templates=$(echo -n "$templates" | base64 | tr -d '\n\r')
+
+    # ШАГ 1: Запись начального заголовка, импортов и путей (Строгий 'EOF' — идеальный цвет в IDE)
+    cat << 'EOF' > upload_server.py
+from flask import Flask, request, render_template_string
+import os
+import re
+import base64
+import shutil
+
+app = Flask(__name__)
+
+# Декодирование сигнатурной матрицы CAME, переданной из ядра NetHunter/Termux
+B64_REGEX_DATA = "__CAME_B64_UPLOAD_REGEX_PLACEHOLDER__"
+GLOBAL_AV_PIPE_REGEX = re.compile(base64.b64decode(B64_REGEX_DATA).decode('utf-8', errors='ignore'), re.IGNORECASE | re.MULTILINE)
+
+# Сохраняем во входящую папку внутри PRIME_LOOT
+UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Декодирование и динамическая инициализация шаблонов интерфейса
+B64_TEMPLATES_DATA = "__CAME_B64_UI_TEMPLATES_PLACEHOLDER__"
+HTML_TEMPLATES_DECODED = base64.b64decode(B64_TEMPLATES_DATA).decode('utf-8', errors='ignore')
+
+# Выполняем инжекцию декодированных шаблонов в пространство имен Python
+exec(HTML_TEMPLATES_DECODED, globals())
+
+@app.route('/')
+def index():
+    # Главная страница: Интуитивная защищенная форма загрузки данных в Drop-Box
+    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
+    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    # --- ВЕКТОР ПРОВЕРКИ И БЕССЛЕДНОГО УНИЧТОЖЕНИЯ (PRE-UPLOAD TOTAL PURGE) ---
+    if 'file' not in request.files: 
+        return "TRANSFER_ERROR", 400
+        
+    f = request.files['file']
+    if f.filename == '': 
+        return "EMPTY_FILENAME", 400
+    
+    # 1. Первичный прием потока данных во временную буферную зону /tmp
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    
+    is_infected = False
+    report = []
+    
+    try:
+        # 2. Чтение бинарного дампа загруженного объекта для структурного аудита CAME
+        with open(tmp_path, 'rb') as file_buffer:
+            raw_content = file_buffer.read()
+            
+        total_bytes = len(raw_content)
+        
+        # Анализ плотности ASCII (Выявление обфускации / Высокой энтропии)
+        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
+        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
+        
+        # Декодирование в текстовый стрим для сигнатурного матчинга
+        text_content = raw_content.decode('utf-8', errors='ignore')
+        
+        matches = []
+        # Запуск сканирования по Слоям
+        try:
+            for i, line in enumerate(text_content.splitlines(), 1):
+                if GLOBAL_AV_PIPE_REGEX.search(line):
+                    matches.append(f"Line {i}: {line.strip()[:100]}")
+        except Exception as regex_err:
+            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
+            
+        # 3. Принятие решения на основе полученных эвристических метрик
+        if total_bytes > 1000 and readable_ratio < 12:
+            is_infected = True
+            report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
+            
+        if matches:
+            is_infected = True
+            report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
+            
+        # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
+        if is_infected:
+            # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
+            # Файл ЗАРАЖЕН — Полное удаление с диска без создания карантинных копий
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            
+            # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
+            content = f"""
+            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
+                CRITICAL DETECTION: THREAT TOTALLY DESTROYED
+            </div>
+            <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\\n".join(report)}</pre>
+            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
+            """
+            return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
+            
+        else:
+            # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
+            final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
+            
+            # На случай, если файл с таким именем уже существовал, безопасно перезаписываем его
+            if os.path.exists(final_dest_path):
+                os.remove(final_dest_path)
+                
+            shutil.move(tmp_path, final_dest_path)
+            
+            content = f"""
+            <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">
+                SUCCESS: UPLOAD VERIFIED
+            </div>
+            <p style="font-size:12px;">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
+            <div style="margin-top:20px;"><a href="/" class="btn">[ UPLOAD ANOTHER FILE ]</a></div>
+            """
+            return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
+            
+    except Exception as e:
+        # Гарантированная зачистка временного буфера в случае критического сбоя выполнения
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=False)
+EOF
+
+    # Безопасная контекстная подстановка строк Base64 в переменные файла.
+    # Этот синтаксис на сто процентов совместим с Zsh и Bash на рутованных Kali NetHunter и Termux.
+    local final_code
+    final_code=$(cat upload_server.py)
+    final_code="${final_code//__CAME_B64_UPLOAD_REGEX_PLACEHOLDER__/$b64_regex}"
+    final_code="${final_code//__CAME_B64_UI_TEMPLATES_PLACEHOLDER__/$b64_templates}"
+
+    echo "$final_code" > upload_server.py
+    echo "[+] upload_server.py успешно сгенерирован под Termux/NetHunter на основе GLOBAL_AV_MATRIX. Цвета и запуск в норме."
+}
+
+generate_upload_server_code_raworigin() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
