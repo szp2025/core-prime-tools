@@ -3483,11 +3483,11 @@ EOF
 # ==============================================================================
 
 generate_av_server_code_raw() {
+    # Раскрываем Bash-переменные для Python
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
-    # Используем 'EOF' с кавычками, чтобы Bash не трогал спецсимволы (\, $) внутри Python
-    cat << 'EOF' > server.py
+    cat << EOF > server.py
 from flask import Flask, request, render_template_string
 import re
 import os
@@ -3514,12 +3514,12 @@ GLOBAL_HASH_MATRIX = [
 ]
 
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
-GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
-GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
+GLOBAL_AV_PROC_REGEX = r"$GLOBAL_AV_ACTIVE_MALWARE_PROCS"
+GLOBAL_AV_SOCKET_REGEX = r"$GLOBAL_AV_SOCKET_STATES"
 
-WIN_PAYLOAD = """#{" ".join(GLOBAL_FIX_WIN_REG)}"""
-LINUX_PAYLOAD = """#{" ".join(GLOBAL_FIX_LINUX)}"""
-MACOS_PAYLOAD = """#{" ".join(GLOBAL_FIX_MACOS)}"""
+WIN_PAYLOAD = "$(echo "${GLOBAL_FIX_WIN_REG[@]}")"
+LINUX_PAYLOAD = "$(echo "${GLOBAL_FIX_LINUX[@]}")"
+MACOS_PAYLOAD = "$(echo "${GLOBAL_FIX_MACOS[@]}")"
 
 $templates
 
@@ -3533,13 +3533,17 @@ def index():
         "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
     }
     label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
-    body = form_html + f"""<div style="margin-top: 30px;"><h3 style="color: var(--accent-color);">[ SYSTEM LIVE SCANNER ]</h3>
+    body = form_html + f"""
+    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
+        <h3 style="color: var(--accent-color);">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
         <div style="display: flex; gap: 10px;">
             <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
             <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
         </div>
         <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
-        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a></div>"""
+        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
+    </div>
+    """
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 @app.route('/scan', methods=['POST'])
@@ -3553,17 +3557,15 @@ def scan():
     try:
         proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
         for line in proc.stdout:
-            try:
-                parts = line.split(' ', 1)
-                if len(parts) < 2: continue
-                offset, content = parts
-                for hsig in GLOBAL_HASH_MATRIX:
-                    if re.search(hsig, content): report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
-                for layer in GLOBAL_AV_MATRIX:
-                    if re.search(layer, content, re.I):
-                        report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
-                        threat_count += 1
-            except: continue
+            parts = line.split(' ', 1)
+            if len(parts) < 2: continue
+            offset, content = parts
+            for hsig in GLOBAL_HASH_MATRIX:
+                if re.search(hsig, content): report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
+            for layer in GLOBAL_AV_MATRIX:
+                if re.search(layer, content, re.I):
+                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                    threat_count += 1
         report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
     except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
     finally: os.remove(tmp)
