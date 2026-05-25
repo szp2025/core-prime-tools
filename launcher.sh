@@ -93,6 +93,7 @@ GLOBAL_MENU_REGISTRY=(
 
     "NEXUS:Full_Pipeline|run_nexus_full_pipeline"
 )
+
 # ==============================================================================
 # GLOBAL OSINT & RECON MATRIX (EXTENDED DATA SOURCES)
 # ==============================================================================
@@ -4350,36 +4351,38 @@ EOF
 # ==========================================
 run_system_info() {
     local start_time=$(date +%s)
-    core_engine_ui "h" "NEXUS v25.7: HYPER-STEALTH HEURISTIC ENGINE (ULTIMATE)"
+    core_engine_ui "h" "NEXUS v25.7: HEURISTIC PERIMETER EXPLORER"
     
-    # 1. Сбор и нормализация цели
-    local r_input=$(core_engine_input "text" "Enter Target URL, Domain or IP [default: localhost]")
+    # 1. Сбор и нормализация
+    local r_input=$(core_engine_input "text" "Enter Target (IP, Domain or URL)")
     [[ -z "$r_input" ]] && r_input="http://localhost"
-    
-    # УНИВЕРСАЛЬНЫЙ ПАРСЕР
-    # Если введен полный URL (с http), очищаем, если домен - добавляем схему
     [[ ! "$r_input" =~ ^http ]] && r_input="http://$r_input"
+    
     local r_target=$(echo "$r_input" | awk -F/ '{print $3}')
     local r_base_url=$(echo "$r_input" | cut -d'/' -f1-3)
-    
     local target_ip=$(getent hosts "$r_target" | awk '{print $1}' | head -n 1)
-    local info_payload=$(curl -s -I -L --connect-timeout 5 "$r_input" 2>/dev/null)
-    local whois_data=$(whois "$r_target" 2>/dev/null)
     
     clear
-    # ЭТАП 1: КАРТОЧКА ЦЕЛИ И ИНФРАСТРУКТУРА
     core_engine_ui "h" "AUDIT TARGET: ${r_target}"
-    echo -e "${W}Target Domain  :${NC} ${Y}${r_target}${NC}"
-    echo -e "${W}Resolved IP    :${NC} ${G}${target_ip:-LOCAL}${NC}"
-    echo -e "${W}Server Software:${NC} ${G}$(echo "$info_payload" | grep -Ei "^Server:" | cut -d' ' -f2- || echo "HIDDEN")${NC}"
-    
-    # ЭТАП 2: WHOIS & IDENTIFICATION
-    echo -e "\n${Y}--- [WHOIS & IDENTITY] ---${NC}"
-    for pattern in "${GLOBAL_WHOIS_MATRIX[@]}"; do
-        local match=$(echo "$whois_data" | grep -Ei "$pattern" | head -n 1 | cut -d':' -f2- | xargs)
-        [[ -n "$match" ]] && echo -e "${W}* $(echo "$pattern" | sed 's/\\b//g' | tr -d '()') :${NC} ${C}${match}${NC}"
+
+    # ЭТАП 2: ВЫПОЛНЕНИЕ ВАШЕЙ GLOBAL_OSINT_SERVICES
+    echo -e "${Y}--- [OSINT: EXTERNAL INTELLIGENCE SOURCES] ---${NC}"
+    for service_url in "${GLOBAL_OSINT_SERVICES[@]}"; do
+        # Игнорируем строки с комментариями или пустышки
+        [[ "$service_url" =~ ^# ]] || [[ -z "$service_url" ]] && continue
+        
+        # Подставляем переменные в ваш URL
+        local request_url="${service_url//%TARGET%/$r_target}"
+        request_url="${request_url//%IP%/$target_ip}"
+        
+        echo -e "${W}[*] Querying:${NC} ${service_url}"
+        local response=$(curl -s --connect-timeout 3 "$request_url")
+        
+        # Вывод результата (обрезаем для чистоты экрана)
+        echo -e "${G}    Result:${NC} ${response:0:80}..."
     done
 
+    
 # ЭТАП 3: FULL-STACK AGGRESSIVE FUZZING (С расчетом ETA)
     core_engine_ui "w" "Scanning $total endpoints..."
     echo "" # Строка для прогресса
