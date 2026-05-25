@@ -4162,9 +4162,96 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
 
-
-
 generate_upload_server_code_raw() {
+    # 1. Автоматическая сборка регулярки из массива (без внешних переменных)
+    local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
+    
+    # 2. Получаем шаблоны отдельно (чтобы избежать конфликтов строк в Bash)
+    local template_core=$(generate_core_template)
+    local template_form=$(generate_core_form_template)
+
+    # 3. Создаем файл через 'EOF', чтобы Bash НЕ трогал содержимое
+    # Мы используем абсолютный путь к файлу /root/upload_server.py
+    cat << 'EOF' > /root/upload_server.py
+from flask import Flask, request, render_template_string
+import os
+import re
+import shutil
+
+app = Flask(__name__)
+
+# Маркеры, которые будут заменены через sed
+GLOBAL_AV_PIPE_REGEX = r"__REGEX_MARKER__"
+CORE_TEMPLATE_RAW = """__CORE_MARKER__"""
+FORM_TEMPLATE_RAW = """__FORM_MARKER__"""
+
+def render_prime_page(title, content):
+    return CORE_TEMPLATE_RAW.replace('{{ title }}', title).replace('{{ content }}', content)
+
+def render_prime_form(action, fields, btn_text):
+    fields_html = "".join([f'<input type="{f["type"]}" name="{f["name"]}" placeholder="{f["label"]}" class="form-input" required><br>' for f in fields])
+    return FORM_TEMPLATE_RAW.replace('{{ action }}', action).replace('{{ fields }}', fields_html).replace('{{ btn_text }}', btn_text)
+
+UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
+if not os.path.exists(UPLOAD_DIR): os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.route('/')
+def index():
+    form_html = render_prime_form("/upload", [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}], "INITIATE SECURE UPLOAD")
+    return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files: return "TRANSFER_ERROR", 400
+    f = request.files['file']
+    if f.filename == '': return "EMPTY_FILENAME", 400
+    
+    tmp_path = os.path.join('/tmp', f.filename)
+    f.save(tmp_path)
+    
+    try:
+        with open(tmp_path, 'rb') as b: raw_content = b.read()
+        text = raw_content.decode('utf-8', errors='ignore')
+        matches = [f"Line {i}: {line.strip()[:100]}" for i, line in enumerate(text.splitlines(), 1) if re.search(GLOBAL_AV_PIPE_REGEX, line, re.IGNORECASE | re.MULTILINE)]
+        
+        if matches or (len(raw_content) > 1000 and (len([b for b in raw_content if 32 <= b <= 126]) * 100 / (len(raw_content) or 1)) < 12):
+            if os.path.exists(tmp_path): os.remove(tmp_path)
+            report = "\n".join(matches if matches else ["CRITICAL: High Entropy Detected"])
+            content = f'<div class="status-box infected">THREAT DESTROYED</div><pre>{report}</pre><a href="/" class="btn">[ RETURN ]</a>'
+            return render_template_string(render_prime_page("GATEWAY_BLOCK", content))
+        
+        dest = os.path.join(UPLOAD_DIR, f.filename)
+        if os.path.exists(dest): os.remove(dest)
+        shutil.move(tmp_path, dest)
+        return render_template_string(render_prime_page("TRANSFER_COMPLETE", "SUCCESS: UPLOAD VERIFIED"))
+            
+    except Exception as e:
+        if os.path.exists(tmp_path): os.remove(tmp_path)
+        return f"GATEWAY_ERROR: {str(e)}", 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=False)
+EOF
+
+    # 4. Внедрение данных через sed (защищает от ошибок синтаксиса)
+    sed -i "s|__REGEX_MARKER__|$regex_pattern|g" /root/upload_server.py
+    
+    echo "$template_core" > /root/tmp_core.py
+    sed -i "/__CORE_MARKER__/r /root/tmp_core.py" /root/upload_server.py
+    sed -i "/__CORE_MARKER__/d" /root/upload_server.py
+    
+    echo "$template_form" > /root/tmp_form.py
+    sed -i "/__FORM_MARKER__/r /root/tmp_form.py" /root/upload_server.py
+    sed -i "/__FORM_MARKER__/d" /root/upload_server.py
+    
+    rm /root/tmp_core.py /root/tmp_form.py
+    
+    echo "[+] upload_server.py успешно сгенерирован в /root/"
+}
+
+
+
+generate_upload_server_code_raworigin() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
