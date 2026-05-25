@@ -3488,7 +3488,8 @@ generate_av_server_code_raw() {
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
-    cat << EOF
+    # Используем 'EOF' (в кавычках), чтобы защитить содержимое от bash-интерпретации
+    cat << 'EOF' > server.py
 from flask import Flask, request, render_template_string
 import re
 import os
@@ -3523,20 +3524,6 @@ GLOBAL_HASH_MATRIX = [
 ]
 
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
-GLOBAL_AV_PROC_REGEX = r"""$GLOBAL_AV_ACTIVE_MALWARE_PROCS"""
-GLOBAL_AV_SOCKET_REGEX = r"""$GLOBAL_AV_SOCKET_STATES"""
-
-WIN_PAYLOAD = """#{" ".join(GLOBAL_FIX_WIN_REG)}"""
-LINUX_PAYLOAD = """#{" ".join(GLOBAL_FIX_LINUX)}"""
-MACOS_PAYLOAD = """#{" ".join(GLOBAL_FIX_MACOS)}"""
-
-$templates
-
-@app.route('/')
-def index():
-    form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
-    # ... (код индекса без изменений)
-    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 @app.route('/scan', methods=['POST'])
 def scan():
@@ -3549,27 +3536,25 @@ def scan():
     try:
         proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
         for line in proc.stdout:
-            offset, content = line.split(' ', 1)
-            for hsig in GLOBAL_HASH_MATRIX:
-                if re.search(hsig, content): 
-                    report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
-            for layer in GLOBAL_AV_MATRIX:
-                if re.search(layer, content, re.I):
-                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
-                    threat_count += 1
+            try:
+                offset, content = line.split(' ', 1)
+                for hsig in GLOBAL_HASH_MATRIX:
+                    if re.search(hsig, content): 
+                        report.append(f"[SECRET] [Offset {offset}]: {content.strip()}")
+                for layer in GLOBAL_AV_MATRIX:
+                    if re.search(layer, content, re.I):
+                        report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                        threat_count += 1
+            except: continue
         report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
     except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
     finally: os.remove(tmp)
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
-
-# ... (Остальные роуты sys-audit и inject остаются прежними)
+    return "Report generated" # Упрощено для отладки
 
 if __name__ == '__main__':
-   #app.run(host='0.0.0.0', port=5000, debug=False)
     app.run(host='0.0.0.0', port=5000, debug=True)
 EOF
 }
-
 
 generate_av_server_code_rawold() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
