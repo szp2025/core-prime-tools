@@ -3578,50 +3578,54 @@ def index():
 
 
 @app.route('/scan', methods=['POST'])
+
 def scan():
+
     f = request.files.get('file')
+
     if not f: return "Empty Payload", 400
+
     tmp = os.path.join('/tmp', f.filename)
+
     f.save(tmp)
+
     report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
+
     threat_count = 0
+
     try:
+
         proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
-     for line in proc.stdout:
-            line = line.strip()
-            if not line: continue
-            
-            # Разделяем только первый пробел после offset
-            parts = line.split(' ', 1)
-            if len(parts) < 2: continue
-            offset, content = parts
-            
-            # ВМЕСТО РЕЗКОЙ ОЧИСТКИ используем strip() и проверяем исходный контент
-            # Непечатные символы могут быть частью пароля, но их надо просто убрать по краям
-            clean_content = content.strip()
-            
-            for hsig in GLOBAL_HASH_MATRIX:
-                # Используем поиск с игнорированием регистра, если это уместно
-                match = re.search(hsig, clean_content)
+
+        for line in proc.stdout:
+
+            offset, content = line.split(' ', 1)
+
+           for hsig in GLOBAL_HASH_MATRIX:
+                match = re.search(hsig, content)
                 if match:
-                    found = match.group(0).strip()
-                    # Убираем проверку на длину > 4, так как пароль может быть коротким
-                    # Если нашли - пишем в отчет
-                    report.append(f"[SECRET FOUND] [Offset {offset}]: {found}")
-                else:
-                    # ОТЛАДКА: если строка очень похожа на пароль, но не прошла
-                    if len(clean_content) > 8 and "pass" in clean_content.lower():
-                        report.append(f"[DEBUG: POSSIBLY MISSED] [Offset {offset}]: {clean_content}")
-                        
-            
+                    # Берем группу 1, если она есть (это ваш "чистый" пароль в скобках), 
+                    # если скобок нет в шаблоне — берем всё совпадение (group 0)
+                    secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                    report.append(f"[SECRET FOUND] [Offset {offset}]: {secret.strip()}")
+                    
+
             for layer in GLOBAL_AV_MATRIX:
+
                 if re.search(layer, content, re.I):
+
                     report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+
                     threat_count += 1
+
         report.append(f"\nVERDICT: {'INFECTED' if threat_count > 0 else 'CLEAN'}")
+
     except Exception as e: report.append(f"ENGINE_FAILURE: {e}")
+
     finally: os.remove(tmp)
+
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+
 
 
 @app.route('/sys-audit/<mode>')
