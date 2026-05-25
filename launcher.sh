@@ -4334,10 +4334,12 @@ EOF
 
 
 generate_upload_server_code_raw() {
-    # Загружаем UI шаблоны лаунчера в локальную переменную
-    local templates
-    templates="$(generate_core_template)
-$(generate_core_form_template)"
+    # Загружаем UI шаблоны лаунчера в локальные переменные
+    local template_core
+    template_core=$(generate_core_template)
+    
+    local template_form
+    template_form=$(generate_core_form_template)
 
     # Динамически объединяем все элементы Bash-массива GLOBAL_AV_MATRIX в одну регулярную строку
     local joined_regex=""
@@ -4349,15 +4351,17 @@ $(generate_core_form_template)"
         fi
     done
 
-    # Переводим динамические данные в чистый Base64 (буквы и цифры).
-    # Интерпретаторы NetHunter/Termux (как bash, так и zsh) не увидят спецсимволов и ничего не испортят.
+    # Переводим всё в Base64 для полной изоляции от капризов zsh/bash на Android
     local b64_regex
     b64_regex=$(echo -n "$joined_regex" | base64 | tr -d '\n\r')
     
-    local b64_templates
-    b64_templates=$(echo -n "$templates" | base64 | tr -d '\n\r')
+    local b64_core
+    b64_core=$(echo -n "$template_core" | base64 | tr -d '\n\r')
+    
+    local b64_form
+    b64_form=$(echo -n "$template_form" | base64 | tr -d '\n\r')
 
-    # ШАГ 1: Запись начального заголовка, импортов и путей (Строгий 'EOF' — идеальный цвет в IDE)
+    # Запись монолитного upload_server.py (Кавычки 'EOF' гарантируют правильный цвет в IDE)
     cat << 'EOF' > upload_server.py
 from flask import Flask, request, render_template_string
 import os
@@ -4367,26 +4371,41 @@ import shutil
 
 app = Flask(__name__)
 
-# Декодирование сигнатурной матрицы CAME, переданной из ядра NetHunter/Termux
+# Декодирование регулярного выражения CAME (Матрица Слоев)
 B64_REGEX_DATA = "__CAME_B64_UPLOAD_REGEX_PLACEHOLDER__"
 GLOBAL_AV_PIPE_REGEX = re.compile(base64.b64decode(B64_REGEX_DATA).decode('utf-8', errors='ignore'), re.IGNORECASE | re.MULTILINE)
 
-# Сохраняем во входящую папку внутри PRIME_LOOT
+# Конфигурация защищенного хранилища данных
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Декодирование и динамическая инициализация шаблонов интерфейса
-B64_TEMPLATES_DATA = "__CAME_B64_UI_TEMPLATES_PLACEHOLDER__"
-HTML_TEMPLATES_DECODED = base64.b64decode(B64_TEMPLATES_DATA).decode('utf-8', errors='ignore')
+# Извлекаем сырые HTML данные из Base64 без использования опасного exec()
+B64_CORE_HTML = "__CAME_B64_CORE_HTML__"
+B64_FORM_HTML = "__CAME_B64_FORM_HTML__"
 
-# Выполняем инжекцию декодированных шаблонов в пространство имен Python
-exec(HTML_TEMPLATES_DECODED, globals())
+CORE_TEMPLATE_RAW = base64.b64decode(B64_CORE_HTML).decode('utf-8', errors='ignore')
+FORM_TEMPLATE_RAW = base64.b64decode(B64_FORM_HTML).decode('utf-8', errors='ignore')
+
+# Статические функции рендеринга — теперь это чистый и стабильный Python-код
+def render_prime_page(title, content):
+    return CORE_TEMPLATE_RAW.replace('{{ title }}', title).replace('{{ content }}', content)
+
+def render_prime_form(action, fields, btn_text):
+    # Базовая сборка полей формы, если оригинальный шаблонизатор требует подстановки
+    fields_html = ""
+    for field in fields:
+        fields_html += f'<input type="{field["type"]}" name="{field["name"]}" placeholder="{field["label"]}" class="form-input" required><br>'
+    
+    form_built = FORM_TEMPLATE_RAW.replace('{{ action }}', action)
+    form_built = form_built.replace('{{ fields }}', fields_html)
+    form_built = form_built.replace('{{ btn_text }}', btn_text)
+    return form_built
 
 @app.route('/')
 def index():
-    # Главная страница: Интуитивная защищенная форма загрузки данных в Drop-Box
+    # Главная страница: Форма загрузки в изолированный Drop-Box
     fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
     form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
     return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
@@ -4401,7 +4420,7 @@ def upload():
     if f.filename == '': 
         return "EMPTY_FILENAME", 400
     
-    # 1. Первичный прием потока данных во временную буферную зону /tmp
+    # 1. Прием потока данных во временную буферную зону /tmp
     tmp_path = os.path.join('/tmp', f.filename)
     f.save(tmp_path)
     
@@ -4409,7 +4428,7 @@ def upload():
     report = []
     
     try:
-        # 2. Чтение бинарного дампа загруженного объекта для структурного аудита CAME
+        # 2. Чтение бинарного дампа загруженного объекта для аудита CAME
         with open(tmp_path, 'rb') as file_buffer:
             raw_content = file_buffer.read()
             
@@ -4423,7 +4442,6 @@ def upload():
         text_content = raw_content.decode('utf-8', errors='ignore')
         
         matches = []
-        # Запуск сканирования по Слоям
         try:
             for i, line in enumerate(text_content.splitlines(), 1):
                 if GLOBAL_AV_PIPE_REGEX.search(line):
@@ -4431,7 +4449,7 @@ def upload():
         except Exception as regex_err:
             matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
             
-        # 3. Принятие решения на основе полученных эвристических метрик
+        # 3. Принятие решения на основе полученных метрик
         if total_bytes > 1000 and readable_ratio < 12:
             is_infected = True
             report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
@@ -4440,14 +4458,12 @@ def upload():
             is_infected = True
             report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
             
-        # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
+        # 4. Обработка файла в зависимости от вердикта безопасности
         if is_infected:
             # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
-            # Файл ЗАРАЖЕН — Полное удаление с диска без создания карантинных копий
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
             
-            # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL DETECTION: THREAT TOTALLY DESTROYED
@@ -4459,10 +4475,9 @@ def upload():
             return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
             
         else:
-            # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
+            # Файл чист — перемещаем в постоянный сектор хранения
             final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
             
-            # На случай, если файл с таким именем уже существовал, безопасно перезаписываем его
             if os.path.exists(final_dest_path):
                 os.remove(final_dest_path)
                 
@@ -4478,7 +4493,6 @@ def upload():
             return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
             
     except Exception as e:
-        # Гарантированная зачистка временного буфера в случае критического сбоя выполнения
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
@@ -4487,15 +4501,15 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 
-    # Безопасная контекстная подстановка строк Base64 в переменные файла.
-    # Этот синтаксис на сто процентов совместим с Zsh и Bash на рутованных Kali NetHunter и Termux.
+    # Чистая замена маркеров нативного уровня Bash/Zsh (без sed/awk)
     local final_code
     final_code=$(cat upload_server.py)
     final_code="${final_code//__CAME_B64_UPLOAD_REGEX_PLACEHOLDER__/$b64_regex}"
-    final_code="${final_code//__CAME_B64_UI_TEMPLATES_PLACEHOLDER__/$b64_templates}"
+    final_code="${final_code//__CAME_B64_CORE_HTML__/$b64_core}"
+    final_code="${final_code//__CAME_B64_FORM_HTML__/$b64_form}"
 
     echo "$final_code" > upload_server.py
-    echo "[+] upload_server.py успешно сгенерирован под Termux/NetHunter на основе GLOBAL_AV_MATRIX. Цвета и запуск в норме."
+    echo "[+] upload_server.py успешно стабилизирован под Android (Termux/NetHunter). Запускай."
 }
 
 generate_upload_server_code_raworigin() {
