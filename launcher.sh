@@ -3880,8 +3880,6 @@ generate_share_server_code_raw() {
     # Загружаем только базовый шаблон страницы в локальную переменную
     local template=$(generate_core_template)
 
-
-
     # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
     cat << EOF
 from flask import Flask, render_template_string, send_from_directory, abort
