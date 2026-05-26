@@ -8828,9 +8828,14 @@ run_live_service() {
     # Вызываем синхронизацию (она сама найдет лучший IP и обновит dnsmasq)
     core_network_dns_sync || core_engine_ui "w" "DNS Sync bypassed, using raw IP."
     
-    # Эвристика имени: выбираем домен на основе типа сервиса
-    local service_name="prime.portal"
-    [[ "$service_type" == "av" ]] && service_name="scanclamavlocal"
+# Эвристика домена: используем массив или case для назначения appN.nexus
+    local service_name="app0.nexus" # Дефолт
+    case "$service_type" in
+        "av")      service_name="app0.nexus" ;;
+        "scanner") service_name="app1.nexus" ;;
+        "auth")    service_name="app2.nexus" ;;
+        *)         service_name="prime.portal" ;;
+    esac
 
     # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
     if command -v openssl >/dev/null 2>&1; then
