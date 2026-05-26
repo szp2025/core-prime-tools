@@ -1376,20 +1376,22 @@ FORENSIC_MATRIX=(
 
 
 # ==============================================================================
-# GLOBAL PLATFORM IDENTIFIERS (ULTIMATE LINK PARSING MATRIX v15.0)
+# GLOBAL PLATFORM IDENTIFIERS (ULTIMATE LINK PARSING MATRIX v16.0 - AUTO_PARSE)
 # ==============================================================================
-# Формат записи: "ПЛАТФОРМА|РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ_ДЛЯ_ФИЛЬТРАЦИИ|НОМЕР_ГРУППЫ_ИЛИ_МЕТОД"
-# Поддерживает: субдомены (www, m, mobile), протоколы, GET-параметры, вложенные роуты
+# Формат: "ПЛАТФОРМА|REGEX|GROUP|MODE"
+# [AUTO_PARSE] - триггер для глубокого анализа структуры профиля
+# [LINK_ONLY]  - использование только как источник связей
+# ==============================================================================
 GLOBAL_PLATFORM_IDENTIFIERS=(
-    "Facebook|(?:https?://)?(?:www\.|m\.|mobile\.)?facebook\.com/(?:profile\.php\?id=)?([a-zA-Z0-9.]+)|1"
-    "Instagram|(?:https?://)?(?:www\.)?instagram\.com/([a-zA-Z0-9._]+)|1"
-    "TikTok|(?:https?://)?(?:www\.|vt\.)?tiktok\.com/(?:@[a-zA-Z0-9._]+|t/)([a-zA-Z0-9._]+)|1"
-    "X_Twitter|(?:https?://)?(?:www\.)?(?:x|twitter)\.com/([a-zA-Z0-9._]+)|1"
-    "YouTube|(?:https?://)?(?:www\.)?youtube\.com/(?:@|user/|c/)?([a-zA-Z0-9._-]+)|1"
-    "Telegram|(?:https?://)?(?:t\.me|telegram\.me)/([a-zA-Z0-9._]+)|1"
-    "Reddit|(?:https?://)?(?:www\.)?reddit\.com/user/([a-zA-Z0-9_-]+)|1"
-    "GitHub|(?:https?://)?(?:www\.)?github\.com/([a-zA-Z0-9-]+)|1"
-    "LinkedIn|(?:https?://)?(?:www\.)?linkedin\.com/in/([a-zA-Z0-9_-]+)|1"
+    "Facebook|facebook\.com/(?:profile\.php\?id=)?([a-zA-Z0-9.]+)|1|[AUTO_PARSE]"
+    "Instagram|instagram\.com/([a-zA-Z0-9._]+)|1|[AUTO_PARSE]"
+    "TikTok|tiktok\.com/(?:@[a-zA-Z0-9._]+|t/)([a-zA-Z0-9._]+)|1|[AUTO_PARSE]"
+    "X_Twitter|(?:x|twitter)\.com/([a-zA-Z0-9._]+)|1|[AUTO_PARSE]"
+    "YouTube|youtube\.com/(?:@|user/|c/)?([a-zA-Z0-9._-]+)|1|[LINK_ONLY]"
+    "Telegram|(?:t\.me|telegram\.me)/([a-zA-Z0-9._]+)|1|[AUTO_PARSE]"
+    "Reddit|reddit\.com/user/([a-zA-Z0-9_-]+)|1|[LINK_ONLY]"
+    "GitHub|github\.com/([a-zA-Z0-9-]+)|1|[AUTO_PARSE]"
+    "LinkedIn|linkedin\.com/in/([a-zA-Z0-9_-]+)|1|[AUTO_PARSE]"
 )
 
 # ==============================================================================
@@ -7402,7 +7404,61 @@ run_osint_dorking_engine() {
     core_engine_ui "s" "Universal file discovery complete. All vectors mapped."
 }
 
+# Пример функции для анализа метаданных найденных файлов
+run_osint_metadata_analyzer() {
+    local file="$1"
+    core_engine_ui "i" "Nexus: Analyzing metadata for $file..."
+    
+    if command -v exiftool >/dev/null 2>&1; then
+        exiftool -json "$file" >> "${file}.meta.json"
+        # Интеграция в лог
+        echo "[METADATA_ANALYSIS] $(cat ${file}.meta.json)" >> "$raw_log"
+    fi
+}
 
+
+# --- 7. [NEW] DELTA INTELLIGENCE MONITOR ---
+# Функция сравнения текущего лога с предыдущим (хранится в базе)
+run_osint_delta_monitor() {
+    local target="$1"
+    local new_log="$2"
+    local history_dir="$loot_dir/history"
+    mkdir -p "$history_dir"
+    
+    local last_log=$(ls -t "$history_dir/${target}_"*.log 2>/dev/null | head -n1)
+    
+    if [[ -n "$last_log" ]]; then
+        core_engine_ui "i" "Nexus: Detecting changes since last scan..."
+        local diff_report="$loot_dir/delta_${target}_$(date +%Y%m%d).txt"
+        
+        # Сравниваем файлы и вытаскиваем только новые уникальные строки
+        comm -13 <(sort "$last_log") <(sort "$new_log") > "$diff_report"
+        
+        if [[ -s "$diff_report" ]]; then
+            core_engine_ui "e" "NEW INTELLIGENCE DETECTED! Check $diff_report"
+        else
+            core_engine_ui "s" "No new intelligence detected."
+        fi
+    fi
+    
+    # Копируем текущий лог в историю как последний
+    cp "$new_log" "$history_dir/${target}_$(date +%Y%m%d_%H%M%S).log"
+}
+
+# --- 8. [NEW] FILE FORENSICS PIPELINE ---
+run_osint_forensics() {
+    local file_list="$1"
+    core_engine_ui "i" "Nexus: Deep-diving into extracted file metadata..."
+    
+    while read -r file_path; do
+        if [[ -f "$file_path" ]]; then
+            # Извлечение автора, даты создания и геолокации (если есть)
+            exiftool -j "$file_path" > "${file_path}.json"
+            # Добавляем инфо в общий лог
+            echo "[FILE_META] $file_path -> $(cat ${file_path}.json)" >> "$raw_log"
+        fi
+    done < "$file_list"
+}
 
 # ==============================================================================
 # @description: OSINT NEXUS v21.0 - FULL RECURSIVE MONOLITH (MAX INTEGRATION)
@@ -7544,7 +7600,7 @@ run_smart_osint_engine() {
     [[ "$(type -t run_osint_custom_socialscan)" == "function" ]] && run_osint_custom_socialscan "$TARGET" "$raw_log"
     [[ "$(type -t run_osint_custom_leaks)" == "function" ]] && run_osint_custom_leaks "$TARGET" "$raw_log"
     [[ "$(type -t run_osint_dorking_engine)" == "function" ]] && run_osint_dorking_engine "$TARGET" "$raw_log"
-
+    [[ "$(type -t run_osint_delta_monitor)" == "function" ]] && run_osint_delta_monitor "$TARGET" "$raw_log"
     
     if echo "$TARGET" | grep -Eq "$rx_phone_intl|$rx_phone_cis" && [[ "$(type -t run_osint_custom_ignorant)" == "function" ]]; then
         run_osint_custom_ignorant "$TARGET" "$raw_log"
@@ -7552,6 +7608,14 @@ run_smart_osint_engine() {
 
     # --- 4. РЕКУРСИВНЫЙ ЦИКЛ (Deep-Hunt Стриминг Извлеченных Сущностей) ---
     core_engine_ui "i" "Nexus: Launching recursive search on extracted entities..."
+    
+    # Допустим, мы извлекаем пути к файлам из лога
+    local found_files_list="/tmp/files_$$"
+    grep -oE "https?://[^\"]+\.(pdf|docx?|xlsx?|sql|log)" "$raw_log" | sort -u > "$found_files_list"
+    if [[ -s "$found_files_list" ]]; then
+        run_osint_forensics "$found_files_list"
+    fi
+    rm -f "$found_files_list"
     
     # 4.1 Потоковая дедуплицированная рекурсия по Email (Чистый RAM-пайплайн)
     local ext_emails
@@ -7578,6 +7642,35 @@ run_smart_osint_engine() {
         done
     fi
 
+
+    # --- 4.5. [NEW] CRITICAL ASSET DETECTOR (Tier-1 Scan) ---
+    core_engine_ui "i" "Nexus: Running Priority Asset Analysis..."
+    
+    local critical_assets="$loot_dir/critical_${safe_target}_$timestamp.txt"
+    # Ищем критические маркеры (API-ключи, private keys, пароли)
+    grep -Eoi "AIza[0-9A-Za-z-_]{35}|-----BEGIN RSA PRIVATE KEY-----|password=|auth_token" "$raw_log" | awk '!visited[$0]++' > "$critical_assets"
+    
+    if [[ -s "$critical_assets" ]]; then
+        echo -e "\n[!] ALERT: CRITICAL ASSETS DETECTED" >> "$raw_log"
+        cat "$critical_assets" >> "$raw_log"
+        core_engine_ui "e" "CRITICAL ASSETS FOUND! Check the dossier header."
+    fi
+    rm -f "$critical_assets"
+
+
+    # --- 6. [NEW] GRAPH INTELLIGENCE GENERATOR ---
+    # Экстракция связей: кто с чем связан (Email -> IP -> Domain)
+    local graph_file="$loot_dir/graph_${safe_target}_$timestamp.dot"
+    echo "digraph OSINT_NEXUS {" > "$graph_file"
+    echo "  label=\"Nexus Graph: $TARGET\";" >> "$graph_file"
+    
+    # Извлекаем уникальные пары и формируем связи
+    grep -Eoi "([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})" "$raw_log" | sort -u | \
+    awk -v target="$TARGET" '{print "  \""target"\" -> \"" $1 "\";"}' >> "$graph_file"
+    
+    echo "}" >> "$graph_file"
+    core_engine_ui "s" "Graph intelligence generated: $graph_file"
+    
     # --- 5. СТРУКТУРИРОВАНИЕ И ФОРМИРОВАНИЕ ФОРЕНЗИК-ДОСЬЕ ---
     core_engine_ui "i" "Finalizing intelligence dossier via Multi-Layer GLOBAL_FILTER_MATRIX..."
     
