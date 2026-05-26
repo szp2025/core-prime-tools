@@ -4171,6 +4171,8 @@ generate_upload_server_code_raw() {
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
+local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
+
     # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
     cat << EOF
 from flask import Flask, request, render_template_string
@@ -4180,7 +4182,10 @@ import re
 app = Flask(__name__)
 
 # Проброс глобального регулярного выражения CAME из ядра Bash в Python
-GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
+#GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
+
+# ПРОБРОС МАТРИЦЫ CAME: Интеграция 8 слоев фильтрации
+GLOBAL_AV_PIPE_REGEX = r"""$regex_pattern"""
 
 # Сохраняем во входящую папку внутри PRIME_LOOT
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
