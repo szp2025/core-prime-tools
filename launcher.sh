@@ -2725,27 +2725,47 @@ core_engine_loot() {
 core_nginx_auto_setup() {
     local nginx_conf="/etc/nginx/sites-available/nexus_all.conf"
 
+    # Используем порт 8080 для обхода ограничений Android/NetHunter
+    # Добавляем proxy_set_header для корректной передачи данных во Flask
     cat << 'EOF' > "$nginx_conf"
 server {
-    listen 80;
+    listen 8080;
     server_name app0.local;
-    location / { proxy_pass http://127.0.0.1:5000/; }
+    location / { 
+        proxy_pass http://127.0.0.1:5000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 server {
-    listen 80;
+    listen 8080;
     server_name app1.local;
-    location / { proxy_pass http://127.0.0.1:5001/; }
+    location / { 
+        proxy_pass http://127.0.0.1:5001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 server {
-    listen 80;
+    listen 8080;
     server_name app2.local;
-    location / { proxy_pass http://127.0.0.1:5002/; }
+    location / { 
+        proxy_pass http://127.0.0.1:5002/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 EOF
 
+    # Обеспечиваем наличие ссылки
     ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/"
-    systemctl restart nginx
-    core_engine_ui "+" "Nginx Proxy активен для app0.local, app1.local, app2.local"
+    
+    # Попытка перезапуска через systemctl, если не работает — пробуем прямой вызов nginx
+    if ! systemctl restart nginx 2>/dev/null; then
+        nginx -s reload 2>/dev/null || nginx
+    fi
+    
+    core_engine_ui "+" "Nginx Proxy активен на порту 8080 для app0.local, app1.local, app2.local"
 }
 
 # ==============================================================================
