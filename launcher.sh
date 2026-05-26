@@ -8965,6 +8965,9 @@ run_share_server() {
     # Используем тип "share" на порту 5002
     run_live_service "share" "5002"
 
+# Интеграция в Nginx на лету
+    core_nginx_auto_setup "app1.nexus:5002"
+    
     # Слой 5: Регистрация в Сборщике трофеев [11]
     core_engine_loot "service" "Share Sector (Uplink) active on port 5002"
 }
@@ -8982,6 +8985,9 @@ run_upload_server() {
     # Код сервера передается через пайп, исключая создание .py файлов на диске.
     run_live_service "upload" "5001"
 
+# Интеграция в Nginx на лету
+    core_nginx_auto_setup "app2.nexus:5001"
+    
     # Слой 4: Регистрация в Сборщике трофеев [11]
     # Фиксация события запуска в системном логе
     core_engine_loot "service" "Secure Uplink (Upload) initiated on port 5001"
