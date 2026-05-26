@@ -2719,6 +2719,30 @@ core_engine_loot() {
 }
 
 #Настройки 
+core_nginx_auto_setup() {
+    local hostname=$(hostname)
+    local nginx_conf="/etc/nginx/sites-available/nexus_all.conf"
+
+    # Добавлены ОДИНАРНЫЕ КАВЫЧКИ вокруг 'EOF'
+    # Теперь Bash НИЧЕГО не будет интерпретировать внутри блока
+    cat << 'EOF' > "$nginx_conf"
+server {
+    listen 80;
+    server_name HOSTNAME_PLACEHOLDER.local;
+
+    location /app0/ { proxy_pass http://127.0.0.1:5000/; }
+    location /app1/ { proxy_pass http://127.0.0.1:5001/; }
+    location /app2/ { proxy_pass http://127.0.0.1:5002/; }
+}
+EOF
+
+    # После того как записали файл, заменим плейсхолдер на реальный хост
+    sed -i "s/HOSTNAME_PLACEHOLDER/$hostname/g" "$nginx_conf"
+
+    ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/"
+    systemctl restart nginx
+    core_engine_ui "+" "Nginx Proxy активен для 5000/5001/5002"
+}
 
 
 # ==============================================================================
@@ -2825,6 +2849,16 @@ core_network_dns_sync() {
         return 1
     fi
 
+
+        # --- ШАГ 6: ИНТЕГРАЦИЯ NGINX REVERSE PROXY ---
+        # Вместо iptables используем профессиональный Nginx для маршрутизации портов 5000, 5001, 5002
+        if command -v nginx >/dev/null 2>&1; then
+            core_nginx_auto_setup
+        else
+            core_engine_ui "w" "Nginx не найден. Установите Nginx для корректной работы Proxy."
+        fi
+
+        
     # Финальная санитарная очистка временных файлов из директории /tmp/
     rm -f "$tmp_dns"
     return 0
