@@ -8938,6 +8938,9 @@ run_av_server() {
     # Передаем тип "av" (аудио-визуальный/антивирусный контекст) и выделенный порт 5000
     run_live_service "av" "5000"
 
+   # Интеграция в Nginx на лету
+    core_nginx_auto_setup "app0.nexus:5000"
+    
     # Слой 4: Интеграция в Сборщик трофеев [11]
     core_engine_loot "security" "ClamAV Gateway initiated on port 5000"
 }
