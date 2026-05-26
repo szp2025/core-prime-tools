@@ -76,7 +76,8 @@ GLOBAL_MENU_REGISTRY=(
     "FORENSICS:Document_Sanitizer|run_doc_cleaner" "FORENSICS:Forensic_Loot|run_loot_viewer"
 
     "CYBER_OPS:Ghost_Commander|run_ghost_commander" "CYBER_OPS:PC_Control|pc_password_recovery"
-    "CYBER_OPS:Ultimate_Exploit|run_prime_exploiter_v5" "CYBER_OPS:Omega_Auditor|run_prime_auditor_v2"
+   #"CYBER_OPS:Ultimate_Exploit|run_prime_exploiter_v5" "CYBER_OPS:Omega_Auditor|run_prime_auditor_v2"
+    "CYBER_OPS:Unified_Auditor|run_smart_auditor_nexus"
 
     "CRYPTO_LAB:Hash_Analyzer|run_stealth_stream_analyzer" 
     "CRYPTO_LAB:File_Encryptor|run_file_cryptor"
@@ -5712,6 +5713,108 @@ run_ghost_commander() {
     core_engine_ui "s" "Protocol finalized. Artifacts secured."
     core_engine_wait
 }
+
+run_smart_auditor_nexus() {
+    clear
+    core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v2.0"
+
+    local input
+    input=$(core_engine_input "text" "Enter Target (Domain, IP, or Service URL)")
+    [[ -z "$input" ]] && return
+
+    # --- 0. ИНТЕЛЛЕКТУАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ (Target Analyzer) ---
+    local target_type="unknown"
+    local host="$input"
+    
+    if [[ "$input" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+        target_type="infrastructure"
+    elif [[ "$input" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        target_type="web"
+    elif [[ "$input" =~ :[0-9]+$ ]]; then
+        target_type="service"
+    fi
+
+    # --- 1. ВЫПОЛНЕНИЕ ПО ТИПУ ЦЕЛИ ---
+    case "$target_type" in
+        "web")
+            core_engine_ui "i" "Mode: WEB APPLICATION AUDIT (Deep Discovery)"
+            
+            local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
+            mkdir -p "$loot_dir" 2>/dev/null
+            local results_file="$loot_dir/audit_full_${host//[^a-zA-Z0-9]/_}_$(date +%Y%m%d_%H%M%S).log"
+            local signals_file="/tmp/signals_$$"
+
+            # 1.1 Пассивная разведка
+            core_engine_ui "i" "Phase 1: Ingesting target aura..."
+            {
+                curl -Is --connect-timeout 5 --max-time 7 -A "$GLOBAL_NETWORK_UA" "https://$host"
+                host -t txt "$host" 2>/dev/null
+                whois "$host" 2>/dev/null | grep -iE "city|country|orgname"
+            } > "$signals_file" 2>&1
+
+            local is_high_risk=false
+            grep -qiE "${GLOBAL_SECURITY_MATRIX[0]}" "$signals_file" && is_high_risk=true
+
+            # 1.2 Активный аудит (только если риск низкий)
+            if [ "$is_high_risk" = false ]; then
+                core_engine_ui "s" "Target safe. Deploying Active Probe..."
+                local tmp_pipe="/tmp/prime_pipe_$$"
+                touch "$tmp_pipe"
+                
+                (
+                    curl -s -k -L --max-time 7 "https://$host" | grep -oE "\.(php|js|json|sql|env|xml|yaml|config)" | sort -u | awk '{print "HIT|"$1}' >> "$tmp_pipe"
+                    for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
+                        [[ -z "$f" ]] && continue
+                        [[ $(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 2 "https://$host/$f") == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
+                    done
+                ) &
+                wait $!
+
+                while IFS='|' read -r tag target; do
+                    [[ -z "$target" ]] && continue
+                    local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
+                    if ! echo "$head_check" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}"; then
+                        if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}|\.(sql|env|config)$"; then
+                            core_engine_loot "CRITICAL" "Exposed: $target on $host"
+                            echo -e "${R}[CRITICAL]${NC} $target" >> "$results_file"
+                        else
+                            echo -e "${G}[FILE]${NC} $target" >> "$results_file"
+                        fi
+                        if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[2]}|${GLOBAL_SAST_MATRIX[3]}"; then
+                            run_deep_file_probe "$host" "$target" "$head_check"
+                        fi
+                    fi
+                done < <(sort -u "$tmp_pipe")
+                rm -f "$tmp_pipe"
+            else
+                core_engine_ui "e" "Active Probe bypassed to maintain stealth."
+            fi
+            rm -f "$signals_file"
+            ;;
+            
+        "infrastructure")
+            core_engine_ui "i" "Mode: INFRASTRUCTURE SCAN (Port & Service Audit)"
+            # Интегрированная логика бывшего exploiter_v5
+            local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
+            local results_file="$loot_dir/infra_scan_$(date +%s).log"
+            nmap -T3 -n -Pn -sV --script="safe,discovery" -p "80,443,22,21,8080" "$input" >> "$results_file" 2>&1
+            core_engine_ui "s" "Infrastructure scan complete: $results_file"
+            ;;
+            
+        "service")
+            core_engine_ui "i" "Mode: SERVICE PROBE (Fingerprinting)"
+            curl -I "$input" 2>/dev/null || echo "Service non-responsive"
+            ;;
+            
+        *)
+            core_engine_ui "e" "Target type could not be resolved automatically."
+            return
+            ;;
+    esac
+
+    core_engine_wait
+}
+
 
 
 # ==============================================================================
