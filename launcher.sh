@@ -2722,51 +2722,92 @@ core_engine_loot() {
 }
 
 #Настройки 
+
+# Добавьте эти функции в ваш launcher.sh
+start_nexus_gateway() {
+    echo "[*] Инициализация Nexus Hybrid Gateway..."
+    # Проверка, запущен ли Flask
+    if ! pgrep -f "app.py" > /dev/null; then
+        nohup python3 /путь/к/вашему/app.py > /var/log/nexus_gateway.log 2>&1 &
+        echo "[+] Nexus Flask Gateway запущен на порту 5000"
+    else
+        echo "[!] Flask уже запущен."
+    fi
+
+    # Проверка Nginx
+    if ! pgrep -x "nginx" > /dev/null; then
+        sudo nginx
+        echo "[+] Nginx запущен."
+    else
+        echo "[+] Nginx уже активен."
+    fi
+}
+
+stop_nexus_gateway() {
+    echo "[*] Остановка Nexus Gateway..."
+    sudo nginx -s stop
+    pkill -f "app.py"
+    echo "[+] Системы остановлены."
+}
+
+
 core_nginx_auto_setup() {
     local nginx_conf="/etc/nginx/sites-available/nexus_all.conf"
 
-    # Используем порт 8080 для обхода ограничений Android/NetHunter
-    # Добавляем proxy_set_header для корректной передачи данных во Flask
-    cat << 'EOF' > "$nginx_conf"
+    # Записываем конфигурацию с поддержкой HTTPS для каждого узла
+    echo "
+# --- app0.nexus ---
 server {
     listen 8080;
     server_name app0.nexus;
-    location / { 
-        proxy_pass http://127.0.0.1:5000/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+    return 301 https://app0.nexus:8443\$request_uri;
 }
 server {
-    listen 8080;
-    server_name app1.local;
-    location / { 
-        proxy_pass http://127.0.0.1:5001/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+    listen 8443 ssl;
+    server_name app0.nexus;
+    ssl_certificate /etc/nginx/ssl/nexus.crt;
+    ssl_certificate_key /etc/nginx/ssl/nexus.key;
+    location / { proxy_pass http://127.0.0.1:5000/; proxy_set_header Host \$host; }
 }
+
+# --- app1.nexus ---
+server {
+    listen 8080;
+    server_name app1.nexus;
+    return 301 https://app1.nexus:8443\$request_uri;
+}
+server {
+    listen 8443 ssl;
+    server_name app1.nexus;
+    ssl_certificate /etc/nginx/ssl/nexus.crt;
+    ssl_certificate_key /etc/nginx/ssl/nexus.key;
+    location / { proxy_pass http://127.0.0.1:5001/; proxy_set_header Host \$host; }
+}
+
+# --- app2.nexus ---
 server {
     listen 8080;
     server_name app2.nexus;
-    location / { 
-        proxy_pass http://127.0.0.1:5002/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+    return 301 https://app2.nexus:8443\$request_uri;
 }
-EOF
+server {
+    listen 8443 ssl;
+    server_name app2.nexus;
+    ssl_certificate /etc/nginx/ssl/nexus.crt;
+    ssl_certificate_key /etc/nginx/ssl/nexus.key;
+    location / { proxy_pass http://127.0.0.1:5002/; proxy_set_header Host \$host; }
+}" | sudo tee "$nginx_conf" > /dev/null
 
-    # Обеспечиваем наличие ссылки
-    ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/"
+    sudo ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/"
     
-    # Попытка перезапуска через systemctl, если не работает — пробуем прямой вызов nginx
-    if ! systemctl restart nginx 2>/dev/null; then
-        nginx -s reload 2>/dev/null || nginx
+    if sudo nginx -t >/dev/null 2>&1; then
+        sudo nginx -s reload 2>/dev/null || sudo nginx
+        core_engine_ui "+" "Nginx Proxy: HTTPS (8443) и HTTP (8080) активны для всех узлов"
+    else
+        core_engine_ui "!" "Ошибка HTTPS конфигурации!"
     fi
-    
-    core_engine_ui "+" "Nginx Proxy активен на порту 8080 для app0.local, app1.local, app2.local"
 }
+
 
 # ==============================================================================
 # @description: Синхронизация сетевого слоя DNS и локальной маршрутизации v22.0
