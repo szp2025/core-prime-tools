@@ -8873,14 +8873,19 @@ run_live_service() {
         local final_url="$protocol://$service_name:$port"
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
         
+        # --- ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ В NGINX ---
+        # Теперь Nginx узнает о новом узле сразу после подтверждения его работы
+        core_nginx_auto_setup "$service_name:$port"
+        
         # Авто-регистрация в луте
-        core_engine_loot "node_startup" "Service ${service_type} deployed at $final_url"
+        core_engine_loot "node_startup" "Service ${service_type} deployed & proxied at $final_url"
     else
         core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
         core_engine_ui "line"
         [[ -f "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty."
         core_engine_ui "line"
     fi
+
 
     core_engine_wait
 }
@@ -8937,9 +8942,6 @@ run_av_server() {
     # Используем созданный ранее run_live_service для полной стерильности
     # Передаем тип "av" (аудио-визуальный/антивирусный контекст) и выделенный порт 5000
     run_live_service "av" "5000"
-
-   # Интеграция в Nginx на лету
-    core_nginx_auto_setup "app0.nexus:5000"
     
     # Слой 4: Интеграция в Сборщик трофеев [11]
     core_engine_loot "security" "ClamAV Gateway initiated on port 5000"
@@ -8965,8 +8967,6 @@ run_share_server() {
     # Используем тип "share" на порту 5002
     run_live_service "share" "5002"
 
-# Интеграция в Nginx на лету
-    core_nginx_auto_setup "app1.nexus:5002"
     
     # Слой 5: Регистрация в Сборщике трофеев [11]
     core_engine_loot "service" "Share Sector (Uplink) active on port 5002"
@@ -8985,8 +8985,7 @@ run_upload_server() {
     # Код сервера передается через пайп, исключая создание .py файлов на диске.
     run_live_service "upload" "5001"
 
-# Интеграция в Nginx на лету
-    core_nginx_auto_setup "app2.nexus:5001"
+
     
     # Слой 4: Регистрация в Сборщике трофеев [11]
     # Фиксация события запуска в системном логе
