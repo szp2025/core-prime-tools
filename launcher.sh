@@ -79,9 +79,8 @@ GLOBAL_MENU_REGISTRY=(
    #"CYBER_OPS:Ultimate_Exploit|run_prime_exploiter_v5" "CYBER_OPS:Omega_Auditor|run_prime_auditor_v2"
     "CYBER_OPS:Unified_Auditor|run_smart_auditor_nexus"
 
-    "CRYPTO_LAB:Hash_Analyzer|run_stealth_stream_analyzer" 
-    "CRYPTO_LAB:File_Encryptor|run_file_cryptor"
-   "CRYPTO_LAB:SSH_Key_Gen|run_ssh_keygen"
+    "CRYPTO_LAB:Hash_Analyzer|run_stealth_stream_analyzer" "CRYPTO_LAB:File_Encryptor|run_file_cryptor"
+    "CRYPTO_LAB:SSH_Key_Gen|run_ssh_keygen"
 
     "NET_INFRA:Device_Hack|run_device_hack" "NET_INFRA:Mesh_Bridge|run_mesh_bridge" "NET_INFRA:Server_Control|run_servers"
 
