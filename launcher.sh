@@ -4166,26 +4166,21 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
 
-
 generate_upload_server_code_raw() {
-    # 1. Формируем строку регулярки из массива
-    local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
-    
-    # Загружаем UI шаблоны
+    # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
 
-    # 2. Оригинальный код с заменой маркера
-    cat << EOF > /root/upload_server.py
+    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
+    cat << EOF
 from flask import Flask, request, render_template_string
 import os
 import re
-import shutil
 
 app = Flask(__name__)
 
 # Проброс глобального регулярного выражения CAME из ядра Bash в Python
-GLOBAL_AV_PIPE_REGEX = r"""$regex_pattern"""
+GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
 
 # Сохраняем во входящую папку внутри PRIME_LOOT
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
