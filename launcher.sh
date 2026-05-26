@@ -1582,6 +1582,9 @@ GLOBAL_DNS_CONFIG_MATRIX=(
     "address=/audit.local/%IP%"                 # Выделенная точка сбора логов безопасности и аудита
     "address=/localhost/127.0.0.1"              # Принудительный хардкод петли
     "address=/localhost/::1"                    # IPv6 петля для предотвращения задержек парсеров
+    "address=/app0.local/%IP%"
+    "address=/app1.local/%IP%"
+    "address=/app2.local/%IP%"
 
     # --- БЛОК 6: ГЛОБАЛЬНЫЕ ВНЕШНИЕ АПСТРИМЫ (Скорость + Шифрование/Резерв) ---
     "server=1.1.1.1"                            # Cloudflare Primary (Максимальный показатель TTFB в мире)
@@ -2720,30 +2723,30 @@ core_engine_loot() {
 
 #Настройки 
 core_nginx_auto_setup() {
-    local hostname=$(hostname)
     local nginx_conf="/etc/nginx/sites-available/nexus_all.conf"
 
-    # Добавлены ОДИНАРНЫЕ КАВЫЧКИ вокруг 'EOF'
-    # Теперь Bash НИЧЕГО не будет интерпретировать внутри блока
     cat << 'EOF' > "$nginx_conf"
 server {
     listen 80;
-    server_name HOSTNAME_PLACEHOLDER.local;
-
-    location /app0/ { proxy_pass http://127.0.0.1:5000/; }
-    location /app1/ { proxy_pass http://127.0.0.1:5001/; }
-    location /app2/ { proxy_pass http://127.0.0.1:5002/; }
+    server_name app0.local;
+    location / { proxy_pass http://127.0.0.1:5000/; }
+}
+server {
+    listen 80;
+    server_name app1.local;
+    location / { proxy_pass http://127.0.0.1:5001/; }
+}
+server {
+    listen 80;
+    server_name app2.local;
+    location / { proxy_pass http://127.0.0.1:5002/; }
 }
 EOF
 
-    # После того как записали файл, заменим плейсхолдер на реальный хост
-    sed -i "s/HOSTNAME_PLACEHOLDER/$hostname/g" "$nginx_conf"
-
     ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/"
     systemctl restart nginx
-    core_engine_ui "+" "Nginx Proxy активен для 5000/5001/5002"
+    core_engine_ui "+" "Nginx Proxy активен для app0.local, app1.local, app2.local"
 }
-
 
 # ==============================================================================
 # @description: Синхронизация сетевого слоя DNS и локальной маршрутизации v22.0
