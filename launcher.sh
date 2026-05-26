@@ -8890,7 +8890,9 @@ run_live_service() {
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local final_url="$protocol://$service_name:$port"
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
-        
+        # 1. Регистрация в DNS
+    core_network_dns_register "$service_name" "$active_ip"
+    
         # --- ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ В NGINX ---
         # Теперь Nginx узнает о новом узле сразу после подтверждения его работы
         core_nginx_auto_setup "$service_name:$port"
