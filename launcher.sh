@@ -7714,6 +7714,27 @@ run_smart_osint_engine() {
     echo "[$(date)] OSINT_NEXUS_SUCCESS | TARGET: $TARGET | DOSSIER: $(basename "$final_report") | LAYERS: $layer_index" >> "$loot_dir/bridge_signals.log"
 
     core_engine_ui "s" "Dossier complete: $final_report"
+
+
+    # --- 7. [INTEGRITY CHECK] Очистка лога от «шума» ---
+    core_engine_ui "i" "Nexus: Running post-scan integrity check..."
+    
+    # Удаляем пустые теги или строки с ошибками curl, которые могли попасть в лог
+    sed -i '/curl: (.*)/d' "$raw_log"
+    sed -i '/\[.*\]$/d' "$raw_log"
+    
+    # Добавляем итоговую статистику по найденным активам
+    local found_count=$(grep -c "\[MATCH\]" "$raw_log")
+    echo "[*] SCAN SUMMARY: Found $found_count primary intelligence matches." >> "$raw_log"
+    # Генерация PNG-карты связей цели
+    # --- 8. [VISUALIZATION ENGINE] Генерация PNG-карты ---
+    if [[ -f "$graph_file" ]]; then
+        dot -Tpng "$graph_file" -o "$loot_dir/nexus_map_${safe_target}.png"
+        core_engine_ui "s" "Visualization generated: nexus_map_${safe_target}.png"
+    else
+        core_engine_ui "i" "Visualization skipped: no relationship data found."
+    fi
+    
     core_engine_wait
 }
 
