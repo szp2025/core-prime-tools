@@ -1576,15 +1576,15 @@ GLOBAL_DNS_CONFIG_MATRIX=(
     "local=/portal/"                            # Изоляция зоны .portal внутри периметра ядра
     
     # --- БЛОК 5: ДИНАМИЧЕСКАЯ МАТРИЦА ШЛЮЗОВ И СЕРВИСОВ ---
-    "address=/scanclamavlocal/%IP%"             # Внутренний выделенный шлюз антивирусного сканера ClamAV
-    "address=/%HOST%.local/%IP%"                # Динамический хост-резолв текущей машины
+    "address=/scanclamavnexus/%IP%"             # Внутренний выделенный шлюз антивирусного сканера ClamAV
+    "address=/%HOST%.nexus/%IP%"                # Динамический хост-резолв текущей машины
     "address=/prime.portal/%IP%"                # Главный веб-интерфейс управления платформы
-    "address=/audit.local/%IP%"                 # Выделенная точка сбора логов безопасности и аудита
+    "address=/audit.nexus/%IP%"                 # Выделенная точка сбора логов безопасности и аудита
     "address=/localhost/127.0.0.1"              # Принудительный хардкод петли
     "address=/localhost/::1"                    # IPv6 петля для предотвращения задержек парсеров
-    "address=/app0.local/%IP%"
-    "address=/app1.local/%IP%"
-    "address=/app2.local/%IP%"
+    "address=/app0.nexus/%IP%"
+    "address=/app1.nexus/%IP%"
+    "address=/app2.nexus/%IP%"
 
     # --- БЛОК 6: ГЛОБАЛЬНЫЕ ВНЕШНИЕ АПСТРИМЫ (Скорость + Шифрование/Резерв) ---
     "server=1.1.1.1"                            # Cloudflare Primary (Максимальный показатель TTFB в мире)
