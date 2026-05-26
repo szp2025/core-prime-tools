@@ -4139,7 +4139,7 @@ def get_file(filename):
                 CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
             </div>
             <p style="font-size:12px; color:var(--accent-color);">The requested object <b>{filename}</b> failed outbound security compliance and was <b>permanently purged</b> from the storage node.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
+           <pre style='background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;'>{'\\n'.join(report)}</pre>
             <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO DISTRIBUTION ]</a></div>
             """
             return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
@@ -4180,9 +4180,6 @@ import os
 import re
 
 app = Flask(__name__)
-
-# Проброс глобального регулярного выражения CAME из ядра Bash в Python
-#GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
 
 # ПРОБРОС МАТРИЦЫ CAME: Интеграция 8 слоев фильтрации
 GLOBAL_AV_PIPE_REGEX = r"""$regex_pattern"""
