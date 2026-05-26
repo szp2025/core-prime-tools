@@ -2750,107 +2750,27 @@ stop_nexus_gateway() {
     echo "[+] Системы остановлены."
 }
 
+# Использование: core_nginx_auto_setup "app0.nexus:5000" "app1.nexus:5001" "app2.nexus:5002"
 core_nginx_auto_setup() {
     local nginx_conf="/etc/nginx/sites-available/nexus_all.conf"
-    local required_dirs=("/etc/nginx/sites-available" "/etc/nginx/sites-enabled" "/etc/nginx/ssl")
+    local config_content=""
 
-    # 1. Эвристическая проверка среды
-    for dir in "${required_dirs[@]}"; do
-        if [ ! -d "$dir" ]; then
-            echo "[*] Создание отсутствующей инфраструктуры: $dir"
-            sudo mkdir -p "$dir"
-        fi
+    for service in "$@"; do
+        local domain="${service%%:*}"
+        local port="${service#*:}"
+        
+        config_content+="
+server { listen 8080; server_name $domain; return 301 https://$domain:8443\$request_uri; }
+server { listen 8443 ssl; server_name $domain; ssl_certificate /etc/nginx/ssl/nexus.crt; ssl_certificate_key /etc/nginx/ssl/nexus.key; location / { proxy_pass http://127.0.0.1:$port/; proxy_set_header Host \$host; } }"
     done
 
-    # 2. Формирование динамического шаблона
-    local new_config="
-server { listen 8080; server_name app0.nexus; return 301 https://app0.nexus:8443\$request_uri; }
-server { listen 8443 ssl; server_name app0.nexus; ssl_certificate /etc/nginx/ssl/nexus.crt; ssl_certificate_key /etc/nginx/ssl/nexus.key; location / { proxy_pass http://127.0.0.1:5000/; proxy_set_header Host \$host; } }
-server { listen 8080; server_name app1.nexus; return 301 https://app1.nexus:8443\$request_uri; }
-server { listen 8443 ssl; server_name app1.nexus; ssl_certificate /etc/nginx/ssl/nexus.crt; ssl_certificate_key /etc/nginx/ssl/nexus.key; location / { proxy_pass http://127.0.0.1:5001/; proxy_set_header Host \$host; } }
-server { listen 8080; server_name app2.nexus; return 301 https://app2.nexus:8443\$request_uri; }
-server { listen 8443 ssl; server_name app2.nexus; ssl_certificate /etc/nginx/ssl/nexus.crt; ssl_certificate_key /etc/nginx/ssl/nexus.key; location / { proxy_pass http://127.0.0.1:5002/; proxy_set_header Host \$host; } }"
-
-    # 3. Эвристическая проверка: нужно ли обновление?
-    if [ -f "$nginx_conf" ]; then
-        if grep -q "app0.nexus" "$nginx_conf" && grep -q "proxy_pass" "$nginx_conf"; then
-            core_engine_ui "+" "Конфигурация Nginx уже актуальна. Пропускаем перезапись."
-            return 0
-        else
-            echo "[!] Обнаружена некорректная конфигурация. Создаем бэкап..."
-            sudo mv "$nginx_conf" "${nginx_conf}.bak"
-        fi
-    fi
-
-    # 4. Автономная запись
-    echo "$new_config" | sudo tee "$nginx_conf" > /dev/null
-    sudo ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/"
-
-    # 5. Динамическая валидация
-    if sudo nginx -t >/dev/null 2>&1; then
-        sudo nginx -s reload 2>/dev/null || sudo nginx
-        core_engine_ui "+" "Инфраструктура Nexus Gateway успешно развернута и валидирована."
-    else
-        core_engine_ui "!" "Ошибка валидации! Откат к бэкапу..."
-        [ -f "${nginx_conf}.bak" ] && sudo mv "${nginx_conf}.bak" "$nginx_conf"
-    fi
-}
-
-
-core_nginx_auto_setupol() {
-    local nginx_conf="/etc/nginx/sites-available/nexus_all.conf"
-
-    # Записываем конфигурацию с поддержкой HTTPS для каждого узла
-    echo "
-# --- app0.nexus ---
-server {
-    listen 8080;
-    server_name app0.nexus;
-    return 301 https://app0.nexus:8443\$request_uri;
-}
-server {
-    listen 8443 ssl;
-    server_name app0.nexus;
-    ssl_certificate /etc/nginx/ssl/nexus.crt;
-    ssl_certificate_key /etc/nginx/ssl/nexus.key;
-    location / { proxy_pass http://127.0.0.1:5000/; proxy_set_header Host \$host; }
-}
-
-# --- app1.nexus ---
-server {
-    listen 8080;
-    server_name app1.nexus;
-    return 301 https://app1.nexus:8443\$request_uri;
-}
-server {
-    listen 8443 ssl;
-    server_name app1.nexus;
-    ssl_certificate /etc/nginx/ssl/nexus.crt;
-    ssl_certificate_key /etc/nginx/ssl/nexus.key;
-    location / { proxy_pass http://127.0.0.1:5001/; proxy_set_header Host \$host; }
-}
-
-# --- app2.nexus ---
-server {
-    listen 8080;
-    server_name app2.nexus;
-    return 301 https://app2.nexus:8443\$request_uri;
-}
-server {
-    listen 8443 ssl;
-    server_name app2.nexus;
-    ssl_certificate /etc/nginx/ssl/nexus.crt;
-    ssl_certificate_key /etc/nginx/ssl/nexus.key;
-    location / { proxy_pass http://127.0.0.1:5002/; proxy_set_header Host \$host; }
-}" | sudo tee "$nginx_conf" > /dev/null
-
+    echo "$config_content" | sudo tee "$nginx_conf" > /dev/null
     sudo ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/"
     
+    # Валидация и перезапуск...
     if sudo nginx -t >/dev/null 2>&1; then
         sudo nginx -s reload 2>/dev/null || sudo nginx
-        core_engine_ui "+" "Nginx Proxy: HTTPS (8443) и HTTP (8080) активны для всех узлов"
-    else
-        core_engine_ui "!" "Ошибка HTTPS конфигурации!"
+        core_engine_ui "+" "Nginx Proxy обновлен для: $*"
     fi
 }
 
