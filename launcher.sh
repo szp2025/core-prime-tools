@@ -2774,7 +2774,7 @@ server { listen 8443 ssl; server_name $domain; ssl_certificate /etc/nginx/ssl/ne
     fi
 }
 
-Core_network_dns_register() {
+core_network_dns_register() {
     local domain="$1"
     local ip="${2:-$active_ip}"
     local dns_registry="/tmp/dns_registry"
