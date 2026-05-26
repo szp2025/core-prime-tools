@@ -2730,7 +2730,7 @@ core_nginx_auto_setup() {
     cat << 'EOF' > "$nginx_conf"
 server {
     listen 8080;
-    server_name app0.local;
+    server_name app0.nexus;
     location / { 
         proxy_pass http://127.0.0.1:5000/;
         proxy_set_header Host $host;
@@ -2748,7 +2748,7 @@ server {
 }
 server {
     listen 8080;
-    server_name app2.local;
+    server_name app2.nexus;
     location / { 
         proxy_pass http://127.0.0.1:5002/;
         proxy_set_header Host $host;
