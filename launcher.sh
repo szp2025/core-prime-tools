@@ -7206,97 +7206,12 @@ osint_nexus_router() {
 }
 
 # ==============================================================================
-# @description: OSINT NEXUS v20.0 - SOCIALSCAN INTERNAL PARSER (FIXED & VELOCITY)
-# МОДЕРНИЗАЦИЯ: Исправление логики масок, асинхронный параллельный I/O
-# АРХИТЕКТУРА: Ghost-Speed Engine, нативная деструктуризация строк, PID-изоляция
-# @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | OPERATIONAL LIMIT
-# ==============================================================================
-run_osint_custom_socialscan_internal() {
-    local scan_target="$1"
-    [[ -z "$scan_target" ]] && return 1
-
-    # Изолированный временный буфер для сбора находок из параллельных потоков
-    local tmp_scan="/tmp/nexus_social_$$"
-    touch "$tmp_scan"
-
-    core_engine_ui "i" "SocialScan: Initializing parallel signature verification..."
-
-    local current_jobs=0
-    local max_parallel_jobs=15 # Оптимальный предел одновременных сокетов
-
-    # --- СЛОЙ ВЫСОКОСКОРОСТНОГО ПАРАЛЛЕЛЬНОГО ПАРСИНГА ---
-    for site_entry in "${GLOBAL_OSINT_SITES[@]}"; do
-        [[ "$site_entry" != *"|"* ]] && continue
-        
-        # Строгая пошаговая нативная деструктуризация строки без форка процессов
-        local base_url="${site_entry%%|*}"
-        local rem1="${site_entry#*|}"
-        
-        local check_type="${rem1%%|*}"
-        local rem2="${rem1#*|}"
-        
-        local error_marker="${rem2%%|*}"
-        local rem3="${rem2#*|}"
-        
-        local category="${rem3%%|*}"
-        local site_name="${rem3#*|}"
-        
-        local full_url="${base_url}${scan_target}"
-
-        # Асинхронный поток проверки узла
-        (
-            if [[ "$check_type" == "HTTP_CODE" ]]; then
-                # Быстрый запрос заголовков (I - HEAD запрос, L - следовать перенаправлениям)
-                local http_code=$(curl -s -o /dev/null -I -L -A "$GLOBAL_NETWORK_UA" \
-                    --connect-timeout 4 \
-                    --max-time 8 \
-                    -w "%{http_code}" "$full_url" 2>/dev/null)
-                
-                if [[ "$http_code" == "200" ]]; then
-                    echo "[MATCH] $site_name -> $full_url" | tee -a "$tmp_scan"
-                fi
-                
-            elif [[ "$check_type" == "TEXT_ABSENT" ]]; then
-                # Оптимизация трафика: скачиваем только первые 50 КБ страницы, этого достаточно для поиска маркеров
-                local page_body=$(curl -s -L -A "$GLOBAL_NETWORK_UA" \
-                    --connect-timeout 4 \
-                    --max-time 10 \
-                    --range 0-51200 \
-                    "$full_url" 2>/dev/null)
-                
-                if [[ -n "$page_body" ]] && ! echo "$page_body" | grep -qF "$error_marker"; then
-                    echo "[MATCH] $site_name -> $full_url" | tee -a "$tmp_scan"
-                fi
-            fi
-        ) &
-
-        # Контроллер пула задач
-        ((current_jobs++))
-        if (( current_jobs >= max_parallel_jobs )); then
-            wait
-            current_jobs=0
-        fi
-    done
-    wait # Синхронизация: дожидаемся завершения всех фоновых потоков сканирования
-
-    # --- СЛОЙ СОХРАНЕНИЯ ДАННЫХ В ОБЩИЙ ПОТОК ---
-    # Если запущен глобальный логгер, переносим трофеи в него
-    if [[ -s "$tmp_scan" && -n "$raw_log" ]]; then
-        cat "$tmp_scan" >> "$raw_log"
-    fi
-
-    # Полная очистка временных файлов текущей сессии
-    rm -f "$tmp_scan"
-}
-
-
-# ==============================================================================
 # @description: OSINT NEXUS v16.2 - BREACH LEAKS INTERNAL ENGINE
 # МОДЕРНИЗАЦИЯ: Досрочное прерывание потока I/O, нативная фильтрация бинарных данных
 # АРХИТЕКТУРА: Ghost-Speed Engine, RAM-дедупликация, динамическая привязка к PRIME_LOOT
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | ABSOLUTE TEXT LIMIT
 # ==============================================================================
-run_osint_custom_leaks_internal() {
+run_osint_custom_leaks() {
     local clean_target="$1"
     [[ -z "$clean_target" ]] && return 1
 
@@ -7336,7 +7251,7 @@ run_osint_custom_leaks_internal() {
 # АРХИТЕКТУРА: Ghost-Speed Engine, неблокирующее скользящее окно, RAM-дедупликация
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | INTEGRATION LIMIT
 # ==============================================================================
-run_osint_omni_crawler_internal() {
+run_osint_omni_crawler() {
     local target_user="$1"
     
     # Защита контекста среды: входной вектор обязано быть инициализирован
@@ -7432,6 +7347,62 @@ run_osint_omni_crawler_internal() {
     # Тотальная санитарная зачистка изолированных временных файлов текущей сессии PID
     rm -f "$tmp_phones" "$tmp_emails"
 }
+
+
+# ==============================================================================
+# @description: OSINT NEXUS v24.0 - UNIVERSAL FILE DISCOVERY ENGINE
+# МОДЕРНИЗАЦИЯ: Полная матрица расширений, динамический URI-билдинг
+# ==============================================================================
+run_osint_dorking_engine() {
+    local target="$1"
+    local raw_log="$2"
+    
+    core_engine_ui "i" "Dorking Engine: Initiating universal file-discovery for $target..."
+
+    # Матрица форматов (Архивы, Документы, Данные, Конфигурации)
+    local extensions=("pdf" "doc" "docx" "xls" "xlsx" "csv" "txt" "log" "bak" "sql" "db" "json" "xml" "zip" "tar" "gz" "cfg" "conf")
+    
+    # Генерация поискового вектора для всех форматов сразу
+    local file_dork="filetype:$(IFS='|'; echo "${extensions[*]}") \"$target\""
+
+    local dorks=(
+        "$file_dork"
+        "intitle:index.of \"$target\""
+        "intext:\"$target\" AND \"password\" OR \"key\" OR \"token\""
+        "site:pastebin.com \"$target\""
+        "site:github.com \"$target\""
+        "inurl:backup \"$target\""
+    )
+
+    for dork in "${dorks[@]}"; do
+        local gateway=$(shuf -n1 -e "${GLOBAL_FALLBACK_SEARCH_GATES[@]}")
+        
+        # Интеллектуальная адаптация URL-параметра (поддержка q=, p=, query=)
+        local query_param="q="
+        [[ "$gateway" == *"yahoo"* ]] && query_param="p="
+        
+        local encoded_dork=$(echo "$dork" | jq -sRr @uri)
+        local query="${gateway%%=*}=${encoded_dork}" # Динамическая сборка URL
+        
+        echo "[DORK_QUERY] Gateway: $gateway | Dork: $dork" >> "$raw_log"
+        
+        local selected_ua=$(shuf -n1 -e "${GLOBAL_NETWORK_UA[@]}")
+        local results=$(curl -s -L -A "$selected_ua" --connect-timeout 5 "$query" 2>/dev/null)
+        
+        # Парсинг с исключением технических узлов поисковиков
+        echo "$results" | grep -oP 'https://[^"]+' | \
+        grep -vE "google|bing|yahoo|ask|duckduckgo" | \
+        grep -E "\.($(IFS='|'; echo "${extensions[*]}"))" | \
+        awk '!visited[$0]++' | \
+        head -n 8 >> "$raw_log"
+        
+        sleep 1.0
+    done
+    
+    core_engine_ui "s" "Universal file discovery complete. All vectors mapped."
+}
+
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v21.0 - FULL RECURSIVE MONOLITH (MAX INTEGRATION)
@@ -7572,6 +7543,8 @@ run_smart_osint_engine() {
     [[ "$(type -t run_osint_omni_crawler)" == "function" ]] && run_osint_omni_crawler "$TARGET" "$raw_log"
     [[ "$(type -t run_osint_custom_socialscan)" == "function" ]] && run_osint_custom_socialscan "$TARGET" "$raw_log"
     [[ "$(type -t run_osint_custom_leaks)" == "function" ]] && run_osint_custom_leaks "$TARGET" "$raw_log"
+    [[ "$(type -t run_osint_dorking_engine)" == "function" ]] && run_osint_dorking_engine "$TARGET" "$raw_log"
+
     
     if echo "$TARGET" | grep -Eq "$rx_phone_intl|$rx_phone_cis" && [[ "$(type -t run_osint_custom_ignorant)" == "function" ]]; then
         run_osint_custom_ignorant "$TARGET" "$raw_log"
@@ -9918,60 +9891,56 @@ run_dd_logic() {
 }
 
 
-# ==============================================================================
-# @description: OSINT NEXUS v25.5 - UNIVERSAL IDENTIFIER DISPATCHER
-# @status: FULL-STACK MATRIX INTEGRATION | AUTONOMOUS ARTIFACT EXTRACTION
-# ==============================================================================
 run_osint_custom_socialscan() {
     local input_target="$1"
     local raw_log="$2"
-
     [[ -z "$input_target" ]] && input_target="$target_user"
-    [[ -z "$input_target" ]] && return 1
-
-    # Защита от системных петель
+    
+    # 1. Защита и диспетчеризация
     if is_valid "$input_target" "GLOBAL_PLATFORM_SYSTEM_ROUTES"; then return 1; fi
-
-    # 1. Автоматическое определение типа цели (Авто-маршрутизация)
     local target_type="NICK"
     [[ "$input_target" =~ ${GLOBAL_EMAIL_MATRIX[0]} ]] && target_type="EMAIL"
-    [[ "$input_target" =~ ${GLOBAL_PRIME_MATRIX[0]} || "$input_target" =~ ${GLOBAL_PRIME_MATRIX[3]} ]] && target_type="PHONE"
-    [[ "$input_target" =~ ${GLOBAL_INFRA_MATRIX[0]} || "$input_target" =~ ${GLOBAL_INFRA_MATRIX[2]} ]] && target_type="INFRA"
-
-    core_engine_ui "i" "Nexus Dispatcher: Target type [$target_type] | Scanning registry..."
-
-    # 2. Итерация по реестру платформ
+    
+    # 2. Параллельный движок (из v20.0)
+    local max_parallel_jobs=12
+    local tmp_scan="/tmp/nexus_social_$$"
+    
     for site_entry in "${GLOBAL_OSINT_SITES[@]}"; do
-        local base_url="${site_entry%%|*}"; local remaining="${site_entry#*|}"
-        local check_type="${remaining%%|*}"; remaining="${remaining#*|}"
-        local error_marker="${remaining%%|*}"; local site_name="${remaining##*|}"
-        
+        # Деструктуризация (как в v20.0)
+        local base_url="${site_entry%%|*}"; local rem="${site_entry#*|}"
+        local check_type="${rem%%|*}"; rem="${rem#*|}"
+        local error_marker="${rem%%|*}"; local site_name="${rem##*|}"
         local full_url="${base_url}${input_target}"
-        local account_exists=0
 
-        # Диспетчер методов проверки
-        if [[ "$check_type" == "HTTP_CODE" ]]; then
-            [[ "$(curl -s -o /dev/null -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 -w "%{http_code}" "$full_url")" == "200" ]] && account_exists=1
-        elif [[ "$check_type" == "TEXT_ABSENT" ]]; then
-            local page_body=$(curl -s -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 "$full_url" 2>/dev/null)
-            [[ -n "$page_body" && ! "$page_body" =~ "$error_marker" ]] && account_exists=1
-        fi
+        (
+            # Логика проверки (из v25.5)
+            local account_exists=0
+            if [[ "$check_type" == "HTTP_CODE" ]]; then
+                [[ "$(curl -s -o /dev/null -I -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 3 -w "%{http_code}" "$full_url")" == "200" ]] && account_exists=1
+            elif [[ "$check_type" == "TEXT_ABSENT" ]]; then
+                local page_body=$(curl -s -L -A "$GLOBAL_NETWORK_UA" --connect-timeout 4 "$full_url" 2>/dev/null)
+                [[ -n "$page_body" && ! "$page_body" =~ "$error_marker" ]] && account_exists=1
+            fi
 
-        # 3. Рекурсивная экстракция через Матрицы
-        if (( account_exists == 1 )); then
-            echo "[MATCH_$target_type] $site_name -> $full_url" >> "$raw_log"
-            core_engine_ui "s" "[+] Linked: $site_name (Artifact Extraction Active)"
-            
-            local page_data=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "$full_url" 2>/dev/null)
-            
-            # Извлечение артефактов по глобальным матрицам
-            echo "$page_data" | grep -oE "${GLOBAL_EMAIL_MATRIX[0]}" >> "/tmp/nexus_emails.tmp" 2>/dev/null
-            echo "$page_data" | grep -oE "${GLOBAL_PRIME_MATRIX[0]}|${GLOBAL_PRIME_MATRIX[3]}" >> "/tmp/nexus_phones.tmp" 2>/dev/null
-            echo "$page_data" | grep -oE "${GLOBAL_INFRA_MATRIX[0]}" >> "/tmp/nexus_ips.tmp" 2>/dev/null
-        fi
-        sleep 0.4
+            # Экстракция артефактов (из v25.5)
+            if (( account_exists == 1 )); then
+                echo "[MATCH_$target_type] $site_name -> $full_url" >> "$tmp_scan"
+                local page_data=$(curl -s -L -A "$GLOBAL_NETWORK_UA" "$full_url" 2>/dev/null)
+                echo "$page_data" | grep -oE "${GLOBAL_EMAIL_MATRIX[0]}" >> "/tmp/nexus_emails.tmp" 2>/dev/null
+                echo "$page_data" | grep -oE "${GLOBAL_PRIME_MATRIX[0]}|${GLOBAL_PRIME_MATRIX[3]}" >> "/tmp/nexus_phones.tmp" 2>/dev/null
+            fi
+        ) &
+
+        # Управление пулом (Sliding Window)
+        while (( $(jobs -p | wc -l) >= max_parallel_jobs )); do sleep 0.05; done
     done
+    wait
+    
+    # 3. Финализация
+    cat "$tmp_scan" >> "$raw_log"
+    rm -f "$tmp_scan"
 }
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v26.0 - INTEGRATED BREACH INTEL HUB
