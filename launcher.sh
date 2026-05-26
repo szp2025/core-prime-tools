@@ -82,13 +82,15 @@ GLOBAL_MENU_REGISTRY=(
     "CRYPTO_LAB:Hash_Analyzer|run_stealth_stream_analyzer" "CRYPTO_LAB:File_Encryptor|run_file_cryptor"
     "CRYPTO_LAB:SSH_Key_Gen|run_ssh_keygen"
 
-    "NET_INFRA:Device_Hack|run_device_hack" "NET_INFRA:Mesh_Bridge|run_mesh_bridge" "NET_INFRA:Server_Control|run_servers"
+    #"NET_INFRA:Device_Hack|run_device_hack" "NET_INFRA:Mesh_Bridge|run_mesh_bridge" "NET_INFRA:Server_Control|run_servers"
+    "NET_INFRA:Mesh_Bridge|run_mesh_bridge" "NET_INFRA:Server_Control|run_servers"
 
-    "CORE_LAB:Mem_Injection|run_mem_inject" "CORE_LAB:Packet_Forge|run_packet_forge"
-    "CORE_LAB:WiFi_Pulse|run_wifi_pulse" "CORE_LAB:Kernel_Audit|run_kernel_check"
+    "CORE_LAB:Forensic_Nexus_System |run_forensic_nexus"
+    "CORE_LAB:Packet_Forge|run_packet_forge"  "CORE_LAB:WiFi_Pulse|run_wifi_pulse" 
 
-    "FIN_SHIELD:IBAN_Validator|run_iban_analyzer" "FIN_SHIELD:Gambit_Strategy|run_gambit_info"
-    "FIN_SHIELD:Transaction_Audit|run_trans_audit" "FIN_SHIELD:Secure_Wallet|run_wallet_manager"
+    "FIN_SHIELD:IBAN_Validator|run_iban_analyzer" 
+    #"FIN_SHIELD:Gambit_Strategy|run_gambit_info"
+    #"FIN_SHIELD:Transaction_Audit|run_trans_audit" "FIN_SHIELD:Secure_Wallet|run_wallet_manager"
 
     "STEALTH_COMMS:Live_Node_AV|run_av_server" "STEALTH_COMMS:Shared_Node_Store|run_share_server"
     "STEALTH_COMMS:Upload_Portal|run_upload_server" "STEALTH_COMMS:Node_Destroy|run_node_clean"
@@ -8611,160 +8613,6 @@ run_deep_file_probe() {
 }
 
 
-# ==============================================================================
-# @description: Основной диспетчер верификации конфигурации веб-ресурсов
-# АРХИТЕКТУРА: Параллельный движок, интегрированный с NET-NEXUS и SAST-NEXUS
-# @status: FULLY INTEGRATED | REFACTOR COMPLETE
-# ==============================================================================
-run_prime_auditor_v2() {
-    local host="$1"
-    local tmp_pipe="/tmp/prime_pipe_$$"
-    local tag=""
-    local target=""
-    local head_check=""
-    
-    core_engine_ui "h" "OMEGA AUDITOR v6.0 (Integrated Matrix Engine)"
-
-    # 1. ПОЛУЧЕНИЕ ЦЕЛИ
-    if [[ -z "$host" ]]; then
-        host=$(core_engine_input "text" "Enter Target (Domain or IP)")
-    fi
-    [[ -z "$host" ]] && return
-
-    # 2. ЭВРИСТИКА БЕЗОПАСНОСТИ (Использование матрицы GLOBAL_NET_MATRIX)
-    # Динамическое объединение всех сетевых паттернов в один конвейер изоляции
-    local net_isolate_regex
-    net_isolate_regex=$(local IFS='|'; echo "${GLOBAL_NET_MATRIX[*]}")
-
-    if [[ "$host" =~ $net_isolate_regex ]]; then
-        core_engine_ui "i" "Local or private target detected. Skipping Anonymity Check."
-    else
-        core_engine_validator "privacy" "" "Security Shield" || return
-    fi
-
-    # 3. ВАЛИДАЦИЯ
-    core_engine_validator "url" "$host" "Syntax" || return
-    core_engine_validator "net_up" "$host" "Availability" || return
-
-    # 4. ПАРАЛЛЕЛЬНЫЙ ДВИЖОК
-    trap 'rm -f "$tmp_pipe" 2>/dev/null' INT TERM EXIT
-    touch "$tmp_pipe"
-    core_engine_ui "i" "Deploying Parallel Engines on: $host"
-
-    # Поток А: Краулинг контента (используем GLOBAL_SAST_MATRIX[5] для расширений)
-    (
-        local discovered=$(curl -s -k -L --max-time 7 --connect-timeout 4 "https://$host" | grep -oE "\.(php|js|json|sql|env|xml|yaml|config)" 2>/dev/null | sort -u)
-        for t in $discovered; do 
-            echo "HIT|$t" >> "$tmp_pipe"
-        done
-    ) &
-    local pid_a=$!
-
-    # Поток Б: Фаззинг (итерация по списку)
-    (
-        for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
-            [[ -z "$f" ]] && continue
-            local res=$(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 2 --max-time 4 "https://$host/$f")
-            [[ "$res" == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
-        done
-    ) &
-    local pid_b=$!
-
-    wait $pid_a $pid_b 2>/dev/null
-    
-    # 5. ИНТЕЛЛЕКТУАЛЬНЫЙ ЛУТИНГ + DEEP PROBE (Интеграция с SAST-NEXUS)
-    core_engine_ui "line"
-    echo -e "${Y}>>> AUDIT REPORT: $host <<<${NC}"
-
-    while IFS='|' read -r tag target; do
-        [[ -z "$target" ]] && continue
-
-        head_check=$(curl -s -k -L --max-time 3 --connect-timeout 2 "https://$host/$target" | head -c 500 2>/dev/null)
-        
-        # Фильтрация мусора (используем индекс 0 из матрицы SAST для проверок конфигураций)
-        if ! echo "$head_check" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}" 2>/dev/null; then
-            
-            # Классификация через SAST-матрицу
-            # Индекс 0 - утечки, Индекс 3 - LFI/файлы
-            if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}" 2>/dev/null || echo "$target" | grep -qiE "\.(sql|env|config)$" 2>/dev/null; then
-                core_engine_loot "CRITICAL" "Exposed: $target on $host"
-                echo -e "${R}[CRITICAL]${NC} $target"
-            else
-                echo -e "${G}[FILE]${NC} $target"
-            fi
-
-            # ЭВРИСТИЧЕСКИЙ ВЫЗОВ SAST PROBE
-            # Если цель соответствует RCE (индекс 2) или LFI (индекс 3) паттернам
-            if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[2]}|${GLOBAL_SAST_MATRIX[3]}" 2>/dev/null; then
-               run_deep_file_probe "$host" "$target" "$head_check"
-            fi
-        fi
-    done < <(sort -u "$tmp_pipe" 2>/dev/null)
-
-    rm -f "$tmp_pipe" 2>/dev/null
-    trap - INT TERM EXIT
-    core_engine_ui "line"
-    core_engine_wait
-}
-
-
-
-
-run_omni_scan() {
-    core_engine_ui "h" "OMNI-SCAN ENGINE v3.0 (SYS-FUSE INTEGRATED)"
-    
-    # Слой 3-4: Подготовка фильтров из SYS-FUSE
-    local target_host=$(core_engine_input "text" "Enter Target Host")
-    [[ -z "$target_host" ]] && return 1
-    
-    # Передаем маски портов из реестра SYS-FUSE
-    local DANGER_MASK="${GLOBAL_SYSTEM_FUSE_MATRIX[1]}"
-    local WHITE_MASK="${GLOBAL_SYSTEM_FUSE_MATRIX[2]}"
-    local port_list="21,22,80,443,3306,5001,8080,9050,4444,31337"
-
-    core_engine_ui "!" "Deploying Parallel Async Auditor (Security Level: SYS-FUSE)..."
-
-    # Исполнение в ОЗУ с использованием SYS-FUSE для классификации
-    python3 - "$target_host" "$port_list" "$DANGER_MASK" "$WHITE_MASK" 2>/dev/null << 'EOF'
-import sys
-import socket
-import re
-from concurrent.futures import ThreadPoolExecutor
-
-target = sys.argv[1]
-ports = [int(p) for p in sys.argv[2].split(',')]
-danger_regex = sys.argv[3]
-white_regex = sys.argv[4]
-
-def get_status(port):
-    # Логика классификации через SYS-FUSE
-    if re.search(str(port), danger_regex):
-        return "!!! CRITICAL !!!", "\033[1;31m" # Жирный красный
-    elif re.search(str(port), white_regex):
-        return "INFRASTRUCTURE", "\033[0;32m"  # Зеленый
-    return "UNKNOWN", "\033[0;37m"             # Серый
-
-def check_socket(port):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(1.0)
-            result = sock.connect_ex((target, port))
-            status, color = get_status(port)
-            return port, status, color, (result == 0)
-    except:
-        return port, "OFFLINE", "\033[0;31m", False
-
-with ThreadPoolExecutor(max_workers=10) as executor:
-    results = executor.map(check_socket, ports)
-
-for port, status, color, is_open in results:
-    if is_open:
-        print(f" [ {port:<5} ] {status:<15} {color}ONLINE\033[0m")
-    else:
-        print(f" [ {port:<5} ] {'OFFLINE':<15} \033[0;31mCLOSED\033[0m")
-EOF
-    core_engine_wait
-}
 
 
 # ==============================================================================
@@ -9302,92 +9150,6 @@ EOF
 
 
 # ==============================================================================
-# @description: OSINT NEXUS v23.5 - PROCESS MEMORY FORENSIC SCANNER (RAM AUDIT)
-# @status: VIRTUAL FS MAP PARSING & READ-SAFE SEARCH | PRODUCTION READY
-# ==============================================================================
-run_mem_inject() {
-    # Слой 1: Визуальный заголовок через Голос [1]
-    core_engine_ui "h" "FORENSICS: PROCESS MEMORY SCANNER"
-    
-    # Слой 2: Проверка прав (Чтение /proc/[pid]/mem требует привилегий root или CAP_SYS_PTRACE)
-    if [[ $EUID -ne 0 ]]; then
-        core_engine_ui "e" "Root privileges (or CAP_SYS_PTRACE) required for runtime RAM analysis."
-        core_engine_wait
-        return 1
-    fi
-
-    # Слой 3: Органы чувств [3] — Сбор идентификаторов
-    local t_pid=$(core_engine_input "text" "Target Process ID (PID)")
-    local t_search=$(core_engine_input "text" "String/Pattern to search in RAM (e.g., HTTP_AUTH)")
-
-    # Валидация параметров через Валидатор [5]
-    [[ -z "$t_pid" || -z "$t_search" ]] && { core_engine_ui "e" "Error: Missing PID or Search Pattern."; core_engine_wait; return 1; }
-
-    # Слой 4: Проверка существования процесса и доступности его метаданных
-    if [[ ! -d "/proc/$t_pid" ]]; then
-        core_engine_ui "e" "Target Process [PID: $t_pid] is not running or active."
-        core_engine_wait
-        return 1
-    fi
-
-    local proc_name=$(cat "/proc/$t_pid/comm" 2>/dev/null || echo "Unknown")
-    local dump_log="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}/ram_scan_${proc_name}_${t_pid}.log"
-    mkdir -p "$(dirname "$dump_log")" 2>/dev/null
-
-    core_engine_ui "!" "Initiating Forensic Memory Scan for: $proc_name (PID: $t_pid)"
-    core_engine_ui "i" "Parsing virtual memory address space maps..."
-
-    # Проверяем, активен ли запрет ptrace_scope в системе
-    if [[ -f "/proc/sys/kernel/yama/ptrace_scope" ]]; then
-        local scope_val=$(cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null)
-        core_engine_ui "i" "System Yama Ptrace Scope security level: $scope_val"
-    fi
-
-    # Слой 5: ИНТЕЛЛЕКТУАЛЬНЫЙ ПАРСИНГ КАРТЫ ПАМЯТИ И СИГНАТУРНЫЙ ПОИСК
-    if [[ -r "/proc/$t_pid/maps" && -r "/proc/$t_pid/mem" ]]; then
-        core_engine_ui "i" "Scanning readable memory segments via direct /proc/I/O interface..."
-        echo "=== MEMORY SCAN REPORT FOR $proc_name [PID: $t_pid] [$(date)] ===" > "$dump_log"
-        
-        local match_count=0
-        
-        # Читаем карту памяти построчно, отбирая только сегменты с флагом чтения 'r'
-        while read -r start end mode rest; do
-            [[ "$mode" != r* ]] && continue # Пропускаем нечитаемые или защищенные сегменты
-            
-            # Переводим шестнадцатеричные адреса сегментов памяти в десятичный формат для dd
-            local start_dec=$((16#$start))
-            local end_dec=$((16#$end))
-            local size=$((end_dec - start_dec))
-            
-            # Безопасно вырезаем кусок памяти сегмента в поток строк без сброса тяжелых бинарников на диск
-            local block_matches=$(sudo dd if="/proc/$t_pid/mem" bs=1 skip="$start_dec" count="$size" status=none 2>/dev/null | LC_ALL=C strings 2>/dev/null | grep -F "$t_search")
-            
-            if [[ -n "$block_matches" ]]; then
-                echo -e "\n[Segment: $start-$end | Mode: $mode]" >> "$dump_log"
-                echo "$block_matches" >> "$dump_log"
-                ((match_count++))
-            fi
-        done < "/proc/$t_pid/maps"
-
-        # Слой 6: Финализация результатов и Сбор трофеев [11]
-        if (( match_count > 0 )); then
-            core_engine_ui "s" "[+] Forensic Scan Complete! Patterns isolated in $match_count memory segments."
-            core_engine_ui "!" "Comprehensive signatures saved to: $(basename "$dump_log")"
-            core_engine_loot "memory" "RAM Scan success on $proc_name ($t_pid). Hits in $match_count segments. Log: $dump_log"
-        else
-            core_engine_ui "w" "Scan finished. Target pattern was not found in any readable RAM segments."
-            rm -f "$dump_log"
-        fi
-    else
-        core_engine_ui "e" "Critical: Hard I/O Error. Cannot read /proc/$t_pid/mem. Process may be protected by kernel."
-        rm -f "$dump_log"
-    fi
-
-    # Слой 7: Синхронизация [13]
-    core_engine_wait
-}
-
-# ==============================================================================
 # @description: OSINT NEXUS v23.6 - WIRELESS PASSIVE ANOMALY & DEAUTH RADAR
 # @status: PASSIVE MONITOR VERIFICATION & L2 ALARM COUNTER | PRODUCTION READY
 # ==============================================================================
@@ -9485,77 +9247,96 @@ run_wifi_pulse() {
 }
 
 
+run_forensic_nexus() {
+    clear
+    core_engine_ui "h" "FORENSIC NEXUS: INTEGRATED SECURITY AUDIT v5.0"
 
-# ==============================================================================
-# @description: OSINT NEXUS v25.0 - FORENSIC-NEXUS KERNEL RADAR
-# @status: DYNAMIC MATRIX INTEGRATION | FULL-STACK LKM AUDIT
-# ==============================================================================
-run_kernel_check() {
-    core_engine_ui "h" "CORE_LAB: KERNEL INTEGRITY AUDIT (FORENSIC-NEXUS v3.0)"
-    core_engine_ui "i" "Initializing forensic cross-examination..."
-    
-    local audit_log="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}/kernel_audit.log"
-    local tainted="0"
+    # --- ЧАСТЬ 1: ПРОВЕРКА КЕРНЕЛА (Kernel Integrity) ---
+    core_engine_ui "!" "Stage 1: Running Kernel Integrity Audit..."
     local anomalies_found=0
-
-    # 1. Анализ состояния TAINTED (Побитовый декодер)
-    if [[ -f "/proc/sys/kernel/tainted" ]]; then
-        tainted=$(cat /proc/sys/kernel/tainted 2>/dev/null | tr -cd '0-9')
-        [[ -z "$tainted" ]] && tainted="0"
-    fi
+    local audit_log="${PRIME_LOOT:-${BASE_DIR:-./}/prime_loot}/kernel_audit.log"
+    
+    # 1.1 Анализ состояния TAINTED
+    local tainted="0"
+    [[ -f "/proc/sys/kernel/tainted" ]] && tainted=$(cat /proc/sys/kernel/tainted 2>/dev/null | tr -cd '0-9')
+    [[ -z "$tainted" ]] && tainted="0"
     
     if (( tainted != 0 )); then
-        core_engine_ui "e" "Kernel TAINTED (Mask: $tainted). Analysis of hardware/module safety:"
-        # (Оставляем прежнюю логику декодирования битов для наглядности)
+        core_engine_ui "e" "Kernel TAINTED (Mask: $tainted)."
+        ((anomalies_found++))
     else
         core_engine_ui "s" "[+] Kernel integrity: Pure."
     fi
 
-    # 2. LKM Cross-Check (Метод поиска "призраков")
+    # 1.2 LKM Cross-Check
     core_engine_ui "i" "Cross-checking Hardware Bus vs Virtual FS..."
-    local proc_modules_cache="/tmp/proc_mods_$$"
-    local sys_modules_cache="/tmp/sys_mods_$$"
+    local proc_mods="/tmp/proc_mods_$$"
+    local sys_mods="/tmp/sys_mods_$$"
+    awk '{print $1}' /proc/modules 2>/dev/null | sort -u > "$proc_mods"
+    find /sys/module -maxdepth 1 -mindepth 1 -type d -exec basename {} \; 2>/dev/null | sort -u > "$sys_mods"
     
-    awk '{print $1}' /proc/modules 2>/dev/null | sort -u > "$proc_modules_cache"
-    find /sys/module -maxdepth 1 -mindepth 1 -type d -exec basename {} \; 2>/dev/null | sort -u > "$sys_modules_cache"
-    
-    local hidden_modules=$(comm -13 "$proc_modules_cache" "$sys_modules_cache")
-    if [[ -n "$hidden_modules" ]]; then
+    local hidden=$(comm -13 "$proc_mods" "$sys_mods")
+    if [[ -n "$hidden" ]]; then
         core_engine_ui "e" "CRITICAL: Stealth LKM detected!"
-        echo "$hidden_modules" | while read -r mod; do
-            core_engine_ui "!" "  [HIDDEN]: $mod"
-            ((anomalies_found++))
-        done
+        echo "$hidden" | while read -r mod; do core_engine_ui "!" "  [HIDDEN]: $mod"; done
+        ((anomalies_found++))
     fi
-    rm -f "$proc_modules_cache" "$sys_modules_cache"
+    rm -f "$proc_mods" "$sys_mods"
 
-    # 3. СИГНАТУРНЫЙ АНАЛИЗ (Интеграция FORENSIC_MATRIX[0])
-    core_engine_ui "i" "Scanning memory hooks using FORENSIC_MATRIX layer 1..."
-    
-    # Используем первый слой матрицы для поиска руткитов и инжектов
+    # 1.3 Сигнатурный анализ
     local kernel_rootkit_regex="${FORENSIC_MATRIX[0]}"
-
     for source in "/proc/modules" "/proc/kallsyms"; do
         if [[ -f "$source" ]]; then
-            local matches=$(LC_ALL=C grep -Ei "$kernel_rootkit_regex" "$source" 2>/dev/null | head -n 10)
+            local matches=$(LC_ALL=C grep -Ei "$kernel_rootkit_regex" "$source" 2>/dev/null | head -n 5)
             if [[ -n "$matches" ]]; then
-                core_engine_ui "e" "CRITICAL: Rootkit signature detected in $source!"
-                echo "$matches" | sed 's/^/  [ROOTKIT_SIG]: /' >> "$audit_log"
+                core_engine_ui "e" "CRITICAL: Rootkit signature in $source!"
                 ((anomalies_found++))
             fi
         fi
     done
 
-    # 4. Финализация
-    if (( anomalies_found == 0 )); then
-        core_engine_ui "s" "[+] Audit complete. Core verified."
-    else
-        core_engine_ui "e" "[!] Security Alarm: $anomalies_found high-risk kernel anomalies isolated!"
+    # --- ЧАСТЬ 2: АУДИТ ПАМЯТИ (Memory Forensic) ---
+    if (( anomalies_found > 0 )); then
+        core_engine_ui "w" "System integrity compromised. Memory forensic data might be unreliable."
+        [[ "$(core_engine_input "text" "Continue anyway? (y/n)")" != "y" ]] && { core_engine_wait; return 1; }
     fi
 
-    core_engine_loot "security" "Kernel Audit complete. Taint: $tainted. Anomalies: $anomalies_found"
+    core_engine_ui "!" "Stage 2: Initiating Process Memory Forensic..."
+    if [[ $EUID -ne 0 ]]; then
+        core_engine_ui "e" "Root privileges required for memory analysis."
+    else
+        local t_pid=$(core_engine_input "text" "Target PID")
+        local t_search=$(core_engine_input "text" "Search Pattern")
+        
+        if [[ -d "/proc/$t_pid" && -r "/proc/$t_pid/mem" ]]; then
+            local proc_name=$(cat "/proc/$t_pid/comm" 2>/dev/null || echo "Unknown")
+            local dump_log="${PRIME_LOOT:-./}/ram_scan_${proc_name}_${t_pid}.log"
+            
+            core_engine_ui "i" "Scanning memory segments for $proc_name..."
+            local match_count=0
+            while read -r start end mode rest; do
+                [[ "$mode" != r* ]] && continue
+                local start_dec=$((16#$start))
+                local size=$((16#$end - start_dec))
+                
+                local hits=$(sudo dd if="/proc/$t_pid/mem" bs=1 skip="$start_dec" count="$size" status=none 2>/dev/null | LC_ALL=C strings 2>/dev/null | grep -F "$t_search")
+                if [[ -n "$hits" ]]; then
+                    echo -e "\n[Segment: $start-$end]" >> "$dump_log"
+                    echo "$hits" >> "$dump_log"
+                    ((match_count++))
+                fi
+            done < "/proc/$t_pid/maps"
+            
+            [[ $match_count -gt 0 ]] && core_engine_ui "s" "[+] Found in $match_count segments. Log: $dump_log" || core_engine_ui "w" "No pattern found."
+        else
+            core_engine_ui "e" "Cannot access process memory."
+        fi
+    fi
+
+    core_engine_ui "s" "Forensic Audit Sequence Complete."
     core_engine_wait
 }
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v25.0 - UNIFIED FORENSIC-NEXUS ANALYSIS CORE
