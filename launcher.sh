@@ -3722,18 +3722,25 @@ def deep_audit():
         except (subprocess.CalledProcessError, FileNotFoundError):
             report.append("ExifTool not found or unsupported file format.")
 
-        # 2. BANKING/CRYPTO ARTIFACTS (БИНАРНЫЙ ПОИСК)
+    # 2. BANKING/CRYPTO ARTIFACTS (ДЕТАЛЬНЫЙ ПОИСК С ИЗВЛЕЧЕНИЕМ)
         BANK_PATTERNS = {
             "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
-            "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}",
-            "PRIVATE_KEY_BLOCK": rb"-----BEGIN (RSA|EC|DSA)? ?PRIVATE KEY-----"
+            "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"
         }
-        report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
+        
+        report.append("\n--- [BANKING/CRYPTO ARTIFACTS FOUND] ---")
         with open(tmp, 'rb') as f_bin:
             content = f_bin.read()
+            # Преобразуем бинарный контент в текст для удобства (с игнорированием ошибок)
+            text_content = content.decode('utf-8', errors='ignore')
+            
             for name, pattern in BANK_PATTERNS.items():
-                if re.search(pattern, content):
-                    report.append(f"[ALERT] FOUND {name}")
+                # Используем findall, чтобы найти ВСЕ совпадения
+                matches = re.findall(pattern.decode('utf-8', errors='ignore'), text_content)
+                if matches:
+                    for match in set(matches): # set() убирает дубликаты
+                        if len(match) > 6: # Фильтр от шума
+                            report.append(f"[ALERT] FOUND {name}: {match}")
 
         # 3. X.509 CERTIFICATE ANALYSIS (ОСТАВЛЯЕМ ДЛЯ PEM-ФАЙЛОВ)
         report.append("\n--- [X.509 CERTIFICATE ANALYSIS] ---")
