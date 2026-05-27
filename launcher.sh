@@ -3568,37 +3568,77 @@ EOF
 # ==============================================================================
 
 generate_av_server_code_raw() {
+
+
+
     local templates="$(generate_core_template)
+
+
+
 $(generate_core_form_template)"
-cat << 'EOF'
+
+
+
+
+
+
+
+    cat << EOF
+
+
+
 from flask import Flask, request, render_template_string, session
+
+
+
 import re
+
+
+
 import os
+
+
+
 import shutil
+
+
+
 import subprocess
+
+
+
 import platform
-import ssl
-from datetime import datetime
 
 app = Flask(__name__)
+
+
+
 # [КОНФИГУРАЦИЯ ЯДРА]
 
 GLOBAL_HASH_MATRIX = [
 
     # Токены и секреты (группа захвата во 2-й скобке)
 
-    r"\b(password|pwd|hash|secret|token|access_token)[ \t]*[:=]{1,2}[ \t]*['\"]?([a-fA-F0-9]{32,128})['\"]?",   
+    r"\b(password|pwd|hash|secret|token|access_token)[ \t]*[:=]{1,2}[ \t]*['\"]?([a-fA-F0-9]{32,128})['\"]?",
+
+    
 
     # API ключи (группа захвата во 2-й скобке)
 
-    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?([A-Za-z0-9\-_]{20,})['\"]?",    
+    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?([A-Za-z0-9\-_]{20,})['\"]?",
+
+    
 
     # Обычные текстовые пароли (группа захвата во 2-й скобке)
-    r"\b(password|pwd|secret|key)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#$%^&*()_+]{8,32})['\"]",   
+
+    r"\b(password|pwd|secret|key)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#$%^&*()_+]{8,32})['\"]",
+
+    
 
     # AWS ключи
+
     r"\b(AKIA[0-9A-Z]{16})\b"
-    
+
 ]
 
 
@@ -3619,6 +3659,8 @@ MACOS_PAYLOAD = r"""$(printf "%s\n" "${GLOBAL_FIX_MACOS[@]}")"""
 
 app.secret_key = 'super_secret_key_for_came_gateway' # Обязательно для работы сессий
 
+
+
 # Интеллектуальный детектор зашифрованных контейнеров
 
 def is_encrypted_container(file_path):
@@ -3637,24 +3679,8 @@ def is_encrypted_container(file_path):
 
         return False
 
-def extract_text_from_file(file_path, file_extension):
-    """Преобразует любые файлы в текст для анализа"""
-    ext = file_extension.lower()
-    try:
-        if ext == 'pdf':
-            return subprocess.run(['pdftotext', file_path, '-'], capture_output=True, text=True).stdout
-        elif ext in ['doc', 'docx']:
-            return subprocess.run(['antiword', file_path], capture_output=True, text=True).stdout 
-            # Либо 'docx2txt' для docx
-        elif ext in ['jpg', 'png', 'jpeg']:
-            # Базовое OCR через tesseract
-            subprocess.run(['tesseract', file_path, '/tmp/ocr_out'], capture_output=True)
-            with open('/tmp/ocr_out.txt', 'r') as f: return f.read()
-    except Exception:
-        return ""
-    return ""
+        
 
-    
 $templates
 
 
@@ -3703,7 +3729,7 @@ def index():
 
 
 
- body = form_html + f"""
+    body = form_html + f"""
 
     <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
 
@@ -3724,7 +3750,9 @@ def index():
     """
 
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
-  
+
+
+
 @app.route('/scan', methods=['POST'])
 
 def scan():
@@ -3872,85 +3900,59 @@ def system_audit(mode):
 
 
             lines = subprocess.run(cmd, capture_output=True, text=True).stdout.splitlines()
-            
+
+
+
             report = [l for l in lines if re.search(GLOBAL_AV_SOCKET_REGEX, l, re.I)]
-            
+
+
+
     except Exception as e: report = [f"EXEC_ERROR: {e}"]
-    
+
+
+
     return render_template_string(render_prime_page("SYSTEM_REPORT", f"<pre>{chr(10).join(report or ['CLEAN'])}</pre><a href='/'>RETURN</a>"))
-    
+
+
+
+
+
+
+
 @app.route('/inject/<os_type>')
+
+
 
 def inject_payload(os_type):
 
+
+
     pl = {"windows": WIN_PAYLOAD, "linux": LINUX_PAYLOAD, "macos": MACOS_PAYLOAD}
-   return render_template_string(render_prime_page("INJECTOR", f"<textarea style='width:100%; height:300px;'>{pl.get(os_type, 'ERROR')}</textarea>"))
 
-@app.route('/vault', methods=['GET', 'POST'])
-def vault():
-    if request.method == 'GET':
-        form_html = render_prime_form("/vault", fields=[{"type": "file", "name": "cert", "label": "TARGET_ASSET_FILE"}], btn_text="EXTRACT BANK ASSETS")
-        return render_template_string(render_prime_page("SECURE_VAULT", form_html))
 
-    f = request.files.get('cert')
-    if not f: return "Empty Payload", 400
 
-    tmp = os.path.join('/tmp', f.filename)
-    f.save(tmp)
-    ext = f.filename.split('.')[-1].lower()
+    return render_template_string(render_prime_page("INJECTOR", f"<textarea style='width:100%; height:300px;'>{pl.get(os_type, 'ERROR')}</textarea>"))
 
-    report = ["=== [CORE: INTELLECTUAL VAULT-ENGINE v3.0] ===", f"Target: {f.filename} [{ext}]"]
-    content = ""
 
-    try:
-        if ext == 'pdf':
-            content = subprocess.run(['pdftotext', tmp, '-'], capture_output=True, text=True).stdout
-        elif ext in ['doc', 'docx']:
-            content = subprocess.run(['antiword', tmp], capture_output=True, text=True).stdout
-        elif ext in ['jpg', 'png', 'jpeg']:
-            subprocess.run(['tesseract', tmp, '/tmp/ocr_out'], capture_output=True)
-            if os.path.exists('/tmp/ocr_out.txt'):
-                with open('/tmp/ocr_out.txt', 'r') as f_ocr: content = f_ocr.read()
-        else:
-            with open(tmp, 'r', errors='ignore') as f_txt: content = f_txt.read()
 
-        patterns = {
-            "SECURE_TOKEN": r'(?i)(banksecret|api_key|token|access)[^a-zA-Z0-9]{1,10}([a-zA-Z0-9+/=]{16,64})',
-            "BANK_IDENTITY": r'(?i)(clientid|reference|account|uid)[^a-zA-Z0-9]{1,10}([0-9-]{8,20})',
-            "CRYPTOGRAPHIC_ASSET": r'(?i)(private_key|secret_hash|keyid)[^a-zA-Z0-9]{1,10}([a-zA-Z0-9+/=]{32,})'
-        }
 
-        found_any = False
-        for category, regex in patterns.items():
-            matches = re.findall(regex, content)
-            if matches:
-                found_any = True
-                report.append(f"\n[!!! CATEGORY: {category} !!!]")
-                for label, val in matches:
-                    if len(val) > 10:
-                        report.append(f"  -> {label.upper()}: {val}")
 
-        if not found_any:
-            report.append("[INFO]: System found no high-probability banking assets.")
-            suspicious = re.findall(r'[a-zA-Z0-9+/=]{50,}', content)
-            if suspicious:
-                report.append(f"[WARNING]: Found {len(suspicious)} long-string entities (potential raw keys).")
-                report.append(f"  Sample: {suspicious[0][:30]}...")
 
-    except Exception as e:
-        report.append(f"[CRITICAL_FAILURE]: {e}")
-    finally:
-        if os.path.exists(tmp): os.remove(tmp)
-        if os.path.exists('/tmp/ocr_out.txt'): os.remove('/tmp/ocr_out.txt')
-
-    return render_template_string(render_prime_page("VAULT_REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/vault'>RETURN</a>"))    
-    
 
 if __name__ == '__main__':
+
+
+
     app.run(host='0.0.0.0', port=5000, debug=False)
+
+
+
 EOF
 
+
+
 }
+
 
 
 # ==============================================================================
