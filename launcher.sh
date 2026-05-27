@@ -3581,6 +3581,10 @@ import requests
 import ssl
 import urllib3
 
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+
+
 from datetime import datetime
 
 app = Flask(__name__)
@@ -3684,6 +3688,58 @@ def scan():
 def system_audit(mode):
     # Используем переменные напрямую, так как Bash их больше не парсит в 'EOF'
     return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
+
+# --- НОВЫЙ МАРШРУТ АУДИТА ---
+@app.route('/audit/deep', methods=['GET', 'POST'])
+def deep_audit():
+    if request.method == 'GET':
+        form_html = render_prime_form("/audit/deep", fields=[{"type": "file", "name": "file", "label": "UPLOAD_FOR_FORENSIC_AUDIT"}], btn_text="RUN DEEP AUDIT")
+        return render_template_string(render_prime_page("FORENSIC_AUDIT", form_html))
+
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    tmp = os.path.join('/tmp', f.filename)
+    f.save(tmp)
+    
+    report = [f"=== [FORENSIC AUDIT: {f.filename}] ==="]
+    
+    # 1. Метаданные (уже есть функция)
+    meta = get_file_metadata(tmp)
+    report.append("--- [METADATA] ---")
+    for k, v in meta.items(): report.append(f"{k.upper()}: {v}")
+
+    # 2. Поиск банковских ключей (регулярки)
+    BANK_PATTERNS = {
+        "SWIFT_KEY": r"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
+        "IBAN_PATTERN": r"[A-Z]{2}\d{2}[A-Z0-9]{1,30}",
+        "PRIVATE_KEY_BLOCK": r"-----BEGIN (RSA|EC|DSA)? ?PRIVATE KEY-----"
+    }
+    
+    report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
+    try:
+        with open(tmp, 'r', errors='ignore') as file_content:
+            content = file_content.read()
+            for name, pattern in BANK_PATTERNS.items():
+                if re.search(pattern, content):
+                    report.append(f"[ALERT] FOUND {name}")
+    except:
+        report.append("Could not scan for text artifacts.")
+
+    # 3. Чтение сертификатов (если это .pem, .crt, .cer)
+    report.append("\n--- [CERTIFICATE ANALYSIS] ---")
+    try:
+        with open(tmp, 'rb') as cert_file:
+            cert_data = cert_file.read()
+            cert = x509.load_pem_x509_certificate(cert_data, default_backend())
+            report.append(f"Subject: {cert.subject}")
+            report.append(f"Issuer: {cert.issuer}")
+            report.append(f"Not Valid Before: {cert.not_valid_before}")
+    except:
+        report.append("No valid certificate structure found.")
+
+    if os.path.exists(tmp): os.remove(tmp)
+    return render_template_string(render_prime_page("AUDIT_REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+    
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
@@ -8645,6 +8701,28 @@ core_get_service_cert() {
     return 0
 }
 
+# Эта функция регистрирует все ваши домены разом
+update_all_dns_records() {
+    local ip=$(hostname -I | awk '{print $1}')
+    local conf_file="/etc/dnsmasq.d/prime_gateway.conf"
+
+    # Создаем директорию
+    mkdir -p /etc/dnsmasq.d/
+
+    # Перезаписываем весь конфиг списком всех ваших доменов
+    {
+        echo "address=/app0.nexus/$ip"
+        echo "address=/app1.nexus/$ip"
+        echo "address=/app2.nexus/$ip"
+        echo "address=/scanclamavnexus/$ip"
+        echo "address=/kali.nexus/$ip"
+        echo "address=/prime.portal/$ip"
+        echo "address=/audit.nexus/$ip"
+    } > "$conf_file"
+
+    systemctl restart dnsmasq
+    core_engine_ui "+" "DNS Реестр: ВСЕ домены синхронизированы на IP $ip"
+}
 
 
 run_live_service() {
@@ -8657,6 +8735,9 @@ run_live_service() {
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
     # --- 1. АДАПТИВНЫЙ DNS & IP ---
+    # 1. Сначала подготавливаем сеть
+    update_all_dns_records
+    
     # Вызываем синхронизацию (она сама найдет лучший IP и обновит dnsmasq)
     core_network_dns_sync || core_engine_ui "w" "DNS Sync bypassed, using raw IP."
     
@@ -8720,25 +8801,17 @@ run_live_service() {
     
     core_engine_progress 2 "NODE_STABILIZATION"
 
-    # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
+   # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local final_url="$protocol://$service_name:$port"
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
-        # 1. Регистрация в DNS
-    core_network_dns_register "$service_name" "$active_ip"
+        
+        # Исправленный вызов
+        local current_ip=$(hostname -I | awk '{print $1}')
+        core_network_dns_register "$service_name" "$current_ip"
     
         # --- ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ В NGINX ---
-        # Теперь Nginx узнает о новом узле сразу после подтверждения его работы
         core_nginx_auto_setup "$service_name:$port"
-        
-        # Авто-регистрация в луте
-        core_engine_loot "node_startup" "Service ${service_type} deployed & proxied at $final_url"
-    else
-        core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
-        core_engine_ui "line"
-        [[ -f "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty."
-        core_engine_ui "line"
-    fi
 
 
     core_engine_wait
