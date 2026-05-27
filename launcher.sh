@@ -3689,7 +3689,7 @@ def system_audit(mode):
     # Используем переменные напрямую, так как Bash их больше не парсит в 'EOF'
     return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
 
-# --- НОВЫЙ МАРШРУТ АУДИТА ---
+
 @app.route('/audit/deep', methods=['GET', 'POST'])
 def deep_audit():
     if request.method == 'GET':
