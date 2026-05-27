@@ -3581,14 +3581,13 @@ import shutil
 import subprocess
 import platform
 import requests
+import ssl
+import urllib3
+
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_came_gateway'
-
-# Игнорируем ошибку самоподписанного сертификата при автоматических запросах
-response = requests.get('https://app0.nexus:5000', verify=False)
-
 
 # --- ШАБЛОНЫ (ВСТАВЛЕНЫ АВТОМАТИЧЕСКИ) ---
 EOF
@@ -3688,21 +3687,24 @@ def scan():
 def system_audit(mode):
     # Используем переменные напрямую, так как Bash их больше не парсит в 'EOF'
     return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
-
+    
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
     
-    # ПРИНУДИТЕЛЬНЫЙ HTTPS: Если файл есть, создаем контекст
-    if cert_path and os.path.exists(cert_path):
+    # ПРОВЕРКА: Файл должен существовать и быть доступен для чтения
+    if cert_path and os.path.exists(cert_path) and os.access(cert_path, os.R_OK):
+        print(f"[*] Starting HTTPS Server with cert: {cert_path}")
         try:
-            # Используем cert_path как cert и key, так как они объединены
-            app.run(host='0.0.0.0', port=5000, ssl_context=(cert_path, cert_path))
+            # Важно: ssl_context требует tuple (cert, key)
+            # Если ваш файл объединен, передаем его дважды
+            context = (cert_path, cert_path)
+            app.run(host='0.0.0.0', port=5000, ssl_context=context, debug=False)
         except Exception as e:
-            print(f"SSL Failed, falling back to HTTP: {e}")
-            app.run(host='0.0.0.0', port=5000)
+            print(f"[!] SSL Context Error: {e}. Falling back to HTTP.")
+            app.run(host='0.0.0.0', port=5000, debug=False)
     else:
-        # Fallback на обычный HTTP, если сертификата нет
-        app.run(host='0.0.0.0', port=5000)
+        print("[*] No valid cert found. Starting HTTP Server.")
+        app.run(host='0.0.0.0', port=5000, debug=False)
     
 EOF
 }
