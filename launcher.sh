@@ -3646,6 +3646,11 @@ def index():
             <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
             <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
         </div>
+
+        <div style="margin-top: 15px;">
+            <a href="/audit/deep" class="btn" style="background:#ff9800; color:#fff; display:block; text-align:center; padding:12px; font-weight:bold;">[ FORENSIC DEEP AUDIT ENGINE ]</a>
+        </div>
+        
         {injection_kit_html}
     </div>
     """
