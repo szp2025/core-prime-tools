@@ -3701,51 +3701,60 @@ def deep_audit():
         form_html = render_prime_form("/audit/deep", 
             fields=[{"type": "file", "name": "file", "label": "UPLOAD_FOR_FORENSIC_AUDIT"}], 
             btn_text="RUN DEEP AUDIT")
-        return render_template_string(render_prime_page("FORENSIC_AUDIT", form_html))
+        # Используем "REPORT" как самый надежный ключ, если "AUDIT_REPORT" падает
+        return render_template_string(render_prime_page("REPORT", form_html))
 
     f = request.files.get('file')
     if not f: return "Empty Payload", 400
     
     tmp = os.path.join('/tmp', f.filename)
-    f.save(tmp)
+    report = [f"=== [START AUDIT: {f.filename}] ==="]
     
-    report = [f"=== [FORENSIC AUDIT: {f.filename}] ==="]
-    
-    # 1. Метаданные
-    meta = get_file_metadata(tmp)
-    report.append("--- [METADATA] ---")
-    for k, v in meta.items(): report.append(f"{k.upper()}: {v}")
-
-    # 2. Банковские/Крипто артефакты
-    BANK_PATTERNS = {
-        "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
-        "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"
-    }
-    
-    report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
     try:
+        f.save(tmp)
+        
+        # 1. Метаданные с защитой от падения
+        try:
+            meta = get_file_metadata(tmp)
+            report.append("--- [METADATA] ---")
+            for k, v in meta.items(): report.append(f"{k.upper()}: {v}")
+        except Exception as e:
+            report.append(f"Metadata error: {str(e)}")
+
+        # 2. Банковские артефакты
+        BANK_PATTERNS = {
+            "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
+            "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"
+        }
+        report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
         with open(tmp, 'rb') as f_bin:
             content = f_bin.read()
             for name, pattern in BANK_PATTERNS.items():
                 if re.search(pattern, content):
                     report.append(f"[ALERT] FOUND {name}")
+
+        # 3. Анализ OpenSSL с принудительным перехватом ошибок
+        report.append("\n--- [CERTIFICATE ANALYSIS] ---")
+        try:
+            # Проверяем, существует ли openssl вообще
+            result = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
+                                             stderr=subprocess.STDOUT, text=True)
+            for line in result.split('\n'):
+                line = line.strip()
+                if any(s in line for s in ['Subject:', 'Issuer:', 'Not Before:']):
+                    report.append(line)
+        except subprocess.CalledProcessError:
+            report.append("No valid X.509 structure (skipping).")
+        except FileNotFoundError:
+            report.append("CRITICAL: OpenSSL binary not found in system path.")
+
     except Exception as e:
-        report.append(f"Scan error: {str(e)}")
+        report.append(f"CRITICAL SYSTEM ERROR: {str(e)}")
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
 
-    # 3. Анализ через системный OpenSSL
-    report.append("\n--- [CERTIFICATE ANALYSIS] ---")
-    try:
-        result = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
-                                         stderr=subprocess.STDOUT, text=True)
-        for line in result.split('\n'):
-            line = line.strip()
-            if any(s in line for s in ['Subject:', 'Issuer:', 'Not Before:']):
-                report.append(line)
-    except Exception:
-        report.append("No valid X.509 certificate found.")
-
-    if os.path.exists(tmp): os.remove(tmp)
-    return render_template_string(render_prime_page("AUDIT_REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+    # ВАЖНО: используем 'REPORT' вместо 'AUDIT_REPORT', если второй падает
+    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
         
     
 if __name__ == '__main__':
