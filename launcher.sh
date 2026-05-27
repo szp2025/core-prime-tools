@@ -3717,7 +3717,7 @@ def deep_audit():
     for k, v in meta.items(): 
         report.append(f"{k.upper()}: {v}")
 
-    # 2. Поиск банковских/крипто артефактов (БИНАРНЫЙ ПОИСК)
+    # 2. Поиск банковских/крипто артефактов (Бинарный поиск)
     BANK_PATTERNS = {
         "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
         "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}",
@@ -3734,33 +3734,31 @@ def deep_audit():
     except Exception as e:
         report.append(f"Artifact scan error: {str(e)}")
 
-   # 3. Чтение сертификатов (ИСПОЛЬЗУЕМ ВНУТРЕННИЙ OPENSSL)
+    # 3. Чтение сертификатов (Использование системного OpenSSL)
     report.append("\n--- [CERTIFICATE ANALYSIS] ---")
     try:
-        # Используем subprocess для вызова штатного openssl
-        # -noout -text позволяет получить всю информацию в текстовом виде
-        result = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
-                                         stderr=subprocess.STDOUT, text=True)
+        # Вызов системного openssl исключает проблемы с установкой библиотек
+        result = subprocess.check_output(
+            ['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
+            stderr=subprocess.STDOUT, text=True
+        )
         
-        # Парсим нужные строки из вывода openssl
         for line in result.split('\n'):
             line = line.strip()
-            if line.startswith('Subject:') or line.startswith('Issuer:') or line.startswith('Not Before:'):
+            if any(key in line for key in ['Subject:', 'Issuer:', 'Not Before:']):
                 report.append(line)
                 
     except subprocess.CalledProcessError:
-        report.append("No valid X.509 certificate found (or not in PEM format).")
+        report.append("No valid X.509 certificate found (or file is not in PEM format).")
     except Exception as e:
         report.append(f"Certificate analysis failed: {str(e)}")
-        
 
-    # Cleanup
+    # 4. Финализация и очистка
     if os.path.exists(tmp): 
         os.remove(tmp)
         
     return render_template_string(render_prime_page("AUDIT_REPORT", 
         f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
-
         
     
 if __name__ == '__main__':
