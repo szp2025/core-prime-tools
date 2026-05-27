@@ -3714,14 +3714,12 @@ def deep_audit():
     # 1. Метаданные
     meta = get_file_metadata(tmp)
     report.append("--- [METADATA] ---")
-    for k, v in meta.items(): 
-        report.append(f"{k.upper()}: {v}")
+    for k, v in meta.items(): report.append(f"{k.upper()}: {v}")
 
-    # 2. Поиск банковских/крипто артефактов (Бинарный поиск)
+    # 2. Банковские/Крипто артефакты
     BANK_PATTERNS = {
         "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
-        "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}",
-        "PRIVATE_KEY_BLOCK": rb"-----BEGIN (RSA|EC|DSA)? ?PRIVATE KEY-----"
+        "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"
     }
     
     report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
@@ -3732,33 +3730,22 @@ def deep_audit():
                 if re.search(pattern, content):
                     report.append(f"[ALERT] FOUND {name}")
     except Exception as e:
-        report.append(f"Artifact scan error: {str(e)}")
+        report.append(f"Scan error: {str(e)}")
 
-    # 3. Чтение сертификатов (Использование системного OpenSSL)
+    # 3. Анализ через системный OpenSSL
     report.append("\n--- [CERTIFICATE ANALYSIS] ---")
     try:
-        # Вызов системного openssl исключает проблемы с установкой библиотек
-        result = subprocess.check_output(
-            ['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
-            stderr=subprocess.STDOUT, text=True
-        )
-        
+        result = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
+                                         stderr=subprocess.STDOUT, text=True)
         for line in result.split('\n'):
             line = line.strip()
-            if any(key in line for key in ['Subject:', 'Issuer:', 'Not Before:']):
+            if any(s in line for s in ['Subject:', 'Issuer:', 'Not Before:']):
                 report.append(line)
-                
-    except subprocess.CalledProcessError:
-        report.append("No valid X.509 certificate found (or file is not in PEM format).")
-    except Exception as e:
-        report.append(f"Certificate analysis failed: {str(e)}")
+    except Exception:
+        report.append("No valid X.509 certificate found.")
 
-    # 4. Финализация и очистка
-    if os.path.exists(tmp): 
-        os.remove(tmp)
-        
-    return render_template_string(render_prime_page("AUDIT_REPORT", 
-        f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+    if os.path.exists(tmp): os.remove(tmp)
+    return render_template_string(render_prime_page("AUDIT_REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
         
     
 if __name__ == '__main__':
