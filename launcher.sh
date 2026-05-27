@@ -3881,42 +3881,19 @@ def system_audit(mode):
 
 
             lines = subprocess.run(cmd, capture_output=True, text=True).stdout.splitlines()
-
-
-
+            
             report = [l for l in lines if re.search(GLOBAL_AV_SOCKET_REGEX, l, re.I)]
-
-
-
+            
     except Exception as e: report = [f"EXEC_ERROR: {e}"]
-
-
-
+    
     return render_template_string(render_prime_page("SYSTEM_REPORT", f"<pre>{chr(10).join(report or ['CLEAN'])}</pre><a href='/'>RETURN</a>"))
-
-
-
-
-
-
-
+    
 @app.route('/inject/<os_type>')
-
-
 
 def inject_payload(os_type):
 
-
-
     pl = {"windows": WIN_PAYLOAD, "linux": LINUX_PAYLOAD, "macos": MACOS_PAYLOAD}
-
-
-
-    return render_template_string(render_prime_page("INJECTOR", f"<textarea style='width:100%; height:300px;'>{pl.get(os_type, 'ERROR')}</textarea>"))
-
-
-
-
+   return render_template_string(render_prime_page("INJECTOR", f"<textarea style='width:100%; height:300px;'>{pl.get(os_type, 'ERROR')}</textarea>"))
 
 @app.route('/vault', methods=['GET', 'POST'])
 def vault():
@@ -3930,12 +3907,11 @@ def vault():
     tmp = os.path.join('/tmp', f.filename)
     f.save(tmp)
     ext = f.filename.split('.')[-1].lower()
-    
+
     report = ["=== [CORE: INTELLECTUAL VAULT-ENGINE v3.0] ===", f"Target: {f.filename} [{ext}]"]
     content = ""
 
     try:
-        # 1. АВТОНОМНЫЙ ИНТЕЛЛЕКТУАЛЬНЫЙ ПАРСИНГ
         if ext == 'pdf':
             content = subprocess.run(['pdftotext', tmp, '-'], capture_output=True, text=True).stdout
         elif ext in ['doc', 'docx']:
@@ -3947,8 +3923,6 @@ def vault():
         else:
             with open(tmp, 'r', errors='ignore') as f_txt: content = f_txt.read()
 
-        # 2. ЭВРИСТИЧЕСКИЙ АНАЛИЗАТОР (Context-Aware Extraction)
-        # Ищем пары "ключ-значение", даже если они разделены переносами строк или сложной пунктуацией
         patterns = {
             "SECURE_TOKEN": r'(?i)(banksecret|api_key|token|access)[^a-zA-Z0-9]{1,10}([a-zA-Z0-9+/=]{16,64})',
             "BANK_IDENTITY": r'(?i)(clientid|reference|account|uid)[^a-zA-Z0-9]{1,10}([0-9-]{8,20})',
@@ -3962,13 +3936,11 @@ def vault():
                 found_any = True
                 report.append(f"\n[!!! CATEGORY: {category} !!!]")
                 for label, val in matches:
-                    # Интеллектуальный фильтр: игнорируем мусорные значения
                     if len(val) > 10:
                         report.append(f"  -> {label.upper()}: {val}")
 
         if not found_any:
             report.append("[INFO]: System found no high-probability banking assets.")
-            # Автономная эвристика: если ничего не нашли, ищем подозрительные длинные строки
             suspicious = re.findall(r'[a-zA-Z0-9+/=]{50,}', content)
             if suspicious:
                 report.append(f"[WARNING]: Found {len(suspicious)} long-string entities (potential raw keys).")
@@ -3980,10 +3952,8 @@ def vault():
         if os.path.exists(tmp): os.remove(tmp)
         if os.path.exists('/tmp/ocr_out.txt'): os.remove('/tmp/ocr_out.txt')
 
-    return render_template_string(render_prime_page("VAULT_REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/vault'>RETURN</a>"))
+    return render_template_string(render_prime_page("VAULT_REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/vault'>RETURN</a>"))    
     
-    
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
@@ -3991,13 +3961,13 @@ EOF
 
 }
 
+
 # ==============================================================================
 # @description: Интегрированный кросс-платформенный генератор веб-панели Share-Server v2.0
 # МОДЕРНИЗАЦИЯ: Внедрение сквозного пре-даунлоад контроля CAME с логикой TOTAL OUTBOUND PURGE
 # ФУНКЦИОНАЛ: Сканирование файлов «на лету» перед отдачей, моментальное удаление угроз с хоста
 # АРХИТЕКТУРА: Flask-интерфейс, защита сетевых клиентов от скачивания деструктивных векторов
 # ==============================================================================
-
 
 generate_share_server_code_raw() {
     # 1. Собираем регулярку из массива прямо здесь
