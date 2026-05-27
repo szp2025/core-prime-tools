@@ -2776,26 +2776,20 @@ server { listen 8443 ssl; server_name $domain; ssl_certificate /etc/nginx/ssl/ne
 
 core_network_dns_register() {
     local domain="$1"
-    local ip="${2:-$active_ip}"
-    # Файл, который реально читает dnsmasq
+    # Автоматически находим текущий IP (игнорируем 127.0.0.1)
+    local ip=$(hostname -I | awk '{print $1}') 
     local dns_config="/etc/dnsmasq.d/prime_gateway.conf"
 
-    # Создаем директорию, если её нет
+    # Создаем конфиг, если его нет
     mkdir -p /etc/dnsmasq.d/
-
-    # Удаляем старую запись, если она есть
-    if [[ -f "$dns_config" ]]; then
-        sed -i "/\/$domain\//d" "$dns_config"
-    fi
-
-    # Добавляем актуальную запись
-    echo "address=/$domain/$ip" >> "$dns_config"
-
-    # ПЕРЕЗАГРУЗКА (Критический момент!)
-    # Чтобы dnsmasq узнал о новой записи, его нужно перезапустить
-    systemctl restart dnsmasq 2>/dev/null || service dnsmasq restart
-
-    core_engine_ui "+" "DNS Реестр: Синхронизирован $domain -> $ip (Active)"
+    
+    # Записываем актуальную связь
+    echo "address=/$domain/$ip" > "$dns_config"
+    
+    # Перезагружаем сервис для подхвата нового IP
+    systemctl restart dnsmasq
+    
+    core_engine_ui "+" "DNS Реестр: Синхронизирован $domain -> $ip (Dynamic Mode)"
 }
 
 # ==============================================================================
