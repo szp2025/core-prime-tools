@@ -3734,21 +3734,25 @@ def deep_audit():
     except Exception as e:
         report.append(f"Artifact scan error: {str(e)}")
 
-    # 3. Чтение сертификатов (X.509)
+   # 3. Чтение сертификатов (ИСПОЛЬЗУЕМ ВНУТРЕННИЙ OPENSSL)
     report.append("\n--- [CERTIFICATE ANALYSIS] ---")
     try:
-        with open(tmp, 'rb') as cert_file:
-            cert_data = cert_file.read()
-            # Проверяем наличие PEM заголовка перед парсингом
-            if b"-----BEGIN CERTIFICATE-----" in cert_data:
-                cert = x509.load_pem_x509_certificate(cert_data, default_backend())
-                report.append(f"Subject: {cert.subject.rfc4514_string()}")
-                report.append(f"Issuer: {cert.issuer.rfc4514_string()}")
-                report.append(f"Valid From: {cert.not_valid_before}")
-            else:
-                report.append("File is not in PEM certificate format.")
+        # Используем subprocess для вызова штатного openssl
+        # -noout -text позволяет получить всю информацию в текстовом виде
+        result = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
+                                         stderr=subprocess.STDOUT, text=True)
+        
+        # Парсим нужные строки из вывода openssl
+        for line in result.split('\n'):
+            line = line.strip()
+            if line.startswith('Subject:') or line.startswith('Issuer:') or line.startswith('Not Before:'):
+                report.append(line)
+                
+    except subprocess.CalledProcessError:
+        report.append("No valid X.509 certificate found (or not in PEM format).")
     except Exception as e:
         report.append(f"Certificate analysis failed: {str(e)}")
+        
 
     # Cleanup
     if os.path.exists(tmp): 
