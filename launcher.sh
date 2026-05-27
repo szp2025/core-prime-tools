@@ -3685,9 +3685,16 @@ def system_audit(mode):
     return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
 
 if __name__ == '__main__':
-    # Если сертификат существует, запускаем с SSL
-    ssl_context = ('$cert_path', '$cert_path') if os.path.exists('$cert_path') else None
+   # Считываем путь из переменной окружения, переданной из Bash
+    cert_path = os.environ.get('PRIME_CERT_PATH')
+    
+    # Создаем SSL-контекст, если путь передан и файл существует
+    ssl_context = None
+    if cert_path and os.path.exists(cert_path):
+        ssl_context = (cert_path, cert_path)
+        
     app.run(host='0.0.0.0', port=5000, debug=False, ssl_context=ssl_context)
+    
 EOF
 }
 
@@ -8619,6 +8626,9 @@ run_live_service() {
 
     # Определяем путь к временному серверному файлу
     local temp_service_file="/tmp/${service_type}_server.py"
+
+    # ЭКСПОРТИРУЕМ ПУТЬ К СЕРТИФИКАТУ В ОКРУЖЕНИЕ
+    export PRIME_CERT_PATH="$cert_file"
     
     core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
     export PRIME_LOOT PRIME_SHARE
