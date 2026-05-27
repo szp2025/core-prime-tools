@@ -3816,6 +3816,40 @@ def network_analyze():
     return render_template_string(render_prime_page("REPORT", 
         f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/audit/network/analyze'>RETURN</a>"))
 
+
+@app.route('/audit/network/analyze', methods=['GET', 'POST'])
+def network_analyze():
+    if request.method == 'GET':
+        form_html = render_prime_form("/audit/network/analyze", 
+            fields=[{"type": "textarea", "name": "logs", "label": "PASTE_NETWORK_LOGS_OR_PCAP"}], 
+            btn_text="ANALYZE NETWORK ARTIFACTS")
+        return render_template_string(render_prime_page("REPORT", form_html))
+
+    logs = request.form.get('logs', '')
+    report = ["=== [NETWORK FORENSIC ANALYSIS] ==="]
+    NET_PATTERNS = {
+        "SUSPICIOUS_IP": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        "C2_DOMAIN": r"\b([a-zA-Z0-9-]+\.(xyz|top|ru|su|club|info))\b",
+        "HIDDEN_URL": r"(https?://[^\s\"<>]+)"
+    }
+    for name, pattern in NET_PATTERNS.items():
+        matches = re.findall(pattern, logs)
+        if matches:
+            report.append(f"\n--- [DETECTED: {name}] ---")
+            for m in set(matches):
+                report.append(f"-> {m[0] if isinstance(m, tuple) else m}")
+    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
+@app.route('/audit/entropy', methods=['POST'])
+def check_entropy():
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    data = f.read()
+    ent = calculate_entropy(data)
+    verdict = "HIGH ENTROPY - POTENTIAL ENCRYPTED DATA" if ent > 7.5 else "NORMAL ENTROPY"
+    report = [f"=== [ENTROPY ANALYSIS: {f.filename}] ===", f"Value: {ent:.4f}", f"Verdict: {verdict}"]
+    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
   
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
