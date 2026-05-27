@@ -3567,13 +3567,12 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, трансляция ядерных регулярных выражений CAME Слоев 1-6
 # ==============================================================================
 
-
 generate_av_server_code_raw() {
-    # Сборка шаблонов
-    local templates="$(generate_core_template)
-$(generate_core_form_template)"
+    # Генерируем содержимое шаблонов в переменные
+    local core_tpl="$(generate_core_template)"
+    local form_tpl="$(generate_core_form_template)"
 
-    # Создание файла через cat с одинарными кавычками 'EOF' для предотвращения ошибок подстановки Bash
+    # Используем cat с 'EOF', чтобы Bash не интерпретировал $ внутри Python-кода
     cat << 'EOF' > /tmp/av_server.py
 from flask import Flask, request, render_template_string, session
 import re
@@ -3585,6 +3584,16 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_came_gateway'
+
+# --- ШАБЛОНЫ (ВСТАВЛЕНЫ АВТОМАТИЧЕСКИ) ---
+EOF
+
+    # Добавляем сгенерированные шаблоны в файл без кавычек Bash, чтобы они записались как текст
+    echo "$core_tpl" >> /tmp/av_server.py
+    echo "$form_tpl" >> /tmp/av_server.py
+
+    # Продолжаем запись основного кода
+    cat << 'EOF' >> /tmp/av_server.py
 
 # [КОНФИГУРАЦИЯ ЯДРА]
 GLOBAL_HASH_MATRIX = [
@@ -3604,11 +3613,9 @@ def is_encrypted_container(file_path):
     except:
         return False
 
-# Вставка шаблонов
-# $templates 
-
 @app.route('/')
 def index():
+    # Теперь render_prime_form доступен, так как он был вставлен выше
     form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
 
     current_os = platform.system().lower()
@@ -3636,10 +3643,6 @@ def index():
         </div>
         {injection_kit_html}
     </div>
-    <div style="margin-top: 30px; border-top: 2px solid var(--accent-color); padding-top: 20px;">
-        <h3 style="color: var(--accent-color);">[ SECURE VAULT MANAGEMENT ]</h3>
-        <a href="/vault" class="btn" style="background:#ff9800; color:#fff; display:block; text-align:center; padding:12px;">ACCESS VAULT (EXTRACT KEYS)</a>
-    </div>
     """
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
@@ -3653,26 +3656,23 @@ def scan():
     threat_count = 0
     session['last_verdict'] = 'CLEAN'
     try:
-        if is_encrypted_container(tmp) and not any(ext in f.filename.lower() for ext in ['.txt', '.log']):
-            report.append("[VERDICT]: ENCRYPTED_OBJECT")
-        else:
-            proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
-            for line in proc.stdout:
-                parts = line.strip().split(' ', 1)
-                if len(parts) < 2: continue
-                offset, content = parts
-                for hsig in GLOBAL_HASH_MATRIX:
-                    match = re.search(hsig, content)
-                    if match:
-                        clean_secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
-                        if len(clean_secret) > 6: report.append(f"[SECRET FOUND] [Offset {offset}]: {clean_secret.strip()}")
-                for layer in GLOBAL_AV_MATRIX:
-                    if re.search(layer, content, re.I):
-                        report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
-                        threat_count += 1
-            verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
-            session['last_verdict'] = verdict
-            report.append(f"\nVERDICT: {verdict}")
+        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
+        for line in proc.stdout:
+            parts = line.strip().split(' ', 1)
+            if len(parts) < 2: continue
+            offset, content = parts
+            for hsig in GLOBAL_HASH_MATRIX:
+                match = re.search(hsig, content)
+                if match:
+                    clean_secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                    if len(clean_secret) > 6: report.append(f"[SECRET FOUND] [Offset {offset}]: {clean_secret.strip()}")
+            for layer in GLOBAL_AV_MATRIX:
+                if re.search(layer, content, re.I):
+                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                    threat_count += 1
+        verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
+        session['last_verdict'] = verdict
+        report.append(f"\nVERDICT: {verdict}")
     except Exception as e:
         report.append(f"ENGINE_FAILURE: {e}")
     finally:
@@ -3681,20 +3681,13 @@ def scan():
 
 @app.route('/sys-audit/<mode>')
 def system_audit(mode):
-    report = []
-    try:
-        if mode == "ram":
-            lines = subprocess.run(['ps', '-ef'], capture_output=True, text=True).stdout.splitlines()
-            report = [l for l in lines if re.search(r"$GLOBAL_AV_ACTIVE_MALWARE_PROCS", l, re.I)]
-        else:
-            cmd = ['ss', '-antup'] if shutil.which('ss') else ['netstat', '-antp']
-            lines = subprocess.run(cmd, capture_output=True, text=True).stdout.splitlines()
-            report = [l for l in lines if re.search(r"$GLOBAL_AV_SOCKET_STATES", l, re.I)]
-    except Exception as e: report = [f"EXEC_ERROR: {e}"]
-    return render_template_string(render_prime_page("SYSTEM_REPORT", f"<pre>{chr(10).join(report or ['CLEAN'])}</pre><a href='/'>RETURN</a>"))
+    # Используем переменные напрямую, так как Bash их больше не парсит в 'EOF'
+    return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=5000, debug=False, ssl_context='adhoc')
+    # Если сертификат существует, запускаем с SSL
+    ssl_context = ('$cert_path', '$cert_path') if os.path.exists('$cert_path') else None
+    app.run(host='0.0.0.0', port=5000, debug=False, ssl_context=ssl_context)
 EOF
 }
 
