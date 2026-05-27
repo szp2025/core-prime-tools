@@ -3827,8 +3827,8 @@ def network_analyze():
         f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/audit/network/analyze'>RETURN</a>"))
 
 
-@app.route('/audit/network/analyze', methods=['GET', 'POST'])
-def network_analyze():
+  @app.route('/audit/network/analyze', methods=['GET', 'POST'])
+     def network_analyze():
     if request.method == 'GET':
         form_html = render_prime_form("/audit/network/analyze", 
             fields=[{"type": "textarea", "name": "logs", "label": "PASTE_NETWORK_LOGS_OR_PCAP"}], 
