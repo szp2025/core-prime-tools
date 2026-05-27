@@ -3727,9 +3727,7 @@ def index():
     """
     
   return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
-
-
-
+  
 @app.route('/scan', methods=['POST'])
 
 def scan():
