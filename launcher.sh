@@ -3722,31 +3722,37 @@ def deep_audit():
         except (subprocess.CalledProcessError, FileNotFoundError):
             report.append("ExifTool not found or unsupported file format.")
 
-        # 2. BANKING/CRYPTO ARTIFACTS (ДЕТАЛЬНЫЙ ПОИСК С ИЗВЛЕЧЕНИЕМ)
+        # 2. BANKING/CRYPTO ARTIFACTS (ПОИСК И ИЗВЛЕЧЕНИЕ)
         BANK_PATTERNS = {
             "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
             "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"
         }
         
-        report.append("\n--- [BANKING/CRYPTO ARTIFACTS FOUND] ---")
+        report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
         try:
             with open(tmp, 'rb') as f_bin:
                 content = f_bin.read()
-                # Декодируем для поиска, игнорируя ошибки кодировки
+                # Преобразуем контент в текст для поиска паттернов
                 text_content = content.decode('utf-8', errors='ignore')
                 
                 for name, pattern_bytes in BANK_PATTERNS.items():
-                    # Декодируем паттерн и ищем все вхождения
                     pattern_str = pattern_bytes.decode('utf-8')
+                    # Находим ВСЕ совпадения в файле
                     matches = re.findall(pattern_str, text_content)
                     
                     if matches:
-                        # Используем set, чтобы убрать дубликаты
+                        # Фильтруем результаты: убираем дубликаты и короткий "мусор"
                         unique_matches = set(m for m in matches if len(m) > 6)
                         for match in unique_matches:
                             report.append(f"[ALERT] FOUND {name}: {match}")
+                    else:
+                        # Если ничего не нашли, выводим статус (опционально)
+                        # report.append(f"No {name} found.")
+                        pass
+                        
         except Exception as e:
             report.append(f"Artifact scan error: {str(e)}")
+            
             
 
         # 3. X.509 CERTIFICATE ANALYSIS (ОСТАВЛЯЕМ ДЛЯ PEM-ФАЙЛОВ)
