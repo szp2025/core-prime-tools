@@ -2777,23 +2777,26 @@ server { listen 8443 ssl; server_name $domain; ssl_certificate /etc/nginx/ssl/ne
 core_network_dns_register() {
     local domain="$1"
     local ip="${2:-$active_ip}"
-    local dns_registry="/tmp/dns_registry"
+    # Файл, который реально читает dnsmasq
+    local dns_config="/etc/dnsmasq.d/prime_gateway.conf"
 
-    # Создаем файл, если он не существует
-    touch "$dns_registry"
+    # Создаем директорию, если её нет
+    mkdir -p /etc/dnsmasq.d/
 
-    # Если запись с таким доменом уже есть — удаляем старую перед добавлением новой
-    # Это позволяет функции "обновлять" данные, а не просто дублировать их
-    if grep -q "/$domain/" "$dns_registry"; then
-        sed -i "/\/$domain\//d" "$dns_registry"
+    # Удаляем старую запись, если она есть
+    if [[ -f "$dns_config" ]]; then
+        sed -i "/\/$domain\//d" "$dns_config"
     fi
 
     # Добавляем актуальную запись
-    echo "address=/$domain/$ip" >> "$dns_registry"
-    core_engine_ui "+" "DNS Реестр: Синхронизирован $domain -> $ip"
+    echo "address=/$domain/$ip" >> "$dns_config"
+
+    # ПЕРЕЗАГРУЗКА (Критический момент!)
+    # Чтобы dnsmasq узнал о новой записи, его нужно перезапустить
+    systemctl restart dnsmasq 2>/dev/null || service dnsmasq restart
+
+    core_engine_ui "+" "DNS Реестр: Синхронизирован $domain -> $ip (Active)"
 }
-
-
 
 # ==============================================================================
 # @description: Синхронизация сетевого слоя DNS и локальной маршрутизации v22.0
