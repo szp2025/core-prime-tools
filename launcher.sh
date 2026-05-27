@@ -3694,7 +3694,7 @@ def system_audit(mode):
     return render_template_string(render_prime_page("SYSTEM_REPORT", f"<pre>{chr(10).join(report or ['CLEAN'])}</pre><a href='/'>RETURN</a>"))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+  app.run(host='0.0.0.0', port=5000, debug=False, ssl_context='adhoc')
 EOF
 }
 
