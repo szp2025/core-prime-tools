@@ -3690,7 +3690,69 @@ def system_audit(mode):
     return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
 
 
+@app.route('/audit/deep', methods=['GET', 'POST'])
+def deep_audit():
+    if request.method == 'GET':
+        form_html = render_prime_form("/audit/deep", 
+            fields=[{"type": "file", "name": "file", "label": "UPLOAD_FOR_FORENSIC_AUDIT"}], 
+            btn_text="RUN DEEP AUDIT")
+        return render_template_string(render_prime_page("FORENSIC_AUDIT", form_html))
 
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    
+    tmp = os.path.join('/tmp', f.filename)
+    f.save(tmp)
+    
+    report = [f"=== [FORENSIC AUDIT: {f.filename}] ==="]
+    
+    # 1. Метаданные
+    meta = get_file_metadata(tmp)
+    report.append("--- [METADATA] ---")
+    for k, v in meta.items(): 
+        report.append(f"{k.upper()}: {v}")
+
+    # 2. Поиск банковских/крипто артефактов (БИНАРНЫЙ ПОИСК)
+    BANK_PATTERNS = {
+        "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
+        "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}",
+        "PRIVATE_KEY_BLOCK": rb"-----BEGIN (RSA|EC|DSA)? ?PRIVATE KEY-----"
+    }
+    
+    report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
+    try:
+        with open(tmp, 'rb') as f_bin:
+            content = f_bin.read()
+            for name, pattern in BANK_PATTERNS.items():
+                if re.search(pattern, content):
+                    report.append(f"[ALERT] FOUND {name}")
+    except Exception as e:
+        report.append(f"Artifact scan error: {str(e)}")
+
+    # 3. Чтение сертификатов (X.509)
+    report.append("\n--- [CERTIFICATE ANALYSIS] ---")
+    try:
+        with open(tmp, 'rb') as cert_file:
+            cert_data = cert_file.read()
+            # Проверяем наличие PEM заголовка перед парсингом
+            if b"-----BEGIN CERTIFICATE-----" in cert_data:
+                cert = x509.load_pem_x509_certificate(cert_data, default_backend())
+                report.append(f"Subject: {cert.subject.rfc4514_string()}")
+                report.append(f"Issuer: {cert.issuer.rfc4514_string()}")
+                report.append(f"Valid From: {cert.not_valid_before}")
+            else:
+                report.append("File is not in PEM certificate format.")
+    except Exception as e:
+        report.append(f"Certificate analysis failed: {str(e)}")
+
+    # Cleanup
+    if os.path.exists(tmp): 
+        os.remove(tmp)
+        
+    return render_template_string(render_prime_page("AUDIT_REPORT", 
+        f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+
+        
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
