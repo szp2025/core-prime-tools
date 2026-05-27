@@ -3720,17 +3720,13 @@ def index():
         {injection_kit_html}
 
     </div>
-
-    """
-    
-body += """
-    <div style="margin-top: 30px; border-top: 2px solid var(--accent-color); padding-top: 20px;">
+     <div style="margin-top: 30px; border-top: 2px solid var(--accent-color); padding-top: 20px;">
         <h3 style="color: var(--accent-color);">[ SECURE VAULT MANAGEMENT ]</h3>
         <a href="/vault" class="btn" style="background:#ff9800; color:#fff; display:block; text-align:center; padding:12px;">ACCESS VAULT (EXTRACT KEYS)</a>
     </div>
     """
     
-    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
+  return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 
 
