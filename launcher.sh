@@ -3585,6 +3585,10 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_came_gateway'
 
+# Игнорируем ошибку самоподписанного сертификата при автоматических запросах
+response = requests.get('https://app0.nexus:5000', verify=False)
+
+
 # --- ШАБЛОНЫ (ВСТАВЛЕНЫ АВТОМАТИЧЕСКИ) ---
 EOF
 
@@ -3685,15 +3689,19 @@ def system_audit(mode):
     return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
 
 if __name__ == '__main__':
-   # Считываем путь из переменной окружения, переданной из Bash
     cert_path = os.environ.get('PRIME_CERT_PATH')
     
-    # Создаем SSL-контекст, если путь передан и файл существует
-    ssl_context = None
+    # ПРИНУДИТЕЛЬНЫЙ HTTPS: Если файл есть, создаем контекст
     if cert_path and os.path.exists(cert_path):
-        ssl_context = (cert_path, cert_path)
-        
-    app.run(host='0.0.0.0', port=5000, debug=False, ssl_context=ssl_context)
+        try:
+            # Используем cert_path как cert и key, так как они объединены
+            app.run(host='0.0.0.0', port=5000, ssl_context=(cert_path, cert_path))
+        except Exception as e:
+            print(f"SSL Failed, falling back to HTTP: {e}")
+            app.run(host='0.0.0.0', port=5000)
+    else:
+        # Fallback на обычный HTTP, если сертификата нет
+        app.run(host='0.0.0.0', port=5000)
     
 EOF
 }
