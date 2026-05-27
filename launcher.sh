@@ -3717,7 +3717,7 @@ def deep_audit():
         report.append("\n--- [UNIVERSAL METADATA (EXIFTOOL)] ---")
         try:
             # -j: JSON формат, -G: Группировка данных
-            meta_raw = subprocess.check_output(['exiftool', '-j', '-G', tmp], stderr=subprocess.STDOUT, text=True)
+            meta_raw = subprocess.check_output(['exiftool', '-j', '-G', '-a', '-u', '-ee', tmp],  stderr=subprocess.STDOUT, text=True)
             report.append(meta_raw)
         except (subprocess.CalledProcessError, FileNotFoundError):
             report.append("ExifTool not found or unsupported file format.")
