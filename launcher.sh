@@ -8726,97 +8726,199 @@ update_all_dns_records() {
 
 
 run_live_service() {
+
     local service_type="$1"
+
     local port="${2:-8080}"
+
     local log_file="$HOME/prime_node.log"
+
     local cert_file="$HOME/prime_node.pem"
+
     local protocol="http"
+
+
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
+
+
     # --- 1. АДАПТИВНЫЙ DNS & IP ---
+
     # 1. Сначала подготавливаем сеть
+
     update_all_dns_records
+
     
+
     # Вызываем синхронизацию (она сама найдет лучший IP и обновит dnsmasq)
+
     core_network_dns_sync || core_engine_ui "w" "DNS Sync bypassed, using raw IP."
+
     
+
 # Эвристика домена: используем массив или case для назначения appN.nexus
+
     local service_name="app0.nexus" # Дефолт
+
     case "$service_type" in
+
         "av")      service_name="app0.nexus" ;;
+
         "scanner") service_name="app1.nexus" ;;
+
         "auth")    service_name="app2.nexus" ;;
+
         *)         service_name="prime.portal" ;;
+
     esac
 
+
+
 # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
+
     if command -v openssl >/dev/null 2>&1; then
+
         # Вызываем нашу динамическую функцию
+
         local active_cert
+
         active_cert=$(core_get_service_cert "$service_name")
+
         
+
         if [[ -f "$active_cert" ]]; then
+
             protocol="https"
+
             export PRIME_CERT_PATH="$active_cert"
+
             
+
             # Логируем тип сертификата
+
             if [[ "$active_cert" == *"/prime_certs/"* ]]; then
+
                 core_engine_ui "s" "SSL: Trusted CA Mode active for $service_name"
+
             else
+
                 core_engine_ui "w" "SSL: Ephemeral Mode active (Warning)"
+
             fi
+
         fi
+
     fi
+
     
+
+
 
     # --- 3. ГАРАНТИРОВАННАЯ ОЧИСТКА ---
+
     core_engine_ui "i" "Sanitizing port $port..."
+
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
+
     pkill -9 -f "python3" >/dev/null 2>&1
+
     sleep 1.2
 
+
+
     # --- 4. SMART IGNITION (Запуск через файл в /tmp) ---
+
     local code_gen_func="generate_${service_type}_server_code_raw"
+
     if ! command -v "$code_gen_func" >/dev/null; then
+
         core_engine_ui "e" "Fatal: $code_gen_func not found."
+
         core_engine_wait; return
+
     fi
 
+
+
     # Определяем путь к временному серверному файлу
+
     local temp_service_file="/tmp/${service_type}_server.py"
 
+
+
     # ЭКСПОРТИРУЕМ ПУТЬ К СЕРТИФИКАТУ В ОКРУЖЕНИЕ
+
     # Используем переменную active_cert, которую мы определили в блоке #2
+
     export PRIME_CERT_PATH="$active_cert"
+
     
+
     core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
+
     export PRIME_LOOT PRIME_SHARE
+
     
+
     # Генерируем код сразу в файл
+
    "$code_gen_func" > "$temp_service_file"
+
     
+
     # Запускаем Python из созданного файла (это предотвращает Killed)
+
    python3 "$temp_service_file" > "$log_file" 2>&1 &
+
     
+
     core_engine_progress 2 "NODE_STABILIZATION"
 
-   # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
+
+
+    # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
+
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
+
         local final_url="$protocol://$service_name:$port"
+
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
-        
-        # Исправленный вызов
-        local current_ip=$(hostname -I | awk '{print $1}')
-        core_network_dns_register "$service_name" "$current_ip"
+
+        # 1. Регистрация в DNS
+
+    core_network_dns_register "$service_name" "$active_ip"
+
     
+
         # --- ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ В NGINX ---
+
+        # Теперь Nginx узнает о новом узле сразу после подтверждения его работы
+
         core_nginx_auto_setup "$service_name:$port"
+
+        
+
+        # Авто-регистрация в луте
+
+        core_engine_loot "node_startup" "Service ${service_type} deployed & proxied at $final_url"
+
+    else
+
+        core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
+
+        core_engine_ui "line"
+
+        [[ -f "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty."
+
+        core_engine_ui "line"
+
+    fi
 
 
     core_engine_wait
-}
 
+} 
 
 # --- STEALTH COMMS: NODE DESTROYER v1.0 ---
 run_node_clean() {
