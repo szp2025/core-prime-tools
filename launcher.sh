@@ -3662,6 +3662,16 @@ def index():
             <a href="/audit/deep" class="btn" style="background:#ff9800; color:#fff; display:block; text-align:center; padding:12px; font-weight:bold;">[ FORENSIC DEEP AUDIT ENGINE ]</a>
         </div>
         
+        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <h3 style="color: #ff9800;">[ ADVANCED FORENSIC TOOLS ]</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <a href="/audit/network/analyze" class="btn" style="background:#607d8b; color:#fff; text-align:center; padding:10px;">NETWORK AUDIT</a>
+            <form action="/audit/entropy" method="post" enctype="multipart/form-data" style="margin:0;">
+                <input type="file" name="file" onchange="this.form.submit()" style="display:none;" id="ent_file">
+                <label for="ent_file" class="btn" style="background:#f44336; color:#fff; display:block; text-align:center; padding:10px; cursor:pointer;">CHECK ENTROPY</label>
+            </form>
+        </div>
+    </div>
         {injection_kit_html}
     </div>
     """
