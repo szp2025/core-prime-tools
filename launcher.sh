@@ -8580,6 +8580,65 @@ EOF
 
 # --- PRIME IGNITION: RUN WITHOUT FILES ---
 
+
+# --- CORE: DYNAMIC SSL PROVIDER ---
+# --- CORE: DYNAMIC SSL PROVIDER ---
+core_get_service_cert() {
+    local service_name="$1"
+    local cert_dir="/root/prime_certs"
+    local trusted_cert="$cert_dir/${service_name}.pem"
+    local ephemeral_cert="$HOME/prime_node.pem"
+
+    # Убеждаемся, что директория существует
+    mkdir -p "$cert_dir"
+
+    # 1. ПРОВЕРКА/СОЗДАНИЕ ИНФРАСТРУКТУРЫ CA (Если нет ключей - создаем)
+    if [[ ! -f "$cert_dir/myCA.key" || ! -f "$cert_dir/myCA.pem" ]]; then
+        core_engine_ui "i" "Initializing new Root CA infrastructure..."
+        openssl genrsa -out "$cert_dir/myCA.key" 2048 >/dev/null 2>&1
+        openssl req -x509 -new -nodes -key "$cert_dir/myCA.key" -sha256 -days 3650 \
+            -out "$cert_dir/myCA.pem" \
+            -subj "/C=FR/ST=Auvergne-Rhone-Alpes/L=Lyon/O=PrimeNode/CN=PrimeRootCA" >/dev/null 2>&1
+    fi
+
+    # Инициализация серийного номера, если отсутствует
+    if [[ ! -f "$cert_dir/myCA.srl" ]]; then
+        echo "01" > "$cert_dir/myCA.srl"
+    fi
+
+    # 2. Если доверенный сертификат уже есть (подписанный нашим CA) - возвращаем его
+    if [[ -f "$trusted_cert" ]]; then
+        echo "$trusted_cert"
+        return 0
+    fi
+
+    # 3. ЕСЛИ НЕТ ДОВЕРЕННОГО - ГЕНЕРИРУЕМ И ПОДПИСЫВАЕМ ЕГО
+    # Сначала ключ и запрос для конкретного сервиса
+    local service_key="$cert_dir/${service_name}.key"
+    local service_csr="$cert_dir/${service_name}.csr"
+    
+    openssl genrsa -out "$service_key" 2048 >/dev/null 2>&1
+    openssl req -new -key "$service_key" -out "$service_csr" \
+        -subj "/CN=$service_name" >/dev/null 2>&1
+        
+    # Подписываем нашим CA
+    openssl x509 -req -in "$service_csr" \
+        -CA "$cert_dir/myCA.pem" -CAkey "$cert_dir/myCA.key" \
+        -CAserial "$cert_dir/myCA.srl" -out "$trusted_cert" \
+        -days 365 -sha256 >/dev/null 2>&1
+
+    # Объединяем в .pem для Flask
+    cat "$trusted_cert" "$service_key" > "$trusted_cert.tmp" && mv "$trusted_cert.tmp" "$trusted_cert"
+
+    # Очистка временных файлов запроса
+    rm -f "$service_csr" "$service_key"
+
+    echo "$trusted_cert"
+    return 0
+}
+
+
+
 run_live_service() {
     local service_type="$1"
     local port="${2:-8080}"
@@ -8602,14 +8661,25 @@ run_live_service() {
         *)         service_name="prime.portal" ;;
     esac
 
-    # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
+# --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
     if command -v openssl >/dev/null 2>&1; then
-        if [[ ! -f "$cert_file" ]]; then
-            core_engine_ui "i" "Generating ephemeral SSL for $service_name..."
-            openssl req -x509 -newkey rsa:2048 -keyout "$cert_file" -out "$cert_file" -days 1 -nodes -subj "/CN=$service_name" >/dev/null 2>&1
+        # Вызываем нашу динамическую функцию
+        local active_cert
+        active_cert=$(core_get_service_cert "$service_name")
+        
+        if [[ -f "$active_cert" ]]; then
+            protocol="https"
+            export PRIME_CERT_PATH="$active_cert"
+            
+            # Логируем тип сертификата
+            if [[ "$active_cert" == *"/prime_certs/"* ]]; then
+                core_engine_ui "s" "SSL: Trusted CA Mode active for $service_name"
+            else
+                core_engine_ui "w" "SSL: Ephemeral Mode active (Warning)"
+            fi
         fi
-        [[ -f "$cert_file" ]] && protocol="https" && export PRIME_CERT="$cert_file"
     fi
+    
 
     # --- 3. ГАРАНТИРОВАННАЯ ОЧИСТКА ---
     core_engine_ui "i" "Sanitizing port $port..."
@@ -8628,7 +8698,8 @@ run_live_service() {
     local temp_service_file="/tmp/${service_type}_server.py"
 
     # ЭКСПОРТИРУЕМ ПУТЬ К СЕРТИФИКАТУ В ОКРУЖЕНИЕ
-    export PRIME_CERT_PATH="$cert_file"
+    # Используем переменную active_cert, которую мы определили в блоке #2
+    export PRIME_CERT_PATH="$active_cert"
     
     core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
     export PRIME_LOOT PRIME_SHARE
