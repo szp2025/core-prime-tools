@@ -3701,30 +3701,32 @@ def deep_audit():
         form_html = render_prime_form("/audit/deep", 
             fields=[{"type": "file", "name": "file", "label": "UPLOAD_FOR_FORENSIC_AUDIT"}], 
             btn_text="RUN DEEP AUDIT")
-        # Используем "REPORT" как самый надежный ключ, если "AUDIT_REPORT" падает
         return render_template_string(render_prime_page("REPORT", form_html))
 
     f = request.files.get('file')
     if not f: return "Empty Payload", 400
     
     tmp = os.path.join('/tmp', f.filename)
-    report = [f"=== [START AUDIT: {f.filename}] ==="]
+    report = [f"=== [FORENSIC AUDIT ENGINE: {f.filename}] ==="]
     
     try:
         f.save(tmp)
         
-        # 1. Метаданные с защитой от падения
+        # 1. UNIVERSAL METADATA (EXIFTOOL)
+        # Извлекает данные из любых форматов (PDF, Office, Images, etc.)
+        report.append("\n--- [UNIVERSAL METADATA (EXIFTOOL)] ---")
         try:
-            meta = get_file_metadata(tmp)
-            report.append("--- [METADATA] ---")
-            for k, v in meta.items(): report.append(f"{k.upper()}: {v}")
-        except Exception as e:
-            report.append(f"Metadata error: {str(e)}")
+            # -j: JSON формат, -G: Группировка данных
+            meta_raw = subprocess.check_output(['exiftool', '-j', '-G', tmp], stderr=subprocess.STDOUT, text=True)
+            report.append(meta_raw)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            report.append("ExifTool not found or unsupported file format.")
 
-        # 2. Банковские артефакты
+        # 2. BANKING/CRYPTO ARTIFACTS (БИНАРНЫЙ ПОИСК)
         BANK_PATTERNS = {
             "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
-            "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"
+            "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}",
+            "PRIVATE_KEY_BLOCK": rb"-----BEGIN (RSA|EC|DSA)? ?PRIVATE KEY-----"
         }
         report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
         with open(tmp, 'rb') as f_bin:
@@ -3733,10 +3735,9 @@ def deep_audit():
                 if re.search(pattern, content):
                     report.append(f"[ALERT] FOUND {name}")
 
-        # 3. Анализ OpenSSL с принудительным перехватом ошибок
-        report.append("\n--- [CERTIFICATE ANALYSIS] ---")
+        # 3. X.509 CERTIFICATE ANALYSIS (ОСТАВЛЯЕМ ДЛЯ PEM-ФАЙЛОВ)
+        report.append("\n--- [X.509 CERTIFICATE ANALYSIS] ---")
         try:
-            # Проверяем, существует ли openssl вообще
             result = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
                                              stderr=subprocess.STDOUT, text=True)
             for line in result.split('\n'):
@@ -3744,17 +3745,15 @@ def deep_audit():
                 if any(s in line for s in ['Subject:', 'Issuer:', 'Not Before:']):
                     report.append(line)
         except subprocess.CalledProcessError:
-            report.append("No valid X.509 structure (skipping).")
-        except FileNotFoundError:
-            report.append("CRITICAL: OpenSSL binary not found in system path.")
+            report.append("No valid X.509 certificate structure.")
 
     except Exception as e:
         report.append(f"CRITICAL SYSTEM ERROR: {str(e)}")
     finally:
         if os.path.exists(tmp): os.remove(tmp)
 
-    # ВАЖНО: используем 'REPORT' вместо 'AUDIT_REPORT', если второй падает
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+    return render_template_string(render_prime_page("REPORT", 
+        f"<pre style='white-space: pre-wrap; word-break: break-all;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
         
     
 if __name__ == '__main__':
