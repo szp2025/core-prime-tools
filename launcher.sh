@@ -3820,17 +3820,6 @@ def network_analyze():
                 report.append(f"-> {val}")
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
     
-@app.route('/audit/entropy', methods=['POST'])
-def check_entropy():
-    f = request.files.get('file')
-    if not f:
-        return "Empty Payload", 400
-    data = f.read()
-    ent = calculate_entropy(data)
-    verdict = "HIGH ENTROPY - POTENTIAL ENCRYPTED DATA" if ent > 7.5 else "NORMAL ENTROPY"
-    report = [f"=== [ENTROPY ANALYSIS: {f.filename}] ===", f"Value: {ent:.4f}", f"Verdict: {verdict}"]
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-
   
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
