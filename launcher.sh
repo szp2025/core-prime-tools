@@ -3968,9 +3968,7 @@ async def audit_dispatch():
             f"[SEC] {'RISK SCORE':<14} : {'LOW' if found_nodes_count > 0 else 'MEDIUM'}",
             f"[SEC] {'INTEGRITY':<14} : {'VERIFIED' if is_valid else 'COMPROMISED'}"
         ])
-        report.append("=== [END OF ANALYSIS] ===")
-
-        
+        report.append("=== [END OF ANALYSIS] ===")        
         
     # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (CAME-NEXUS INTEGRATED) ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
@@ -10922,4 +10920,3 @@ run_main_menu()        { run_dynamic_menu "MAIN" "PRIME MASTER EXECUTIVE v$CURRE
 # --- ТОЧКА ЗАПУСКА ---
 clear
 run_main_menu
-
