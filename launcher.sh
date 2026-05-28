@@ -3968,22 +3968,42 @@ def audit_phone_internal(phone):
 @app.route('/audit/dispatch', methods=['POST'])
 def audit_dispatch():
     data = request.form.get('input', '').strip()
+    clean_data = data.replace(" ", "")
     if not data: return "Empty Input", 400
 
     # 1. IBAN
-    if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', data.replace(" ", "")):
-        return audit_iban_internal(data)
-    # 2. Телефон
-    elif re.match(r'^\+?[0-9]{7,15}$', data.replace(" ", "")):
-        return audit_phone_internal(data)
-    # 3. Email (для будущих расширений)
+    if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
+        is_valid = verify_iban(clean_data) # Предполагаем, что эта функция у вас есть
+        is_trusted = any(clean_data.startswith(p) for p in ["FR76", "DE", "GB", "CH", "LU"])
+        res = f"=== [FINANCIAL INTEL: {clean_data}] ===\nStatus: {'VALID (TRUSTED)' if is_valid and is_trusted else 'VALID (FOREIGN)' if is_valid else 'INVALID'}"
+        return render_template_string(render_prime_page("FINANCIAL", f"<pre>{res}</pre><br><a href='/'>RETURN</a>"))
+
+    # 2. ТЕЛЕФОН
+    elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
+        try:
+            p = phonenumbers.parse(clean_data, "FR")
+            res = f"=== [PHONE INTEL: {clean_data}] ===\nRegion: {geocoder.description_for_number(p, 'en')}\nType: {'VOIP' if phonenumbers.number_type(p) == 6 else 'MOBILE'}"
+        except: res = "Error parsing phone."
+        return render_template_string(render_prime_page("PHONE", f"<pre>{res}</pre><br><a href='/'>RETURN</a>"))
+
+    # 3. EMAIL
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
-        return audit_email_internal(data)
-    # 4. Домен / IP
+        res = f"=== [EMAIL INTEL: {data}] ===\nStatus: {'HIGH RISK (DISPOSABLE)' if any(d in data for d in ['temp', 'mail']) else 'ANALYSIS PENDING'}"
+        return render_template_string(render_prime_page("EMAIL", f"<pre>{res}</pre><br><a href='/'>RETURN</a>"))
+
+    # 4. ДОМЕН / IP (NEXUS RECON)
     elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
-        return unified_recon_internal(data)
-        
-    return "Unknown data format - Nexus Engine cannot resolve this entity.", 400
+        report = [f"=== [NEXUS RECON ENGINE: {data}] ==="]
+        try:
+            ip = socket.gethostbyname(data)
+            report.append(f"[+] IP: {ip}\n--- [NMAP] ---")
+            report.append(subprocess.check_output(['nmap', '-F', data], text=True, stderr=subprocess.STDOUT))
+        except Exception as e:
+            report.append(f"[!] Recon failed: {e}")
+        return render_template_string(render_prime_page("RECON", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
+    return "Unknown format.", 400
+    
 
    
     
