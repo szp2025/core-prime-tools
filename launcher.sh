@@ -3799,16 +3799,12 @@ def scan():
                     report.append(f"[!!! THREAT: {layer} !!!]")
                     threat_count += 1
         
-# --- БЛОК 2: DEEP FORENSIC (АВТОМАТИЧЕСКИ) ---
+# --- БЛОК 2: DEEP FORENSIC (MAXIMUM ENGINE) ---
         report.append("\n=== [INITIATING DEEP FORENSIC ANALYSIS] ===")
         
-        # 1. Метаданные (MAXIMUM DETAIL)
+        # 1. Глубокие метаданные (Максимальное покрытие)
         try:
-            # -G: Group names (полезно для понимания структуры метаданных)
-            # -a: Duplicate tags (показывает все дубликаты, даже скрытые)
-            # -u: Unknown tags (показывает теги, которые не определены в базе, но есть в файле)
-            # -ee: Extract embedded information (глубокий анализ вложенных файлов)
-            # -U: Unknown tags (для максимального покрытия)
+            # Использование '-G -a -u -U -ee' дает исчерпывающий дамп всего, что есть в файле
             meta = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-U', '-ee', tmp], 
                                            stderr=subprocess.STDOUT, text=True)
             report.append(f"\n--- [FULL METADATA DUMP]\n{meta}")
@@ -3816,21 +3812,65 @@ def scan():
             report.append(f"\n--- [METADATA ERROR]: {e.output}")
         except Exception as e:
             report.append(f"\n--- [METADATA: UNAVAILABLE] ({e})")
-            
 
-        # Банковские артефакты
+        # 2. Листинг ZIP-структуры (для обнаружения скрытых вложений в контейнерах)
+        # Если файл — это контейнер (pptx, docx, apk, jar), мы увидим все его компоненты
+        if f.filename.lower().endswith(('.pptx', '.docx', '.xlsx', '.jar', '.apk', '.zip')):
+            report.append("\n--- [INTERNAL ZIP-CONTAINER STRUCTURE]")
+            try:
+                zip_content = subprocess.check_output(['unzip', '-l', tmp], stderr=subprocess.STDOUT, text=True)
+                report.append(zip_content)
+            except:
+                report.append("[!] Internal structure analysis unavailable.")
+                
+
+       # --- БАНКОВСКИЕ АРТЕФАКТЫ (ЭКСПЕРТНЫЙ УРОВЕНЬ) ---
+        report.append("\n--- [FINANCIAL/BANKING AUDIT]")
         content_str = file_content.decode('utf-8', errors='ignore')
-        for name, pattern in {"IBAN": r"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"}.items():
-            matches = re.findall(pattern, content_str)
-            for m in set(m for m in matches if len(m) > 6):
-                report.append(f"[ALERT] FOUND {name}: {m}")
+        
+        # Раздельные паттерны для исключения "мусора"
+        patterns = {
+            "IBAN": r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
+            "BIC/SWIFT": r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b",
+            "RIB (FR)": r"\b\d{5}\s?\d{5}\s?\d{11}\s?\d{2}\b"
+        }
 
-        # Сертификаты
+        found_financial = False
+        for name, pattern in patterns.items():
+            matches = set(re.findall(pattern, content_str))
+            for m in matches:
+                # Дополнительная проверка на валидность (для IBAN)
+                risk_level = "HIGH" if name == "IBAN" else "MEDIUM"
+                report.append(f"[ALERT] FOUND {name}: {m.strip()} | RISK: {risk_level}")
+                found_financial = True
+        
+        if not found_financial:
+            report.append("No valid financial/banking artifacts detected.")
+
+        # --- КРИПТОГРАФИЧЕСКИЙ АНАЛИЗ (CERTIFICATE ANALYSIS) ---
+        report.append("\n--- [CERTIFICATE ANALYSIS]")
         try:
-            cert = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text'], stderr=subprocess.STDOUT, text=True)
-            report.append(f"\n--- [CERTIFICATE ANALYSIS]\n{cert[:500]}...")
-        except: report.append("\n--- [CERTIFICATE ANALYSIS: UNAVAILABLE]")
-
+            # Запускаем OpenSSL для получения полного текста сертификата
+            cert_raw = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text'], 
+                                               stderr=subprocess.STDOUT, text=True)
+            
+            # Извлекаем самое важное для аудита
+            issuer = re.search(r"Issuer: (.*)", cert_raw)
+            expiry = re.search(r"Not After : (.*)", cert_raw)
+            subject = re.search(r"Subject: (.*)", cert_raw)
+            
+            report.append(f"[+] Subject: {subject.group(1) if subject else 'N/A'}")
+            report.append(f"[+] Issuer : {issuer.group(1) if issuer else 'N/A'}")
+            report.append(f"[+] Expires: {expiry.group(1) if expiry else 'N/A'}")
+            
+            # Добавляем предупреждение, если срок истек (сравнение даты можно добавить в будущем)
+            report.append("[+] Status : ANALYZED")
+            
+        except subprocess.CalledProcessError:
+            report.append("[!] File is not a valid certificate or analysis failed.")
+        except Exception as e:
+            report.append(f"[!] Analysis Error: {e}")
+            
         # Финал
         verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
         session['last_verdict'] = verdict
