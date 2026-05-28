@@ -3973,7 +3973,7 @@ def audit_dispatch():
             if not phonenumbers.is_valid_number(p): 
                 report.append("[!] Status: INVALID FORMAT/NON-EXISTENT")
             else:
-                # Теперь мы используем PhoneNumberType корректно
+                # Использование PhoneNumberType
                 ntype = phonenumbers.number_type(p)
                 
                 type_map = {
@@ -4001,6 +4001,34 @@ def audit_dispatch():
                     f"[+] E164      : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
                 ])
                 
+                # --- ДОПОЛНЕНИЕ: DIGITAL FOOTPRINT SWEEP (РАСШИРЕННЫЙ) ---
+                report.append("\n--- [DIGITAL FOOTPRINT SWEEP]")
+                platforms = {
+                    "Telegram": f"https://t.me/{clean_data}",
+                    "WhatsApp": f"https://wa.me/{clean_data.replace('+', '')}",
+                    "Signal":   f"https://signal.me/#p/{clean_data}",
+                    "LinkedIn": f"https://www.linkedin.com/search/results/people/?keywords={clean_data}",
+                    "Twitter":  f"https://twitter.com/search?q={clean_data}",
+                    "Instagram": f"https://www.instagram.com/{clean_data.replace('+', '')}/",
+                    "Facebook": f"https://www.facebook.com/search/top/?q={clean_data}",
+                    "Truecaller": f"https://www.truecaller.com/search/fr/{clean_data.replace('+', '')}"
+                }
+                
+                found_footprint = False
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                
+                for name, url in platforms.items():
+                    try:
+                        # Используем HEAD для быстрой проверки активности
+                        res = requests.head(url, timeout=3, allow_redirects=True, headers=headers)
+                        if res.status_code == 200:
+                            report.append(f"[+] {name}: MATCH FOUND (Public link active)")
+                            found_footprint = True
+                    except: continue
+                
+                if not found_footprint:
+                    report.append("[!] Footprint: No public direct links active.")
+                
                 # --- ЭВРИСТИКА ГАМБИТА (RISK ASSESSMENT) ---
                 risk = "LOW"
                 if ntype == PhoneNumberType.VOIP: 
@@ -4010,6 +4038,10 @@ def audit_dispatch():
                 elif not op: 
                     risk = "MEDIUM (Unknown Carrier)"
                 
+                # Усиление риска: если найден цифровой след на виртуальном номере
+                if found_footprint and ntype == PhoneNumberType.VOIP:
+                    risk = "DANGEROUS (Scam-Verified)"
+                
                 report.append(f"\n--- [RISK ASSESSMENT]")
                 report.append(f"[!] Risk Profile: {risk}")
                 
@@ -4018,6 +4050,8 @@ def audit_dispatch():
 
         except Exception as e: 
             report.append(f"[!] Forensic Failure: {e}")
+            
+            
             
 
     # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ (FORENSIC MASTER) ---
