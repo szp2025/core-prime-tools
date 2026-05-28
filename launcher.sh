@@ -3980,7 +3980,7 @@ async def audit_dispatch():
             report.append(nmap)
 
     report.append("\n=== [END OF ANALYSIS] ===")
-     return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+    return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
