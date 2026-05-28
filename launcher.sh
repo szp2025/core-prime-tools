@@ -3814,11 +3814,11 @@ def network_analyze():
         }
         
         for name, pattern in NET_PATTERNS.items():
-        matches = re.findall(pattern, logs)
+            matches = re.findall(pattern, logs)
         if matches:
-        report.append(f"\n--- [DETECTED: {name}] ---")
+            report.append(f"\n--- [DETECTED: {name}] ---")
         for m in set(matches):
-        val = m[0] if isinstance(m, tuple) else m
+            val = m[0] if isinstance(m, tuple) else m
         report.append(f"-> {val}")
         
         return render_template_string(render_prime_page("REPORT", 
