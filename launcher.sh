@@ -3760,14 +3760,10 @@ def index():
     </div>
 
     <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <form action="/audit/strings/deep" method="post" enctype="multipart/form-data" style="margin:0;">
-            <input type="file" name="file" onchange="this.form.submit()" style="display:none;" id="str_file">
-            <label for="str_file" class="btn" style="background:#795548; color:#fff; display:block; text-align:center; padding:10px; cursor:pointer;">STRINGS DEEP SCAN</label>
-        </form>
         <a href="/sys-audit/process" class="btn" style="background:#9c27b0; color:#fff; text-align:center; padding:10px;">AUDIT PROCESSES</a>
     </div>
 
-    <div style="margin-top: 20px; padding: 20px; border: 2px solid #2196f3; border-radius: 8px; background: #f5f9ff;">
+    <div style="margin-top: 20px; padding: 20px; border: 2px solid #2196f3; border-radius: 8px; background:#121216;">
         <h3>[ GLOBAL INTELLIGENCE DISPATCHER ]</h3>
         <form action="/audit/dispatch" method="POST">
             <input type="text" name="input" 
@@ -3787,7 +3783,6 @@ def scan():
     f = request.files.get('file')
     if not f: return "Empty Payload", 400
     
-    # 1. Анализ энтропии (в памяти, до сохранения файла)
     file_content = f.read()
     f.seek(0)
     entropy_val = calculate_entropy(file_content)
@@ -3795,56 +3790,57 @@ def scan():
     tmp = os.path.join('/tmp', f.filename)
     f.save(tmp)
     
-    # Инициализация отчета
     report = [
         f"=== [CAME-NEXUS: FULL-STACK SCAN ENGINE] ===", 
         f"Target: {f.filename}",
         f"Entropy Score: {entropy_val:.4f} ({'HIGH' if entropy_val > 7.5 else 'NORMAL'})"
     ]
     threat_count = 0
-    session['last_verdict'] = 'CLEAN'
     
     try:
-        # --- БЛОК 1: СИГНАТУРНЫЙ АНАЛИЗ (CORE) ---
-        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
-        for line in proc.stdout:
-            parts = line.strip().split(' ', 1)
-            if len(parts) < 2: continue
-            offset, content = parts
+        # --- БЛОК 1: СИГНАТУРНЫЙ АНАЛИЗ + ПУТИ (STRINGS) ---
+        # Используем 'strings' для всего: и для сигнатур, и для поиска путей
+        strings_output = subprocess.check_output(['strings', tmp], text=True)
+        
+        # 1.1 Поиск путей (интегрировано)
+        path_matches = re.findall(r"(?:/|C:\\)[\w./\\-]+", strings_output)
+        if path_matches:
+            report.append("\n--- [FOUND FILE PATHS / ARTIFACTS] ---")
+            report.extend(sorted(list(set(path_matches))))
+            
+        # 1.2 Сигнатурный анализ (основной)
+        for line in strings_output.splitlines():
             for hsig in GLOBAL_HASH_MATRIX:
-                match = re.search(hsig, content)
-                if match:
-                    clean_secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
-                    if len(clean_secret) > 6: report.append(f"[SECRET FOUND] [Offset {offset}]: {clean_secret.strip()}")
+                match = re.search(hsig, line)
+                if match: report.append(f"[SECRET FOUND]: {match.group(0)[:30]}...")
             for layer in GLOBAL_AV_MATRIX:
-                if re.search(layer, content, re.I):
-                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                if re.search(layer, line, re.I):
+                    report.append(f"[!!! THREAT: {layer} !!!]")
                     threat_count += 1
         
-        # --- БЛОК 2: DEEP FORENSIC (АВТОМАТИЧЕСКИ) ---
+        # --- БЛОК 2: DEEP FORENSIC ---
         report.append("\n=== [INITIATING DEEP FORENSIC ANALYSIS] ===")
         
-        # 1. Метаданные
+        # Метаданные (ExifTool)
         try:
             meta = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-ee', tmp], stderr=subprocess.STDOUT, text=True)
-            report.append(f"\n--- [METADATA]\n{meta}")
+            report.append(f"\n--- [METADATA]\n{meta[:500]}...")
         except: report.append("\n--- [METADATA: UNAVAILABLE]")
 
-        # 2. Банковские артефакты
-        BANK_PATTERNS = {"SWIFT": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?", "IBAN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"}
+        # Банковские артефакты
         content_str = file_content.decode('utf-8', errors='ignore')
-        for name, pattern in BANK_PATTERNS.items():
-            matches = re.findall(pattern.decode('utf-8'), content_str)
+        for name, pattern in {"IBAN": r"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"}.items():
+            matches = re.findall(pattern, content_str)
             for m in set(m for m in matches if len(m) > 6):
                 report.append(f"[ALERT] FOUND {name}: {m}")
 
-        # 3. Сертификаты
+        # Сертификаты
         try:
             cert = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text'], stderr=subprocess.STDOUT, text=True)
             report.append(f"\n--- [CERTIFICATE ANALYSIS]\n{cert[:500]}...")
         except: report.append("\n--- [CERTIFICATE ANALYSIS: UNAVAILABLE]")
 
-        # Завершение
+        # Финал
         verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
         session['last_verdict'] = verdict
         report.append(f"\n=== FINAL VERDICT: {verdict} ===")
@@ -3887,23 +3883,6 @@ def network_analyze():
                 report.append(f"-> {val}")
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
 
-@app.route('/audit/strings/deep', methods=['POST'])
-def strings_deep():
-    f = request.files.get('file')
-    if not f: return "Empty Payload", 400
-    tmp = os.path.join('/tmp', f.filename)
-    f.save(tmp)
-    try:
-        # Извлекаем строки и ищем пути, используя grep для фильтрации
-        result = subprocess.check_output(['strings', tmp], text=True)
-        # Паттерн для поиска путей в Linux и Windows стиле
-        matches = re.findall(r"(?:/|C:\\)[\w./\\-]+", result)
-        report = [f"=== [DEEP STRINGS ANALYSIS: {f.filename}] ==="] + sorted(list(set(matches)))
-    except Exception as e:
-        report = [f"Error during deep scan: {str(e)}"]
-    finally:
-        if os.path.exists(tmp): os.remove(tmp)
-    return render_template_string(render_prime_page("STRINGS", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
 
 @app.route('/sys-audit/process')
 def process_audit():
