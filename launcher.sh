@@ -3836,10 +3836,9 @@ def scan():
                 report.append("[!] Internal structure analysis unavailable.")
                 
 
-        # --- АНАЛИЗАТОР ЦИФРОВОГО СЛЕДА (ADVANCED FORENSIC ENGINE) ---
-        report.append("\n--- [DIGITAL FOOTPRINT ANALYSIS - ADVANCED]")
+        # --- АНАЛИЗАТОР ЦИФРОВОГО СЛЕДА (FORENSIC MASTER ENGINE) ---
+        report.append("\n--- [DIGITAL FOOTPRINT ANALYSIS - MASTER]")
         
-        # Расширенный словарь тегов: ищем не только систему, но и следы среды исполнения
         footprint_tags = {
             "PLATFORM": r"Application|Software|OperatingSystem|Platform|Tool",
             "AUTHORSHIP": r"Creator|Author|LastModifiedBy|Company|Manager",
@@ -3848,54 +3847,72 @@ def scan():
             "TIMESTAMP_SYNC": r"CreateDate|ModifyDate|DateTimeOriginal|DigitalCreationDate"
         }
         
-        found_footprint = False
+        dates = {} # Для проверки аномалий времени
+        
+        # 1. Сбор данных и поиск аномалий
         for category, pattern in footprint_tags.items():
-            # Добавили поддержку поиска в любых группах метаданных
-            # Паттерн теперь более гибкий к разделителям
-            matches = re.findall(f"^\[.*?\]\s+.*?(?:{pattern}).*?:\s+(.*)$", meta, re.IGNORECASE | re.MULTILINE)
+            matches = re.findall(rf"^\[.*?\]\s+.*?(?:{pattern}).*?:\s+(.*)$", meta, re.IGNORECASE | re.MULTILINE)
             for m in sorted(set(matches)):
-                # Очистка данных
                 val = m.strip()
                 if val and val.lower() != "unknown":
                     report.append(f"[+] {category:<18} : {val}")
-                    found_footprint = True
+                    # Собираем даты для анализа
+                    if category == "TIMESTAMP_SYNC":
+                        dates[pattern] = val
+
+        # 2. СЕТЕВОЙ РАДАР (IP + MAC)
+        # Ищем не только IP, но и MAC-адреса, которые часто выдают реальное устройство
+        ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+        mac_pattern = r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})'
         
-        # Специальный блок: Выявление аномалий (Time-Travel или подозрительные приложения)
-        # Если вы видите здесь странные имена (например, "TempConverter" или "RandomTool"), это alert.
-        if not found_footprint:
-            report.append("[-] No specific system or geo-footprint detected.")
+        for ip in sorted(set(re.findall(ip_pattern, meta))):
+            if not ip.startswith(('127.', '0.', '255.')):
+                report.append(f"[!] NETWORK IP DETECTED : {ip}")
+        
+        for mac in sorted(set(re.findall(mac_pattern, meta))):
+            report.append(f"[!] MAC ADDR DETECTED  : {mac[0]}")
+
+        # 3. АНАЛИЗАТОР АНОМАЛИЙ (Time-Travel Detector)
+        # Если ModifyDate < CreateDate -> Файл подвергался манипуляции (Anti-Forensics)
+        if "CreateDate" in dates and "ModifyDate" in dates:
+            if dates["ModifyDate"] < dates["CreateDate"]:
+                report.append("[!!!] SECURITY ALERT: METADATA MANIPULATION DETECTED (Time-Travel Anomaly)")
+                
 
 
-       # --- БАНКОВСКИЕ АРТЕФАКТЫ (ЭКСПЕРТНЫЙ УРОВЕНЬ) ---
+        # --- БАНКОВСКИЕ АРТЕФАКТЫ (ИСПРАВЛЕННЫЙ ПАРСЕР) ---
         report.append("\n--- [FINANCIAL/BANKING AUDIT]")
         content_str = file_content.decode('utf-8', errors='ignore')
         
-        # Раздельные паттерны для исключения "мусора"
         patterns = {
-                "IBAN": r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
-                "BIC/SWIFT": r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b",
-                "RIB (FR)": r"\b\d{5}\s?\d{5}\s?\d{11}\s?\d{2}\b",
-                
-                # --- ЧЕГО НЕ ХВАТАЛО ---
-                # 1. Суммы транзакций (EUR, USD, GBP + число)
-                "TRANSACTION AMOUNT": r"\b\d{1,3}(\s?\d{3})*([.,]\d{2})?\s?(EUR|€|USD|\$|GBP|£)\b",
-                # 2. Номера ссылок/ордеров (REF / ORDER / ID)
-                "REF/ORDER ID": r"\b(REF|ORDER|ID|Virement)[:\s#]{1,3}[A-Z0-9-]{6,15}\b",
-                # 3. Имена (Поиск шаблонов "M." или "Mme" перед словами с большой буквы)
-                "BENEFICIARY": r"\b(M\.|Mme|Mr|Ms|Société|SARL|SAS)[:\s][A-Z][a-z]+(\s[A-Z][a-z]+)?\b"
-            }
+            "IBAN": r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
+            # Строгий SWIFT: 8 или 11 символов, буквы и цифры
+            "BIC/SWIFT": r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b",
+            "RIB (FR)": r"\b\d{5}\s?\d{5}\s?\d{11}\s?\d{2}\b"
+        }
 
         found_financial = False
         for name, pattern in patterns.items():
-            matches = set(re.findall(pattern, content_str))
+            # Используем findall. Если паттерн содержит группы (), findall вернет список кортежей.
+            # Нам нужно достать только полное совпадение (index 0).
+            matches = re.findall(pattern, content_str)
+            
+            # Уникальные значения
+            unique_matches = set()
             for m in matches:
-                # Дополнительная проверка на валидность (для IBAN)
+                # Если m - кортеж (из-за групп в BIC), берем первое значение
+                val = str(m[0] if isinstance(m, tuple) else m).strip()
+                if len(val) > 4: # Фильтр мусора: BIC должен быть не короче 8 символов
+                    unique_matches.add(val)
+            
+            for m in unique_matches:
                 risk_level = "HIGH" if name == "IBAN" else "MEDIUM"
-                report.append(f"[ALERT] FOUND {name}: {m.strip()} | RISK: {risk_level}")
+                report.append(f"[ALERT] FOUND {name}: {m} | RISK: {risk_level}")
                 found_financial = True
         
         if not found_financial:
             report.append("No valid financial/banking artifacts detected.")
+            
 
         # --- КРИПТОГРАФИЧЕСКИЙ АНАЛИЗ (CERTIFICATE ANALYSIS) ---
         report.append("\n--- [CERTIFICATE ANALYSIS]")
