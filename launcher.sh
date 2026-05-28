@@ -3796,37 +3796,6 @@ def deep_audit():
     return render_template_string(render_prime_page("REPORT", 
         f"<pre style='white-space: pre-wrap; word-break: break-all;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
         
-  @app.route('/audit/network/analyze', methods=['GET', 'POST'])
-def network_analyze():
-    if request.method == 'GET':
-        form_html = render_prime_form("/audit/network/analyze", 
-            fields=[{"type": "textarea", "name": "logs", "label": "PASTE_NETWORK_LOGS_OR_PCAP_DUMP"}], 
-            btn_text="ANALYZE NETWORK ARTIFACTS")
-        return render_template_string(render_prime_page("REPORT", form_html))
-
-    logs = request.form.get('logs', '')
-    report = ["=== [NETWORK FORENSIC ANALYSIS] ==="]
-    
-    # Паттерны для поиска "плохих" сетевых связей
-    NET_PATTERNS = {
-        "SUSPICIOUS_IP": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
-        "C2_DOMAIN": r"\b([a-zA-Z0-9-]+\.(xyz|top|ru|su|club|info))\b",
-        "HIDDEN_URL": r"(https?://[^\s\"<>]+)"
-    }
-    
-    for name, pattern in NET_PATTERNS.items():
-        matches = re.findall(pattern, logs)
-        if matches:
-            report.append(f"\n--- [DETECTED: {name}] ---")
-            for m in set(matches):
-                # Если это кортеж (из-за групп в regex), берем первый элемент
-                val = m[0] if isinstance(m, tuple) else m
-                report.append(f"-> {val}")
-
-    return render_template_string(render_prime_page("REPORT", 
-        f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/audit/network/analyze'>RETURN</a>"))
-
-
 @app.route('/audit/network/analyze', methods=['GET', 'POST'])
 def network_analyze():
     if request.method == 'GET':
@@ -3849,7 +3818,6 @@ def network_analyze():
         if matches:
             report.append(f"\n--- [DETECTED: {name}] ---")
             for m in set(matches):
-                # Если регулярное выражение содержит группы, берем элемент [0]
                 val = m[0] if isinstance(m, tuple) else m
                 report.append(f"-> {val}")
                 
