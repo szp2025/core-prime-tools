@@ -3971,7 +3971,7 @@ async def audit_dispatch():
             except Exception as e: report.append(f"[PHN] {'ERROR':<14} : {str(e)}")
             report.append("=== [END OF ANALYSIS] ===")
 
-        # --- 3. EMAIL: ASYNC FORENSIC MASTER (FULL RESTORE) ---
+# --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
             report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
@@ -3989,18 +3989,36 @@ async def audit_dispatch():
             
             report.extend(await asyncio.gather(*[get_dns(r) for r in dns_records]))
             
-            # 2. Breach Intel
+            # 2. Экспертный слой безопасности (DMARC + SSL)
+            report.append("\n--- [EXPERT FORENSIC LAYER]")
+            try:
+                dmarc = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
+                report.append(f"[SEC] {'DMARC POLICY':<14} : {str(dmarc[0])}")
+            except: report.append(f"[SEC] {'DMARC POLICY':<14} : NOT CONFIGURED")
+            
+            # Анализ SSL (криминалистический отпечаток)
+            try:
+                import ssl, socket
+                ctx = ssl.create_default_context()
+                with ctx.wrap_socket(socket.socket(), server_hostname=domain) as s:
+                    s.settimeout(3)
+                    s.connect((domain, 443))
+                    cert = s.getpeercert()
+                    issuer = dict(x[0] for x in cert.get('issuer', []))
+                    report.append(f"[SSL] {'ISSUER':<14} : {issuer.get('organizationName', 'Unknown')}")
+            except: report.append(f"[SSL] {'ISSUER':<14} : UNABLE TO VERIFY")
+            
+            # 3. Breach Intel
             try:
                 async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=4) as r:
                     data_br = await r.json()
                     report.append(f"[SEC] {'BREACH STATUS':<14} : {'[!!!] BREACHED' if data_br.get('found') else 'CLEAN'}")
             except: report.append(f"[SEC] {'BREACH STATUS':<14} : UNAVAILABLE")
             
-            # 3. SMTP VALIDATION (С принудительным потоком)
+            # 4. SMTP VALIDATION (Threaded)
             report.append("\n--- [MAILBOX VALIDATION (THREADED)]")
             def smtp_check():
                 try:
-                    # Попытка определения MX записи через стандартную библиотеку для Threading
                     from dns import resolver as sync_resolver
                     import smtplib
                     mx = sync_resolver.resolve(domain, 'MX')[0].exchange
@@ -4010,20 +4028,13 @@ async def audit_dispatch():
                         return f"[SMTP] {'STATUS':<14} : {'ACTIVE' if code == 250 else 'INACTIVE'} (Code: {code})"
                 except: return f"[SMTP] {'STATUS':<14} : PROTECTED/BLOCKED"
             
-            # Выполнение SMTP чека без блокировки Event Loop
             report.append(await asyncio.to_thread(smtp_check))
             
-            # 4. Certificate Transparency
-            async def fetch_crt():
-                try:
-                    async with session.get(f"https://crt.sh/?q={domain}&output=json", timeout=8) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            return f"[EXT] {'SUBDOMAINS':<14} : {len(data)} detected"
-                        return f"[EXT] {'SUBDOMAINS':<14} : API_ERROR"
-                except: return f"[EXT] {'SUBDOMAINS':<14} : TIMEOUT"
+            # 5. Эвристическая оценка риска
+            risk = "LOW" if ("gmail" in domain or "outlook" in domain) else "MEDIUM"
+            if "[!!!] BREACHED" in report[-3]: risk = "CRITICAL"
+            report.append(f"[SEC] {'RISK LEVEL':<14} : {risk}")
             
-            report.append(await fetch_crt())
             report.append("=== [END OF ANALYSIS] ===")
             
         # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
@@ -4038,21 +4049,50 @@ async def audit_dispatch():
             report.extend(await asyncio.gather(*[check(n, u) for n, u in platforms.items()]))
             report.append("=== [END OF ANALYSIS] ===")
 
-        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON ---
+# --- 5. ДОМЕН / IP / SERVER: NEXUS DEEP-RECON MODULE ---
         elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
-            report.append(f"\n=== [ACTIVE VULNERABILITY SURFACE: {clean_data}] ===")
+            report.append(f"\n=== [NEXUS DEEP-RECON: {clean_data}] ===")
             loop = asyncio.get_event_loop()
-            # SSL
-            cmd_ssl = f"openssl s_client -connect {clean_data}:443 -servername {clean_data} 2>/dev/null | openssl x509 -noout -subject -issuer"
-            ssl_res = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True))
-            if ssl_res.returncode == 0: report.extend([f"[SSL] {line.strip()}" for line in ssl_res.stdout.splitlines()])
-            # WHOIS & NMAP
-            whois_res = await loop.run_in_executor(None, lambda: subprocess.run(['whois', clean_data], capture_output=True, text=True))
-            if whois_res.returncode == 0: report.append(f"[WHS] {'SNIPPET':<14} : {whois_res.stdout[:100].replace(chr(10), ' ')}...")
-            nmap_res = await loop.run_in_executor(None, lambda: subprocess.run(['nmap', '-F', '-sV', clean_data], capture_output=True, text=True))
-            if nmap_res.returncode == 0: report.extend([f"[NMP] {line.strip()}" for line in nmap_res.stdout.splitlines() if '/' in line])
-            report.append("=== [END OF ANALYSIS] ===")
+            
+            # 1. SSL/TLS CERTIFICATE FORENSIC (Проверка реального владельца инфраструктуры)
+            report.append(f"\n--- [SSL/TLS HANDSHAKE ANALYZER]")
+            try:
+                cmd_ssl = f"echo | openssl s_client -connect {clean_data}:443 -servername {clean_data} 2>/dev/null | openssl x509 -noout -subject -issuer -dates"
+                res = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True))
+                if res.returncode == 0:
+                    report.extend([f"[SSL] {line.strip()}" for line in res.stdout.splitlines()])
+                else:
+                    report.append("[SSL] {'STATUS':<14} : HANDSHAKE REJECTED/PROTECTED")
+            except Exception as e: report.append(f"[SSL] {'ERROR':<14} : {str(e)}")
 
+            # 2. NETWORK PATH & GEO-LOCATION (Определение физического расположения узла)
+            report.append(f"\n--- [INFRASTRUCTURE GEOPOSITIONING]")
+            try:
+                # Извлекаем IP через DNS
+                import socket
+                ip = socket.gethostbyname(clean_data)
+                report.append(f"[NET] {'RESOLVED IP':<14} : {ip}")
+                
+                # Доп. инфо через API
+                async with session.get(f"http://ip-api.com/json/{ip}", timeout=5) as r:
+                    geo = await r.json()
+                    report.extend([
+                        f"[NET] {'ISP/ORG':<14} : {geo.get('isp')}",
+                        f"[NET] {'REGION/CITY':<14} : {geo.get('city')}, {geo.get('country')}"
+                    ])
+            except: report.append("[NET] {'GEO':<14} : UNABLE TO LOCATE")
+
+            # 3. NMAP VULNERABILITY SURFACE (Анализ открытых векторов атак)
+            report.append(f"\n--- [ACTIVE PROBE: VULNERABILITY SURFACE]")
+            cmd_nmap = ['nmap', '-F', '-sV', '-T4', clean_data]
+            res = await loop.run_in_executor(None, lambda: subprocess.run(cmd_nmap, capture_output=True, text=True))
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if '/' in line and ('open' in line or 'closed' in line):
+                        report.append(f"[NMP] {line.strip()}")
+            
+            report.append("=== [END OF ANALYSIS] ===")
+            
     return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))                                  
 
 
