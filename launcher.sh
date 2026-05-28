@@ -9222,9 +9222,28 @@ run_live_service() {
 
     
 
-    # Запускаем Python из созданного файла (это предотвращает Killed)
+# --- [ИНТЕГРИРОВАННЫЙ БЛОК ЗАПУСКА NEXUS] ---
 
-   python3 "$temp_service_file" > "$log_file" 2>&1 &
+# 1. Установка лимитов для предотвращения принудительного завершения ядром (OOM Killer)
+# Лимит на 512МБ (524288 КБ) физической памяти и 1ГБ виртуальной
+ulimit -m 524288 2>/dev/null
+ulimit -v 1048576 2>/dev/null
+
+# 2. Очистка порта перед запуском (санитария)
+if fuser 5000/tcp > /dev/null 2>&1; then
+    echo "[!] Port 5000 busy. Cleaning..."
+    fuser -k 5000/tcp
+    sleep 1
+fi
+
+# 3. Финальный запуск с защитой от разрыва сессии (nohup) и пониженным приоритетом (nice)
+# Мы заменяем вашу старую строку на этот оптимизированный блок
+echo "[+] Deploying NEXUS engine on app0.nexus:5000..."
+nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
+
+# 4. Фиксация ID процесса для мониторинга
+PID=$!
+echo "[+] NEXUS Engine successfully deployed with PID: $PID"
 
     
 
