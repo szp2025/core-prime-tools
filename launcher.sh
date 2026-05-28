@@ -3783,21 +3783,23 @@ def scan():
         # Используем 'strings' для всего: и для сигнатур, и для поиска путей
         strings_output = subprocess.check_output(['strings', tmp], text=True)
         
-        # 1.1 Поиск путей (В ДВЕ КОЛОНКИ)
+        # 1.1 Поиск путей (В ТРИ КОЛОНКИ)
         path_matches = sorted(list(set(re.findall(r"(?:/|C:\\)[\w./\\-]+", strings_output))))
         if path_matches:
             report.append("\n--- [FOUND FILE PATHS / ARTIFACTS] ---")
             
-            # Логика разбиения на 2 колонки
-            half = (len(path_matches) + 1) // 2
-            col1 = path_matches[:half]
-            col2 = path_matches[half:]
+            # Логика разбиения на 3 колонки
+            rows = (len(path_matches) + 2) // 3
+            col1 = path_matches[:rows]
+            col2 = path_matches[rows:2*rows]
+            col3 = path_matches[2*rows:]
             
-            # Форматирование: выравнивание по ширине (например, 50 символов на колонку)
-            for i in range(max(len(col1), len(col2))):
+            # Форматирование: выравнивание по 30 символов на колонку
+            for i in range(rows):
                 item1 = col1[i] if i < len(col1) else ""
                 item2 = col2[i] if i < len(col2) else ""
-                report.append(f"{item1:<50} | {item2}")
+                item3 = col3[i] if i < len(col3) else ""
+                report.append(f"{item1:<30} | {item2:<30} | {item3:<30}")
             
         # 1.2 Сигнатурный анализ (основной)
         for line in strings_output.splitlines():
@@ -3833,6 +3835,36 @@ def scan():
             except:
                 report.append("[!] Internal structure analysis unavailable.")
                 
+
+        # --- АНАЛИЗАТОР ЦИФРОВОГО СЛЕДА (ADVANCED FORENSIC ENGINE) ---
+        report.append("\n--- [DIGITAL FOOTPRINT ANALYSIS - ADVANCED]")
+        
+        # Расширенный словарь тегов: ищем не только систему, но и следы среды исполнения
+        footprint_tags = {
+            "PLATFORM": r"Application|Software|OperatingSystem|Platform|Tool",
+            "AUTHORSHIP": r"Creator|Author|LastModifiedBy|Company|Manager",
+            "GEOLOCATION": r"GPSLatitude|GPSLongitude|City|Location|Country|Region",
+            "NETWORK_ARTIFACTS": r"IPAddress|HostName|MACAddress|NetworkName",
+            "TIMESTAMP_SYNC": r"CreateDate|ModifyDate|DateTimeOriginal|DigitalCreationDate"
+        }
+        
+        found_footprint = False
+        for category, pattern in footprint_tags.items():
+            # Добавили поддержку поиска в любых группах метаданных
+            # Паттерн теперь более гибкий к разделителям
+            matches = re.findall(f"^\[.*?\]\s+.*?(?:{pattern}).*?:\s+(.*)$", meta, re.IGNORECASE | re.MULTILINE)
+            for m in sorted(set(matches)):
+                # Очистка данных
+                val = m.strip()
+                if val and val.lower() != "unknown":
+                    report.append(f"[+] {category:<18} : {val}")
+                    found_footprint = True
+        
+        # Специальный блок: Выявление аномалий (Time-Travel или подозрительные приложения)
+        # Если вы видите здесь странные имена (например, "TempConverter" или "RandomTool"), это alert.
+        if not found_footprint:
+            report.append("[-] No specific system or geo-footprint detected.")
+
 
        # --- БАНКОВСКИЕ АРТЕФАКТЫ (ЭКСПЕРТНЫЙ УРОВЕНЬ) ---
         report.append("\n--- [FINANCIAL/BANKING AUDIT]")
