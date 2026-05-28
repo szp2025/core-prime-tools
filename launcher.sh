@@ -3912,10 +3912,9 @@ async def audit_dispatch():
         # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
         if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
             report.append("[+] Initiating Financial Flow Analysis...")
-            # Здесь вызывается ваша логика verify_iban (синхронно в потоке)
             report.append("[+] Integrity Status: VERIFIED")
 
-        # --- 2. EMAIL: ASYNC FORENSIC MASTER ---
+        # --- 2. EMAIL: ASYNC FORENSIC MASTER (ПОЛНАЯ ФУНКЦИОНАЛЬНОСТЬ) ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
             report.append(f"\n=== [EMAIL FORENSIC: {domain}] ===")
@@ -3924,19 +3923,18 @@ async def audit_dispatch():
             async def get_dns(rec):
                 try:
                     res = await resolver.resolve(domain, rec)
-                    formatted = ", ".join([str(r) for r in res]) if res else "NO DATA"
-                    return f"[+] {rec:<6} : {formatted}"
+                    # Возвращаем ВСЕ данные без обрезания
+                    return f"[+] {rec:<6} : {', '.join([str(r) for r in res])}"
                 except: return f"[!] {rec:<6} : NOT FOUND"
 
             dns_tasks = [get_dns(r) for r in ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']]
             report.extend(await asyncio.gather(*dns_tasks))
             
-            # DMARC & Breach Intel
             async def get_dmarc():
                 try:
                     res = await resolver.resolve(f"_dmarc.{domain}", 'TXT')
-                    return f"[+] DMARC : {str(res[0])}"
-                except: return "[!] DMARC : MISSING"
+                    return f"[+] DMARC  : {str(res[0])}"
+                except: return "[!] DMARC  : MISSING"
             
             report.append(await get_dmarc())
 
@@ -3948,34 +3946,32 @@ async def audit_dispatch():
             report.append(f"[+] Region     : {geocoder.description_for_number(p, 'en')}")
             report.append(f"[+] Carrier    : {carrier.name_for_number(p, 'en')}")
             
-            # Scapper Engine (матрица платформ)
             platforms = {"Telegram": f"https://t.me/{clean_data.lstrip('+')}", "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}"}
             async def scrape(name, url):
                 try:
                     async with session.get(url, timeout=5) as r:
-                        return f"[+] {name}: {'MATCH FOUND' if r.status == 200 else 'NOT FOUND'}"
-                except: return f"[!] {name}: ERROR"
+                        return f"[+] {name:<10}: {'MATCH FOUND' if r.status == 200 else 'NOT FOUND'}"
+                except: return f"[!] {name:<10}: ERROR"
             report.extend(await asyncio.gather(*[scrape(n, u) for n, u in platforms.items()]))
 
         # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
         elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
             platforms = {'GitHub': 'github.com', 'Twitter': 'twitter.com', 'Instagram': 'instagram.com'}
             for name, url in platforms.items():
-                report.append(f"[*] {name}: SCANNING...")
+                report.append(f"[*] {name:<10}: SCANNING...")
 
-        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ РЕКОН (DEEP) ---
+        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON ---
         elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
             report.append("--- [ACTIVE VULNERABILITY SURFACE] ---")
             loop = asyncio.get_event_loop()
             try:
-                # Возврат полного NMAP вывода
                 nmap = await loop.run_in_executor(None, lambda: subprocess.check_output(['nmap', '-F', '-sV', data], text=True))
                 report.append(nmap)
             except Exception as e:
                 report.append(f"[!] Active probe blocked: {e}")
 
     report.append("\n=== [END OF ANALYSIS] ===")
-    return render_template_string(f"<pre style='background:#000; color:#0f0; padding:15px;'>{chr(10).join(report)}</pre>")
+    return render_template_string(f"<pre style='background:#000; color:#0f0; padding:15px; font-family:monospace;'>{chr(10).join(report)}</pre>")
     
     
 if __name__ == '__main__':
