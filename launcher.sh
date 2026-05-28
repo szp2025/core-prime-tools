@@ -3962,40 +3962,45 @@ def audit_dispatch():
         report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
         report.append("=== [END OF ANALYSIS] ===")
         
-    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
+# --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
     if re.match(r'^\+?[0-9]{7,15}$', clean_data):
         import phonenumbers, requests
-        from bs4 import BeautifulSoup # Для скраппинга содержимого
+        from bs4 import BeautifulSoup
         from phonenumbers import geocoder, carrier, timezone, PhoneNumberType
         
         report.append(f"=== [PHONE INTEL: {clean_data}] ===")
-
-        # Инициализация переменных для предотвращения NameError
+        
+        # 1. ОБЯЗАТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ ПЕРЕМЕННЫХ
         region = "Unknown"
         op = "Unknown"
         tz = "Unknown"
         ntype = PhoneNumberType.UNKNOWN
+
         try:
             p = phonenumbers.parse(clean_data, "FR")
             if not phonenumbers.is_valid_number(p): 
                 report.append("[!] Status: INVALID FORMAT/NON-EXISTENT")
             else:
-                # 1. Базовая гео-криминалистика
+                # 2. Основная логика парсинга
                 ntype = phonenumbers.number_type(p)
+                region = geocoder.description_for_number(p, "en") or "Unknown"
+                op = carrier.name_for_number(p, "en") or "Unknown"
+                tz = ", ".join(timezone.time_zones_for_number(p)) or "Unknown"
+                
                 type_map = {
-                                    PhoneNumberType.FIXED_LINE: "FIXED_LINE (Landline)",
-                                    PhoneNumberType.MOBILE: "MOBILE (Cellular Network)",
-                                    PhoneNumberType.FIXED_LINE_OR_MOBILE: "FIXED_OR_MOBILE (Hybrid/Dual Network)",
-                                    PhoneNumberType.TOLL_FREE: "TOLL_FREE (Freephone/Service)",
-                                    PhoneNumberType.PREMIUM_RATE: "PREMIUM_RATE (High-Cost/Premium Tariff)",
-                                    PhoneNumberType.SHARED_COST: "SHARED_COST (Split-Charge Service)",
-                                    PhoneNumberType.VOIP: "VOIP/VIRTUAL (Virtual/IP-Based - HIGH RISK)",
-                                    PhoneNumberType.PERSONAL_NUMBER: "PERSONAL_NUMBER (Individual Assigned Number)",
-                                    PhoneNumberType.PAGER: "PAGER (Paging Service)",
-                                    PhoneNumberType.UAN: "UAN (Universal Access Number)",
-                                    PhoneNumberType.VOICEMAIL: "VOICEMAIL (Voicemail Access)",
-                                    PhoneNumberType.UNKNOWN: "UNKNOWN (Unidentified/Carrier-Non-Specified)"
-                                }
+                    PhoneNumberType.FIXED_LINE: "FIXED_LINE (Landline)",
+                    PhoneNumberType.MOBILE: "MOBILE (Cellular Network)",
+                    PhoneNumberType.FIXED_LINE_OR_MOBILE: "FIXED_OR_MOBILE (Hybrid/Dual Network)",
+                    PhoneNumberType.TOLL_FREE: "TOLL_FREE (Freephone/Service)",
+                    PhoneNumberType.PREMIUM_RATE: "PREMIUM_RATE (High-Cost/Premium Tariff)",
+                    PhoneNumberType.SHARED_COST: "SHARED_COST (Split-Charge Service)",
+                    PhoneNumberType.VOIP: "VOIP/VIRTUAL (Virtual/IP-Based - HIGH RISK)",
+                    PhoneNumberType.PERSONAL_NUMBER: "PERSONAL_NUMBER (Individual Assigned Number)",
+                    PhoneNumberType.PAGER: "PAGER (Paging Service)",
+                    PhoneNumberType.UAN: "UAN (Universal Access Number)",
+                    PhoneNumberType.VOICEMAIL: "VOICEMAIL (Voicemail Access)",
+                    PhoneNumberType.UNKNOWN: "UNKNOWN (Unidentified/Carrier-Non-Specified)"
+                }
                 
                 # Расширенный вывод данных (Full Forensic Report)
                 report.extend([
