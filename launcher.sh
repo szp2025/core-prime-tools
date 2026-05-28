@@ -3743,26 +3743,7 @@ def index():
         <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
         """
 
-    body = form_html + f"""
-    <div style="margin-top: 30px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
-        <h3 style="color: var(--accent-color);">[ SYSTEM LIVE ENVIRONMENT SCANNER ]</h3>
-        <div style="display: flex; gap: 10px;">
-            <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
-            <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
-        </div>
-        
-        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-        <h3 style="color: #ff9800;">[ ADVANCED FORENSIC TOOLS ]</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <a href="/audit/network/analyze" class="btn" style="background:#607d8b; color:#fff; text-align:center; padding:10px;">NETWORK AUDIT</a>
-  
-        </div>
-    </div>
-
-    <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <a href="/sys-audit/process" class="btn" style="background:#9c27b0; color:#fff; text-align:center; padding:10px;">AUDIT PROCESSES</a>
-    </div>
-
+    body = form_html + f"""             
     <div style="margin-top: 20px; padding: 20px; border: 2px solid #2196f3; border-radius: 8px; background:#121216;">
         <h3>[ GLOBAL INTELLIGENCE DISPATCHER ]</h3>
         <form action="/audit/dispatch" method="POST">
@@ -3852,50 +3833,6 @@ def scan():
         
     return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
     
-    
-
-@app.route('/sys-audit/<mode>')
-def system_audit(mode):
-    # Используем переменные напрямую, так как Bash их больше не парсит в 'EOF'
-    return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
-       
-
-@app.route('/audit/network/analyze', methods=['GET', 'POST'])
-def network_analyze():
-    if request.method == 'GET':
-        form_html = render_prime_form("/audit/network/analyze", 
-            fields=[{"type": "textarea", "name": "logs", "label": "PASTE_NETWORK_LOGS_OR_PCAP"}], 
-            btn_text="ANALYZE NETWORK ARTIFACTS")
-        return render_template_string(render_prime_page("REPORT", form_html))
-    logs = request.form.get('logs', '')
-    report = ["=== [NETWORK FORENSIC ANALYSIS] ==="]
-    NET_PATTERNS = {
-        "SUSPICIOUS_IP": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
-        "C2_DOMAIN": r"\b([a-zA-Z0-9-]+\.(xyz|top|ru|su|club|info))\b",
-        "HIDDEN_URL": r"(https?://[^\s\"<>]+)"
-    }
-    for name, pattern in NET_PATTERNS.items():
-        matches = re.findall(pattern, logs)
-        if matches:
-            report.append(f"\n--- [DETECTED: {name}] ---")
-            for m in set(matches):
-                val = m[0] if isinstance(m, tuple) else m
-                report.append(f"-> {val}")
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-
-
-@app.route('/sys-audit/process')
-def process_audit():
-    report = ["=== [ACTIVE PROCESS ENVIRONMENT] ==="]
-    try:
-        # Получаем список процессов: PID, User, Command
-        # Используем команду ps aux для получения детального дампа
-        proc_list = subprocess.check_output(['ps', 'aux'], text=True)
-        report.append(proc_list)
-        report.append("\n--- [SECURITY NOTE: CHECK FOR UNKNOWN PIDS] ---")
-    except Exception as e:
-        report.append(f"Process audit failure: {str(e)}")
-    return render_template_string(render_prime_page("PROCESS_REPORT", f"<pre style='font-size:10px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
     
 def audit_iban_internal(iban):
     iban = request.form.get('iban', '').strip()
