@@ -3694,6 +3694,11 @@ def index():
             <input type="text" name="target" placeholder="Domain or IP" required>
             <button type="submit" class="btn" style="background:#4caf50; color:#fff;">EXECUTE DEEP RECON</button>
         </form>
+        <form action="/audit/iban" method="POST" style="margin-top:10px;">
+            <input type="text" name="iban" placeholder="Enter IBAN to verify">
+            <button type="submit" class="btn">VERIFY IBAN</button>
+        </form>
+        
     </div>
     
         {injection_kit_html}
@@ -3894,47 +3899,72 @@ def audit_iban():
     status = "VALID" if is_valid else "INVALID/CORRUPTED"
     return render_template_string(render_prime_page("IBAN REPORT", f"IBAN: {iban}<br>Status: {status}"))
 
+
+# --- ИНИЦИАЛИЗАЦИЯ NEXUS-МАТРИЦЫ (Конфигурация) ---
+GLOBAL_FUZZ_WORDLIST = [".env", ".env.local", ".htaccess", ".htpasswd", "config.php", "wp-config.php", "backup.sql", ".git/config", "phpinfo.php", "debug.log"]
+GLOBAL_STATIC_SIGNATURES = r"(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(passwd|shadow)|\b(Authorization|Bearer|X-API-Key|token|secret_key|api_key|passwd|password|private_key|id_rsa)\b"
+
 @app.route('/audit/recon', methods=['POST'])
 def unified_recon():
     target = request.form.get('target', '').strip()
-    if not target:
-        return "Empty Target", 400
+    if not target: return "Empty Target", 400
         
-    report = [f"=== [UNIFIED RECON & SECURITY AUDIT: {target}] ==="]
+    report = [f"=== [NEXUS INTELLIGENCE ENGINE: {target}] ==="]
     
-    # 1. СЕТЕВАЯ ИНФРАСТРУКТУРА
+    # 1. СЕТЕВАЯ И ИНФРАСТРУКТУРНАЯ РАЗВЕДКА
     try:
         ip = socket.gethostbyname(target)
-        report.append(f"[INFO] Resolved IP: {ip}")
-        
-        # DNS записи
-        dns = subprocess.check_output(['dig', target, '+short'], text=True)
-        report.append(f"\n--- [DNS RECORDS] ---\n{dns}")
+        report.append(f"[+] Resolved IP: {ip}")
+        dns = subprocess.check_output(['dig', target, 'ANY', '+short'], text=True)
+        report.append(f"\n--- [DNS DUMP] ---\n{dns}")
     except Exception as e:
         report.append(f"[!] DNS/Resolve Error: {e}")
 
     # 2. WHOIS
     try:
         whois_data = subprocess.check_output(['whois', target], text=True)
-        report.append(f"\n--- [WHOIS DATA] ---\n{whois_data[:800]}...") # Срез для чистоты
+        report.append(f"\n--- [WHOIS ANALYTICS] ---\n{whois_data[:1000]}")
     except:
-        report.append("\n--- [WHOIS] ---\nService unavailable.")
+        report.append("\n--- [WHOIS] --- Service unavailable.")
 
-    # 3. SECURITY & PORT SCAN (Nmap)
-    report.append("\n--- [SECURITY AUDIT: OPEN PORTS & SERVICES] ---")
+    # 3. АКТИВНЫЙ АУДИТ БЕЗОПАСНОСТИ (NMAP)
+    report.append("\n--- [SECURITY & VULN AUDIT: NMAP] ---")
     try:
-        # -F быстрый скан, -sV определение версий
-        nmap = subprocess.check_output(['nmap', '-F', '-sV', target], text=True)
+        nmap = subprocess.check_output(['nmap', '-sV', '-sC', '-Pn', '--top-ports', '100', target], text=True)
         report.append(nmap)
     except:
-        report.append("Nmap scan failed or not installed.")
-        
-    # 4. SECURITY REPUTATION (Заглушка под VirusTotal API)
-    report.append("\n--- [SECURITY REPUTATION] ---")
-    report.append("Status: READY FOR VIRUSTOTAL API INTEGRATION")
-    
-    return render_template_string(render_prime_page("RECON REPORT", 
-        f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+        report.append("[!] Nmap scan failure.")
+
+    # 4. ИНТЕЛЛЕКТУАЛЬНЫЙ АУДИТ (Используем ваш список FUZZ)
+    report.append("\n--- [NEXUS CONFIGURATION GAP PROBE] ---")
+    for f in GLOBAL_FUZZ_WORDLIST:
+        try:
+            url = f"https://{target}/{f}" if not target.startswith('http') else f"{target}/{f}"
+            resp = requests.head(url, timeout=2, allow_redirects=True, headers={'User-Agent': 'Mozilla/5.0 (Nexus-Engine/1.0)'})
+            if resp.status_code == 200:
+                report.append(f"[CRITICAL] Exposed entry point found: {f} (Code: 200)")
+        except:
+            pass
+
+    # 5. ГЛУБОКИЙ СТАТИЧЕСКИЙ АНАЛИЗ ЗАГОЛОВКОВ (Ваша HTTP_MATRIX)
+    report.append("\n--- [SERVER INFRASTRUCTURE HEADERS] ---")
+    try:
+        resp = requests.get(f"https://{target}" if not target.startswith('http') else target, timeout=5)
+        for header, value in resp.headers.items():
+            if header in ["X-Powered-By", "Server", "X-AspNet-Version", "Via"]:
+                report.append(f"[!] Header Leak: {header} -> {value}")
+    except:
+        report.append("[!] Header analysis failed.")
+
+    # 6. ТЕХНИЧЕСКИЙ АНАЛИЗ СИГНАТУР (Поиск секретов)
+    # Здесь мы могли бы просканировать контент, если бы загружали его полностью
+    report.append("\n--- [SIGNATURE SCAN STATUS] ---")
+    report.append("Global Static Signatures Ready for deep-scan mode.")
+
+    return render_template_string(render_prime_page("NEXUS RECON REPORT", 
+        f"<pre style='white-space: pre-wrap; font-size:11px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
+
         
     
 if __name__ == '__main__':
