@@ -3688,15 +3688,11 @@ def index():
         <a href="/sys-audit/process" class="btn" style="background:#9c27b0; color:#fff; text-align:center; padding:10px;">AUDIT PROCESSES</a>
     </div>
 
-    <div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc;">
-        <h3>[ OSINT & DOMAIN/IP SCAN ]</h3>
-        <form action="/audit/network/ext" method="POST">
-            <input type="text" name="target" placeholder="Enter Domain or IP">
-            <button type="submit" class="btn">SCAN INFRASTRUCTURE</button>
-        </form>
-        <form action="/audit/iban" method="POST" style="margin-top:10px;">
-            <input type="text" name="iban" placeholder="Enter IBAN to verify">
-            <button type="submit" class="btn">VERIFY IBAN</button>
+    <div style="margin-top: 20px; padding: 15px; border: 1px solid var(--border-color);">
+        <h3>[ GLOBAL RECON ENGINE ]</h3>
+        <form action="/audit/recon" method="POST">
+            <input type="text" name="target" placeholder="Domain or IP" required>
+            <button type="submit" class="btn" style="background:#4caf50; color:#fff;">EXECUTE DEEP RECON</button>
         </form>
     </div>
     
@@ -3898,25 +3894,48 @@ def audit_iban():
     status = "VALID" if is_valid else "INVALID/CORRUPTED"
     return render_template_string(render_prime_page("IBAN REPORT", f"IBAN: {iban}<br>Status: {status}"))
 
-# 2. IP/DOMAIN AUDIT (Whois & Security)
-@app.route('/audit/network/ext', methods=['POST'])
-def external_audit():
-    target = request.form.get('target', '') # IP или Домен
-    report = [f"=== [EXTERNAL AUDIT: {target}] ==="]
+@app.route('/audit/recon', methods=['POST'])
+def unified_recon():
+    target = request.form.get('target', '').strip()
+    if not target:
+        return "Empty Target", 400
+        
+    report = [f"=== [UNIFIED RECON & SECURITY AUDIT: {target}] ==="]
     
-    # Whois и DNS
+    # 1. СЕТЕВАЯ ИНФРАСТРУКТУРА
     try:
         ip = socket.gethostbyname(target)
-        report.append(f"Resolved IP: {ip}")
-    except:
-        report.append("Could not resolve domain.")
+        report.append(f"[INFO] Resolved IP: {ip}")
+        
+        # DNS записи
+        dns = subprocess.check_output(['dig', target, '+short'], text=True)
+        report.append(f"\n--- [DNS RECORDS] ---\n{dns}")
+    except Exception as e:
+        report.append(f"[!] DNS/Resolve Error: {e}")
 
-    # Проверка репутации (через публичные списки/заглушка для API)
-    # Здесь можно добавить вызовы к VirusTotal API
+    # 2. WHOIS
+    try:
+        whois_data = subprocess.check_output(['whois', target], text=True)
+        report.append(f"\n--- [WHOIS DATA] ---\n{whois_data[:800]}...") # Срез для чистоты
+    except:
+        report.append("\n--- [WHOIS] ---\nService unavailable.")
+
+    # 3. SECURITY & PORT SCAN (Nmap)
+    report.append("\n--- [SECURITY AUDIT: OPEN PORTS & SERVICES] ---")
+    try:
+        # -F быстрый скан, -sV определение версий
+        nmap = subprocess.check_output(['nmap', '-F', '-sV', target], text=True)
+        report.append(nmap)
+    except:
+        report.append("Nmap scan failed or not installed.")
+        
+    # 4. SECURITY REPUTATION (Заглушка под VirusTotal API)
     report.append("\n--- [SECURITY REPUTATION] ---")
-    report.append("Status: ANALYZING (Integration required)")
+    report.append("Status: READY FOR VIRUSTOTAL API INTEGRATION")
     
-    return render_template_string(render_prime_page("NET_AUDIT", f"<pre>{chr(10).join(report)}</pre>"))
+    return render_template_string(render_prime_page("RECON REPORT", 
+        f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+        
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
