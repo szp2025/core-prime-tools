@@ -3948,259 +3948,260 @@ async def audit_dispatch():
                 f"[SEC] {'RISK SCORE':<14} : {'LOW' if found_nodes_count > 0 else 'MEDIUM'}",
                 f"[SEC] {'INTEGRITY':<14} : {'VERIFIED' if is_valid else 'COMPROMISED'}"
             ])
-            report.append("=== [END OF ANALYSIS] ===")        
-    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (CAME-NEXUS INTEGRATED) ---
-    elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
-        report.append(f"\n=== [PHONE INTEL: {clean_data}] ===")
-        
-        try:
-            p = phonenumbers.parse(clean_data, "FR")
-            if not phonenumbers.is_valid_number(p):
-                report.append("[PHN] {'STATUS':<14} : INVALID FORMAT/NON-EXISTENT")
-            else:
-                # Получение данных
-                ntype = phonenumbers.number_type(p)
-                region = geocoder.description_for_number(p, "en") or "Unknown"
-                op = carrier.name_for_number(p, "en") or "Unknown"
-                tz = ", ".join(timezone.time_zones_for_number(p)) or "Unknown"
-                
-                type_map = {
-                    PhoneNumberType.FIXED_LINE: "FIXED_LINE", PhoneNumberType.MOBILE: "MOBILE",
-                    PhoneNumberType.VOIP: "VOIP/VIRTUAL (HIGH RISK)", PhoneNumberType.PREMIUM_RATE: "PREMIUM_RATE"
-                }
-                
-                # CORE FORENSIC DATA
-                report.extend([
-                    f"[PHN] {'VALIDATION':<14} : {'POSITIVE' if phonenumbers.is_valid_number(p) else 'NEGATIVE'}",
-                    f"[PHN] {'REGION':<14} : {region}",
-                    f"[PHN] {'CARRIER':<14} : {op}",
-                    f"[PHN] {'TYPE':<14} : {type_map.get(ntype, 'Other/Undefined')}",
-                    f"[PHN] {'E164':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
-                ])
-
-                # DEEP SCAPPER ENGINE
-                report.append(f"\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
-                
-                platforms = {
-                    "Telegram": f"https://t.me/{clean_data.lstrip('+')}",
-                    "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}",
-                    "GitHub":   f"https://github.com/search?q={clean_data}&type=users",
-                    "Google":   f"https://www.google.com/search?q=%22{clean_data}%22"
-                }
-                
-                GLOBAL_NETWORK_UA = [
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
-                ]
-
-                # Запуск сканера
-                for name, url in platforms.items():
-                    try:
-                        headers = {'User-Agent': random.choice(GLOBAL_NETWORK_UA)}
-                        res = requests.get(url, timeout=10, headers=headers)
-                        
-                        if res.status_code == 200:
-                            soup = BeautifulSoup(res.text, 'html.parser')
-                            title = soup.title.string.strip() if soup.title else "No Title"
-                            
-                            report.append(f"[PHN] {name:<14} : MATCH FOUND (200)")
-                            report.append(f"      -> {title[:60]}")
-                            
-                            links = [a['href'] for a in soup.find_all('a', href=True) if 'http' in a['href']][:2]
-                            if links:
-                                report.append(f"      -> Links: {', '.join(links)}")
-                        else:
-                            report.append(f"[PHN] {name:<14} : NOT FOUND (HTTP {res.status_code})")
-                    except:
-                        report.append(f"[PHN] {name:<14} : ERROR/TIMEOUT")
-                        
-        except Exception as e:
-            report.append(f"[PHN] {'FORENSIC ERROR':<14} : {str(e)}")
+            report.append("=== [END OF ANALYSIS] ===")
             
-    # --- 3. EMAIL: ASYNC FORENSIC MASTER (CAME-NEXUS INTEGRATED) ---
-    elif '@' in clean_data:
-        import asyncio, aiodns, aiohttp, smtplib
-        from dns import resolver as sync_resolver
-        
-        domain = clean_data.split('@')[-1]
-        report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
-        report.append(f"[EML] {'TARGET DOMAIN':<14} : {domain}")
-        
-        dns_resolver = aiodns.DNSResolver()
-        
-        # 1. Параллельный DNS сбор (MAX-EXTENDED)
-        dns_records = ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV', 'DNSKEY', 'TLSA', 'NAPTR', 'HINFO']
-        
-        async def get_dns(rec):
+        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (CAME-NEXUS INTEGRATED) ---
+        elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
+            report.append(f"\n=== [PHONE INTEL: {clean_data}] ===")
+            
             try:
-                # Используем aiodns для скорости, fallback если не найдено
-                res = await dns_resolver.query(domain, rec)
-                return f"[DNS] {rec:<12} : {str(res[0])}"
-            except:
-                return f"[DNS] {rec:<12} : NOT FOUND"
-
-        report.append("--- [DNS INFRASTRUCTURE (ASYNC)]")
-        dns_tasks = [get_dns(r) for r in dns_records]
-        report.extend(await asyncio.gather(*dns_tasks))
-        
-        # 2. DEEP SECURITY LAYER (DMARC, SPF, BREACH)
-        async def get_security_intel():
-            intel = []
+                p = phonenumbers.parse(clean_data, "FR")
+                if not phonenumbers.is_valid_number(p):
+                    report.append("[PHN] {'STATUS':<14} : INVALID FORMAT/NON-EXISTENT")
+                else:
+                    # Получение данных
+                    ntype = phonenumbers.number_type(p)
+                    region = geocoder.description_for_number(p, "en") or "Unknown"
+                    op = carrier.name_for_number(p, "en") or "Unknown"
+                    tz = ", ".join(timezone.time_zones_for_number(p)) or "Unknown"
+                    
+                    type_map = {
+                        PhoneNumberType.FIXED_LINE: "FIXED_LINE", PhoneNumberType.MOBILE: "MOBILE",
+                        PhoneNumberType.VOIP: "VOIP/VIRTUAL (HIGH RISK)", PhoneNumberType.PREMIUM_RATE: "PREMIUM_RATE"
+                    }
+                    
+                    # CORE FORENSIC DATA
+                    report.extend([
+                        f"[PHN] {'VALIDATION':<14} : {'POSITIVE' if phonenumbers.is_valid_number(p) else 'NEGATIVE'}",
+                        f"[PHN] {'REGION':<14} : {region}",
+                        f"[PHN] {'CARRIER':<14} : {op}",
+                        f"[PHN] {'TYPE':<14} : {type_map.get(ntype, 'Other/Undefined')}",
+                        f"[PHN] {'E164':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
+                    ])
+    
+                    # DEEP SCAPPER ENGINE
+                    report.append(f"\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
+                    
+                    platforms = {
+                        "Telegram": f"https://t.me/{clean_data.lstrip('+')}",
+                        "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}",
+                        "GitHub":   f"https://github.com/search?q={clean_data}&type=users",
+                        "Google":   f"https://www.google.com/search?q=%22{clean_data}%22"
+                    }
+                    
+                    GLOBAL_NETWORK_UA = [
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
+                    ]
+    
+                    # Запуск сканера
+                    for name, url in platforms.items():
+                        try:
+                            headers = {'User-Agent': random.choice(GLOBAL_NETWORK_UA)}
+                            res = requests.get(url, timeout=10, headers=headers)
+                            
+                            if res.status_code == 200:
+                                soup = BeautifulSoup(res.text, 'html.parser')
+                                title = soup.title.string.strip() if soup.title else "No Title"
+                                
+                                report.append(f"[PHN] {name:<14} : MATCH FOUND (200)")
+                                report.append(f"      -> {title[:60]}")
+                                
+                                links = [a['href'] for a in soup.find_all('a', href=True) if 'http' in a['href']][:2]
+                                if links:
+                                    report.append(f"      -> Links: {', '.join(links)}")
+                            else:
+                                report.append(f"[PHN] {name:<14} : NOT FOUND (HTTP {res.status_code})")
+                        except:
+                            report.append(f"[PHN] {name:<14} : ERROR/TIMEOUT")
+                            
+            except Exception as e:
+                report.append(f"[PHN] {'FORENSIC ERROR':<14} : {str(e)}")
+                
+        # --- 3. EMAIL: ASYNC FORENSIC MASTER (CAME-NEXUS INTEGRATED) ---
+        elif '@' in clean_data:
+            import asyncio, aiodns, aiohttp, smtplib
+            from dns import resolver as sync_resolver
             
-            # DMARC Check
-            try:
-                res = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
-                intel.append(f"[SEC] {'DMARC':<14} : {str(res[0])}")
-            except:
-                intel.append(f"[SEC] {'DMARC':<14} : MISSING")
+            domain = clean_data.split('@')[-1]
+            report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
+            report.append(f"[EML] {'TARGET DOMAIN':<14} : {domain}")
             
-            # Breach Intel
-            async with aiohttp.ClientSession() as session:
+            dns_resolver = aiodns.DNSResolver()
+            
+            # 1. Параллельный DNS сбор (MAX-EXTENDED)
+            dns_records = ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV', 'DNSKEY', 'TLSA', 'NAPTR', 'HINFO']
+            
+            async def get_dns(rec):
                 try:
-                    async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=4) as r:
-                        data = await r.json()
-                        intel.append(f"[SEC] {'BREACH STATUS':<14} : {'[!!!] BREACHED' if data.get('found') else 'CLEAN'}")
+                    # Используем aiodns для скорости, fallback если не найдено
+                    res = await dns_resolver.query(domain, rec)
+                    return f"[DNS] {rec:<12} : {str(res[0])}"
                 except:
-                    intel.append(f"[SEC] {'BREACH STATUS':<14} : UNAVAILABLE")
+                    return f"[DNS] {rec:<12} : NOT FOUND"
+    
+            report.append("--- [DNS INFRASTRUCTURE (ASYNC)]")
+            dns_tasks = [get_dns(r) for r in dns_records]
+            report.extend(await asyncio.gather(*dns_tasks))
             
-            return intel
-            
-        report.extend(await get_security_intel())
-        
-        # 3. SMTP VALIDATION (В отдельном потоке)
-        report.append("\n--- [MAILBOX VALIDATION (THREADED)]")
-        
-        def smtp_check():
-            try:
-                mx = sync_resolver.resolve(domain, 'MX')[0].exchange
-                with smtplib.SMTP(str(mx), timeout=5) as s:
-                    s.helo(); s.mail('audit@security.test')
-                    code, _ = s.rcpt(clean_data)
-                    return f"[SMTP] {'STATUS':<14} : {'ACTIVE' if code == 250 else 'INACTIVE'} (Code: {code})"
-            except:
-                return f"[SMTP] {'STATUS':<14} : PROTECTED/BLOCKED"
-
-        trusted = {'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'}
-        if domain.lower() in trusted:
-            report.append(f"[SMTP] {'STATUS':<14} : TRUSTED PROVIDER (Skipped)")
-        else:
-            report.append(await asyncio.to_thread(smtp_check))
-            
-        # 4. Итоговая оценка (RISK SUMMARY)
-        risk_score = sum(1 for line in report if "[!]" in line or "[!!!]" in line or "MISSING" in line or "BLOCKED" in line)
-        report.append(f"\n--- [RISK SCORE: {risk_score}] ---")
-        report.append(f"[SEC] {'RISK PROFILE':<14} : {'HIGH' if risk_score > 3 else 'LOW'}")
-        report.append("=== [END OF ANALYSIS] ===")
-        
-            # 3. EXTERNAL INTEL LAYER (CERTIFICATE TRANSPARENCY - выход за рамки DNS)
-            async def fetch_crt_sh():
+            # 2. DEEP SECURITY LAYER (DMARC, SPF, BREACH)
+            async def get_security_intel():
+                intel = []
+                
+                # DMARC Check
                 try:
-                    url = f"https://crt.sh/?q={domain}&output=json"
-                    async with session.get(url, timeout=8) as r:
-                        if r.status == 200:
+                    res = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
+                    intel.append(f"[SEC] {'DMARC':<14} : {str(res[0])}")
+                except:
+                    intel.append(f"[SEC] {'DMARC':<14} : MISSING")
+                
+                # Breach Intel
+                async with aiohttp.ClientSession() as session:
+                    try:
+                        async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=4) as r:
                             data = await r.json()
-                            unique_subs = sorted(list(set([entry['common_name'] for entry in data])))
-                            # Выводим количество и пример, если они есть
-                            summary = f"{len(unique_subs)} detected"
-                            preview = f" (ex: {unique_subs[0]})" if unique_subs else ""
-                            return f"[EXT] { 'SUBDOMAINS':<14} : {summary}{preview}"
-                        return f"[EXT] { 'SUBDOMAINS':<14} : API_ERROR"
-                except: 
-                    return f"[EXT] { 'SUBDOMAINS':<14} : TIMEOUT"
+                            intel.append(f"[SEC] {'BREACH STATUS':<14} : {'[!!!] BREACHED' if data.get('found') else 'CLEAN'}")
+                    except:
+                        intel.append(f"[SEC] {'BREACH STATUS':<14} : UNAVAILABLE")
+                
+                return intel
+                
+            report.extend(await get_security_intel())
             
-            report.append(await fetch_crt_sh())   
+            # 3. SMTP VALIDATION (В отдельном потоке)
+            report.append("\n--- [MAILBOX VALIDATION (THREADED)]")
             
-    # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД (CAME-NEXUS INTEGRATED) ---
-    elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
-        report.append(f"\n=== [DIGITAL FOOTPRINT: {data}] ===")
-        
-        # Расширенная матрица поиска
-        platforms = {
-            'GitHub': 'https://github.com/{}',
-            'Twitter': 'https://twitter.com/{}',
-            'Instagram': 'https://www.instagram.com/{}',
-            'Reddit': 'https://www.reddit.com/user/{}',
-            'Steam': 'https://steamcommunity.com/id/{}',
-            'TikTok': 'https://www.tiktok.com/@{}',
-            'Telegram': 'https://t.me/{}',
-            'Pinterest': 'https://www.pinterest.com/{}/',
-            'GitLab': 'https://gitlab.com/{}',
-            'StackOverflow': 'https://stackoverflow.com/users/search?q={}'
-        }
-
-        async def check_platform(name, url_template):
-            target_url = url_template.format(data)
+            def smtp_check():
+                try:
+                    mx = sync_resolver.resolve(domain, 'MX')[0].exchange
+                    with smtplib.SMTP(str(mx), timeout=5) as s:
+                        s.helo(); s.mail('audit@security.test')
+                        code, _ = s.rcpt(clean_data)
+                        return f"[SMTP] {'STATUS':<14} : {'ACTIVE' if code == 250 else 'INACTIVE'} (Code: {code})"
+                except:
+                    return f"[SMTP] {'STATUS':<14} : PROTECTED/BLOCKED"
+    
+            trusted = {'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'}
+            if domain.lower() in trusted:
+                report.append(f"[SMTP] {'STATUS':<14} : TRUSTED PROVIDER (Skipped)")
+            else:
+                report.append(await asyncio.to_thread(smtp_check))
+                
+            # 4. Итоговая оценка (RISK SUMMARY)
+            risk_score = sum(1 for line in report if "[!]" in line or "[!!!]" in line or "MISSING" in line or "BLOCKED" in line)
+            report.append(f"\n--- [RISK SCORE: {risk_score}] ---")
+            report.append(f"[SEC] {'RISK PROFILE':<14} : {'HIGH' if risk_score > 3 else 'LOW'}")
+            report.append("=== [END OF ANALYSIS] ===")
+            
+                # 3. EXTERNAL INTEL LAYER (CERTIFICATE TRANSPARENCY - выход за рамки DNS)
+                async def fetch_crt_sh():
+                    try:
+                        url = f"https://crt.sh/?q={domain}&output=json"
+                        async with session.get(url, timeout=8) as r:
+                            if r.status == 200:
+                                data = await r.json()
+                                unique_subs = sorted(list(set([entry['common_name'] for entry in data])))
+                                # Выводим количество и пример, если они есть
+                                summary = f"{len(unique_subs)} detected"
+                                preview = f" (ex: {unique_subs[0]})" if unique_subs else ""
+                                return f"[EXT] { 'SUBDOMAINS':<14} : {summary}{preview}"
+                            return f"[EXT] { 'SUBDOMAINS':<14} : API_ERROR"
+                    except: 
+                        return f"[EXT] { 'SUBDOMAINS':<14} : TIMEOUT"
+                
+                report.append(await fetch_crt_sh())   
+                
+        # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД (CAME-NEXUS INTEGRATED) ---
+        elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
+            report.append(f"\n=== [DIGITAL FOOTPRINT: {data}] ===")
+            
+            # Расширенная матрица поиска
+            platforms = {
+                'GitHub': 'https://github.com/{}',
+                'Twitter': 'https://twitter.com/{}',
+                'Instagram': 'https://www.instagram.com/{}',
+                'Reddit': 'https://www.reddit.com/user/{}',
+                'Steam': 'https://steamcommunity.com/id/{}',
+                'TikTok': 'https://www.tiktok.com/@{}',
+                'Telegram': 'https://t.me/{}',
+                'Pinterest': 'https://www.pinterest.com/{}/',
+                'GitLab': 'https://gitlab.com/{}',
+                'StackOverflow': 'https://stackoverflow.com/users/search?q={}'
+            }
+    
+            async def check_platform(name, url_template):
+                target_url = url_template.format(data)
+                try:
+                    # Используем GET для получения контента, чтобы избежать ложных 200 на 404-страницах
+                    async with session.get(target_url, timeout=5, headers={'User-Agent': 'Nexus-Forensic/1.0'}) as r:
+                        # Базовая эвристика: если имя есть в URL ответа, вероятность совпадения выше
+                        if r.status == 200 and data.lower() in r.url.path.lower():
+                            return f"[USR] {name:<14} : MATCH FOUND (200)"
+                        elif r.status == 200:
+                            return f"[USR] {name:<14} : POSSIBLE (200)"
+                        else:
+                            return f"[USR] {name:<14} : NOT FOUND (HTTP {r.status})"
+                except Exception:
+                    return f"[USR] {name:<14} : ERROR/TIMEOUT"
+    
+            # Запуск параллельного сканирования
+            tasks = [check_platform(n, u) for n, u in platforms.items()]
+            results = await asyncio.gather(*tasks)
+            
+            report.extend(results)
+            
+            # Анализ покрытия
+            found = sum(1 for r in results if "MATCH FOUND" in r or "POSSIBLE" in r)
+            report.append(f"\n[USR] {'COVERAGE':<14} : {found}/{len(platforms)} platforms identified.")
+            report.append("=== [END OF ANALYSIS] ===")
+            
+        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON (CAME-NEXUS INTEGRATED) ---
+        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
+            report.append(f"\n=== [ACTIVE VULNERABILITY SURFACE: {data}] ===")
+            loop = asyncio.get_event_loop()
+    
+            # 1. SSL/TLS RECON
             try:
-                # Используем GET для получения контента, чтобы избежать ложных 200 на 404-страницах
-                async with session.get(target_url, timeout=5, headers={'User-Agent': 'Nexus-Forensic/1.0'}) as r:
-                    # Базовая эвристика: если имя есть в URL ответа, вероятность совпадения выше
-                    if r.status == 200 and data.lower() in r.url.path.lower():
-                        return f"[USR] {name:<14} : MATCH FOUND (200)"
-                    elif r.status == 200:
-                        return f"[USR] {name:<14} : POSSIBLE (200)"
-                    else:
-                        return f"[USR] {name:<14} : NOT FOUND (HTTP {r.status})"
-            except Exception:
-                return f"[USR] {name:<14} : ERROR/TIMEOUT"
-
-        # Запуск параллельного сканирования
-        tasks = [check_platform(n, u) for n, u in platforms.items()]
-        results = await asyncio.gather(*tasks)
-        
-        report.extend(results)
-        
-        # Анализ покрытия
-        found = sum(1 for r in results if "MATCH FOUND" in r or "POSSIBLE" in r)
-        report.append(f"\n[USR] {'COVERAGE':<14} : {found}/{len(platforms)} platforms identified.")
-        report.append("=== [END OF ANALYSIS] ===")
-        
-    # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON (CAME-NEXUS INTEGRATED) ---
-    elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
-        report.append(f"\n=== [ACTIVE VULNERABILITY SURFACE: {data}] ===")
-        loop = asyncio.get_event_loop()
-
-        # 1. SSL/TLS RECON
-        try:
-            cmd_ssl = f"openssl s_client -connect {data}:443 -servername {data} 2>/dev/null | openssl x509 -noout -subject -issuer"
-            result = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True))
-            if result.returncode == 0:
-                report.extend([f"[SSL] {line.strip()}" for line in result.stdout.splitlines()])
-            else:
-                report.append("[SSL] {'STATUS':<14} : HANDSHAKE REJECTED")
-        except Exception as e:
-            report.append(f"[SSL] {'EXCEPTION':<14} : {str(e)}")
-
-        # 2. WHOIS INFRASTRUCTURE
-        try:
-            result = await loop.run_in_executor(None, lambda: subprocess.run(['whois', data], capture_output=True, text=True))
-            if result.returncode == 0:
-                snippet = result.stdout[:400].replace('\n', ' ')
-                report.append(f"[WHS] {'SNIPPET':<14} : {snippet}...")
-            else:
-                report.append("[WHS] {'STATUS':<14} : ACCESS DENIED")
-        except Exception as e:
-            report.append(f"[WHS] {'EXCEPTION':<14} : {str(e)}")
-
-        # 3. NMAP VULNERABILITY SCAN
-        report.append("\n--- [ACTIVE PROBE: NMAP PORT ANALYSIS]")
-        try:
-            cmd_nmap = ['nmap', '-F', '-sV', data]
-            result = await loop.run_in_executor(None, lambda: subprocess.run(cmd_nmap, capture_output=True, text=True))
+                cmd_ssl = f"openssl s_client -connect {data}:443 -servername {data} 2>/dev/null | openssl x509 -noout -subject -issuer"
+                result = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True))
+                if result.returncode == 0:
+                    report.extend([f"[SSL] {line.strip()}" for line in result.stdout.splitlines()])
+                else:
+                    report.append("[SSL] {'STATUS':<14} : HANDSHAKE REJECTED")
+            except Exception as e:
+                report.append(f"[SSL] {'EXCEPTION':<14} : {str(e)}")
+    
+            # 2. WHOIS INFRASTRUCTURE
+            try:
+                result = await loop.run_in_executor(None, lambda: subprocess.run(['whois', data], capture_output=True, text=True))
+                if result.returncode == 0:
+                    snippet = result.stdout[:400].replace('\n', ' ')
+                    report.append(f"[WHS] {'SNIPPET':<14} : {snippet}...")
+                else:
+                    report.append("[WHS] {'STATUS':<14} : ACCESS DENIED")
+            except Exception as e:
+                report.append(f"[WHS] {'EXCEPTION':<14} : {str(e)}")
+    
+            # 3. NMAP VULNERABILITY SCAN
+            report.append("\n--- [ACTIVE PROBE: NMAP PORT ANALYSIS]")
+            try:
+                cmd_nmap = ['nmap', '-F', '-sV', data]
+                result = await loop.run_in_executor(None, lambda: subprocess.run(cmd_nmap, capture_output=True, text=True))
+                
+                if result.returncode == 0:
+                    for line in result.stdout.splitlines():
+                        if '/' in line and ('open' in line or 'closed' in line):
+                            parts = line.split()
+                            report.append(f"[NMP] {parts[0]:<12} : {parts[1]:<8} | {' '.join(parts[2:])}")
+                else:
+                    report.append(f"[NMP] {'ERR_STATUS':<12} : CODE {result.returncode}")
+                    report.append(f"[NMP] {'ERR_DETAIL':<12} : {result.stderr.strip()[:40]}...")
+            except Exception as e:
+                report.append(f"[NMP] {'EXCEPTION':<12} : {str(e)}")
             
-            if result.returncode == 0:
-                for line in result.stdout.splitlines():
-                    if '/' in line and ('open' in line or 'closed' in line):
-                        parts = line.split()
-                        report.append(f"[NMP] {parts[0]:<12} : {parts[1]:<8} | {' '.join(parts[2:])}")
-            else:
-                report.append(f"[NMP] {'ERR_STATUS':<12} : CODE {result.returncode}")
-                report.append(f"[NMP] {'ERR_DETAIL':<12} : {result.stderr.strip()[:40]}...")
-        except Exception as e:
-            report.append(f"[NMP] {'EXCEPTION':<12} : {str(e)}")
-        
-        report.append("=== [END OF ANALYSIS] ===")
-        
-    return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+            report.append("=== [END OF ANALYSIS] ===")
+            
+        return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
 
 
 
