@@ -3750,19 +3750,12 @@ def index():
             <a href="/sys-audit/ram" class="btn" style="background:#2196f3; color:#fff; flex:1; text-align:center; padding:10px;">SCAN RAM</a>
             <a href="/sys-audit/network" class="btn" style="background:#009688; color:#fff; flex:1; text-align:center; padding:10px;">SCAN NETWORK</a>
         </div>
-
-        <div style="margin-top: 15px;">
-            <a href="/audit/deep" class="btn" style="background:#ff9800; color:#fff; display:block; text-align:center; padding:12px; font-weight:bold;">[ FORENSIC DEEP AUDIT ENGINE ]</a>
-        </div>
         
         <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
         <h3 style="color: #ff9800;">[ ADVANCED FORENSIC TOOLS ]</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <a href="/audit/network/analyze" class="btn" style="background:#607d8b; color:#fff; text-align:center; padding:10px;">NETWORK AUDIT</a>
-            <form action="/audit/entropy" method="post" enctype="multipart/form-data" style="margin:0;">
-                <input type="file" name="file" onchange="this.form.submit()" style="display:none;" id="ent_file">
-                <label for="ent_file" class="btn" style="background:#f44336; color:#fff; display:block; text-align:center; padding:10px; cursor:pointer;">CHECK ENTROPY</label>
-            </form>
+  
         </div>
     </div>
 
@@ -3793,11 +3786,21 @@ def index():
 def scan():
     f = request.files.get('file')
     if not f: return "Empty Payload", 400
+    
+    # 1. Анализ энтропии (в памяти, до сохранения файла)
+    file_content = f.read()
+    f.seek(0)
+    entropy_val = calculate_entropy(file_content)
+    
     tmp = os.path.join('/tmp', f.filename)
     f.save(tmp)
     
-    # Инициализация отчета (Core + Forensic)
-    report = [f"=== [CAME-NEXUS: FULL-STACK SCAN ENGINE] ===", f"Target: {f.filename}"]
+    # Инициализация отчета
+    report = [
+        f"=== [CAME-NEXUS: FULL-STACK SCAN ENGINE] ===", 
+        f"Target: {f.filename}",
+        f"Entropy Score: {entropy_val:.4f} ({'HIGH' if entropy_val > 7.5 else 'NORMAL'})"
+    ]
     threat_count = 0
     session['last_verdict'] = 'CLEAN'
     
@@ -3829,18 +3832,17 @@ def scan():
 
         # 2. Банковские артефакты
         BANK_PATTERNS = {"SWIFT": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?", "IBAN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"}
-        with open(tmp, 'rb') as f_bin:
-            content = f_bin.read().decode('utf-8', errors='ignore')
-            for name, pattern in BANK_PATTERNS.items():
-                matches = re.findall(pattern.decode('utf-8'), content)
-                for m in set(m for m in matches if len(m) > 6):
-                    report.append(f"[ALERT] FOUND {name}: {m}")
+        content_str = file_content.decode('utf-8', errors='ignore')
+        for name, pattern in BANK_PATTERNS.items():
+            matches = re.findall(pattern.decode('utf-8'), content_str)
+            for m in set(m for m in matches if len(m) > 6):
+                report.append(f"[ALERT] FOUND {name}: {m}")
 
         # 3. Сертификаты
         try:
             cert = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text'], stderr=subprocess.STDOUT, text=True)
-            report.append(f"\n--- [CERTIFICATE ANALYSIS]\n{cert[:500]}...") # Ограничим вывод
-        except: pass
+            report.append(f"\n--- [CERTIFICATE ANALYSIS]\n{cert[:500]}...")
+        except: report.append("\n--- [CERTIFICATE ANALYSIS: UNAVAILABLE]")
 
         # Завершение
         verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
@@ -3854,93 +3856,13 @@ def scan():
         
     return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
     
+    
 
 @app.route('/sys-audit/<mode>')
 def system_audit(mode):
     # Используем переменные напрямую, так как Bash их больше не парсит в 'EOF'
     return render_template_string(render_prime_page("SYSTEM_REPORT", "AUDIT_ACTIVE"))
-
-
-@app.route('/audit/deep', methods=['GET', 'POST'])
-def deep_audit():
-    if request.method == 'GET':
-        form_html = render_prime_form("/audit/deep", 
-            fields=[{"type": "file", "name": "file", "label": "UPLOAD_FOR_FORENSIC_AUDIT"}], 
-            btn_text="RUN DEEP AUDIT")
-        return render_template_string(render_prime_page("REPORT", form_html))
-
-    f = request.files.get('file')
-    if not f: return "Empty Payload", 400
-    
-    tmp = os.path.join('/tmp', f.filename)
-    report = [f"=== [FORENSIC AUDIT ENGINE: {f.filename}] ==="]
-    
-    try:
-        f.save(tmp)
-        
-        # 1. UNIVERSAL METADATA (EXIFTOOL)
-        # Извлекает данные из любых форматов (PDF, Office, Images, etc.)
-        report.append("\n--- [UNIVERSAL METADATA (EXIFTOOL)] ---")
-        try:
-            # -j: JSON формат, -G: Группировка данных
-            meta_raw = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-ee', tmp],  stderr=subprocess.STDOUT, text=True)
-            report.append(meta_raw)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            report.append("ExifTool not found or unsupported file format.")
-
-        # 2. BANKING/CRYPTO ARTIFACTS (ПОИСК И ИЗВЛЕЧЕНИЕ)
-        BANK_PATTERNS = {
-            "SWIFT_KEY": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?",
-            "IBAN_PATTERN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"
-        }
-        
-        report.append("\n--- [BANKING/CRYPTO ARTIFACTS] ---")
-        try:
-            with open(tmp, 'rb') as f_bin:
-                content = f_bin.read()
-                # Преобразуем контент в текст для поиска паттернов
-                text_content = content.decode('utf-8', errors='ignore')
-                
-                for name, pattern_bytes in BANK_PATTERNS.items():
-                    pattern_str = pattern_bytes.decode('utf-8')
-                    # Находим ВСЕ совпадения в файле
-                    matches = re.findall(pattern_str, text_content)
-                    
-                    if matches:
-                        # Фильтруем результаты: убираем дубликаты и короткий "мусор"
-                        unique_matches = set(m for m in matches if len(m) > 6)
-                        for match in unique_matches:
-                            report.append(f"[ALERT] FOUND {name}: {match}")
-                    else:
-                        # Если ничего не нашли, выводим статус (опционально)
-                        # report.append(f"No {name} found.")
-                        pass
-                        
-        except Exception as e:
-            report.append(f"Artifact scan error: {str(e)}")
-            
-            
-
-        # 3. X.509 CERTIFICATE ANALYSIS (ОСТАВЛЯЕМ ДЛЯ PEM-ФАЙЛОВ)
-        report.append("\n--- [X.509 CERTIFICATE ANALYSIS] ---")
-        try:
-            result = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text', '-nameopt', 'rfc2253'], 
-                                             stderr=subprocess.STDOUT, text=True)
-            for line in result.split('\n'):
-                line = line.strip()
-                if any(s in line for s in ['Subject:', 'Issuer:', 'Not Before:']):
-                    report.append(line)
-        except subprocess.CalledProcessError:
-            report.append("No valid X.509 certificate structure.")
-
-    except Exception as e:
-        report.append(f"CRITICAL SYSTEM ERROR: {str(e)}")
-    finally:
-        if os.path.exists(tmp): os.remove(tmp)
-
-    return render_template_string(render_prime_page("REPORT", 
-        f"<pre style='white-space: pre-wrap; word-break: break-all;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-        
+       
 
 @app.route('/audit/network/analyze', methods=['GET', 'POST'])
 def network_analyze():
@@ -3964,18 +3886,6 @@ def network_analyze():
                 val = m[0] if isinstance(m, tuple) else m
                 report.append(f"-> {val}")
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-    
-@app.route('/audit/entropy', methods=['POST'])
-def check_entropy():
-    f = request.files.get('file')
-    if not f:
-        return "Empty Payload", 400
-    data = f.read()
-    ent = calculate_entropy(data)
-    verdict = "HIGH ENTROPY - POTENTIAL ENCRYPTED DATA" if ent > 7.5 else "NORMAL ENTROPY"
-    report = [f"=== [ENTROPY ANALYSIS: {f.filename}] ===", f"Value: {ent:.4f}", f"Verdict: {verdict}"]
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-
 
 @app.route('/audit/strings/deep', methods=['POST'])
 def strings_deep():
