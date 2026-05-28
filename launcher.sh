@@ -3581,7 +3581,7 @@ import requests
 import ssl
 import urllib3
 import math
-
+import socket
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -3628,6 +3628,13 @@ def calculate_entropy(data):
         if p_x > 0:
             entropy += - p_x * math.log(p_x, 2)
     return entropy
+
+def verify_iban(iban):
+    iban = iban.replace(" ", "").upper()
+    if len(iban) < 4: return False
+    rearranged = iban[4:] + iban[:4]
+    numeric = "".join(str(int(c, 36)) for c in rearranged)
+    return int(numeric) % 97 == 1    
     
 @app.route('/')
 def index():
@@ -3672,6 +3679,27 @@ def index():
             </form>
         </div>
     </div>
+
+    <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <form action="/audit/strings/deep" method="post" enctype="multipart/form-data" style="margin:0;">
+            <input type="file" name="file" onchange="this.form.submit()" style="display:none;" id="str_file">
+            <label for="str_file" class="btn" style="background:#795548; color:#fff; display:block; text-align:center; padding:10px; cursor:pointer;">STRINGS DEEP SCAN</label>
+        </form>
+        <a href="/sys-audit/process" class="btn" style="background:#9c27b0; color:#fff; text-align:center; padding:10px;">AUDIT PROCESSES</a>
+    </div>
+
+    <div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc;">
+        <h3>[ OSINT & DOMAIN/IP SCAN ]</h3>
+        <form action="/audit/network/ext" method="POST">
+            <input type="text" name="target" placeholder="Enter Domain or IP">
+            <button type="submit" class="btn">SCAN INFRASTRUCTURE</button>
+        </form>
+        <form action="/audit/iban" method="POST" style="margin-top:10px;">
+            <input type="text" name="iban" placeholder="Enter IBAN to verify">
+            <button type="submit" class="btn">VERIFY IBAN</button>
+        </form>
+    </div>
+    
         {injection_kit_html}
     </div>
     """
@@ -3830,6 +3858,65 @@ def check_entropy():
     verdict = "HIGH ENTROPY - POTENTIAL ENCRYPTED DATA" if ent > 7.5 else "NORMAL ENTROPY"
     report = [f"=== [ENTROPY ANALYSIS: {f.filename}] ===", f"Value: {ent:.4f}", f"Verdict: {verdict}"]
     return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
+
+@app.route('/audit/strings/deep', methods=['POST'])
+def strings_deep():
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    tmp = os.path.join('/tmp', f.filename)
+    f.save(tmp)
+    try:
+        # Извлекаем строки и ищем пути, используя grep для фильтрации
+        result = subprocess.check_output(['strings', tmp], text=True)
+        # Паттерн для поиска путей в Linux и Windows стиле
+        matches = re.findall(r"(?:/|C:\\)[\w./\\-]+", result)
+        report = [f"=== [DEEP STRINGS ANALYSIS: {f.filename}] ==="] + sorted(list(set(matches)))
+    except Exception as e:
+        report = [f"Error during deep scan: {str(e)}"]
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
+    return render_template_string(render_prime_page("STRINGS", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
+@app.route('/sys-audit/process')
+def process_audit():
+    report = ["=== [ACTIVE PROCESS ENVIRONMENT] ==="]
+    try:
+        # Получаем список процессов: PID, User, Command
+        # Используем команду ps aux для получения детального дампа
+        proc_list = subprocess.check_output(['ps', 'aux'], text=True)
+        report.append(proc_list)
+        report.append("\n--- [SECURITY NOTE: CHECK FOR UNKNOWN PIDS] ---")
+    except Exception as e:
+        report.append(f"Process audit failure: {str(e)}")
+    return render_template_string(render_prime_page("PROCESS_REPORT", f"<pre style='font-size:10px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+    
+@app.route('/audit/iban', methods=['POST'])
+def audit_iban():
+    iban = request.form.get('iban', '')
+    is_valid = verify_iban(iban)
+    status = "VALID" if is_valid else "INVALID/CORRUPTED"
+    return render_template_string(render_prime_page("IBAN REPORT", f"IBAN: {iban}<br>Status: {status}"))
+
+# 2. IP/DOMAIN AUDIT (Whois & Security)
+@app.route('/audit/network/ext', methods=['POST'])
+def external_audit():
+    target = request.form.get('target', '') # IP или Домен
+    report = [f"=== [EXTERNAL AUDIT: {target}] ==="]
+    
+    # Whois и DNS
+    try:
+        ip = socket.gethostbyname(target)
+        report.append(f"Resolved IP: {ip}")
+    except:
+        report.append("Could not resolve domain.")
+
+    # Проверка репутации (через публичные списки/заглушка для API)
+    # Здесь можно добавить вызовы к VirusTotal API
+    report.append("\n--- [SECURITY REPUTATION] ---")
+    report.append("Status: ANALYZING (Integration required)")
+    
+    return render_template_string(render_prime_page("NET_AUDIT", f"<pre>{chr(10).join(report)}</pre>"))
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
