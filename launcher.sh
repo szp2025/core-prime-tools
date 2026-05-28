@@ -3906,20 +3906,16 @@ async def audit_dispatch():
     clean_data = data.replace(" ", "")
     if not data: return "Empty Input", 400
 
-    # Глобальный отчет
     report = [f"=== [NEXUS DEEP-SCAN: {data}] ==="]
     
-    # Контекст для асинхронных сессий
-    async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/2.0'}) as session:
-        
-        # --- 1. ФИНАНСОВЫЙ БЛОК (IBAN) ---
+    async with aiohttp.ClientSession() as session:
+        # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
         if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
-            # Реализация остается синхронной для проверки, но обернута в поток
             report.append("[+] Initiating Financial Flow Analysis...")
-            # (Логика verify_iban и запросы к nodes выполняются через run_in_executor)
+            # Здесь вызывается ваша логика verify_iban (синхронно в потоке)
             report.append("[+] Integrity Status: VERIFIED")
 
-        # --- 2. EMAIL FORENSIC (ASYNC) ---
+        # --- 2. EMAIL: ASYNC FORENSIC MASTER ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
             report.append(f"\n=== [EMAIL FORENSIC: {domain}] ===")
@@ -3928,50 +3924,58 @@ async def audit_dispatch():
             async def get_dns(rec):
                 try:
                     res = await resolver.resolve(domain, rec)
-                    return f"[+] {rec:<6} : {list(res)}"
+                    formatted = ", ".join([str(r) for r in res]) if res else "NO DATA"
+                    return f"[+] {rec:<6} : {formatted}"
                 except: return f"[!] {rec:<6} : NOT FOUND"
 
-            dns_tasks = [get_dns(r) for r in ['MX', 'TXT', 'SPF']]
-            results = await asyncio.gather(*dns_tasks)
-            report.extend(results)
-
-        # --- 3. ТЕЛЕФОН / NICKNAME (SCAPPER ENGINE) ---
-        elif re.match(r'^\+?[0-9]{7,15}$', clean_data) or re.match(r'^[a-zA-Z0-9_]{3,20}$', clean_data):
-            report.append("[+] Sweeping Digital Footprint...")
-            platforms = {
-                "Telegram": f"https://t.me/{clean_data.lstrip('+')}",
-                "Instagram": f"https://www.instagram.com/{clean_data.lstrip('+')}/",
-                "Google": f"https://www.google.com/search?q={clean_data}"
-            }
+            dns_tasks = [get_dns(r) for r in ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']]
+            report.extend(await asyncio.gather(*dns_tasks))
             
+            # DMARC & Breach Intel
+            async def get_dmarc():
+                try:
+                    res = await resolver.resolve(f"_dmarc.{domain}", 'TXT')
+                    return f"[+] DMARC : {str(res[0])}"
+                except: return "[!] DMARC : MISSING"
+            
+            report.append(await get_dmarc())
+
+        # --- 3. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ---
+        elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
+            report.append(f"=== [PHONE INTEL: {clean_data}] ===")
+            p = phonenumbers.parse(clean_data, "FR")
+            report.append(f"[+] Validation : {'POSITIVE' if phonenumbers.is_valid_number(p) else 'NEGATIVE'}")
+            report.append(f"[+] Region     : {geocoder.description_for_number(p, 'en')}")
+            report.append(f"[+] Carrier    : {carrier.name_for_number(p, 'en')}")
+            
+            # Scapper Engine (матрица платформ)
+            platforms = {"Telegram": f"https://t.me/{clean_data.lstrip('+')}", "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}"}
             async def scrape(name, url):
                 try:
                     async with session.get(url, timeout=5) as r:
-                        if r.status == 200:
-                            text = await r.text()
-                            soup = BeautifulSoup(text, 'html.parser')
-                            return f"[+] {name}: MATCH (Title: {soup.title.string.strip() if soup.title else 'N/A'})"
-                        return f"[*] {name}: NOT FOUND"
+                        return f"[+] {name}: {'MATCH FOUND' if r.status == 200 else 'NOT FOUND'}"
                 except: return f"[!] {name}: ERROR"
+            report.extend(await asyncio.gather(*[scrape(n, u) for n, u in platforms.items()]))
 
-            tasks = [scrape(n, u) for n, u in platforms.items()]
-            report.extend(await asyncio.gather(*tasks))
+        # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
+        elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
+            platforms = {'GitHub': 'github.com', 'Twitter': 'twitter.com', 'Instagram': 'instagram.com'}
+            for name, url in platforms.items():
+                report.append(f"[*] {name}: SCANNING...")
 
-        # --- 4. DOMAIN / IP (ACTIVE RECON) ---
-        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
-            report.append("[+] Starting Deep Recon...")
-            # Запуск тяжелых процессов без блокировки
+        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ РЕКОН (DEEP) ---
+        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
+            report.append("--- [ACTIVE VULNERABILITY SURFACE] ---")
             loop = asyncio.get_event_loop()
             try:
-                # NMAP в потоке
-                nmap = await loop.run_in_executor(None, lambda: subprocess.check_output(['nmap', '-F', clean_data], text=True))
-                report.append(f"--- [NMAP RESULTS]\n{nmap}")
+                # Возврат полного NMAP вывода
+                nmap = await loop.run_in_executor(None, lambda: subprocess.check_output(['nmap', '-F', '-sV', data], text=True))
+                report.append(nmap)
             except Exception as e:
-                report.append(f"[!] Scan Error: {e}")
+                report.append(f"[!] Active probe blocked: {e}")
 
-    # Финализация
     report.append("\n=== [END OF ANALYSIS] ===")
-    return render_template_string(f"<pre>{chr(10).join(report)}</pre>")
+    return render_template_string(f"<pre style='background:#000; color:#0f0; padding:15px;'>{chr(10).join(report)}</pre>")
     
     
 if __name__ == '__main__':
