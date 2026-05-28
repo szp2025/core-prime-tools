@@ -2803,20 +2803,20 @@ core_network_dns_sync() {
 
     # Слой 0: Верификация прав доступа (изменение /etc/ требует привилегий root)
     if [[ $EUID -ne 0 ]]; then
-        core_engine_ui "!" "Ошибка доступа: Требуются права суперпользователя (sudo)."
+        core_engine_ui "!" "Access error: Superuser (sudo) privileges required."
         return 1
     fi
 
     # Проверка доступности бинарного файла dnsmasq в системе
     if ! command -v dnsmasq >/dev/null 2>&1; then
-        core_engine_ui "!" "Сбой окружения: dnsmasq не найден в системе. Пропуск слоя."
+        core_engine_ui "!" "Environment failure: dnsmasq not found in the system. Skipping layer."
         return 1
     fi
 
     # --- ИНТЕГРИРОВАННЫЙ БЛОК: НЕЙТРАЛИЗАЦИЯ КОНФЛИКТОВ ---
     # Проверка и нейтрализация конфликтующего резолвера (systemd-resolved)
     if command -v lsof >/dev/null 2>&1 && lsof -i :53 2>/dev/null | grep -q "systemd-resolve"; then
-        core_engine_ui "w" "Конфликт: systemd-resolved занял порт 53. Нейтрализация..."
+        core_engine_ui "w" "Conflict: systemd-resolved has occupied port 53. Neutralizing..."
         systemctl stop systemd-resolved 2>/dev/null
         sleep 1 # Даем системе время на освобождение сокета
     fi
@@ -2833,7 +2833,7 @@ core_network_dns_sync() {
     hostname=$(hostname)
     local dns_conf="/etc/dnsmasq.conf"
     
-    core_engine_ui "i" "Связывание локальных доменов с активным узлом IP: $active_ip"
+    core_engine_ui "i" "Binding local domains to the active IP node $active_ip"
 
     # --- ШАГ 3: ДИНАМИЧЕСКАЯ ИНЪЕКЦИЯ КОНФИГУРАЦИИ ИЗ ГЛОБАЛЬНОЙ МАТРИЦЫ ---
     local tmp_dns
@@ -2856,14 +2856,14 @@ core_network_dns_sync() {
         cp "$tmp_dns" "$dns_conf"
         chmod 644 "$dns_conf"
         
-        core_engine_ui "i" "Конфигурация успешно верифицирована. Перезапуск демона..."
+        core_engine_ui "i" "Configuration successfully verified. Restarting daemon..."
         
         # Попытка мягкого перезапуска через системный менеджер служб (systemd или init.d)
         if systemctl restart dnsmasq 2>/dev/null || service dnsmasq restart 2>/dev/null; then
             core_engine_ui "+" "DNS Sync Complete: http://$hostname.local"
         else
             # Критический путь: если служба зависла, сначала пробуем мягкий SIGTERM (15)
-            core_engine_ui "w" "Служба заблокирована сокетом. Очистка дедлоков..."
+            core_engine_ui "w" "Service blocked by socket. Clearing deadlocks..."
             killall -15 dnsmasq 2>/dev/null
             sleep 1
             
@@ -2877,7 +2877,7 @@ core_network_dns_sync() {
             if dnsmasq -C "$dns_conf"; then
                 core_engine_ui "+" "DNS Engine Restarted (Manual Recovery Mode)"
             else
-                core_engine_ui "!" "Критический сбой: Порт 53 занят сторонним процессом (systemd-resolved?)."
+                core_engine_ui "!" "Critical failure: Port 53 is occupied by a third-party process (systemd-resolved?)."
                 rm -f "$tmp_dns"
                 return 1
             fi
@@ -2891,7 +2891,7 @@ core_network_dns_sync() {
             sed -i '1i nameserver 127.0.0.1' /etc/resolv.conf 2>/dev/null
         fi
     else
-        core_engine_ui "!" "Критическая ошибка: Сгенерированный конфиг v22.0 поврежден. Откат изменений."
+        core_engine_ui "!" "Critical error: Generated config v22.0 is corrupted. Rolling back changes."
         rm -f "$tmp_dns"
         return 1
     fi
@@ -2902,7 +2902,7 @@ core_network_dns_sync() {
         if command -v nginx >/dev/null 2>&1; then
             core_nginx_auto_setup
         else
-            core_engine_ui "w" "Nginx не найден. Установите Nginx для корректной работы Proxy."
+            core_engine_ui "w" "Nginx not found. Please install Nginx for the proxy to function correctly."
         fi
 
         
