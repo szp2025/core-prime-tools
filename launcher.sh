@@ -3914,10 +3914,65 @@ async def audit_dispatch():
     report = [f"=== [NEXUS DEEP-SCAN ANALYSIS: {data}] ==="]
 
     async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/1.0'}) as session:
+    
+    # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ (CAME-NEXUS INTEGRATED) ---
+    if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
+    is_valid = verify_iban(clean_data)
+    
+    report.append(f"\n=== [IBAN FORENSIC: {clean_data}] ===")
+    report.append(f"[IBN] {'MOD97 CHECK':<14} : {'PASSED' if is_valid else 'CRITICAL FAILURE'}")
+    
+    bic = clean_data[4:12] 
+    nodes = [
+        ("https://api.openiban.org/validate/{}", clean_data),
+        ("https://relais.epsoft.fr/api/iban/{}", clean_data),
+        ("https://bank-code.net/api/v1/bic/{}", bic)
+    ]
+    
+    found_nodes_count = 0
+    
+    for url_template, param in nodes:
+        try:
+            target_url = url_template.format(param)
+            resp = requests.get(target_url, timeout=7, headers={'User-Agent': 'Nexus-Forensic/1.0'})
+            
+            if resp.status_code == 200:
+                data_json = resp.json()
+                bd = data_json.get('bankData') or data_json.get('bank') or data_json
+                
+                report.append(f"--- [SOURCE: {url_template.split('/')[2]}] ---")
+                report.extend([
+                    f"[IBN] {'INSTITUTION':<14} : {bd.get('name') or bd.get('bankName') or 'N/A'}",
+                    f"[IBN] {'BIC/SWIFT':<14} : {bd.get('bic') or bd.get('swift') or 'N/A'}",
+                    f"[IBN] {'LOCATION':<14} : {bd.get('city') or 'N/A'}, {bd.get('country') or 'N/A'}"
+                ])
+                found_nodes_count += 1
+        except Exception:
+            continue
+    
+    if found_nodes_count == 0:
+        report.append("[IBN] {'NODES REACHED':<14} : 0 [!] No public data returned.")
+    else:
+        report.append(f"[IBN] {'NODES REACHED':<14} : {found_nodes_count}")
+
+    report.append(f"\n--- [SECURITY & FORENSIC SUMMARY]")
+    report.extend([
+        f"[SEC] {'RISK SCORE':<14} : {'LOW' if found_nodes_count > 0 else 'MEDIUM'}",
+        f"[SEC] {'INTEGRITY':<14} : {'VERIFIED' if is_valid else 'COMPROMISED'}"
+    ])
+    report.append("=== [END OF ANALYSIS] ===")
+    
+        # --- СИНТЕЗ КРИТИЧЕСКИХ ДАННЫХ (SECURITY SUMMARY) ---
+        report.append(f"\n--- [SECURITY & FORENSIC SUMMARY]")
+        report.extend([
+            f"[SEC] {'RISK SCORE':<14} : {'LOW' if found_nodes_count > 0 else 'MEDIUM'}",
+            f"[SEC] {'INTEGRITY':<14} : {'VERIFIED' if is_valid else 'COMPROMISED'}"
+        ])
+        report.append("=== [END OF ANALYSIS] ===")
 
         
         
-# --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (CAME-NEXUS INTEGRATED) ---
+    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (CAME-NEXUS INTEGRATED) ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
         report.append(f"\n=== [PHONE INTEL: {clean_data}] ===")
         
@@ -3985,7 +4040,7 @@ async def audit_dispatch():
         except Exception as e:
             report.append(f"[PHN] {'FORENSIC ERROR':<14} : {str(e)}")
             
-# --- 3. EMAIL: ASYNC FORENSIC MASTER (CAME-NEXUS INTEGRATED) ---
+    # --- 3. EMAIL: ASYNC FORENSIC MASTER (CAME-NEXUS INTEGRATED) ---
     elif '@' in clean_data:
         import asyncio, aiodns, aiohttp, smtplib
         from dns import resolver as sync_resolver
@@ -4078,7 +4133,7 @@ async def audit_dispatch():
             
             report.append(await fetch_crt_sh())   
             
-# --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД (CAME-NEXUS INTEGRATED) ---
+    # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД (CAME-NEXUS INTEGRATED) ---
     elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
         report.append(f"\n=== [DIGITAL FOOTPRINT: {data}] ===")
         
