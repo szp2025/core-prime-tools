@@ -9205,7 +9205,7 @@ update_all_dns_records() {
     } > "$conf_file"
 
     systemctl restart dnsmasq
-    core_engine_ui "+" "DNS Реестр: ВСЕ домены синхронизированы на IP $ip"
+    core_engine_ui "+" "DNS Registry: ALL domains synchronized to IP $ip"
 }
 
 
@@ -9357,7 +9357,7 @@ run_live_service() {
 
     
 
-    core_engine_progress 2 "NODE_STABILIZATION"
+    #core_engine_progress 2 "NODE_STABILIZATION"
 
 
 
@@ -9433,7 +9433,7 @@ run_node_clean() {
     rm -f "$HOME/prime_node.log" "/tmp/prime_node.log"
     
     core_engine_ui "s" "Sector is now clean."
-    core_engine_wait
+    #core_engine_wait
 }
 
 
