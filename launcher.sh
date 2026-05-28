@@ -2829,8 +2829,8 @@ core_network_dns_sync() {
     [[ -z "$active_ip" ]] && active_ip="127.0.0.1"
 
     # --- ШАГ 2: СБОР МЕТРИК ОКРУЖЕНИЯ ---
-    local hostname
-    hostname=$(hostname)
+    #local hostname
+   local hostname=$(hostname)
     local dns_conf="/etc/dnsmasq.conf"
     
     core_engine_ui "i" "Binding local domains to the active IP node $active_ip"
