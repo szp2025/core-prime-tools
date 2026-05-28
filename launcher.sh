@@ -3962,7 +3962,7 @@ def audit_dispatch():
         report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
         report.append("=== [END OF ANALYSIS] ===")
         
-# --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
+    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
     if re.match(r'^\+?[0-9]{7,15}$', clean_data):
         import phonenumbers, requests
         from bs4 import BeautifulSoup # Для скраппинга содержимого
