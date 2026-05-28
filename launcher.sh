@@ -3855,40 +3855,6 @@ def scan():
     return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
     
 
-
-@app.route('/scan1', methods=['POST'])
-def scan():
-    f = request.files.get('file')
-    if not f: return "Empty Payload", 400
-    tmp = os.path.join('/tmp', f.filename)
-    f.save(tmp)
-    report = ["=== [CORE: CRYPTO-NEXUS STEALTH-ENGINE] ===", f"Target: {f.filename}"]
-    threat_count = 0
-    session['last_verdict'] = 'CLEAN'
-    try:
-        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
-        for line in proc.stdout:
-            parts = line.strip().split(' ', 1)
-            if len(parts) < 2: continue
-            offset, content = parts
-            for hsig in GLOBAL_HASH_MATRIX:
-                match = re.search(hsig, content)
-                if match:
-                    clean_secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
-                    if len(clean_secret) > 6: report.append(f"[SECRET FOUND] [Offset {offset}]: {clean_secret.strip()}")
-            for layer in GLOBAL_AV_MATRIX:
-                if re.search(layer, content, re.I):
-                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
-                    threat_count += 1
-        verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
-        session['last_verdict'] = verdict
-        report.append(f"\nVERDICT: {verdict}")
-    except Exception as e:
-        report.append(f"ENGINE_FAILURE: {e}")
-    finally:
-        if os.path.exists(tmp): os.remove(tmp)
-    return render_template_string(render_prime_page("REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
-
 @app.route('/sys-audit/<mode>')
 def system_audit(mode):
     # Используем переменные напрямую, так как Bash их больше не парсит в 'EOF'
