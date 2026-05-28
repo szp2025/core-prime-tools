@@ -3914,8 +3914,7 @@ async def audit_dispatch():
     report = [f"=== [NEXUS DEEP-SCAN ANALYSIS: {data}] ==="]
 
     async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/1.0'}) as session:
-
-    # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ (CAME-NEXUS INTEGRATED) ---
+# --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ (CAME-NEXUS INTEGRATED) ---
     if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
         is_valid = verify_iban(clean_data)
         
@@ -3966,6 +3965,7 @@ async def audit_dispatch():
             f"[SEC] {'INTEGRITY':<14} : {'VERIFIED' if is_valid else 'COMPROMISED'}"
         ])
         report.append("=== [END OF ANALYSIS] ===")
+
         
 # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (CAME-NEXUS INTEGRATED) ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
