@@ -4056,27 +4056,31 @@ async def audit_dispatch():
             tasks = [check_platform(n, u) for n, u in platforms.items()]
             report.extend(await asyncio.gather(*tasks))
             
-        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON (CAME-NEXUS STYLE) ---
-        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
-            report.append(f"\n=== [ACTIVE VULNERABILITY SURFACE: {data}] ===")
-            try:
-                loop = asyncio.get_event_loop()
-                # Выполняем Nmap с -F (fast) и -sV (service version)
-                nmap_raw = await loop.run_in_executor(None, lambda: subprocess.check_output(['nmap', '-F', '-sV', data], text=True))
-                
-                # Парсинг вывода для стиля CAME-NEXUS
-                for line in nmap_raw.splitlines():
-                    if '/' in line and ('open' in line or 'closed' in line):
-                        parts = line.split()
-                        port_proto = parts[0]
-                        state = parts[1]
-                        service = " ".join(parts[2:]) if len(parts) > 2 else "unknown"
-                        report.append(f"[NMP] {port_proto:<12} : {state:<8} | {service}")
-                    elif "Host is up" in line:
-                        report.append(f"[NMP] {'STATUS':<12} : HOST IS UP")
-            except Exception as e:
-                report.append(f"[NMP] {'ERROR':<12} : {str(e)}")
-                
+# --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON (CAME-NEXUS STYLE) ---
+            elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
+                report.append(f"\n=== [ACTIVE VULNERABILITY SURFACE: {data}] ===")
+                try:
+                    # Добавляем sudo-less флаг или игнорируем специфические ошибки
+                    # -F: быстрый скан, -sV: версии, --privileged: попытка обойти права
+                    cmd = ['nmap', '-F', '-sV', data]
+                    loop = asyncio.get_event_loop()
+                    
+                    # Используем subprocess.run вместо check_output для захвата stderr
+                    result = await loop.run_in_executor(None, lambda: subprocess.run(cmd, capture_output=True, text=True))
+                    
+                    if result.returncode == 0:
+                        for line in result.stdout.splitlines():
+                            if '/' in line and ('open' in line or 'closed' in line):
+                                parts = line.split()
+                                report.append(f"[NMP] {parts[0]:<12} : {parts[1]:<8} | {' '.join(parts[2:])}")
+                    else:
+                        # Если Nmap вернул ошибку, выводим её в стиле лога, а не ломаем скрипт
+                        report.append(f"[NMP] {'ERR_STATUS':<12} : CODE {result.returncode}")
+                        report.append(f"[NMP] {'ERR_DETAIL':<12} : {result.stderr.strip()[:40]}...")
+                        
+                except Exception as e:
+                    report.append(f"[NMP] {'EXCEPTION':<12} : {str(e)}")
+                    
     return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
 
 
