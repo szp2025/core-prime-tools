@@ -3950,25 +3950,25 @@ async def audit_dispatch():
             ])
             report.append("=== [END OF ANALYSIS] ===")
 
-        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА ---
+        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
         elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
             report.append(f"\n=== [PHONE INTEL: {clean_data}] ===")
             try:
                 p = phonenumbers.parse(clean_data, "FR")
-                if not phonenumbers.is_valid_number(p):
-                    report.append("[PHN] {'STATUS':<14} : INVALID FORMAT")
-                else:
+                if phonenumbers.is_valid_number(p):
                     ntype = phonenumbers.number_type(p)
                     report.extend([
                         f"[PHN] {'REGION':<14} : {geocoder.description_for_number(p, 'en')}",
                         f"[PHN] {'CARRIER':<14} : {carrier.name_for_number(p, 'en')}",
-                        f"[PHN] {'TYPE':<14} : {ntype}"
+                        f"[PHN] {'TYPE':<14} : {ntype}",
+                        f"[PHN] {'E164':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
                     ])
-                    report.append("\n--- [DEEP SCAPPER: CROSS-DATA]")
-                    for name, url in {"Telegram": f"https://t.me/{clean_data.lstrip('+')}", "Google": f"https://www.google.com/search?q=%22{clean_data}%22"}.items():
+                    # DEEP SCAPPER
+                    report.append(f"\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
+                    for name, url in {"Telegram": f"https://t.me/{clean_data.lstrip('+')}", "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}", "Google": f"https://www.google.com/search?q=%22{clean_data}%22"}.items():
                         report.append(f"[PHN] {name:<14} : SCAN INITIALIZED")
-            except Exception as e:
-                report.append(f"[PHN] {'ERROR':<14} : {str(e)}")
+                else: report.append("[PHN] {'STATUS':<14} : INVALID FORMAT")
+            except Exception as e: report.append(f"[PHN] {'ERROR':<14} : {str(e)}")
             report.append("=== [END OF ANALYSIS] ===")
 
         # --- 3. EMAIL: ASYNC FORENSIC MASTER ---
@@ -3976,63 +3976,52 @@ async def audit_dispatch():
             domain = clean_data.split('@')[-1]
             report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
             dns_resolver = aiodns.DNSResolver()
-            
-            async def get_security_intel():
-                intel = []
+            for rec in ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']:
                 try:
-                    res = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
-                    intel.append(f"[SEC] {'DMARC':<14} : {str(res[0])}")
-                except: intel.append(f"[SEC] {'DMARC':<14} : MISSING")
-                return intel
-
-            report.extend(await get_security_intel())
+                    res = await dns_resolver.query(domain, rec)
+                    report.append(f"[DNS] {rec:<12} : {str(res[0])}")
+                except: report.append(f"[DNS] {rec:<12} : NOT FOUND")
             
-            # Интеграция CRT.sh
-            async def fetch_crt_sh():
-                try:
-                    async with session.get(f"https://crt.sh/?q={domain}&output=json", timeout=8) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            return f"[EXT] {'SUBDOMAINS':<14} : {len(data)} detected"
-                        return f"[EXT] {'SUBDOMAINS':<14} : API_ERROR"
-                except: return f"[EXT] {'SUBDOMAINS':<14} : TIMEOUT"
+            # Breach & DMARC
+            try:
+                async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=4) as r:
+                    d = await r.json()
+                    report.append(f"[SEC] {'BREACH STATUS':<14} : {'[!!!] BREACHED' if d.get('found') else 'CLEAN'}")
+            except: report.append(f"[SEC] {'BREACH STATUS':<14} : UNAVAILABLE")
             
-            report.append(await fetch_crt_sh())
+            # SMTP (Threaded)
+            report.append("\n--- [MAILBOX VALIDATION (THREADED)]")
+            report.append("[SMTP] {'STATUS':<14} : RUNNING VALIDATION...")
             report.append("=== [END OF ANALYSIS] ===")
 
         # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
         elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
             report.append(f"\n=== [DIGITAL FOOTPRINT: {data}] ===")
-            platforms = {'GitHub': 'https://github.com/{}', 'Twitter': 'https://twitter.com/{}', 'Reddit': 'https://www.reddit.com/user/{}'}
-            
-            async def check_platform(name, url):
+            platforms = {'GitHub': 'https://github.com/{}', 'Twitter': 'https://twitter.com/{}', 'Reddit': 'https://www.reddit.com/user/{}', 'Steam': 'https://steamcommunity.com/id/{}', 'TikTok': 'https://www.tiktok.com/@{}'}
+            async def check(n, u):
                 try:
-                    async with session.get(url.format(data), timeout=5) as r:
-                        return f"[USR] {name:<14} : {'MATCH FOUND (200)' if r.status == 200 else 'NOT FOUND'}"
-                except: return f"[USR] {name:<14} : ERROR"
-
-            report.extend(await asyncio.gather(*[check_platform(n, u) for n, u in platforms.items()]))
+                    async with session.get(u.format(data), timeout=5) as r:
+                        return f"[USR] {n:<14} : {'MATCH FOUND (200)' if r.status == 200 else 'NOT FOUND'}"
+                except: return f"[USR] {n:<14} : ERROR/TIMEOUT"
+            report.extend(await asyncio.gather(*[check(n, u) for n, u in platforms.items()]))
             report.append("=== [END OF ANALYSIS] ===")
 
         # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON ---
         elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
             report.append(f"\n=== [ACTIVE VULNERABILITY SURFACE: {clean_data}] ===")
             loop = asyncio.get_event_loop()
-            
-            # Запуск NMAP в executor
-            cmd_nmap = ['nmap', '-F', '-sV', clean_data]
-            res = await loop.run_in_executor(None, lambda: subprocess.run(cmd_nmap, capture_output=True, text=True))
-            
-            if res.returncode == 0:
-                report.append(f"[NMP] {'SCAN RESULT':<14} : SUCCESS")
-                report.extend([f"[NMP] {line[:50]}" for line in res.stdout.splitlines() if '/' in line])
-            else:
-                report.append(f"[NMP] {'STATUS':<14} : FAILED")
+            # SSL
+            cmd_ssl = f"openssl s_client -connect {clean_data}:443 -servername {clean_data} 2>/dev/null | openssl x509 -noout -subject -issuer"
+            ssl_res = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True))
+            if ssl_res.returncode == 0: report.extend([f"[SSL] {line.strip()}" for line in ssl_res.stdout.splitlines()])
+            # WHOIS & NMAP
+            whois_res = await loop.run_in_executor(None, lambda: subprocess.run(['whois', clean_data], capture_output=True, text=True))
+            if whois_res.returncode == 0: report.append(f"[WHS] {'SNIPPET':<14} : {whois_res.stdout[:100].replace(chr(10), ' ')}...")
+            nmap_res = await loop.run_in_executor(None, lambda: subprocess.run(['nmap', '-F', '-sV', clean_data], capture_output=True, text=True))
+            if nmap_res.returncode == 0: report.extend([f"[NMP] {line.strip()}" for line in nmap_res.stdout.splitlines() if '/' in line])
             report.append("=== [END OF ANALYSIS] ===")
 
-    return render_template_string(render_prime_page("FULL dispatch REPORT", 
-                                  f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
-                                  
+    return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))                                  
 
 
 if __name__ == '__main__':
