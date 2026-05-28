@@ -3962,9 +3962,10 @@ def audit_dispatch():
         report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
         report.append("=== [END OF ANALYSIS] ===")
         
-     # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & BREACH INTEL (MASTER ENGINE) ---
+# --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
     if re.match(r'^\+?[0-9]{7,15}$', clean_data):
         import phonenumbers, requests
+        from bs4 import BeautifulSoup # Для скраппинга содержимого
         from phonenumbers import geocoder, carrier, timezone, PhoneNumberType
         
         report.append(f"=== [PHONE INTEL: {clean_data}] ===")
@@ -3973,101 +3974,65 @@ def audit_dispatch():
             if not phonenumbers.is_valid_number(p): 
                 report.append("[!] Status: INVALID FORMAT/NON-EXISTENT")
             else:
-                # 1. Сбор гео-данных
+                # 1. Базовая гео-криминалистика
                 ntype = phonenumbers.number_type(p)
-                type_map = {
-                    PhoneNumberType.FIXED_LINE: "Landline (Fixed)",
-                    PhoneNumberType.MOBILE: "Mobile Network",
-                    PhoneNumberType.VOIP: "VOIP/Virtual (HIGH RISK)",
-                    PhoneNumberType.TOLL_FREE: "Toll-Free/Service",
-                    PhoneNumberType.SHARED_COST: "Shared Cost/Premium",
-                    PhoneNumberType.PAGER: "Pager",
-                    PhoneNumberType.UAN: "Universal Access Number",
-                    PhoneNumberType.UNKNOWN: "Unknown"
-                }
-                region = geocoder.description_for_number(p, "en")
-                op = carrier.name_for_number(p, "en")
-                tz = ", ".join(timezone.time_zones_for_number(p))
+                type_map = {PhoneNumberType.VOIP: "VOIP/Virtual (HIGH RISK)", PhoneNumberType.MOBILE: "Mobile Network", ...} # (список типов)
                 
+                # Расширенный вывод данных (Full Forensic Report)
                 report.extend([
-                    f"[+] Validation: POSITIVE",
-                    f"[+] Origin    : {region or 'Unknown'}",
-                    f"[+] Operator  : {op or 'Unknown'}",
-                    f"[+] Timezone  : {tz}",
-                    f"[+] Type      : {type_map.get(ntype, 'Other/Undefined')}",
-                    f"[+] E164      : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
+                    "--- [CORE FORENSIC DATA: EXTENDED]",
+                    f"[+] Validation      : {'POSITIVE' if phonenumbers.is_valid_number(p) else 'NEGATIVE'}",
+                    f"[+] Country Code    : {p.country_code}",
+                    f"[+] National Number : {p.national_number}",
+                    f"[+] Extension       : {p.extension if p.extension else 'None'}",
+                    f"[+] Italian Leading Zero: {'Yes' if p.italian_leading_zero else 'No'}",
+                    f"[+] Number of Leading Zeros: {p.number_of_leading_zeros if p.number_of_leading_zeros else 'N/A'}",
+                    f"[+] Raw Input       : {p.raw_input}",
+                    f"[+] Country Code Source: {p.country_code_source}",
+                    f"[+] Preferred Domestic Ch: {p.preferred_domestic_carrier_code if p.preferred_domestic_carrier_code else 'None'}",
+                    f"[+] E164 Format     : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
+                    f"[+] International   : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.INTERNATIONAL)}",
+                    f"[+] National Format : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
+                    f"[+] RFC3966 Format  : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.RFC3966)}",
+                    f"[+] Type Code       : {ntype}",
+                    f"[+] Type Description: {type_map.get(ntype, 'Other/Undefined')}",
+                    f"[+] Region Origin   : {region or 'Unknown'}",
+                    f"[+] Carrier Name    : {op or 'Unknown'}",
+                    f"[+] Timezones       : {tz if tz else 'Unknown'}"
                 ])
-                
-                # 2. МОДУЛЬ: BREACH INTEL
-                report.append("\n--- [BREACH & COMB INTEL SCAN]")
-                breach_nodes = [
-                    "https://api.proxynova.com/comb?query={TARGET}|GET|ProxyNova",
-                    "https://api.breachdirectory.org/v1/check?term={TARGET}|GET|BreachDirectory"
-                ]
-                for node in breach_nodes:
-                    url_tpl, method, name = node.split('|')
-                    target_url = url_tpl.replace("{TARGET}", clean_data.lstrip('+'))
-                    try:
-                        res = requests.get(target_url, timeout=5)
-                        if res.status_code == 200:
-                            data = res.json()
-                            if data.get("found") or data.get("leaks"):
-                                report.append(f"[!] {name}: COMPROMISED (Data found in breach)")
-                            else:
-                                report.append(f"[+] {name}: CLEAN (No leaks found)")
-                    except: continue
 
-                # 3. МОДУЛЬ: DIGITAL FOOTPRINT SWEEP (FULL MAPPING & VALIDATION)
-                report.append("\n--- [DIGITAL FOOTPRINT SWEEP: VERIFIED LINKS]")
+                # 2. SCAPPER ENGINE: Сбор перекрестных данных
+                report.append("\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
                 platforms = {
-                    "Telegram": f"https://t.me/{clean_data.lstrip('+')}",
-                    "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}",
-                    "Signal":   f"https://signal.me/#p/{clean_data}",
-                    "LinkedIn": f"https://www.linkedin.com/search/results/people/?keywords={clean_data}",
-                    "Twitter":  f"https://twitter.com/search?q={clean_data}",
-                    "Instagram": f"https://www.instagram.com/{clean_data.lstrip('+')}/",
-                    "Facebook": f"https://www.facebook.com/search/top/?q={clean_data}",
-                    "GitHub":   f"https://github.com/search?q={clean_data}&type=users",
-                    "Truecaller": f"https://www.truecaller.com/search/fr/{clean_data.lstrip('+')}"
+                    "Truecaller": f"https://www.truecaller.com/search/fr/{clean_data.lstrip('+')}",
+                    "LinkedIn": f"https://www.linkedin.com/search/results/people/?keywords={clean_data}"
                 }
                 
-                found_footprint = False
                 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
                 
                 for name, url in platforms.items():
                     try:
-                        res = requests.get(url, timeout=5, allow_redirects=True, headers=headers)
-                        
-                        # ФИЛЬТР ВАЛИДНОСТИ:
-                        # 1. Проверяем наличие маркеров ошибок в тексте страницы (если поиск выдал пустоту)
-                        # 2. Для мессенджеров проверяем, что URL после редиректа не ведет на главную
-                        page_text = res.text.lower()
-                        is_error = any(word in page_text for word in ["not found", "no results", "doesn’t exist", "404", "error"])
-                        
-                        if res.status_code == 200 and not is_error:
-                            # Проверка для WhatsApp/Telegram: если URL не изменился на главную страницу сервиса
-                            if name in ["WhatsApp", "Telegram"] and len(res.url) < 30: continue
+                        res = requests.get(url, timeout=10, headers=headers)
+                        if res.status_code == 200:
+                            soup = BeautifulSoup(res.text, 'html.parser')
                             
-                            report.append(f"[+] {name}: {res.url}")
-                            found_footprint = True
+                            # Извлечение метаданных (перекрестные данные)
+                            title = soup.title.string.strip() if soup.title else "No Title"
+                            meta_desc = soup.find("meta", attrs={"name": "description"})
+                            desc = meta_desc["content"] if meta_desc else "No Description"
+                            
+                            report.append(f"[+] {name} (SCAPPED): {title}")
+                            report.append(f"    -> Context: {desc[:100]}...")
+                            
+                            # Поиск дополнительных ссылок внутри профиля (перекрестная связь)
+                            links = [a['href'] for a in soup.find_all('a', href=True) if 'http' in a['href']][:3]
+                            if links:
+                                report.append(f"    -> Linked Infrastructure: {', '.join(links)}")
                     except: continue
-                
-                if not found_footprint:
-                    report.append("[!] Footprint: No verified public profiles detected.")
-                
-                # 4. ЭВРИСТИКА ГАМБИТА
-                risk = "LOW"
-                if ntype == PhoneNumberType.VOIP: risk = "CRITICAL (Virtual/Temporary)"
-                if found_footprint and ntype == PhoneNumberType.VOIP: risk = "DANGEROUS (Scam-Verified)"
-                
-                report.append(f"\n--- [RISK ASSESSMENT]")
-                report.append(f"[!] Risk Profile: {risk}")
-                if risk != "LOW": report.append("[!!!] SECURITY ACTION: PROCEED WITH EXTREME CAUTION")
 
         except Exception as e: 
             report.append(f"[!] Forensic Failure: {e}")
-            
-            
+                   
 
     # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ (FORENSIC MASTER) ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
