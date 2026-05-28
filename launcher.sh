@@ -4002,7 +4002,7 @@ def audit_dispatch():
                 ])
                 
                 # --- ДОПОЛНЕНИЕ: DIGITAL FOOTPRINT SWEEP (РАСШИРЕННЫЙ) ---
-                report.append("\n--- [DIGITAL FOOTPRINT SWEEP]")
+                report.append("\n--- [DIGITAL FOOTPRINT SWEEP: VERIFIED LINKS]")
                 platforms = {
                     "Telegram": f"https://t.me/{clean_data}",
                     "WhatsApp": f"https://wa.me/{clean_data.replace('+', '')}",
@@ -4019,15 +4019,19 @@ def audit_dispatch():
                 
                 for name, url in platforms.items():
                     try:
-                        # Используем HEAD для быстрой проверки активности
-                        res = requests.head(url, timeout=3, allow_redirects=True, headers=headers)
+                        # Используем HEAD для подтверждения активности
+                        res = requests.head(url, timeout=4, allow_redirects=True, headers=headers)
+                        
+                        # Если сервер отвечает, значит ссылка валидна и доступна
                         if res.status_code == 200:
-                            report.append(f"[+] {name}: MATCH FOUND (Public link active)")
+                            report.append(f"[+] {name}: {url}")
                             found_footprint = True
-                    except: continue
+                    except: 
+                        continue
                 
                 if not found_footprint:
                     report.append("[!] Footprint: No public direct links active.")
+                    
                 
                 # --- ЭВРИСТИКА ГАМБИТА (RISK ASSESSMENT) ---
                 risk = "LOW"
