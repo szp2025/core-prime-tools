@@ -3898,10 +3898,15 @@ GLOBAL_STATIC_SIGNATURES = r"(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(p
 
 @app.route('/audit/dispatch', methods=['POST'])
 def audit_dispatch():
+    # Получение и первичная очистка входных данных
     data = request.form.get('input', '').strip()
     clean_data = data.replace(" ", "")
-    if not data: return "Empty Input", 400
+    
+    # Контроль целостности входящего потока
+    if not data: 
+        return "Empty Input", 400
 
+    # Инициализация отчета (структура строго по заданному формату)
     report = [f"=== [NEXUS DEEP-SCAN ANALYSIS: {data}] ==="]
 
     # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
@@ -3928,7 +3933,7 @@ def audit_dispatch():
                     data_json = resp.json()
                     bd = data_json.get('bankData') or data_json.get('bank') or data_json
                     
-                    # Максимум информации: извлекаем всё, что есть
+                    # Максимум информации: извлекаем всё, что есть в объекте ответа
                     report.extend([
                         f"[+] Source Node: {url_template.split('//')[1].split('/')[0]}",
                         f"[+] Institution: {bd.get('name') or bd.get('bankName') or 'N/A'}",
@@ -3938,18 +3943,17 @@ def audit_dispatch():
                     ])
                     found = True
                     break 
-            except: continue 
-        if not found: report.append("[!] FinIntel Nodes: All validators unreachable.")
+            except: 
+                continue 
+        if not found: 
+            report.append("[!] FinIntel Nodes: All validators unreachable.")
 
-    # --- 2. СИНТЕЗ КРИТИЧЕСКИХ ДАННЫХ (Forensic Summary) ---
-    report.append("\n--- [SECURITY & FORENSIC SUMMARY]")
-    report.append(f"[!] Risk Score: {'HIGH' if not found else 'LOW'}")
-    report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
-    report.append("=== [END OF ANALYSIS] ===")
-    
-    return render_template_string(render_prime_page("MAXIMUM AUDIT REPORT", f"<pre>{chr(10).join(report)}</pre>"))
-    
-            
+        # --- СИНТЕЗ КРИТИЧЕСКИХ ДАННЫХ (Forensic Summary) ---
+        report.append("\n--- [SECURITY & FORENSIC SUMMARY]")
+        report.append(f"[!] Risk Score: {'HIGH' if not found else 'LOW'}")
+        report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
+        report.append("=== [END OF ANALYSIS] ===")
+
     # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА (MASTER FORENSIC ENGINE) ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
         import phonenumbers
@@ -3972,7 +3976,7 @@ def audit_dispatch():
                     number_type.SHARED_COST: "Shared Cost/Premium"
                 }
                 
-                # Сбор данных
+                # Сбор полных данных
                 region = geocoder.description_for_number(p, "en")
                 op = carrier.name_for_number(p, "en")
                 tz = ", ".join(timezone.time_zones_for_number(p))
@@ -3997,54 +4001,54 @@ def audit_dispatch():
                 
                 if risk != "LOW":
                     report.append("[!!!] SECURITY ACTION: PROCEED WITH EXTREME CAUTION")
-
         except Exception as e: 
             report.append(f"[!] Forensic Failure: {e}")
-            
+
     # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ (FORENSIC MASTER) ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
-        import dns.resolver # Рекомендуется использовать эту библиотеку вместо subprocess
+        import dns.resolver
         domain = data.split('@')[-1]
         report = [f"=== [EMAIL INTEL: {data}] ==="]
         report.append(f"[+] Domain: {domain}")
 
-        # Список критических DNS-записей для анализа инфраструктуры
+        # Список критических DNS-записей
         records = ['MX', 'TXT', 'SPF', 'SOA', 'NS']
         for rec in records:
             try:
                 answers = dns.resolver.resolve(domain, rec)
                 results = [str(rdata) for rdata in answers]
-                report.append(f"[+] {rec:<4} : {', '.join(results[:3])}") # Вывод топ-3
+                report.append(f"[+] {rec:<4} : {', '.join(results[:3])}")
             except:
                 report.append(f"[!] {rec:<4} : NOT FOUND / PROTECTED")
 
         # --- ЭВРИСТИКА ГАМБИТА: ANTI-PHISHING ANALYZER ---
-        # Проверяем наличие DMARC, который почти всегда отсутствует у мошенников
         try:
             dmarc = dns.resolver.resolve(f"_dmarc.{domain}", "TXT")
             report.append(f"[+] DMARC : {str(dmarc[0])}")
         except:
             report.append("[!] DMARC : MISSING (HIGH PHISHING RISK)")
             
-        # Анализ длины домена (короткие/странные домены часто фейковые)
+        # Анализ длины домена
         if len(domain) < 5 or '-' in domain and len(domain.split('-')) > 2:
             report.append("[!!!] SECURITY ALERT: POTENTIAL DGA/TYPOSQUATTING DOMAIN")
-            
 
     # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
     elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
         report.append("[+] Initiating cross-platform footprint sweep...")
-        platforms = {'GitHub': 'github.com', 'Twitter': 'twitter.com', 'Instagram': 'instagram.com', 
-                     'Telegram': 't.me', 'TikTok': 'tiktok.com/@', 'Steam': 'steamcommunity.com/id/'}
+        platforms = {
+            'GitHub': 'github.com', 'Twitter': 'twitter.com', 'Instagram': 'instagram.com', 
+            'Telegram': 't.me', 'TikTok': 'tiktok.com/@', 'Steam': 'steamcommunity.com/id/'
+        }
         for name, url in platforms.items():
             try:
                 resp = requests.get(f"https://{url}/{data}", timeout=4, headers={'User-Agent': 'Nexus/1.0'})
                 report.append(f"[*] {name}: {'MATCH FOUND (200)' if resp.status_code == 200 else 'NOT FOUND'}")
-            except: report.append(f"[*] {name}: ERROR")
+            except: 
+                report.append(f"[*] {name}: ERROR")
 
     # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ РЕКОН (DEEP) ---
     elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
-        # 1. SSL/TLS сертификаты (разбор криптографии)
+        # 1. SSL/TLS сертификаты
         try:
             cert = subprocess.check_output(['openssl', 'x509', '-in', '/dev/stdin', '-noout', '-text'], 
                                            input=subprocess.check_output(['openssl', 's_client', '-connect', f'{data}:443', '-servername', data], 
@@ -4052,24 +4056,27 @@ def audit_dispatch():
             subject = re.search(r'Subject: (.*)', cert).group(1)
             issuer = re.search(r'Issuer: (.*)', cert).group(1)
             report.extend([f"[+] SSL Subject: {subject}", f"[+] SSL Issuer: {issuer}"])
-        except: report.append("[!] SSL handshake rejected.")
+        except: 
+            report.append("[!] SSL handshake rejected.")
         
         # 2. WHOIS и инфраструктура
         try:
             whois = subprocess.check_output(['whois', data], text=True, stderr=subprocess.STDOUT)
-            report.append(f"[+] WHOIS Snippet:\n{whois[:800]}") # Только верхушка для лимита
-        except: report.append("[!] WHOIS access denied.")
+            report.append(f"[+] WHOIS Snippet:\n{whois[:800]}")
+        except: 
+            report.append("[!] WHOIS access denied.")
 
         # 3. Активное сканирование портов (NMAP)
         report.append("--- [ACTIVE VULNERABILITY SURFACE] ---")
         try:
             nmap = subprocess.check_output(['nmap', '-F', '-sV', data], text=True)
             report.append(nmap)
-        except: report.append("[!] Active probe blocked.")
+        except: 
+            report.append("[!] Active probe blocked.")
 
+    # Финальная отрисовка
     return render_template_string(render_prime_page("MAX_INTEL_REPORT", f"<pre style='font-size:10px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
     
-  
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
