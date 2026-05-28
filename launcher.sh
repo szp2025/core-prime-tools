@@ -3661,67 +3661,7 @@ def verify_iban(iban):
 
 
 # --- ВНУТРЕННИЕ ФУНКЦИИ (NEXUS ENGINE) ---
-
-def audit_iban_internal(iban):
-    is_valid = verify_iban(iban)
-    report = [f"=== [FINANCIAL INTEL: {iban}] ===", f"Status: {'VALID' if is_valid else 'INVALID/CORRUPTED'}"]
-    # Добавить логику сверки с GLOBAL_BANK_MATRIX
-    return render_template_string(render_prime_page("FINANCIAL REPORT", f"<pre>{chr(10).join(report)}</pre>"))
-
-def audit_phone_internal(phone):
-    parsed = phonenumbers.parse(phone, "FR")
-    report = [f"=== [PHONE INTEL: {phone}] ===", 
-              f"Region: {geocoder.description_for_number(parsed, 'en')}",
-              f"Carrier: {carrier.name_for_number(parsed, 'en')}",
-              f"Type: {'VOIP/VIRTUAL (HIGH RISK)' if phonenumbers.number_type(parsed) == 6 else 'MOBILE/LANDLINE'}"]
-    return render_template_string(render_prime_page("PHONE REPORT", f"<pre>{chr(10).join(report)}</pre>"))
-
-def unified_recon_internal(target):
-    report = [f"=== [NEXUS RECON ENGINE: {target}] ==="]
-    
-    # 1. СЕТЕВАЯ РАЗВЕДКА
-    try:
-        ip = socket.gethostbyname(target)
-        report.append(f"[+] Resolved IP: {ip}")
-        dns = subprocess.check_output(['dig', target, 'ANY', '+short'], text=True)
-        report.append(f"\n--- [DNS RECORDS] ---\n{dns}")
-    except:
-        report.append("[!] DNS Resolution failed.")
-
-    # 2. NMAP (Активный аудит)
-    report.append("\n--- [SECURITY & VULN AUDIT] ---")
-    try:
-        nmap_out = subprocess.check_output(['nmap', '-F', '-sV', '--top-ports', '50', target], text=True)
-        report.append(nmap_out)
-    except:
-        report.append("[!] Nmap unavailable or target blocked.")
-
-    # 3. АДАПТИВНЫЙ ФАЗЗИНГ (Использование паттернов из GLOBAL_FUZZ_WORDLIST)
-    report.append("\n--- [CONFIGURATION GAP PROBE] ---")
-    common_files = ['.env', 'config.php', 'backup.sql', '.git/config']
-    for f in common_files:
-        try:
-            resp = requests.head(f"https://{target}/{f}", timeout=2, headers={'User-Agent': 'Mozilla/5.0'})
-            if resp.status_code == 200:
-                report.append(f"[CRITICAL] Exposed: {f}")
-        except: pass
-
-    # 4. ЗАГОЛОВКИ (Header Leakage)
-    report.append("\n--- [INFRASTRUCTURE HEADERS] ---")
-    try:
-        h = requests.get(f"https://{target}", timeout=3).headers
-        for key in ["Server", "X-Powered-By"]:
-            if key in h: report.append(f"[!] {key}: {h[key]}")
-    except: pass
-
-    return render_template_string(render_prime_page("RECON REPORT", f"<pre>{chr(10).join(report)}</pre>"))
-
-def audit_email_internal(email):
-    # Заглушка под будущий анализ email
-    report = [f"=== [EMAIL INTEL: {email}] ===", "Status: ANALYSIS PENDING"]
-    return render_template_string(render_prime_page("EMAIL REPORT", f"<pre>{chr(10).join(report)}</pre>"))
-    
-    
+   
 @app.route('/')
 def index():
     # Теперь render_prime_form доступен, так как он был вставлен выше
@@ -3967,56 +3907,129 @@ def audit_dispatch():
     # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
     if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
         is_valid = verify_iban(clean_data)
-        report.extend([f"[+] MOD97 Check: {'PASSED' if is_valid else 'CRITICAL FAILURE'}",
-                       f"[+] Country: {clean_data[:2]}", f"[+] Bank Code: {clean_data[4:9]}"])
-        try:
-            resp = requests.get(f"https://api.openiban.org/validate/{clean_data}", timeout=8).json()
-            if resp.get('valid'):
-                bd = resp.get('bankData', {})
-                report.extend([f"[+] Bank Name: {bd.get('name')}", f"[+] BIC/SWIFT: {bd.get('bic')}",
-                               f"[+] Address: {bd.get('street', 'N/A')}, {bd.get('city', 'N/A')}"])
-            else: report.append("[!] API: Entity not registered in SEPA.")
-        except Exception as e: report.append(f"[!] Financial API Timeout: {e}")
+        report.append(f"[+] MOD97 Check: {'PASSED' if is_valid else 'CRITICAL FAILURE'}")
+        
+        bic = clean_data[4:12]
+        bik = clean_data[4:13]
+        nodes = [
+            "https://api.openiban.org/validate/{IBAN}",
+            "https://api.ibanapi.com/v1/validate/{IBAN}?api_key=free",
+            "https://api.validiban.com/v1/check/{IBAN}",
+            "https://relais.epsoft.fr/api/iban/{IBAN}",
+            "https://api.swiftcodesfinder.com/v1/swift/{BIC}",
+            "https://bank-code.net/api/v1/bic/{BIC}"
+        ]
+        
+        found = False
+        for url_template in nodes:
+            try:
+                resp = requests.get(url_template.format(IBAN=clean_data, BIC=bic, BIK=bik), timeout=5)
+                if resp.status_code == 200:
+                    data_json = resp.json()
+                    bd = data_json.get('bankData') or data_json.get('bank') or data_json
+                    
+                    # Максимум информации: извлекаем всё, что есть
+                    report.extend([
+                        f"[+] Source Node: {url_template.split('//')[1].split('/')[0]}",
+                        f"[+] Institution: {bd.get('name') or bd.get('bankName') or 'N/A'}",
+                        f"[+] BIC/SWIFT  : {bd.get('bic') or bd.get('swift') or 'N/A'}",
+                        f"[+] Location   : {bd.get('city') or bd.get('zip') or 'N/A'}, {bd.get('country') or 'N/A'}",
+                        f"[+] Contact    : {bd.get('phone') or 'N/A'}"
+                    ])
+                    found = True
+                    break 
+            except: continue 
+        if not found: report.append("[!] FinIntel Nodes: All validators unreachable.")
 
-  # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА (ИСПРАВЛЕНО) ---
+    # --- 2. СИНТЕЗ КРИТИЧЕСКИХ ДАННЫХ (Forensic Summary) ---
+    report.append("\n--- [SECURITY & FORENSIC SUMMARY]")
+    report.append(f"[!] Risk Score: {'HIGH' if not found else 'LOW'}")
+    report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
+    report.append("=== [END OF ANALYSIS] ===")
+    
+    return render_template_string(render_prime_page("MAXIMUM AUDIT REPORT", f"<pre>{chr(10).join(report)}</pre>"))
+    
+            
+    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА (MASTER FORENSIC ENGINE) ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
         import phonenumbers
-        from phonenumbers import geocoder, carrier, timezone, phonenumberutil
+        from phonenumbers import geocoder, carrier, timezone, number_type
         
         report = [f"=== [PHONE INTEL: {clean_data}] ==="]
         try:
+            # Парсим номер, по умолчанию считаем регион Франция
             p = phonenumbers.parse(clean_data, "FR")
             if not phonenumbers.is_valid_number(p): 
-                report.append("[!] Status: INVALID FORMAT")
+                report.append("[!] Status: INVALID FORMAT/NON-EXISTENT")
             else:
-                # Получаем тип номера через PhoneNumberType
-                ntype = phonenumbers.number_type(p)
+                ntype = number_type(p)
+                # Определяем тип номера более точно
+                type_map = {
+                    number_type.FIXED_LINE: "Landline (Fixed)",
+                    number_type.MOBILE: "Mobile Network",
+                    number_type.VOIP: "VOIP/Virtual (HIGH RISK)",
+                    number_type.TOLL_FREE: "Toll-Free/Service",
+                    number_type.SHARED_COST: "Shared Cost/Premium"
+                }
+                
+                # Сбор данных
+                region = geocoder.description_for_number(p, "en")
+                op = carrier.name_for_number(p, "en")
+                tz = ", ".join(timezone.time_zones_for_number(p))
                 
                 report.extend([
-                    f"[+] Status: VALID",
-                    f"[+] Region: {geocoder.description_for_number(p, 'en')}",
-                    f"[+] Timezone: {', '.join(timezone.time_zones_for_number(p))}",
-                    f"[+] Carrier: {carrier.name_for_number(p, 'en')}",
-                    f"[+] Type Code: {ntype}", 
-                    f"[+] E164 Format: {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
+                    f"[+] Validation: POSITIVE",
+                    f"[+] Origin    : {region or 'Unknown'}",
+                    f"[+] Operator  : {op or 'Unknown'}",
+                    f"[+] Timezone  : {tz}",
+                    f"[+] Type      : {type_map.get(ntype, 'Other/Undefined')}",
+                    f"[+] E164      : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
                 ])
                 
-                # Анализ риска для Гамбита
-                if ntype == phonenumbers.PhoneNumberType.VOIP:
-                    report.append("[!] ALERT: VOIP/Virtual number detected (HIGH RISK)")
+                # --- ЭВРИСТИКА ГАМБИТА (RISK ASSESSMENT) ---
+                risk = "LOW"
+                if ntype == number_type.VOIP: risk = "CRITICAL (Virtual/Temporary)"
+                elif ntype == number_type.SHARED_COST: risk = "MEDIUM (Financial Scam Risk)"
+                elif not op: risk = "MEDIUM (Unknown Carrier)"
+                
+                report.append(f"\n--- [RISK ASSESSMENT]")
+                report.append(f"[!] Risk Profile: {risk}")
+                
+                if risk != "LOW":
+                    report.append("[!!!] SECURITY ACTION: PROCEED WITH EXTREME CAUTION")
+
         except Exception as e: 
             report.append(f"[!] Forensic Failure: {e}")
-
-    # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ ---
+            
+    # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ (FORENSIC MASTER) ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
+        import dns.resolver # Рекомендуется использовать эту библиотеку вместо subprocess
         domain = data.split('@')[-1]
-        report.append(f"[+] Domain Intel: {domain}")
-        # Проверка DNS записей для выявления Shadow-инфраструктуры
-        for rec in ['MX', 'TXT', 'SPF', 'SOA']:
+        report = [f"=== [EMAIL INTEL: {data}] ==="]
+        report.append(f"[+] Domain: {domain}")
+
+        # Список критических DNS-записей для анализа инфраструктуры
+        records = ['MX', 'TXT', 'SPF', 'SOA', 'NS']
+        for rec in records:
             try:
-                val = subprocess.check_output(['dig', domain, rec, '+short'], text=True).strip()
-                report.append(f"[+] Record {rec}: {val if val else 'NULL'}")
-            except: report.append(f"[!] DNS {rec} lookup failed.")
+                answers = dns.resolver.resolve(domain, rec)
+                results = [str(rdata) for rdata in answers]
+                report.append(f"[+] {rec:<4} : {', '.join(results[:3])}") # Вывод топ-3
+            except:
+                report.append(f"[!] {rec:<4} : NOT FOUND / PROTECTED")
+
+        # --- ЭВРИСТИКА ГАМБИТА: ANTI-PHISHING ANALYZER ---
+        # Проверяем наличие DMARC, который почти всегда отсутствует у мошенников
+        try:
+            dmarc = dns.resolver.resolve(f"_dmarc.{domain}", "TXT")
+            report.append(f"[+] DMARC : {str(dmarc[0])}")
+        except:
+            report.append("[!] DMARC : MISSING (HIGH PHISHING RISK)")
+            
+        # Анализ длины домена (короткие/странные домены часто фейковые)
+        if len(domain) < 5 or '-' in domain and len(domain.split('-')) > 2:
+            report.append("[!!!] SECURITY ALERT: POTENTIAL DGA/TYPOSQUATTING DOMAIN")
+            
 
     # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
     elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
