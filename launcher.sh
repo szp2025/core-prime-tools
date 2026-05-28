@@ -3971,29 +3971,61 @@ async def audit_dispatch():
             except Exception as e: report.append(f"[PHN] {'ERROR':<14} : {str(e)}")
             report.append("=== [END OF ANALYSIS] ===")
 
-        # --- 3. EMAIL: ASYNC FORENSIC MASTER ---
+        # --- 3. EMAIL: ASYNC FORENSIC MASTER (FULL RESTORE) ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
             report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
+            report.append(f"[EML] {'TARGET DOMAIN':<14} : {domain}")
+            
             dns_resolver = aiodns.DNSResolver()
-            for rec in ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']:
+            dns_records = ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']
+            
+            # 1. Параллельный DNS сбор
+            async def get_dns(rec):
                 try:
                     res = await dns_resolver.query(domain, rec)
-                    report.append(f"[DNS] {rec:<12} : {str(res[0])}")
-                except: report.append(f"[DNS] {rec:<12} : NOT FOUND")
+                    return f"[DNS] {rec:<12} : {str(res[0])}"
+                except: return f"[DNS] {rec:<12} : NOT FOUND"
             
-            # Breach & DMARC
+            report.extend(await asyncio.gather(*[get_dns(r) for r in dns_records]))
+            
+            # 2. Breach Intel
             try:
                 async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=4) as r:
-                    d = await r.json()
-                    report.append(f"[SEC] {'BREACH STATUS':<14} : {'[!!!] BREACHED' if d.get('found') else 'CLEAN'}")
+                    data_br = await r.json()
+                    report.append(f"[SEC] {'BREACH STATUS':<14} : {'[!!!] BREACHED' if data_br.get('found') else 'CLEAN'}")
             except: report.append(f"[SEC] {'BREACH STATUS':<14} : UNAVAILABLE")
             
-            # SMTP (Threaded)
+            # 3. SMTP VALIDATION (С принудительным потоком)
             report.append("\n--- [MAILBOX VALIDATION (THREADED)]")
-            report.append("[SMTP] {'STATUS':<14} : RUNNING VALIDATION...")
+            def smtp_check():
+                try:
+                    # Попытка определения MX записи через стандартную библиотеку для Threading
+                    from dns import resolver as sync_resolver
+                    import smtplib
+                    mx = sync_resolver.resolve(domain, 'MX')[0].exchange
+                    with smtplib.SMTP(str(mx), timeout=5) as s:
+                        s.helo(); s.mail('audit@security.test')
+                        code, _ = s.rcpt(clean_data)
+                        return f"[SMTP] {'STATUS':<14} : {'ACTIVE' if code == 250 else 'INACTIVE'} (Code: {code})"
+                except: return f"[SMTP] {'STATUS':<14} : PROTECTED/BLOCKED"
+            
+            # Выполнение SMTP чека без блокировки Event Loop
+            report.append(await asyncio.to_thread(smtp_check))
+            
+            # 4. Certificate Transparency
+            async def fetch_crt():
+                try:
+                    async with session.get(f"https://crt.sh/?q={domain}&output=json", timeout=8) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            return f"[EXT] {'SUBDOMAINS':<14} : {len(data)} detected"
+                        return f"[EXT] {'SUBDOMAINS':<14} : API_ERROR"
+                except: return f"[EXT] {'SUBDOMAINS':<14} : TIMEOUT"
+            
+            report.append(await fetch_crt())
             report.append("=== [END OF ANALYSIS] ===")
-
+            
         # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
         elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
             report.append(f"\n=== [DIGITAL FOOTPRINT: {data}] ===")
