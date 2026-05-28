@@ -9278,16 +9278,31 @@ echo "[+] NEXUS Engine successfully deployed with PID: $PID"
         core_engine_loot "node_startup" "Service ${service_type} deployed & proxied at $final_url"
 
     else
-
         core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
-
         core_engine_ui "line"
 
-        [[ -f "$log_file" ]] && tail -n 10 "$log_file" || echo "Logs empty."
-
-        core_engine_ui "line"
-
-    fi
+        if [[ -f "$log_file" ]]; then
+            # Ищем последние 20 строк, но приоритет отдаем ключевым словам ошибки
+            echo "[!] LAST 20 LINES OF LOG:"
+            tail -n 20 "$log_file"
+            
+            core_engine_ui "line"
+            
+            # Экспертный поиск причины падения
+            if grep -q "Killed" "$log_file"; then
+                echo "[CRITICAL] OOM Killer detected: Process was terminated due to memory pressure."
+                echo "Check 'dmesg | grep -i oom' for system-wide memory exhaustion."
+            elif grep -q "Traceback" "$log_file"; then
+                echo "[ERROR] Python Exception Traceback detected:"
+                grep -A 5 "Traceback" "$log_file"
+            elif grep -q "Address already in use" "$log_file"; then
+                echo "[ERROR] Port collision: Port 5000 is already in use by another process."
+            else
+                echo "[INFO] No specific crash signature found. Check log file for details."
+            fi
+        else
+            echo "[!] Logs empty. Process never started."
+        fi
 
 
     core_engine_wait
