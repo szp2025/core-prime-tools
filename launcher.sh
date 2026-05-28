@@ -4027,15 +4027,59 @@ def audit_dispatch():
 
                 # 2. SCAPPER ENGINE: Сбор перекрестных данных
                 report.append("\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
+                # --- [ULTIMATE OSINT PLATFORM MATRIX] ---
                 platforms = {
-                    "Truecaller": f"https://www.truecaller.com/search/fr/{clean_data.lstrip('+')}",
-                    "LinkedIn": f"https://www.linkedin.com/search/results/people/?keywords={clean_data}"
+                    # --- Messengers (Direct Contact) ---
+                    "Telegram": f"https://t.me/{clean_data.lstrip('+')}",
+                    "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}",
+                    "Signal":   f"https://signal.me/#p/{clean_data}",
+                    "Viber":    f"viber://contact?number={clean_data.lstrip('+')}",
+                    
+                    # --- Social & Profiles (Persona Analysis) ---
+                    "LinkedIn":  f"https://www.linkedin.com/search/results/people/?keywords={clean_data}",
+                    "Facebook":  f"https://www.facebook.com/search/top/?q={clean_data}",
+                    "Instagram": f"https://www.instagram.com/{clean_data.lstrip('+')}/",
+                    "Twitter":   f"https://twitter.com/search?q={clean_data}",
+                    "TikTok":    f"https://www.tiktok.com/@{clean_data.lstrip('+')}",
+                    "VKontakte": f"https://vk.com/search?c%5Bq%5D={clean_data}&c%5Bsection%5D=people",
+                    "Reddit":    f"https://www.reddit.com/user/{clean_data}",
+                    
+                    # --- Professional & Dev (Digital Footprint) ---
+                    "GitHub":        f"https://github.com/search?q={clean_data}&type=users",
+                    "GitLab":        f"https://gitlab.com/search?search={clean_data}",
+                    "StackOverflow": f"https://stackoverflow.com/users?search={clean_data}",
+                    "Habr":          f"https://habr.com/ru/search/?q={clean_data}",
+                    
+                    # --- Reputation & Spam (Scam Detection) ---
+                    "Truecaller":    f"https://www.truecaller.com/search/fr/{clean_data.lstrip('+')}",
+                    "Zvonili":       f"https://zvonili.com/phone/{clean_data}",
+                    "UnknownPhone":  f"https://www.unknownphone.com/phone/{clean_data.lstrip('+')}",
+                    "SyncMe":        f"https://sync.me/search/?number={clean_data.lstrip('+')}",
+                    
+                    # --- Search Engines & Archive (Cross-Data) ---
+                    "Google_Dork":   f"https://www.google.com/search?q=%22{clean_data}%22",
+                    "Archive_Org":   f"https://web.archive.org/web/*/{clean_data}",
+                    "Yandex":        f"https://yandex.ru/search/?text={clean_data}"
                 }
                 
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-                
+                GLOBAL_NETWORK_UA = [
+                    # Windows 11
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Edge/124.0.0.0",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+                    # macOS
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+                    # Linux
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0",
+                    # Mobile
+                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+                    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/605.1.15"
+                ]                
                 for name, url in platforms.items():
                     try:
+                        headers = {'User-Agent': random.choice(GLOBAL_NETWORK_UA)}
                         res = requests.get(url, timeout=10, headers=headers)
                         if res.status_code == 200:
                             soup = BeautifulSoup(res.text, 'html.parser')
@@ -4058,34 +4102,86 @@ def audit_dispatch():
             report.append(f"[!] Forensic Failure: {e}")
                    
 
-    # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ (FORENSIC MASTER) ---
-    elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
-        import dns.resolver
-        domain = data.split('@')[-1]
-        report = [f"=== [EMAIL INTEL: {data}] ==="]
-        report.append(f"[+] Domain: {domain}")
-
-        # Список критических DNS-записей
-        records = ['MX', 'TXT', 'SPF', 'SOA', 'NS']
+    # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ & FORENSIC MASTER ---
+    elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', clean_data):
+        import dns.resolver, requests, smtplib
+        from socket import gethostbyname
+        
+        domain = clean_data.split('@')[-1]
+        report.append(f"=== [EMAIL INTEL: {clean_data}] ===")
+        
+        # 1. СЕТЕВАЯ КРИМИНАЛИСТИКА (DNS & RECORDS)
+        # Расширенный список для полной идентификации инфраструктуры
+        records = [
+            'MX',    # Почтовые серверы (маршрутизация)
+            'TXT',   # SPF/DMARC/Domain Verification (идентификация владельца)
+            'SPF',   # Прямая политика отправки (защита от спуфинга)
+            'SOA',   # Начало зоны (кто администрирует домен)
+            'NS',    # Авторитетные DNS-серверы (кто хостит DNS)
+            'CNAME', # Алиасы (выдает скрытые сервисы, например, "mail.domain.com -> google.com")
+            'PTR',   # Обратный DNS (привязка IP к домену, проверка на подмену)
+            'CAA',   # Политика авторизации сертификатов (выдает, кто выпускает SSL)
+            'SRV'    # Служебные записи (показывает использование VOIP/SIP, Active Directory)
+        ]
+        report.append("--- [DNS INFRASTRUCTURE]")
         for rec in records:
             try:
                 answers = dns.resolver.resolve(domain, rec)
                 results = [str(rdata) for rdata in answers]
                 report.append(f"[+] {rec:<4} : {', '.join(results[:3])}")
             except:
-                report.append(f"[!] {rec:<4} : NOT FOUND / PROTECTED")
+                report.append(f"[!] {rec:<4} : NOT FOUND")
 
-        # --- ЭВРИСТИКА ГАМБИТА: ANTI-PHISHING ANALYZER ---
+        # 2. ANTI-PHISHING & AUTHENTICATION SCANNER
+        report.append("\n--- [AUTHENTICATION & PHISHING PROTOCOLS]")
+        # DMARC Check
         try:
             dmarc = dns.resolver.resolve(f"_dmarc.{domain}", "TXT")
             report.append(f"[+] DMARC : {str(dmarc[0])}")
-        except:
-            report.append("[!] DMARC : MISSING (HIGH PHISHING RISK)")
-            
-        # Анализ длины домена
-        if len(domain) < 5 or '-' in domain and len(domain.split('-')) > 2:
-            report.append("[!!!] SECURITY ALERT: POTENTIAL DGA/TYPOSQUATTING DOMAIN")
+        except: report.append("[!] DMARC : MISSING (HIGH PHISHING RISK)")
+        
+        # 3. BREACH & LEAK INTEL (DATABASE CHECK)
+        try:
+            leak_url = f"https://api.breachdirectory.org/v1/check?term={clean_data}"
+            res = requests.get(leak_url, timeout=5)
+            if res.status_code == 200 and res.json().get("found"):
+                report.append("[!!!] SECURITY ALERT: EMAIL FOUND IN PUBLIC BREACHES")
+            else:
+                report.append("[+] Breach Intel: CLEAN (No data found)")
+        except: report.append("[!] Breach Intel: SERVICE UNAVAILABLE")
 
+        # 4. ВАЛИДАЦИЯ СУЩЕСТВОВАНИЯ (SMTP VRFY)
+        report.append("\n--- [MAILBOX VALIDATION]")
+        try:
+            mx_records = dns.resolver.resolve(domain, 'MX')
+            mx_record = str(mx_records[0].exchange)
+            
+            # Имитация рукопожатия с сервером
+            server = smtplib.SMTP(timeout=5)
+            server.connect(mx_record)
+            server.helo()
+            server.mail('forensic@check.com')
+            code, message = server.rcpt(clean_data)
+            server.quit()
+            
+            if code == 250:
+                report.append("[+] Mailbox Status: ACTIVE/EXISTING")
+            else:
+                report.append(f"[!] Mailbox Status: INACTIVE/REJECTED (Code: {code})")
+        except Exception as e:
+            report.append(f"[!] SMTP Validation: FAILED/BLOCKED BY FIREWALL ({e})")
+
+        # 5. ЭВРИСТИКА ГАМБИТА (RISK ASSESSMENT)
+        if len(domain) < 5 or '-' in domain and len(domain.split('-')) > 2:
+            report.append("[!!!] SECURITY ALERT: POTENTIAL DGA/TYPOSQUATTING")
+            
+        # Оценка риска для Банковского Гамбита
+        report.append("\n--- [RISK ASSESSMENT]")
+        if "MISSING" in report[-5] or "FOUND IN PUBLIC BREACHES" in report[-4]:
+            report.append("[!] RISK PROFILE: HIGH - DO NOT INTERACT")
+        else:
+            report.append("[!] RISK PROFILE: LOW - TRUSTED DOMAIN")
+            
     # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
     elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
         report.append("[+] Initiating cross-platform footprint sweep...")
