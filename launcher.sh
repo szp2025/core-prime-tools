@@ -3979,9 +3979,10 @@ async def audit_dispatch():
             nmap = await loop.run_in_executor(None, lambda: subprocess.check_output(['nmap', '-F', data], text=True))
             report.append(nmap)
 
-    report.append("\n=== [END OF ANALYSIS] ===")
-    return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
-    
+    return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+
+
+
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
     
