@@ -3976,7 +3976,20 @@ def audit_dispatch():
             else:
                 # 1. Базовая гео-криминалистика
                 ntype = phonenumbers.number_type(p)
-                type_map = {PhoneNumberType.VOIP: "VOIP/Virtual (HIGH RISK)", PhoneNumberType.MOBILE: "Mobile Network", ...} # (список типов)
+                type_map = {
+                                    PhoneNumberType.FIXED_LINE: "FIXED_LINE (Landline)",
+                                    PhoneNumberType.MOBILE: "MOBILE (Cellular Network)",
+                                    PhoneNumberType.FIXED_LINE_OR_MOBILE: "FIXED_OR_MOBILE (Hybrid/Dual Network)",
+                                    PhoneNumberType.TOLL_FREE: "TOLL_FREE (Freephone/Service)",
+                                    PhoneNumberType.PREMIUM_RATE: "PREMIUM_RATE (High-Cost/Premium Tariff)",
+                                    PhoneNumberType.SHARED_COST: "SHARED_COST (Split-Charge Service)",
+                                    PhoneNumberType.VOIP: "VOIP/VIRTUAL (Virtual/IP-Based - HIGH RISK)",
+                                    PhoneNumberType.PERSONAL_NUMBER: "PERSONAL_NUMBER (Individual Assigned Number)",
+                                    PhoneNumberType.PAGER: "PAGER (Paging Service)",
+                                    PhoneNumberType.UAN: "UAN (Universal Access Number)",
+                                    PhoneNumberType.VOICEMAIL: "VOICEMAIL (Voicemail Access)",
+                                    PhoneNumberType.UNKNOWN: "UNKNOWN (Unidentified/Carrier-Non-Specified)"
+                                }
                 
                 # Расширенный вывод данных (Full Forensic Report)
                 report.extend([
