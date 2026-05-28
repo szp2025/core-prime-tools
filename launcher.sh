@@ -3799,14 +3799,24 @@ def scan():
                     report.append(f"[!!! THREAT: {layer} !!!]")
                     threat_count += 1
         
-        # --- БЛОК 2: DEEP FORENSIC ---
+# --- БЛОК 2: DEEP FORENSIC (АВТОМАТИЧЕСКИ) ---
         report.append("\n=== [INITIATING DEEP FORENSIC ANALYSIS] ===")
         
-        # Метаданные (ExifTool)
+        # 1. Метаданные (MAXIMUM DETAIL)
         try:
-            meta = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-ee', tmp], stderr=subprocess.STDOUT, text=True)
-            report.append(f"\n--- [METADATA]\n{meta[:500]}...")
-        except: report.append("\n--- [METADATA: UNAVAILABLE]")
+            # -G: Group names (полезно для понимания структуры метаданных)
+            # -a: Duplicate tags (показывает все дубликаты, даже скрытые)
+            # -u: Unknown tags (показывает теги, которые не определены в базе, но есть в файле)
+            # -ee: Extract embedded information (глубокий анализ вложенных файлов)
+            # -U: Unknown tags (для максимального покрытия)
+            meta = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-U', '-ee', tmp], 
+                                           stderr=subprocess.STDOUT, text=True)
+            report.append(f"\n--- [FULL METADATA DUMP]\n{meta}")
+        except subprocess.CalledProcessError as e:
+            report.append(f"\n--- [METADATA ERROR]: {e.output}")
+        except Exception as e:
+            report.append(f"\n--- [METADATA: UNAVAILABLE] ({e})")
+            
 
         # Банковские артефакты
         content_str = file_content.decode('utf-8', errors='ignore')
