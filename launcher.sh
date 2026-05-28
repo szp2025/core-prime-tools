@@ -3971,7 +3971,7 @@ async def audit_dispatch():
                 report.append(f"[!] Active probe blocked: {e}")
 
     report.append("\n=== [END OF ANALYSIS] ===")
-    return render_template_string(f"<pre style='background:#000; color:#0f0; padding:15px; font-family:monospace;'>{chr(10).join(report)}</pre>")
+    return render_template_string(f"<pre style='background:#000; color:#0f0; padding:15px;'>{chr(10).join(report)}</pre>")
     
     
 if __name__ == '__main__':
