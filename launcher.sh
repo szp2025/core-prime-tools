@@ -3833,136 +3833,11 @@ def scan():
         
     return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
     
-    
-def audit_iban_internal(iban):
-    iban = request.form.get('iban', '').strip()
-    if not iban: return "Empty IBAN", 400
-    
-    report = [f"=== [FINANCIAL INTEL: {iban}] ==="]
-    
-    # 1. СТРУКТУРНАЯ ВЕРИФИКАЦИЯ (Локальный MOD97)
-    is_valid = verify_iban(iban)
-    report.append(f"[+] MOD97 Check: {'PASSED' if is_valid else 'FAILED'}")
-    
-    # 2. ИДЕНТИФИКАЦИЯ БАНКА (Через GLOBAL_BANK_MATRIX)
-    # Извлекаем код банка из IBAN (для Франции это символы 5-9)
-    bank_code = iban[4:9] if len(iban) > 9 else "UNKNOWN"
-    report.append(f"[+] Extracted Bank Code: {bank_code}")
-    
-    bank_found = False
-    for entry in GLOBAL_BANK_MATRIX:
-        if entry.startswith(bank_code):
-            parts = entry.split('|')
-            report.append(f"[!] BANK IDENTIFIED: {parts[2]} ({parts[3]})")
-            bank_found = True
-            break
-    if not bank_found: report.append("[?] Bank not in Global Registry.")
-
-    # 3. API-ВАЛИДАЦИЯ (Использование первого узла из GLOBAL_API_FINANCE_NODES)
-    # Берем OpenIBAN Community Engine
-    try:
-        api_url = f"https://api.openiban.org/validate/{iban}"
-        resp = requests.get(api_url, timeout=5).json()
-        if resp.get('valid'):
-            report.append(f"[+] API Verification: VALID (Bank: {resp.get('bankData', {}).get('name')})")
-        else:
-            report.append("[!] API Verification: INVALID/NOT FOUND")
-    except Exception as e:
-        report.append(f"[!] API Node unreachable: {e}")
-
-    return render_template_string(render_prime_page("FINANCIAL REPORT", 
-        f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-
-
 
 # --- ИНИЦИАЛИЗАЦИЯ NEXUS-МАТРИЦЫ (Конфигурация) ---
 GLOBAL_FUZZ_WORDLIST = [".env", ".env.local", ".htaccess", ".htpasswd", "config.php", "wp-config.php", "backup.sql", ".git/config", "phpinfo.php", "debug.log"]
 GLOBAL_STATIC_SIGNATURES = r"(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(passwd|shadow)|\b(Authorization|Bearer|X-API-Key|token|secret_key|api_key|passwd|password|private_key|id_rsa)\b"
 
-def unified_recon_internal(target):
-    target = request.form.get('target', '').strip()
-    if not target: return "Empty Target", 400
-    
-    report = [f"=== [NEXUS ADAPTIVE RECON: {target}] ==="]
-    
-    # 1. СТЕПЕНЬ АДАПТАЦИИ (Stealth Delay)
-    # Начинаем с быстрой разведки, но если WAF детектится, замедляемся
-    delay = 0.5 
-    
-    for attempt in range(3):
-        try:
-            # Выбор случайного UA для каждого запроса
-            headers = {'User-Agent': random.choice(GLOBAL_NETWORK_UA)}
-            
-            # Разведка через прокси-запросы (HEAD/GET)
-            resp = requests.get(f"https://{target}" if not target.startswith('http') else target, 
-                               headers=headers, timeout=5)
-            
-            # Анализ WAF в ответах
-            waf_detected = re.search(GLOBAL_SECURITY_MATRIX[0], resp.text, re.IGNORECASE)
-            if waf_detected:
-                report.append(f"[!] WAF Detected ({waf_detected.group(0)}). Adapting...")
-                delay = random.uniform(2.0, 5.0) # Увеличиваем задержку при WAF
-                time.sleep(delay)
-                continue
-            
-            report.append(f"[+] Connection established. WAF: Stealth")
-            break
-        except Exception as e:
-            report.append(f"[!] Attempt {attempt+1} failed: {e}")
-            time.sleep(delay * 2)
-
-    # 2. Интеграция сканирования
-    # Используем задержки для обхода защиты
-    try:
-        report.append("\n--- [NEXUS CONFIGURATION GAP PROBE] ---")
-        for f in GLOBAL_FUZZ_WORDLIST:
-            time.sleep(delay) # Динамическая адаптация паузы между запросами
-            resp = requests.head(f"https://{target}/{f}", headers={'User-Agent': random.choice(GLOBAL_NETWORK_UA)}, timeout=3)
-            if resp.status_code == 200:
-                report.append(f"[CRITICAL] Exposed entry point found: {f}")
-    except:
-        report.append("[!] Probe interrupted.")
-
-    return render_template_string(render_prime_page("NEXUS ADAPTIVE REPORT", 
-        f"<pre>{chr(10).join(report)}</pre>"))
-        
-def audit_phone_internal(phone):
-    phone_input = request.form.get('phone', '').strip()
-    if not phone_input: return "Empty Number", 400
-    
-    report = [f"=== [PHONE INTEL: {phone_input}] ==="]
-    
-    try:
-        # Парсинг номера
-        parsed_number = phonenumbers.parse(phone_input, "FR") # По умолчанию Франция
-        
-        if not phonenumbers.is_valid_number(parsed_number):
-            report.append("[!] Status: INVALID NUMBER FORMAT")
-        else:
-            report.append("[+] Status: VALID NUMBER")
-            
-            # Геолокация
-            location = geocoder.description_for_number(parsed_number, "en")
-            report.append(f"[+] Region: {location}")
-            
-            # Оператор
-            carrier_name = carrier.name_for_number(parsed_number, "en")
-            report.append(f"[+] Carrier: {carrier_name}")
-            
-            # Тип номера (важно для Гамбита!)
-            ntype = number_type(parsed_number)
-            is_voip = (ntype == phonenumbers.PhoneNumberType.VOIP)
-            report.append(f"[+] Type: {'VOIP/VIRTUAL (HIGH RISK)' if is_voip else 'MOBILE/LANDLINE'}")
-            
-            if is_voip:
-                report.append("\n[!] WARNING: VOIP numbers are frequently used by attackers.")
-                
-    except Exception as e:
-        report.append(f"[!] Analysis Error: {e}")
-        
-    return render_template_string(render_prime_page("PHONE REPORT", 
-        f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
 
 # --- Маршрут Диспетчера (Единая точка входа) ---
 @app.route('/audit/dispatch', methods=['POST'])
@@ -3971,38 +3846,88 @@ def audit_dispatch():
     clean_data = data.replace(" ", "")
     if not data: return "Empty Input", 400
 
-    # 1. IBAN
-    if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
-        is_valid = verify_iban(clean_data) # Предполагаем, что эта функция у вас есть
-        is_trusted = any(clean_data.startswith(p) for p in ["FR76", "DE", "GB", "CH", "LU"])
-        res = f"=== [FINANCIAL INTEL: {clean_data}] ===\nStatus: {'VALID (TRUSTED)' if is_valid and is_trusted else 'VALID (FOREIGN)' if is_valid else 'INVALID'}"
-        return render_template_string(render_prime_page("FINANCIAL", f"<pre>{res}</pre><br><a href='/'>RETURN</a>"))
+    report = []
 
-    # 2. ТЕЛЕФОН
+    # --- 1. IBAN (Логика из audit_iban_internal) ---
+    if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
+        is_valid = verify_iban(clean_data)
+        bank_code = clean_data[4:9] if len(clean_data) > 9 else "UNKNOWN"
+        report = [f"=== [FINANCIAL INTEL: {clean_data}] ===", f"[+] MOD97 Check: {'PASSED' if is_valid else 'FAILED'}", f"[+] Bank Code: {bank_code}"]
+        
+        bank_found = False
+        for entry in GLOBAL_BANK_MATRIX:
+            if entry.startswith(bank_code):
+                report.append(f"[!] BANK IDENTIFIED: {entry.split('|')[2]} ({entry.split('|')[3]})")
+                bank_found = True; break
+        if not bank_found: report.append("[?] Bank not in Global Registry.")
+        
+        try:
+            resp = requests.get(f"https://api.openiban.org/validate/{clean_data}", timeout=5).json()
+            report.append(f"[+] API: {'VALID' if resp.get('valid') else 'INVALID'}")
+        except: report.append("[!] API Node unreachable.")
+
+    # --- 2. ТЕЛЕФОН (Логика из audit_phone_internal) ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
+        report = [f"=== [PHONE INTEL: {clean_data}] ==="]
         try:
             p = phonenumbers.parse(clean_data, "FR")
-            res = f"=== [PHONE INTEL: {clean_data}] ===\nRegion: {geocoder.description_for_number(p, 'en')}\nType: {'VOIP' if phonenumbers.number_type(p) == 6 else 'MOBILE'}"
-        except: res = "Error parsing phone."
-        return render_template_string(render_prime_page("PHONE", f"<pre>{res}</pre><br><a href='/'>RETURN</a>"))
+            if not phonenumbers.is_valid_number(p): report.append("[!] Status: INVALID")
+            else:
+                report.extend([f"[+] Status: VALID", f"[+] Region: {geocoder.description_for_number(p, 'en')}",
+                               f"[+] Carrier: {carrier.name_for_number(p, 'en')}",
+                               f"[+] Type: {'VOIP (HIGH RISK)' if number_type(p) == 6 else 'MOBILE/LANDLINE'}"])
+        except Exception as e: report.append(f"[!] Error: {e}")
 
-    # 3. EMAIL
+# --- 3. EMAIL ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
-        res = f"=== [EMAIL INTEL: {data}] ===\nStatus: {'HIGH RISK (DISPOSABLE)' if any(d in data for d in ['temp', 'mail']) else 'ANALYSIS PENDING'}"
-        return render_template_string(render_prime_page("EMAIL", f"<pre>{res}</pre><br><a href='/'>RETURN</a>"))
-
-    # 4. ДОМЕН / IP (NEXUS RECON)
-    elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
-        report = [f"=== [NEXUS RECON ENGINE: {data}] ==="]
+        report = [f"=== [EMAIL INTEL: {data}] ==="]
+        domain = data.split('@')[-1]
+        is_disposable = any(d in domain for d in ['temp', 'mail', 'guerrilla', '10min'])
+        report.append(f"[+] Domain: {domain}")
+        report.append(f"[+] Risk: {'HIGH (DISPOSABLE)' if is_disposable else 'LOW/UNKNOWN'}")
+        # Проверка MX записей для валидации
         try:
-            ip = socket.gethostbyname(data)
-            report.append(f"[+] IP: {ip}\n--- [NMAP] ---")
-            report.append(subprocess.check_output(['nmap', '-F', data], text=True, stderr=subprocess.STDOUT))
-        except Exception as e:
-            report.append(f"[!] Recon failed: {e}")
-        return render_template_string(render_prime_page("RECON", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+            records = subprocess.check_output(['dig', domain, 'MX', '+short'], text=True)
+            report.append(f"[+] MX Records found:\n{records}")
+        except: report.append("[!] Domain DNS unreachable.")
 
-    return "Unknown format.", 400
+    # --- 4. NICKNAME (Новый блок) ---
+    elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
+        report = [f"=== [OSINT NICKNAME PROBE: {data}] ==="]
+        # Проверка наличия профиля на популярных ресурсах
+        platforms = ['github.com', 'twitter.com', 'instagram.com']
+        for p in platforms:
+            try:
+                status = requests.head(f"https://{p}/{data}", timeout=3).status_code
+                if status == 200: report.append(f"[FOUND] Match on {p}")
+            except: pass
+        if len(report) == 1: report.append("[?] No public traces found.")
+
+    # --- 5. ДОМЕН / IP (Логика из unified_recon_internal) ---
+    elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
+        report = [f"=== [NEXUS ADAPTIVE RECON: {data}] ==="]
+        delay = 0.5
+        for attempt in range(3):
+            try:
+                resp = requests.get(f"https://{data}" if not data.startswith('http') else data, 
+                                    headers={'User-Agent': random.choice(GLOBAL_NETWORK_UA)}, timeout=5)
+                if re.search(GLOBAL_SECURITY_MATRIX[0], resp.text, re.IGNORECASE):
+                    report.append(f"[!] WAF Detected. Adapting..."); time.sleep(delay * 4); continue
+                report.append(f"[+] Connection OK"); break
+            except Exception as e: report.append(f"[!] Attempt {attempt+1} failed: {e}"); time.sleep(delay * 2)
+        
+        report.append("\n--- [CONFIG GAP PROBE] ---")
+        for f in GLOBAL_FUZZ_WORDLIST:
+            try:
+                if requests.head(f"https://{data}/{f}", timeout=2).status_code == 200:
+                    report.append(f"[CRITICAL] Exposed: {f}")
+            except: pass
+    
+    else:
+        return "Unknown data format.", 400
+
+    return render_template_string(render_prime_page("AUDIT REPORT", f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+    
     
 
    
