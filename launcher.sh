@@ -3585,7 +3585,10 @@ import socket
 import random
 import time
 import phonenumbers
-
+import asyncio
+import aiodns
+import aiohttp
+import smtplib
 from phonenumbers import geocoder, carrier, number_type
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -3962,7 +3965,7 @@ def audit_dispatch():
         report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
         report.append("=== [END OF ANALYSIS] ===")
         
-# --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
+    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
     if re.match(r'^\+?[0-9]{7,15}$', clean_data):
         import phonenumbers, requests
         from bs4 import BeautifulSoup
@@ -4102,86 +4105,71 @@ def audit_dispatch():
             report.append(f"[!] Forensic Failure: {e}")
                    
 
-    # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ & FORENSIC MASTER ---
+   # --- 3. EMAIL: ASYNC FORENSIC MASTER (HIGH PERFORMANCE) ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', clean_data):
-        import dns.resolver, requests, smtplib
-        from socket import gethostbyname
-        
-        domain = clean_data.split('@')[-1]
-        report.append(f"=== [EMAIL INTEL: {clean_data}] ===")
-        
-        # 1. СЕТЕВАЯ КРИМИНАЛИСТИКА (DNS & RECORDS)
-        # Расширенный список для полной идентификации инфраструктуры
-        records = [
-            'MX',    # Почтовые серверы (маршрутизация)
-            'TXT',   # SPF/DMARC/Domain Verification (идентификация владельца)
-            'SPF',   # Прямая политика отправки (защита от спуфинга)
-            'SOA',   # Начало зоны (кто администрирует домен)
-            'NS',    # Авторитетные DNS-серверы (кто хостит DNS)
-            'CNAME', # Алиасы (выдает скрытые сервисы, например, "mail.domain.com -> google.com")
-            'PTR',   # Обратный DNS (привязка IP к домену, проверка на подмену)
-            'CAA',   # Политика авторизации сертификатов (выдает, кто выпускает SSL)
-            'SRV'    # Служебные записи (показывает использование VOIP/SIP, Active Directory)
-        ]
-        report.append("--- [DNS INFRASTRUCTURE]")
-        for rec in records:
-            try:
-                answers = dns.resolver.resolve(domain, rec)
-                results = [str(rdata) for rdata in answers]
-                report.append(f"[+] {rec:<4} : {', '.join(results[:3])}")
-            except:
-                report.append(f"[!] {rec:<4} : NOT FOUND")
+        import asyncio, aiodns, aiohttp, smtplib
+        from dns import resolver as sync_resolver
 
-        # 2. ANTI-PHISHING & AUTHENTICATION SCANNER
-        report.append("\n--- [AUTHENTICATION & PHISHING PROTOCOLS]")
-        # DMARC Check
-        try:
-            dmarc = dns.resolver.resolve(f"_dmarc.{domain}", "TXT")
-            report.append(f"[+] DMARC : {str(dmarc[0])}")
-        except: report.append("[!] DMARC : MISSING (HIGH PHISHING RISK)")
-        
-        # 3. BREACH & LEAK INTEL (DATABASE CHECK)
-        try:
-            leak_url = f"https://api.breachdirectory.org/v1/check?term={clean_data}"
-            res = requests.get(leak_url, timeout=5)
-            if res.status_code == 200 and res.json().get("found"):
-                report.append("[!!!] SECURITY ALERT: EMAIL FOUND IN PUBLIC BREACHES")
+        async def perform_forensics():
+            domain = clean_data.split('@')[-1]
+            report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
+            dns_resolver = aiodns.DNSResolver()
+            
+            # 1. Параллельный DNS сбор
+            records = ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']
+            async def resolve(rec):
+                try:
+                    res = await dns_resolver.query(domain, rec)
+                    return f"[+] {rec:<6} : {str(res[0])}"
+                except: return f"[!] {rec:<6} : NOT FOUND"
+
+            dns_tasks = [resolve(r) for r in records]
+            report.append("--- [DNS INFRASTRUCTURE (ASYNC)]")
+            report.extend(await asyncio.gather(*dns_tasks))
+
+            # 2. DMARC & BREACH INTEL
+            async def get_dmarc():
+                try:
+                    res = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
+                    return f"[+] DMARC : {str(res[0])}"
+                except: return "[!] DMARC : MISSING"
+
+            async def get_breach():
+                async with aiohttp.ClientSession() as session:
+                    try:
+                        async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=4) as r:
+                            data = await r.json()
+                            return "[!!!] SECURITY ALERT: BREACHED" if data.get("found") else "[+] Breach Intel: CLEAN"
+                    except: return "[!] Breach Intel: UNAVAILABLE"
+
+            other_results = await asyncio.gather(get_dmarc(), get_breach())
+            report.extend(other_results)
+
+            # 3. SMTP VALIDATION (В отдельном потоке)
+            report.append("\n--- [MAILBOX VALIDATION (THREADED)]")
+            def smtp_check():
+                try:
+                    mx = sync_resolver.resolve(domain, 'MX')[0].exchange
+                    with smtplib.SMTP(str(mx), timeout=5) as s:
+                        s.helo(); s.mail('audit@security.test')
+                        code, _ = s.rcpt(clean_data)
+                        return f"[+] SMTP Status: {'ACTIVE' if code == 250 else 'INACTIVE'} (Code: {code})"
+                except: return "[!] SMTP: PROTECTED/BLOCKED"
+
+            trusted = {'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'}
+            if domain.lower() in trusted:
+                report.append("[+] Status: TRUSTED PROVIDER (Skipped)")
             else:
-                report.append("[+] Breach Intel: CLEAN (No data found)")
-        except: report.append("[!] Breach Intel: SERVICE UNAVAILABLE")
+                report.append(await asyncio.to_thread(smtp_check))
 
-        # 4. ВАЛИДАЦИЯ СУЩЕСТВОВАНИЯ (SMTP VRFY)
-        report.append("\n--- [MAILBOX VALIDATION]")
-        try:
-            mx_records = dns.resolver.resolve(domain, 'MX')
-            mx_record = str(mx_records[0].exchange)
-            
-            # Имитация рукопожатия с сервером
-            server = smtplib.SMTP(timeout=5)
-            server.connect(mx_record)
-            server.helo()
-            server.mail('forensic@check.com')
-            code, message = server.rcpt(clean_data)
-            server.quit()
-            
-            if code == 250:
-                report.append("[+] Mailbox Status: ACTIVE/EXISTING")
-            else:
-                report.append(f"[!] Mailbox Status: INACTIVE/REJECTED (Code: {code})")
-        except Exception as e:
-            report.append(f"[!] SMTP Validation: FAILED/BLOCKED BY FIREWALL ({e})")
+            # 4. Итоговая оценка
+            risk_score = sum(1 for line in report if "[!]" in line or "[!!!]" in line)
+            report.append(f"\n--- [RISK SCORE: {risk_score}] ---")
+            report.append("[+] RISK PROFILE: " + ("HIGH" if risk_score > 3 else "LOW"))
 
-        # 5. ЭВРИСТИКА ГАМБИТА (RISK ASSESSMENT)
-        if len(domain) < 5 or '-' in domain and len(domain.split('-')) > 2:
-            report.append("[!!!] SECURITY ALERT: POTENTIAL DGA/TYPOSQUATTING")
-            
-        # Оценка риска для Банковского Гамбита
-        report.append("\n--- [RISK ASSESSMENT]")
-        if "MISSING" in report[-5] or "FOUND IN PUBLIC BREACHES" in report[-4]:
-            report.append("[!] RISK PROFILE: HIGH - DO NOT INTERACT")
-        else:
-            report.append("[!] RISK PROFILE: LOW - TRUSTED DOMAIN")
-            
+        # Запуск асинхронного блока
+        await perform_forensics()
+        
     # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
     elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
         report.append("[+] Initiating cross-platform footprint sweep...")
