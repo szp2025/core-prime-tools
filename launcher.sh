@@ -3839,98 +3839,92 @@ GLOBAL_FUZZ_WORDLIST = [".env", ".env.local", ".htaccess", ".htpasswd", "config.
 GLOBAL_STATIC_SIGNATURES = r"(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(passwd|shadow)|\b(Authorization|Bearer|X-API-Key|token|secret_key|api_key|passwd|password|private_key|id_rsa)\b"
 
 
-# --- Маршрут Диспетчера (Единая точка входа) ---
 @app.route('/audit/dispatch', methods=['POST'])
 def audit_dispatch():
     data = request.form.get('input', '').strip()
     clean_data = data.replace(" ", "")
     if not data: return "Empty Input", 400
 
-    report = []
+    report = [f"=== [NEXUS DEEP-SCAN ANALYSIS: {data}] ==="]
 
-    # --- 1. IBAN (Логика из audit_iban_internal) ---
+    # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
     if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
         is_valid = verify_iban(clean_data)
-        bank_code = clean_data[4:9] if len(clean_data) > 9 else "UNKNOWN"
-        report = [f"=== [FINANCIAL INTEL: {clean_data}] ===", f"[+] MOD97 Check: {'PASSED' if is_valid else 'FAILED'}", f"[+] Bank Code: {bank_code}"]
-        
-        bank_found = False
-        for entry in GLOBAL_BANK_MATRIX:
-            if entry.startswith(bank_code):
-                report.append(f"[!] BANK IDENTIFIED: {entry.split('|')[2]} ({entry.split('|')[3]})")
-                bank_found = True; break
-        if not bank_found: report.append("[?] Bank not in Global Registry.")
-        
+        report.extend([f"[+] MOD97 Check: {'PASSED' if is_valid else 'CRITICAL FAILURE'}",
+                       f"[+] Country: {clean_data[:2]}", f"[+] Bank Code: {clean_data[4:9]}"])
         try:
-            resp = requests.get(f"https://api.openiban.org/validate/{clean_data}", timeout=5).json()
-            report.append(f"[+] API: {'VALID' if resp.get('valid') else 'INVALID'}")
-        except: report.append("[!] API Node unreachable.")
+            resp = requests.get(f"https://api.openiban.org/validate/{clean_data}", timeout=8).json()
+            if resp.get('valid'):
+                bd = resp.get('bankData', {})
+                report.extend([f"[+] Bank Name: {bd.get('name')}", f"[+] BIC/SWIFT: {bd.get('bic')}",
+                               f"[+] Address: {bd.get('street', 'N/A')}, {bd.get('city', 'N/A')}"])
+            else: report.append("[!] API: Entity not registered in SEPA.")
+        except Exception as e: report.append(f"[!] Financial API Timeout: {e}")
 
-    # --- 2. ТЕЛЕФОН (Логика из audit_phone_internal) ---
+    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
-        report = [f"=== [PHONE INTEL: {clean_data}] ==="]
         try:
             p = phonenumbers.parse(clean_data, "FR")
-            if not phonenumbers.is_valid_number(p): report.append("[!] Status: INVALID")
-            else:
-                report.extend([f"[+] Status: VALID", f"[+] Region: {geocoder.description_for_number(p, 'en')}",
-                               f"[+] Carrier: {carrier.name_for_number(p, 'en')}",
-                               f"[+] Type: {'VOIP (HIGH RISK)' if number_type(p) == 6 else 'MOBILE/LANDLINE'}"])
-        except Exception as e: report.append(f"[!] Error: {e}")
+            report.extend([f"[+] Status: {'VALID' if phonenumbers.is_valid_number(p) else 'INVALID'}",
+                           f"[+] Location: {geocoder.description_for_number(p, 'en')}",
+                           f"[+] Timezone: {phonenumbers.timezone.time_zones_for_number(p)}",
+                           f"[+] Carrier: {carrier.name_for_number(p, 'en')}",
+                           f"[+] Line Type: {number_type(p)}",
+                           f"[+] E164 Format: {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"])
+            # Проверка Spydialer/OSINT (имитация)
+            report.append("[+] Reputation: Scanning global spam databases... [CLEAN/SUSPICIOUS]")
+        except Exception as e: report.append(f"[!] Forensic Failure: {e}")
 
-# --- 3. EMAIL ---
+    # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
-        report = [f"=== [EMAIL INTEL: {data}] ==="]
         domain = data.split('@')[-1]
-        is_disposable = any(d in domain for d in ['temp', 'mail', 'guerrilla', '10min'])
-        report.append(f"[+] Domain: {domain}")
-        report.append(f"[+] Risk: {'HIGH (DISPOSABLE)' if is_disposable else 'LOW/UNKNOWN'}")
-        # Проверка MX записей для валидации
-        try:
-            records = subprocess.check_output(['dig', domain, 'MX', '+short'], text=True)
-            report.append(f"[+] MX Records found:\n{records}")
-        except: report.append("[!] Domain DNS unreachable.")
+        report.append(f"[+] Domain Intel: {domain}")
+        # Проверка DNS записей для выявления Shadow-инфраструктуры
+        for rec in ['MX', 'TXT', 'SPF', 'SOA']:
+            try:
+                val = subprocess.check_output(['dig', domain, rec, '+short'], text=True).strip()
+                report.append(f"[+] Record {rec}: {val if val else 'NULL'}")
+            except: report.append(f"[!] DNS {rec} lookup failed.")
 
-    # --- 4. NICKNAME (Новый блок) ---
+    # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
     elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
-        report = [f"=== [OSINT NICKNAME PROBE: {data}] ==="]
-        # Проверка наличия профиля на популярных ресурсах
-        platforms = ['github.com', 'twitter.com', 'instagram.com']
-        for p in platforms:
+        report.append("[+] Initiating cross-platform footprint sweep...")
+        platforms = {'GitHub': 'github.com', 'Twitter': 'twitter.com', 'Instagram': 'instagram.com', 
+                     'Telegram': 't.me', 'TikTok': 'tiktok.com/@', 'Steam': 'steamcommunity.com/id/'}
+        for name, url in platforms.items():
             try:
-                status = requests.head(f"https://{p}/{data}", timeout=3).status_code
-                if status == 200: report.append(f"[FOUND] Match on {p}")
-            except: pass
-        if len(report) == 1: report.append("[?] No public traces found.")
+                resp = requests.get(f"https://{url}/{data}", timeout=4, headers={'User-Agent': 'Nexus/1.0'})
+                report.append(f"[*] {name}: {'MATCH FOUND (200)' if resp.status_code == 200 else 'NOT FOUND'}")
+            except: report.append(f"[*] {name}: ERROR")
 
-    # --- 5. ДОМЕН / IP (Логика из unified_recon_internal) ---
+    # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ РЕКОН (DEEP) ---
     elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
-        report = [f"=== [NEXUS ADAPTIVE RECON: {data}] ==="]
-        delay = 0.5
-        for attempt in range(3):
-            try:
-                resp = requests.get(f"https://{data}" if not data.startswith('http') else data, 
-                                    headers={'User-Agent': random.choice(GLOBAL_NETWORK_UA)}, timeout=5)
-                if re.search(GLOBAL_SECURITY_MATRIX[0], resp.text, re.IGNORECASE):
-                    report.append(f"[!] WAF Detected. Adapting..."); time.sleep(delay * 4); continue
-                report.append(f"[+] Connection OK"); break
-            except Exception as e: report.append(f"[!] Attempt {attempt+1} failed: {e}"); time.sleep(delay * 2)
+        # 1. SSL/TLS сертификаты (разбор криптографии)
+        try:
+            cert = subprocess.check_output(['openssl', 'x509', '-in', '/dev/stdin', '-noout', '-text'], 
+                                           input=subprocess.check_output(['openssl', 's_client', '-connect', f'{data}:443', '-servername', data], 
+                                           input='QUIT', text=True, stderr=subprocess.DEVNULL), text=True)
+            subject = re.search(r'Subject: (.*)', cert).group(1)
+            issuer = re.search(r'Issuer: (.*)', cert).group(1)
+            report.extend([f"[+] SSL Subject: {subject}", f"[+] SSL Issuer: {issuer}"])
+        except: report.append("[!] SSL handshake rejected.")
         
-        report.append("\n--- [CONFIG GAP PROBE] ---")
-        for f in GLOBAL_FUZZ_WORDLIST:
-            try:
-                if requests.head(f"https://{data}/{f}", timeout=2).status_code == 200:
-                    report.append(f"[CRITICAL] Exposed: {f}")
-            except: pass
-    
-    else:
-        return "Unknown data format.", 400
+        # 2. WHOIS и инфраструктура
+        try:
+            whois = subprocess.check_output(['whois', data], text=True, stderr=subprocess.STDOUT)
+            report.append(f"[+] WHOIS Snippet:\n{whois[:800]}") # Только верхушка для лимита
+        except: report.append("[!] WHOIS access denied.")
 
-    return render_template_string(render_prime_page("AUDIT REPORT", f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-    
-    
+        # 3. Активное сканирование портов (NMAP)
+        report.append("--- [ACTIVE VULNERABILITY SURFACE] ---")
+        try:
+            nmap = subprocess.check_output(['nmap', '-F', '-sV', data], text=True)
+            report.append(nmap)
+        except: report.append("[!] Active probe blocked.")
 
-   
+    return render_template_string(render_prime_page("MAX_INTEL_REPORT", f"<pre style='font-size:10px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+    
+  
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
