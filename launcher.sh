@@ -3582,6 +3582,9 @@ import ssl
 import urllib3
 import math
 import socket
+import random
+import time
+
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -3611,6 +3614,20 @@ GLOBAL_HASH_MATRIX = [
 ]
 
 GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
+
+# Матрицы для Nexus-движка
+GLOBAL_NETWORK_UA = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/605.1.15"
+]
+
+GLOBAL_SECURITY_MATRIX = [
+    r"\b(cloudflare|akamai|sucuri|incapsula|imperva|aws-waf|429|too many requests)\b",
+    r"\b(select|union|drop|exec|xp_cmdshell|eval\(|base64_decode)\b"
+]
+
 
 def is_encrypted_container(file_path):
     try:
@@ -3908,62 +3925,50 @@ GLOBAL_STATIC_SIGNATURES = r"(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(p
 def unified_recon():
     target = request.form.get('target', '').strip()
     if not target: return "Empty Target", 400
-        
-    report = [f"=== [NEXUS INTELLIGENCE ENGINE: {target}] ==="]
     
-    # 1. СЕТЕВАЯ И ИНФРАСТРУКТУРНАЯ РАЗВЕДКА
-    try:
-        ip = socket.gethostbyname(target)
-        report.append(f"[+] Resolved IP: {ip}")
-        dns = subprocess.check_output(['dig', target, 'ANY', '+short'], text=True)
-        report.append(f"\n--- [DNS DUMP] ---\n{dns}")
-    except Exception as e:
-        report.append(f"[!] DNS/Resolve Error: {e}")
-
-    # 2. WHOIS
-    try:
-        whois_data = subprocess.check_output(['whois', target], text=True)
-        report.append(f"\n--- [WHOIS ANALYTICS] ---\n{whois_data[:1000]}")
-    except:
-        report.append("\n--- [WHOIS] --- Service unavailable.")
-
-    # 3. АКТИВНЫЙ АУДИТ БЕЗОПАСНОСТИ (NMAP)
-    report.append("\n--- [SECURITY & VULN AUDIT: NMAP] ---")
-    try:
-        nmap = subprocess.check_output(['nmap', '-sV', '-sC', '-Pn', '--top-ports', '100', target], text=True)
-        report.append(nmap)
-    except:
-        report.append("[!] Nmap scan failure.")
-
-    # 4. ИНТЕЛЛЕКТУАЛЬНЫЙ АУДИТ (Используем ваш список FUZZ)
-    report.append("\n--- [NEXUS CONFIGURATION GAP PROBE] ---")
-    for f in GLOBAL_FUZZ_WORDLIST:
+    report = [f"=== [NEXUS ADAPTIVE RECON: {target}] ==="]
+    
+    # 1. СТЕПЕНЬ АДАПТАЦИИ (Stealth Delay)
+    # Начинаем с быстрой разведки, но если WAF детектится, замедляемся
+    delay = 0.5 
+    
+    for attempt in range(3):
         try:
-            url = f"https://{target}/{f}" if not target.startswith('http') else f"{target}/{f}"
-            resp = requests.head(url, timeout=2, allow_redirects=True, headers={'User-Agent': 'Mozilla/5.0 (Nexus-Engine/1.0)'})
-            if resp.status_code == 200:
-                report.append(f"[CRITICAL] Exposed entry point found: {f} (Code: 200)")
-        except:
-            pass
+            # Выбор случайного UA для каждого запроса
+            headers = {'User-Agent': random.choice(GLOBAL_NETWORK_UA)}
+            
+            # Разведка через прокси-запросы (HEAD/GET)
+            resp = requests.get(f"https://{target}" if not target.startswith('http') else target, 
+                               headers=headers, timeout=5)
+            
+            # Анализ WAF в ответах
+            waf_detected = re.search(GLOBAL_SECURITY_MATRIX[0], resp.text, re.IGNORECASE)
+            if waf_detected:
+                report.append(f"[!] WAF Detected ({waf_detected.group(0)}). Adapting...")
+                delay = random.uniform(2.0, 5.0) # Увеличиваем задержку при WAF
+                time.sleep(delay)
+                continue
+            
+            report.append(f"[+] Connection established. WAF: Stealth")
+            break
+        except Exception as e:
+            report.append(f"[!] Attempt {attempt+1} failed: {e}")
+            time.sleep(delay * 2)
 
-    # 5. ГЛУБОКИЙ СТАТИЧЕСКИЙ АНАЛИЗ ЗАГОЛОВКОВ (Ваша HTTP_MATRIX)
-    report.append("\n--- [SERVER INFRASTRUCTURE HEADERS] ---")
+    # 2. Интеграция сканирования
+    # Используем задержки для обхода защиты
     try:
-        resp = requests.get(f"https://{target}" if not target.startswith('http') else target, timeout=5)
-        for header, value in resp.headers.items():
-            if header in ["X-Powered-By", "Server", "X-AspNet-Version", "Via"]:
-                report.append(f"[!] Header Leak: {header} -> {value}")
+        report.append("\n--- [NEXUS CONFIGURATION GAP PROBE] ---")
+        for f in GLOBAL_FUZZ_WORDLIST:
+            time.sleep(delay) # Динамическая адаптация паузы между запросами
+            resp = requests.head(f"https://{target}/{f}", headers={'User-Agent': random.choice(GLOBAL_NETWORK_UA)}, timeout=3)
+            if resp.status_code == 200:
+                report.append(f"[CRITICAL] Exposed entry point found: {f}")
     except:
-        report.append("[!] Header analysis failed.")
+        report.append("[!] Probe interrupted.")
 
-    # 6. ТЕХНИЧЕСКИЙ АНАЛИЗ СИГНАТУР (Поиск секретов)
-    # Здесь мы могли бы просканировать контент, если бы загружали его полностью
-    report.append("\n--- [SIGNATURE SCAN STATUS] ---")
-    report.append("Global Static Signatures Ready for deep-scan mode.")
-
-    return render_template_string(render_prime_page("NEXUS RECON REPORT", 
-        f"<pre style='white-space: pre-wrap; font-size:11px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
-
+    return render_template_string(render_prime_page("NEXUS ADAPTIVE REPORT", 
+        f"<pre>{chr(10).join(report)}</pre>"))
 
         
     
