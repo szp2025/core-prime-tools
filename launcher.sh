@@ -3783,11 +3783,21 @@ def scan():
         # Используем 'strings' для всего: и для сигнатур, и для поиска путей
         strings_output = subprocess.check_output(['strings', tmp], text=True)
         
-        # 1.1 Поиск путей (интегрировано)
-        path_matches = re.findall(r"(?:/|C:\\)[\w./\\-]+", strings_output)
+        # 1.1 Поиск путей (В ДВЕ КОЛОНКИ)
+        path_matches = sorted(list(set(re.findall(r"(?:/|C:\\)[\w./\\-]+", strings_output))))
         if path_matches:
             report.append("\n--- [FOUND FILE PATHS / ARTIFACTS] ---")
-            report.extend(sorted(list(set(path_matches))))
+            
+            # Логика разбиения на 2 колонки
+            half = (len(path_matches) + 1) // 2
+            col1 = path_matches[:half]
+            col2 = path_matches[half:]
+            
+            # Форматирование: выравнивание по ширине (например, 50 символов на колонку)
+            for i in range(max(len(col1), len(col2))):
+                item1 = col1[i] if i < len(col1) else ""
+                item2 = col2[i] if i < len(col2) else ""
+                report.append(f"{item1:<50} | {item2}")
             
         # 1.2 Сигнатурный анализ (основной)
         for line in strings_output.splitlines():
@@ -3799,7 +3809,7 @@ def scan():
                     report.append(f"[!!! THREAT: {layer} !!!]")
                     threat_count += 1
         
-# --- БЛОК 2: DEEP FORENSIC (MAXIMUM ENGINE) ---
+        # --- БЛОК 2: DEEP FORENSIC (MAXIMUM ENGINE) ---
         report.append("\n=== [INITIATING DEEP FORENSIC ANALYSIS] ===")
         
         # 1. Глубокие метаданные (Максимальное покрытие)
