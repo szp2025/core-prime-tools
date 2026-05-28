@@ -3830,10 +3830,18 @@ def scan():
         
         # Раздельные паттерны для исключения "мусора"
         patterns = {
-            "IBAN": r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
-            "BIC/SWIFT": r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b",
-            "RIB (FR)": r"\b\d{5}\s?\d{5}\s?\d{11}\s?\d{2}\b"
-        }
+                "IBAN": r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
+                "BIC/SWIFT": r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b",
+                "RIB (FR)": r"\b\d{5}\s?\d{5}\s?\d{11}\s?\d{2}\b",
+                
+                # --- ЧЕГО НЕ ХВАТАЛО ---
+                # 1. Суммы транзакций (EUR, USD, GBP + число)
+                "TRANSACTION AMOUNT": r"\b\d{1,3}(\s?\d{3})*([.,]\d{2})?\s?(EUR|€|USD|\$|GBP|£)\b",
+                # 2. Номера ссылок/ордеров (REF / ORDER / ID)
+                "REF/ORDER ID": r"\b(REF|ORDER|ID|Virement)[:\s#]{1,3}[A-Z0-9-]{6,15}\b",
+                # 3. Имена (Поиск шаблонов "M." или "Mme" перед словами с большой буквы)
+                "BENEFICIARY": r"\b(M\.|Mme|Mr|Ms|Société|SARL|SAS)[:\s][A-Z][a-z]+(\s[A-Z][a-z]+)?\b"
+            }
 
         found_financial = False
         for name, pattern in patterns.items():
