@@ -3909,74 +3909,85 @@ def audit_dispatch():
     # Инициализация отчета (структура строго по заданному формату)
     report = [f"=== [NEXUS DEEP-SCAN ANALYSIS: {data}] ==="]
 
-    # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
+    # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ (РАБОЧИЕ УЗЛЫ) ---
     if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
         is_valid = verify_iban(clean_data)
         report.append(f"[+] MOD97 Check: {'PASSED' if is_valid else 'CRITICAL FAILURE'}")
         
-        bic = clean_data[4:12]
-        bik = clean_data[4:13]
+        # Подготовка данных для запросов
+        bic = clean_data[4:12] # Стандартный BIC
+        
+        # Словарь узлов с логикой параметров для каждого
+        # Мы используем список кортежей, чтобы передавать нужный параметр
         nodes = [
-            "https://api.openiban.org/validate/{IBAN}",
-            "https://api.ibanapi.com/v1/validate/{IBAN}?api_key=free",
-            "https://api.validiban.com/v1/check/{IBAN}",
-            "https://relais.epsoft.fr/api/iban/{IBAN}",
-            "https://api.swiftcodesfinder.com/v1/swift/{BIC}",
-            "https://bank-code.net/api/v1/bic/{BIC}"
+            ("https://api.openiban.org/validate/{}", clean_data),
+            ("https://relais.epsoft.fr/api/iban/{}", clean_data),
+            ("https://bank-code.net/api/v1/bic/{}", bic)
         ]
         
-        found = False
-        for url_template in nodes:
+        found_nodes_count = 0
+        for url_template, param in nodes:
             try:
-                resp = requests.get(url_template.format(IBAN=clean_data, BIC=bic, BIK=bik), timeout=5)
+                # Формируем URL динамически
+                target_url = url_template.format(param)
+                
+                resp = requests.get(target_url, timeout=7, headers={'User-Agent': 'Nexus-Forensic/1.0'})
+                
                 if resp.status_code == 200:
                     data_json = resp.json()
+                    
+                    # Извлечение данных с учетом структуры конкретного API
+                    # Для openiban структура часто плоская, для остальных - через 'bankData'
                     bd = data_json.get('bankData') or data_json.get('bank') or data_json
                     
-                    # Максимум информации: извлекаем всё, что есть в объекте ответа
+                    report.append(f"--- [SOURCE: {url_template.split('/')[2]}] ---")
                     report.extend([
-                        f"[+] Source Node: {url_template.split('//')[1].split('/')[0]}",
-                        f"[+] Institution: {bd.get('name') or bd.get('bankName') or 'N/A'}",
-                        f"[+] BIC/SWIFT  : {bd.get('bic') or bd.get('swift') or 'N/A'}",
-                        f"[+] Location   : {bd.get('city') or bd.get('zip') or 'N/A'}, {bd.get('country') or 'N/A'}",
-                        f"[+] Contact    : {bd.get('phone') or 'N/A'}"
+                        f"[+] Institution : {bd.get('name') or bd.get('bankName') or 'N/A'}",
+                        f"[+] BIC/SWIFT   : {bd.get('bic') or bd.get('swift') or 'N/A'}",
+                        f"[+] Location    : {bd.get('city') or 'N/A'}, {bd.get('country') or 'N/A'}"
                     ])
-                    found = True
-                    break 
-            except: 
-                continue 
-        if not found: 
-            report.append("[!] FinIntel Nodes: All validators unreachable.")
+                    found_nodes_count += 1
+            except Exception as e:
+                # Логируем ошибку тихо, не прерывая выполнение
+                continue
+        
+        if found_nodes_count == 0:
+            report.append("[!] FinIntel Nodes: No public data returned for this IBAN/BIC.")
+        else:
+            report.append(f"[+] Intelligence nodes successfully reached: {found_nodes_count}")
 
-        # --- СИНТЕЗ КРИТИЧЕСКИХ ДАННЫХ (Forensic Summary) ---
+        # --- СИНТЕЗ КРИТИЧЕСКИХ ДАННЫХ ---
         report.append("\n--- [SECURITY & FORENSIC SUMMARY]")
-        report.append(f"[!] Risk Score: {'HIGH' if not found else 'LOW'}")
+        report.append(f"[!] Risk Score: {'LOW' if found_nodes_count > 0 else 'MEDIUM'}")
         report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
         report.append("=== [END OF ANALYSIS] ===")
-
-    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА (MASTER FORENSIC ENGINE) ---
-    elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
-        import phonenumbers
-        from phonenumbers import geocoder, carrier, timezone, number_type
         
-        report = [f"=== [PHONE INTEL: {clean_data}] ==="]
+    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА (MASTER FORENSIC ENGINE) ---
+    if re.match(r'^\+?[0-9]{7,15}$', clean_data):
+        import phonenumbers
+        from phonenumbers import geocoder, carrier, timezone, PhoneNumberType
+        
+        report.append(f"=== [PHONE INTEL: {clean_data}] ===")
         try:
-            # Парсим номер, по умолчанию считаем регион Франция
             p = phonenumbers.parse(clean_data, "FR")
             if not phonenumbers.is_valid_number(p): 
                 report.append("[!] Status: INVALID FORMAT/NON-EXISTENT")
             else:
-                ntype = number_type(p)
-                # Определяем тип номера более точно
+                # Теперь мы используем PhoneNumberType корректно
+                ntype = phonenumbers.number_type(p)
+                
                 type_map = {
-                    number_type.FIXED_LINE: "Landline (Fixed)",
-                    number_type.MOBILE: "Mobile Network",
-                    number_type.VOIP: "VOIP/Virtual (HIGH RISK)",
-                    number_type.TOLL_FREE: "Toll-Free/Service",
-                    number_type.SHARED_COST: "Shared Cost/Premium"
+                    PhoneNumberType.FIXED_LINE: "Landline (Fixed)",
+                    PhoneNumberType.MOBILE: "Mobile Network",
+                    PhoneNumberType.VOIP: "VOIP/Virtual (HIGH RISK)",
+                    PhoneNumberType.TOLL_FREE: "Toll-Free/Service",
+                    PhoneNumberType.SHARED_COST: "Shared Cost/Premium",
+                    PhoneNumberType.PAGER: "Pager",
+                    PhoneNumberType.UAN: "Universal Access Number",
+                    PhoneNumberType.UNKNOWN: "Unknown"
                 }
                 
-                # Сбор полных данных
+                # Сбор расширенных данных
                 region = geocoder.description_for_number(p, "en")
                 op = carrier.name_for_number(p, "en")
                 tz = ", ".join(timezone.time_zones_for_number(p))
@@ -3992,17 +4003,22 @@ def audit_dispatch():
                 
                 # --- ЭВРИСТИКА ГАМБИТА (RISK ASSESSMENT) ---
                 risk = "LOW"
-                if ntype == number_type.VOIP: risk = "CRITICAL (Virtual/Temporary)"
-                elif ntype == number_type.SHARED_COST: risk = "MEDIUM (Financial Scam Risk)"
-                elif not op: risk = "MEDIUM (Unknown Carrier)"
+                if ntype == PhoneNumberType.VOIP: 
+                    risk = "CRITICAL (Virtual/Temporary)"
+                elif ntype == PhoneNumberType.SHARED_COST: 
+                    risk = "MEDIUM (Financial Scam Risk)"
+                elif not op: 
+                    risk = "MEDIUM (Unknown Carrier)"
                 
                 report.append(f"\n--- [RISK ASSESSMENT]")
                 report.append(f"[!] Risk Profile: {risk}")
                 
                 if risk != "LOW":
                     report.append("[!!!] SECURITY ACTION: PROCEED WITH EXTREME CAUTION")
+
         except Exception as e: 
             report.append(f"[!] Forensic Failure: {e}")
+            
 
     # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ (FORENSIC MASTER) ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
