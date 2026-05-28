@@ -3584,8 +3584,9 @@ import math
 import socket
 import random
 import time
+import phonenumbers
 
-
+from phonenumbers import geocoder, carrier, number_type
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
@@ -3628,6 +3629,11 @@ GLOBAL_SECURITY_MATRIX = [
     r"\b(select|union|drop|exec|xp_cmdshell|eval\(|base64_decode)\b"
 ]
 
+GLOBAL_PHONE_RISK_MATRIX = {
+    "VOIP": "HIGH_RISK",
+    "UNKNOWN_CARRIER": "MEDIUM_RISK",
+    "INTERNATIONAL_OFFSHORE": "CRITICAL_RISK"
+}
 
 def is_encrypted_container(file_path):
     try:
@@ -3717,6 +3723,14 @@ def index():
         </form>
         
     </div>
+
+    <div style="margin-top: 15px;">
+        <h3>[ PHONE ANALYZER ]</h3>
+        <form action="/audit/phone" method="POST">
+            <input type="text" name="phone" placeholder="+33 6 00 00 00 00">
+            <button type="submit" class="btn">AUDIT IDENTITY</button>
+        </form>
+    </div> 
     
         {injection_kit_html}
     </div>
@@ -3909,12 +3923,47 @@ def process_audit():
         report.append(f"Process audit failure: {str(e)}")
     return render_template_string(render_prime_page("PROCESS_REPORT", f"<pre style='font-size:10px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
     
+
 @app.route('/audit/iban', methods=['POST'])
 def audit_iban():
-    iban = request.form.get('iban', '')
+    iban = request.form.get('iban', '').strip()
+    if not iban: return "Empty IBAN", 400
+    
+    report = [f"=== [FINANCIAL INTEL: {iban}] ==="]
+    
+    # 1. СТРУКТУРНАЯ ВЕРИФИКАЦИЯ (Локальный MOD97)
     is_valid = verify_iban(iban)
-    status = "VALID" if is_valid else "INVALID/CORRUPTED"
-    return render_template_string(render_prime_page("IBAN REPORT", f"IBAN: {iban}<br>Status: {status}"))
+    report.append(f"[+] MOD97 Check: {'PASSED' if is_valid else 'FAILED'}")
+    
+    # 2. ИДЕНТИФИКАЦИЯ БАНКА (Через GLOBAL_BANK_MATRIX)
+    # Извлекаем код банка из IBAN (для Франции это символы 5-9)
+    bank_code = iban[4:9] if len(iban) > 9 else "UNKNOWN"
+    report.append(f"[+] Extracted Bank Code: {bank_code}")
+    
+    bank_found = False
+    for entry in GLOBAL_BANK_MATRIX:
+        if entry.startswith(bank_code):
+            parts = entry.split('|')
+            report.append(f"[!] BANK IDENTIFIED: {parts[2]} ({parts[3]})")
+            bank_found = True
+            break
+    if not bank_found: report.append("[?] Bank not in Global Registry.")
+
+    # 3. API-ВАЛИДАЦИЯ (Использование первого узла из GLOBAL_API_FINANCE_NODES)
+    # Берем OpenIBAN Community Engine
+    try:
+        api_url = f"https://api.openiban.org/validate/{iban}"
+        resp = requests.get(api_url, timeout=5).json()
+        if resp.get('valid'):
+            report.append(f"[+] API Verification: VALID (Bank: {resp.get('bankData', {}).get('name')})")
+        else:
+            report.append("[!] API Verification: INVALID/NOT FOUND")
+    except Exception as e:
+        report.append(f"[!] API Node unreachable: {e}")
+
+    return render_template_string(render_prime_page("FINANCIAL REPORT", 
+        f"<pre style='white-space: pre-wrap;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
 
 
 # --- ИНИЦИАЛИЗАЦИЯ NEXUS-МАТРИЦЫ (Конфигурация) ---
@@ -3970,6 +4019,43 @@ def unified_recon():
     return render_template_string(render_prime_page("NEXUS ADAPTIVE REPORT", 
         f"<pre>{chr(10).join(report)}</pre>"))
 
+@app.route('/audit/phone', methods=['POST'])
+def audit_phone():
+    phone_input = request.form.get('phone', '').strip()
+    if not phone_input: return "Empty Number", 400
+    
+    report = [f"=== [PHONE INTEL: {phone_input}] ==="]
+    
+    try:
+        # Парсинг номера
+        parsed_number = phonenumbers.parse(phone_input, "FR") # По умолчанию Франция
+        
+        if not phonenumbers.is_valid_number(parsed_number):
+            report.append("[!] Status: INVALID NUMBER FORMAT")
+        else:
+            report.append("[+] Status: VALID NUMBER")
+            
+            # Геолокация
+            location = geocoder.description_for_number(parsed_number, "en")
+            report.append(f"[+] Region: {location}")
+            
+            # Оператор
+            carrier_name = carrier.name_for_number(parsed_number, "en")
+            report.append(f"[+] Carrier: {carrier_name}")
+            
+            # Тип номера (важно для Гамбита!)
+            ntype = number_type(parsed_number)
+            is_voip = (ntype == phonenumbers.PhoneNumberType.VOIP)
+            report.append(f"[+] Type: {'VOIP/VIRTUAL (HIGH RISK)' if is_voip else 'MOBILE/LANDLINE'}")
+            
+            if is_voip:
+                report.append("\n[!] WARNING: VOIP numbers are frequently used by attackers.")
+                
+    except Exception as e:
+        report.append(f"[!] Analysis Error: {e}")
+        
+    return render_template_string(render_prime_page("PHONE REPORT", 
+        f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
         
     
 if __name__ == '__main__':
