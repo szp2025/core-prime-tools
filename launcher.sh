@@ -3962,9 +3962,9 @@ def audit_dispatch():
         report.append(f"[!] Integrity Status: {'VERIFIED' if is_valid else 'COMPROMISED'}")
         report.append("=== [END OF ANALYSIS] ===")
         
-    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА (MASTER FORENSIC ENGINE) ---
+     # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & BREACH INTEL (MASTER ENGINE) ---
     if re.match(r'^\+?[0-9]{7,15}$', clean_data):
-        import phonenumbers
+        import phonenumbers, requests
         from phonenumbers import geocoder, carrier, timezone, PhoneNumberType
         
         report.append(f"=== [PHONE INTEL: {clean_data}] ===")
@@ -3973,9 +3973,8 @@ def audit_dispatch():
             if not phonenumbers.is_valid_number(p): 
                 report.append("[!] Status: INVALID FORMAT/NON-EXISTENT")
             else:
-                # Использование PhoneNumberType
+                # 1. Сбор гео-данных
                 ntype = phonenumbers.number_type(p)
-                
                 type_map = {
                     PhoneNumberType.FIXED_LINE: "Landline (Fixed)",
                     PhoneNumberType.MOBILE: "Mobile Network",
@@ -3986,8 +3985,6 @@ def audit_dispatch():
                     PhoneNumberType.UAN: "Universal Access Number",
                     PhoneNumberType.UNKNOWN: "Unknown"
                 }
-                
-                # Сбор расширенных данных
                 region = geocoder.description_for_number(p, "en")
                 op = carrier.name_for_number(p, "en")
                 tz = ", ".join(timezone.time_zones_for_number(p))
@@ -4001,17 +3998,37 @@ def audit_dispatch():
                     f"[+] E164      : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
                 ])
                 
-                # --- ДОПОЛНЕНИЕ: DIGITAL FOOTPRINT SWEEP (РАСШИРЕННЫЙ) ---
+                # 2. МОДУЛЬ: BREACH INTEL
+                report.append("\n--- [BREACH & COMB INTEL SCAN]")
+                breach_nodes = [
+                    "https://api.proxynova.com/comb?query={TARGET}|GET|ProxyNova",
+                    "https://api.breachdirectory.org/v1/check?term={TARGET}|GET|BreachDirectory"
+                ]
+                for node in breach_nodes:
+                    url_tpl, method, name = node.split('|')
+                    target_url = url_tpl.replace("{TARGET}", clean_data.lstrip('+'))
+                    try:
+                        res = requests.get(target_url, timeout=5)
+                        if res.status_code == 200:
+                            data = res.json()
+                            if data.get("found") or data.get("leaks"):
+                                report.append(f"[!] {name}: COMPROMISED (Data found in breach)")
+                            else:
+                                report.append(f"[+] {name}: CLEAN (No leaks found)")
+                    except: continue
+
+                # 3. МОДУЛЬ: DIGITAL FOOTPRINT SWEEP (FULL MAPPING & VALIDATION)
                 report.append("\n--- [DIGITAL FOOTPRINT SWEEP: VERIFIED LINKS]")
                 platforms = {
-                    "Telegram": f"https://t.me/{clean_data}",
-                    "WhatsApp": f"https://wa.me/{clean_data.replace('+', '')}",
+                    "Telegram": f"https://t.me/{clean_data.lstrip('+')}",
+                    "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}",
                     "Signal":   f"https://signal.me/#p/{clean_data}",
                     "LinkedIn": f"https://www.linkedin.com/search/results/people/?keywords={clean_data}",
                     "Twitter":  f"https://twitter.com/search?q={clean_data}",
-                    "Instagram": f"https://www.instagram.com/{clean_data.replace('+', '')}/",
+                    "Instagram": f"https://www.instagram.com/{clean_data.lstrip('+')}/",
                     "Facebook": f"https://www.facebook.com/search/top/?q={clean_data}",
-                    "Truecaller": f"https://www.truecaller.com/search/fr/{clean_data.replace('+', '')}"
+                    "GitHub":   f"https://github.com/search?q={clean_data}&type=users",
+                    "Truecaller": f"https://www.truecaller.com/search/fr/{clean_data.lstrip('+')}"
                 }
                 
                 found_footprint = False
@@ -4019,42 +4036,36 @@ def audit_dispatch():
                 
                 for name, url in platforms.items():
                     try:
-                        # Используем HEAD для подтверждения активности
-                        res = requests.head(url, timeout=4, allow_redirects=True, headers=headers)
+                        res = requests.get(url, timeout=5, allow_redirects=True, headers=headers)
                         
-                        # Если сервер отвечает, значит ссылка валидна и доступна
-                        if res.status_code == 200:
-                            report.append(f"[+] {name}: {url}")
+                        # ФИЛЬТР ВАЛИДНОСТИ:
+                        # 1. Проверяем наличие маркеров ошибок в тексте страницы (если поиск выдал пустоту)
+                        # 2. Для мессенджеров проверяем, что URL после редиректа не ведет на главную
+                        page_text = res.text.lower()
+                        is_error = any(word in page_text for word in ["not found", "no results", "doesn’t exist", "404", "error"])
+                        
+                        if res.status_code == 200 and not is_error:
+                            # Проверка для WhatsApp/Telegram: если URL не изменился на главную страницу сервиса
+                            if name in ["WhatsApp", "Telegram"] and len(res.url) < 30: continue
+                            
+                            report.append(f"[+] {name}: {res.url}")
                             found_footprint = True
-                    except: 
-                        continue
+                    except: continue
                 
                 if not found_footprint:
-                    report.append("[!] Footprint: No public direct links active.")
-                    
+                    report.append("[!] Footprint: No verified public profiles detected.")
                 
-                # --- ЭВРИСТИКА ГАМБИТА (RISK ASSESSMENT) ---
+                # 4. ЭВРИСТИКА ГАМБИТА
                 risk = "LOW"
-                if ntype == PhoneNumberType.VOIP: 
-                    risk = "CRITICAL (Virtual/Temporary)"
-                elif ntype == PhoneNumberType.SHARED_COST: 
-                    risk = "MEDIUM (Financial Scam Risk)"
-                elif not op: 
-                    risk = "MEDIUM (Unknown Carrier)"
-                
-                # Усиление риска: если найден цифровой след на виртуальном номере
-                if found_footprint and ntype == PhoneNumberType.VOIP:
-                    risk = "DANGEROUS (Scam-Verified)"
+                if ntype == PhoneNumberType.VOIP: risk = "CRITICAL (Virtual/Temporary)"
+                if found_footprint and ntype == PhoneNumberType.VOIP: risk = "DANGEROUS (Scam-Verified)"
                 
                 report.append(f"\n--- [RISK ASSESSMENT]")
                 report.append(f"[!] Risk Profile: {risk}")
-                
-                if risk != "LOW":
-                    report.append("[!!!] SECURITY ACTION: PROCEED WITH EXTREME CAUTION")
+                if risk != "LOW": report.append("[!!!] SECURITY ACTION: PROCEED WITH EXTREME CAUTION")
 
         except Exception as e: 
             report.append(f"[!] Forensic Failure: {e}")
-            
             
             
 
