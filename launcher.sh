@@ -3861,19 +3861,34 @@ def audit_dispatch():
             else: report.append("[!] API: Entity not registered in SEPA.")
         except Exception as e: report.append(f"[!] Financial API Timeout: {e}")
 
-    # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА ---
+  # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА (ИСПРАВЛЕНО) ---
     elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
+        import phonenumbers
+        from phonenumbers import geocoder, carrier, timezone, phonenumberutil
+        
+        report = [f"=== [PHONE INTEL: {clean_data}] ==="]
         try:
             p = phonenumbers.parse(clean_data, "FR")
-            report.extend([f"[+] Status: {'VALID' if phonenumbers.is_valid_number(p) else 'INVALID'}",
-                           f"[+] Location: {geocoder.description_for_number(p, 'en')}",
-                           f"[+] Timezone: {phonenumbers.timezone.time_zones_for_number(p)}",
-                           f"[+] Carrier: {carrier.name_for_number(p, 'en')}",
-                           f"[+] Line Type: {number_type(p)}",
-                           f"[+] E164 Format: {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"])
-            # Проверка Spydialer/OSINT (имитация)
-            report.append("[+] Reputation: Scanning global spam databases... [CLEAN/SUSPICIOUS]")
-        except Exception as e: report.append(f"[!] Forensic Failure: {e}")
+            if not phonenumbers.is_valid_number(p): 
+                report.append("[!] Status: INVALID FORMAT")
+            else:
+                # Получаем тип номера через PhoneNumberType
+                ntype = phonenumbers.number_type(p)
+                
+                report.extend([
+                    f"[+] Status: VALID",
+                    f"[+] Region: {geocoder.description_for_number(p, 'en')}",
+                    f"[+] Timezone: {', '.join(timezone.time_zones_for_number(p))}",
+                    f"[+] Carrier: {carrier.name_for_number(p, 'en')}",
+                    f"[+] Type Code: {ntype}", 
+                    f"[+] E164 Format: {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
+                ])
+                
+                # Анализ риска для Гамбита
+                if ntype == phonenumbers.PhoneNumberType.VOIP:
+                    report.append("[!] ALERT: VOIP/Virtual number detected (HIGH RISK)")
+        except Exception as e: 
+            report.append(f"[!] Forensic Failure: {e}")
 
     # --- 3. EMAIL: СЕТЕВАЯ ИДЕНТИФИКАЦИЯ ---
     elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
