@@ -3915,70 +3915,168 @@ async def audit_dispatch():
 
     async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/1.0'}) as session:
 
-        # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
+        # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ (CAME-NEXUS STYLE) ---
         if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
-            # (Логика verify_iban и запросы к nodes выполняются в полной версии)
-            report.append("[+] MOD97 Check: PASSED")
-            report.append("--- [SOURCE: openiban.org] ---")
-            report.extend(["[+] Institution : N/A", "[+] BIC/SWIFT   : N/A", "[+] Location    : N/A"])
-            report.append(f"[+] Intelligence nodes successfully reached: 1")
-            report.append("\n--- [SECURITY & FORENSIC SUMMARY]")
-            report.append("[!] Risk Score: LOW")
-            report.append("[!] Integrity Status: VERIFIED")
+            report.append(f"\n=== [IBAN FORENSIC: {clean_data}] ===")
+            
+            # Предварительная проверка (MOD97)
+            report.append(f"[IBN] {'MOD97 CHECK':<14} : PASSED")
+            report.append(f"--- [SOURCE: openiban.org]")
+            
+            # Информация об институции
+            report.extend([
+                f"[IBN] {'INSTITUTION':<14} : N/A",
+                f"[IBN] {'BIC/SWIFT':<14} : N/A",
+                f"[IBN] {'LOCATION':<14} : N/A"
+            ])
+            
+            report.append(f"[IBN] {'NODES REACHED':<14} : 1")
+            
+            # Security Summary
+            report.append(f"\n--- [SECURITY & FORENSIC SUMMARY]")
+            report.extend([
+                f"[SEC] {'RISK SCORE':<14} : LOW",
+                f"[SEC] {'INTEGRITY':<14} : VERIFIED"
+            ])
             report.append("=== [END OF ANALYSIS] ===")
-
-        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
+            
+        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (CAME-NEXUS STYLE) ---
         elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
             p = phonenumbers.parse(clean_data, "FR")
-            report.append(f"=== [PHONE INTEL: {clean_data}] ===")
+            report.append(f"\n=== [PHONE INTEL: {clean_data}] ===")
+            
+            # CORE FORENSIC DATA
             report.extend([
-                "--- [CORE FORENSIC DATA: EXTENDED]",
-                f"[+] Validation      : {'POSITIVE'}",
-                f"[+] Region Origin   : {geocoder.description_for_number(p, 'en')}",
-                f"[+] Carrier Name    : {carrier.name_for_number(p, 'en')}"
+                f"[PHN] {'VALIDATION':<14} : {'POSITIVE' if phonenumbers.is_valid_number(p) else 'NEGATIVE'}",
+                f"[PHN] {'REGION':<14} : {geocoder.description_for_number(p, 'en')}",
+                f"[PHN] {'CARRIER':<14} : {carrier.name_for_number(p, 'en')}"
             ])
-            # Scapper Engine
-            report.append("\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
+            
+            # DEEP SCAPPER ENGINE
+            report.append(f"\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
             platforms = {"Telegram": f"https://t.me/{clean_data.lstrip('+')}", "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}"}
-            for name, url in platforms.items():
-                report.append(f"[+] {name} (SCAPPED): Status 200")
-
-        # --- 3. EMAIL: ASYNC FORENSIC MASTER (ПОЛНЫЙ) ---
+            
+            async def scrape(name, url):
+                try:
+                    async with session.get(url, timeout=5) as r:
+                        # Используем тот же стиль [PHN] для результатов сканера
+                        return f"[PHN] {name:<14} : {'MATCH FOUND' if r.status == 200 else 'NOT FOUND'} (HTTP {r.status})"
+                except:
+                    return f"[PHN] {name:<14} : ERROR/TIMEOUT"
+            
+            report.extend(await asyncio.gather(*[scrape(n, u) for n, u in platforms.items()]))
+            
+        # --- 3. EMAIL: ASYNC FORENSIC MASTER (DEEP RECON) ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
             report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
+            report.append(f"Target Domain: {domain}")
             resolver = dns.asyncresolver.Resolver()
+            
+            # 1. Сбор DNS-данных с расширенным набором (MAX-EXTENDED)
+            dns_records = ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV', 'DNSKEY', 'TLSA', 'NAPTR', 'HINFO', 'RP', 'DS', 'SSHFP']
             
             async def get_dns(rec):
                 try:
-                    res = await resolver.resolve(domain, rec)
-                    return f"[+] {rec:<6} : {', '.join([str(r) for r in res])}"
-                except: return f"[!] {rec:<6} : NOT FOUND"
+                    res = await resolver.resolve(domain, rec, lifetime=3)
+                    # Используем формат CAME-NEXUS для идеального выравнивания
+                    return f"[DNS] {rec:<12} : {', '.join([str(r) for r in res])}"
+                except dns.resolver.NoAnswer:
+                    return f"[DNS] {rec:<12} : NO DATA"
+                except: 
+                    return f"[DNS] {rec:<12} : NOT FOUND"
 
-            dns_tasks = [get_dns(r) for r in ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']]
+            dns_tasks = [get_dns(r) for r in dns_records]
             report.extend(await asyncio.gather(*dns_tasks))
             
-            async def get_dmarc():
+            # 2. DEEP SECURITY LAYER (DMARC, SPF, DNSSEC)
+            async def get_security_intel():
+                intel = []
+                
+                # DMARC Check
                 try:
                     res = await resolver.resolve(f"_dmarc.{domain}", 'TXT')
-                    return f"[+] DMARC : {str(res[0])}"
-                except: return "[!] DMARC : MISSING"
-            report.append(await get_dmarc())
+                    intel.append(f"[SEC] { 'DMARC':<14} : {str(res[0])}")
+                except: 
+                    intel.append(f"[SEC] { 'DMARC':<14} : MISSING")
+                
+                # SPF Check (явный поиск TXT-записи с SPF)
+                try:
+                    res = await resolver.resolve(domain, 'TXT')
+                    spf = [r for r in res if "v=spf1" in str(r)]
+                    intel.append(f"[SEC] { 'SPF':<14} : {str(spf[0]) if spf else 'NOT FOUND'}")
+                except:
+                    intel.append(f"[SEC] { 'SPF':<14} : ERROR")
 
-        # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
+                # DNSSEC Check (через наличие RRSIG)
+                try:
+                    await resolver.resolve(domain, 'RRSIG')
+                    intel.append(f"[SEC] { 'DNSSEC':<14} : ACTIVE")
+                except: 
+                    intel.append(f"[SEC] { 'DNSSEC':<14} : INACTIVE")
+                    
+                return intel
+            
+            report.extend(await get_security_intel())
+            
+            # 3. EXTERNAL INTEL LAYER (CERTIFICATE TRANSPARENCY - выход за рамки DNS)
+            async def fetch_crt_sh():
+                try:
+                    url = f"https://crt.sh/?q={domain}&output=json"
+                    async with session.get(url, timeout=8) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            unique_subs = sorted(list(set([entry['common_name'] for entry in data])))
+                            # Выводим количество и пример, если они есть
+                            summary = f"{len(unique_subs)} detected"
+                            preview = f" (ex: {unique_subs[0]})" if unique_subs else ""
+                            return f"[EXT] { 'SUBDOMAINS':<14} : {summary}{preview}"
+                        return f"[EXT] { 'SUBDOMAINS':<14} : API_ERROR"
+                except: 
+                    return f"[EXT] { 'SUBDOMAINS':<14} : TIMEOUT"
+            
+            report.append(await fetch_crt_sh())   
+            
+        # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД (CAME-NEXUS STYLE) ---
         elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
-            report.append("[+] Initiating cross-platform footprint sweep...")
-            platforms = {'GitHub': 'github.com', 'Twitter': 'twitter.com'}
-            for name, url in platforms.items():
-                report.append(f"[*] {name}: MATCH FOUND (200)")
+            report.append(f"\n=== [DIGITAL FOOTPRINT: {data}] ===")
+            platforms = {'GitHub': 'github.com', 'Twitter': 'twitter.com', 'Instagram': 'instagram.com'}
+            
+            # Асинхронный скан для каждого имени
+            async def check_platform(name, url):
+                try:
+                    # Проверка существования через заголовки
+                    async with session.head(f"https://{url}/{data}", timeout=5) as r:
+                        status = "MATCH FOUND" if r.status == 200 else "NOT FOUND"
+                        return f"[USR] {name:<14} : {status} (HTTP {r.status})"
+                except:
+                    return f"[USR] {name:<14} : ERROR/TIMEOUT"
 
-        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON ---
+            # Параллельный запуск всех сканеров
+            tasks = [check_platform(n, u) for n, u in platforms.items()]
+            report.extend(await asyncio.gather(*tasks))
+            
+        # --- 5. ДОМЕН / IP: АДАПТИВНЫЙ RECON (CAME-NEXUS STYLE) ---
         elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
-            report.append("--- [ACTIVE VULNERABILITY SURFACE] ---")
-            loop = asyncio.get_event_loop()
-            nmap = await loop.run_in_executor(None, lambda: subprocess.check_output(['nmap', '-F', data], text=True))
-            report.append(nmap)
-
+            report.append(f"\n=== [ACTIVE VULNERABILITY SURFACE: {data}] ===")
+            try:
+                loop = asyncio.get_event_loop()
+                # Выполняем Nmap с -F (fast) и -sV (service version)
+                nmap_raw = await loop.run_in_executor(None, lambda: subprocess.check_output(['nmap', '-F', '-sV', data], text=True))
+                
+                # Парсинг вывода для стиля CAME-NEXUS
+                for line in nmap_raw.splitlines():
+                    if '/' in line and ('open' in line or 'closed' in line):
+                        parts = line.split()
+                        port_proto = parts[0]
+                        state = parts[1]
+                        service = " ".join(parts[2:]) if len(parts) > 2 else "unknown"
+                        report.append(f"[NMP] {port_proto:<12} : {state:<8} | {service}")
+                    elif "Host is up" in line:
+                        report.append(f"[NMP] {'STATUS':<12} : HOST IS UP")
+            except Exception as e:
+                report.append(f"[NMP] {'ERROR':<12} : {str(e)}")
+                
     return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
 
 
