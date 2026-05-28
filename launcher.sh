@@ -3658,6 +3658,69 @@ def verify_iban(iban):
     rearranged = iban[4:] + iban[:4]
     numeric = "".join(str(int(c, 36)) for c in rearranged)
     return int(numeric) % 97 == 1    
+
+
+# --- ВНУТРЕННИЕ ФУНКЦИИ (NEXUS ENGINE) ---
+
+def audit_iban_internal(iban):
+    is_valid = verify_iban(iban)
+    report = [f"=== [FINANCIAL INTEL: {iban}] ===", f"Status: {'VALID' if is_valid else 'INVALID/CORRUPTED'}"]
+    # Добавить логику сверки с GLOBAL_BANK_MATRIX
+    return render_template_string(render_prime_page("FINANCIAL REPORT", f"<pre>{chr(10).join(report)}</pre>"))
+
+def audit_phone_internal(phone):
+    parsed = phonenumbers.parse(phone, "FR")
+    report = [f"=== [PHONE INTEL: {phone}] ===", 
+              f"Region: {geocoder.description_for_number(parsed, 'en')}",
+              f"Carrier: {carrier.name_for_number(parsed, 'en')}",
+              f"Type: {'VOIP/VIRTUAL (HIGH RISK)' if phonenumbers.number_type(parsed) == 6 else 'MOBILE/LANDLINE'}"]
+    return render_template_string(render_prime_page("PHONE REPORT", f"<pre>{chr(10).join(report)}</pre>"))
+
+def unified_recon_internal(target):
+    report = [f"=== [NEXUS RECON ENGINE: {target}] ==="]
+    
+    # 1. СЕТЕВАЯ РАЗВЕДКА
+    try:
+        ip = socket.gethostbyname(target)
+        report.append(f"[+] Resolved IP: {ip}")
+        dns = subprocess.check_output(['dig', target, 'ANY', '+short'], text=True)
+        report.append(f"\n--- [DNS RECORDS] ---\n{dns}")
+    except:
+        report.append("[!] DNS Resolution failed.")
+
+    # 2. NMAP (Активный аудит)
+    report.append("\n--- [SECURITY & VULN AUDIT] ---")
+    try:
+        nmap_out = subprocess.check_output(['nmap', '-F', '-sV', '--top-ports', '50', target], text=True)
+        report.append(nmap_out)
+    except:
+        report.append("[!] Nmap unavailable or target blocked.")
+
+    # 3. АДАПТИВНЫЙ ФАЗЗИНГ (Использование паттернов из GLOBAL_FUZZ_WORDLIST)
+    report.append("\n--- [CONFIGURATION GAP PROBE] ---")
+    common_files = ['.env', 'config.php', 'backup.sql', '.git/config']
+    for f in common_files:
+        try:
+            resp = requests.head(f"https://{target}/{f}", timeout=2, headers={'User-Agent': 'Mozilla/5.0'})
+            if resp.status_code == 200:
+                report.append(f"[CRITICAL] Exposed: {f}")
+        except: pass
+
+    # 4. ЗАГОЛОВКИ (Header Leakage)
+    report.append("\n--- [INFRASTRUCTURE HEADERS] ---")
+    try:
+        h = requests.get(f"https://{target}", timeout=3).headers
+        for key in ["Server", "X-Powered-By"]:
+            if key in h: report.append(f"[!] {key}: {h[key]}")
+    except: pass
+
+    return render_template_string(render_prime_page("RECON REPORT", f"<pre>{chr(10).join(report)}</pre>"))
+
+def audit_email_internal(email):
+    # Заглушка под будущий анализ email
+    report = [f"=== [EMAIL INTEL: {email}] ===", "Status: ANALYSIS PENDING"]
+    return render_template_string(render_prime_page("EMAIL REPORT", f"<pre>{chr(10).join(report)}</pre>"))
+    
     
 @app.route('/')
 def index():
@@ -3711,26 +3774,15 @@ def index():
         <a href="/sys-audit/process" class="btn" style="background:#9c27b0; color:#fff; text-align:center; padding:10px;">AUDIT PROCESSES</a>
     </div>
 
-    <div style="margin-top: 20px; padding: 15px; border: 1px solid var(--border-color);">
-        <h3>[ GLOBAL RECON ENGINE ]</h3>
-        <form action="/audit/recon" method="POST">
-            <input type="text" name="target" placeholder="Domain or IP" required>
-            <button type="submit" class="btn" style="background:#4caf50; color:#fff;">EXECUTE DEEP RECON</button>
+    <div style="margin-top: 20px; padding: 20px; border: 2px solid #2196f3; border-radius: 8px; background: #f5f9ff;">
+        <h3>[ GLOBAL INTELLIGENCE DISPATCHER ]</h3>
+        <form action="/audit/dispatch" method="POST">
+            <input type="text" name="input" 
+                   placeholder="Enter IBAN, Phone, Domain, IP, or Email..." 
+                   style="width: 70%; padding: 10px;" required>
+            <button type="submit" class="btn" style="background:#2196f3; color:#fff; padding:10px;">ANALYZE DATA</button>
         </form>
-        <form action="/audit/iban" method="POST" style="margin-top:10px;">
-            <input type="text" name="iban" placeholder="Enter IBAN to verify">
-            <button type="submit" class="btn">VERIFY IBAN</button>
-        </form>
-        
     </div>
-
-    <div style="margin-top: 15px;">
-        <h3>[ PHONE ANALYZER ]</h3>
-        <form action="/audit/phone" method="POST">
-            <input type="text" name="phone" placeholder="+33 6 00 00 00 00">
-            <button type="submit" class="btn">AUDIT IDENTITY</button>
-        </form>
-    </div> 
     
         {injection_kit_html}
     </div>
@@ -3738,6 +3790,73 @@ def index():
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 @app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    tmp = os.path.join('/tmp', f.filename)
+    f.save(tmp)
+    
+    # Инициализация отчета (Core + Forensic)
+    report = [f"=== [CAME-NEXUS: FULL-STACK SCAN ENGINE] ===", f"Target: {f.filename}"]
+    threat_count = 0
+    session['last_verdict'] = 'CLEAN'
+    
+    try:
+        # --- БЛОК 1: СИГНАТУРНЫЙ АНАЛИЗ (CORE) ---
+        proc = subprocess.Popen(['strings', '-a', '-t', 'x', tmp], stdout=subprocess.PIPE, text=True)
+        for line in proc.stdout:
+            parts = line.strip().split(' ', 1)
+            if len(parts) < 2: continue
+            offset, content = parts
+            for hsig in GLOBAL_HASH_MATRIX:
+                match = re.search(hsig, content)
+                if match:
+                    clean_secret = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                    if len(clean_secret) > 6: report.append(f"[SECRET FOUND] [Offset {offset}]: {clean_secret.strip()}")
+            for layer in GLOBAL_AV_MATRIX:
+                if re.search(layer, content, re.I):
+                    report.append(f"[!!! THREAT: {layer} !!!] [Offset {offset}]")
+                    threat_count += 1
+        
+        # --- БЛОК 2: DEEP FORENSIC (АВТОМАТИЧЕСКИ) ---
+        report.append("\n=== [INITIATING DEEP FORENSIC ANALYSIS] ===")
+        
+        # 1. Метаданные
+        try:
+            meta = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-ee', tmp], stderr=subprocess.STDOUT, text=True)
+            report.append(f"\n--- [METADATA]\n{meta}")
+        except: report.append("\n--- [METADATA: UNAVAILABLE]")
+
+        # 2. Банковские артефакты
+        BANK_PATTERNS = {"SWIFT": rb"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?", "IBAN": rb"[A-Z]{2}\d{2}[A-Z0-9]{1,30}"}
+        with open(tmp, 'rb') as f_bin:
+            content = f_bin.read().decode('utf-8', errors='ignore')
+            for name, pattern in BANK_PATTERNS.items():
+                matches = re.findall(pattern.decode('utf-8'), content)
+                for m in set(m for m in matches if len(m) > 6):
+                    report.append(f"[ALERT] FOUND {name}: {m}")
+
+        # 3. Сертификаты
+        try:
+            cert = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text'], stderr=subprocess.STDOUT, text=True)
+            report.append(f"\n--- [CERTIFICATE ANALYSIS]\n{cert[:500]}...") # Ограничим вывод
+        except: pass
+
+        # Завершение
+        verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
+        session['last_verdict'] = verdict
+        report.append(f"\n=== FINAL VERDICT: {verdict} ===")
+
+    except Exception as e:
+        report.append(f"CRITICAL ENGINE FAILURE: {e}")
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
+        
+    return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+    
+
+
+@app.route('/scan1', methods=['POST'])
 def scan():
     f = request.files.get('file')
     if not f: return "Empty Payload", 400
@@ -3923,9 +4042,7 @@ def process_audit():
         report.append(f"Process audit failure: {str(e)}")
     return render_template_string(render_prime_page("PROCESS_REPORT", f"<pre style='font-size:10px;'>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
     
-
-@app.route('/audit/iban', methods=['POST'])
-def audit_iban():
+def audit_iban_internal(iban):
     iban = request.form.get('iban', '').strip()
     if not iban: return "Empty IBAN", 400
     
@@ -3970,8 +4087,7 @@ def audit_iban():
 GLOBAL_FUZZ_WORDLIST = [".env", ".env.local", ".htaccess", ".htpasswd", "config.php", "wp-config.php", "backup.sql", ".git/config", "phpinfo.php", "debug.log"]
 GLOBAL_STATIC_SIGNATURES = r"(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(passwd|shadow)|\b(Authorization|Bearer|X-API-Key|token|secret_key|api_key|passwd|password|private_key|id_rsa)\b"
 
-@app.route('/audit/recon', methods=['POST'])
-def unified_recon():
+def unified_recon_internal(target):
     target = request.form.get('target', '').strip()
     if not target: return "Empty Target", 400
     
@@ -4018,9 +4134,8 @@ def unified_recon():
 
     return render_template_string(render_prime_page("NEXUS ADAPTIVE REPORT", 
         f"<pre>{chr(10).join(report)}</pre>"))
-
-@app.route('/audit/phone', methods=['POST'])
-def audit_phone():
+        
+def audit_phone_internal(phone):
     phone_input = request.form.get('phone', '').strip()
     if not phone_input: return "Empty Number", 400
     
@@ -4056,7 +4171,29 @@ def audit_phone():
         
     return render_template_string(render_prime_page("PHONE REPORT", 
         f"<pre>{chr(10).join(report)}</pre><br><a href='/'>RETURN</a>"))
+
+# --- Маршрут Диспетчера (Единая точка входа) ---
+@app.route('/audit/dispatch', methods=['POST'])
+def audit_dispatch():
+    data = request.form.get('input', '').strip()
+    if not data: return "Empty Input", 400
+
+    # 1. IBAN
+    if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', data.replace(" ", "")):
+        return audit_iban_internal(data)
+    # 2. Телефон
+    elif re.match(r'^\+?[0-9]{7,15}$', data.replace(" ", "")):
+        return audit_phone_internal(data)
+    # 3. Email (для будущих расширений)
+    elif re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', data):
+        return audit_email_internal(data)
+    # 4. Домен / IP
+    elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', data):
+        return unified_recon_internal(data)
         
+    return "Unknown data format - Nexus Engine cannot resolve this entity.", 400
+
+   
     
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
