@@ -3969,6 +3969,12 @@ def audit_dispatch():
         from phonenumbers import geocoder, carrier, timezone, PhoneNumberType
         
         report.append(f"=== [PHONE INTEL: {clean_data}] ===")
+
+        # Инициализация переменных для предотвращения NameError
+        region = "Unknown"
+        op = "Unknown"
+        tz = "Unknown"
+        ntype = PhoneNumberType.UNKNOWN
         try:
             p = phonenumbers.parse(clean_data, "FR")
             if not phonenumbers.is_valid_number(p): 
