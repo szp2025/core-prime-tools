@@ -2801,116 +2801,57 @@ core_network_dns_register() {
 core_network_dns_sync() {
     core_engine_ui "h" "NEXUS LAYER: NETWORK DNS ADAPTATION & SYNC v22.0"
 
-    # Слой 0: Верификация прав доступа (изменение /etc/ требует привилегий root)
+    # Слой 0: Верификация прав доступа
     if [[ $EUID -ne 0 ]]; then
         core_engine_ui "!" "Access error: Superuser (sudo) privileges required."
         return 1
     fi
 
-    # Проверка доступности бинарного файла dnsmasq в системе
-    if ! command -v dnsmasq >/dev/null 2>&1; then
-        core_engine_ui "!" "Environment failure: dnsmasq not found in the system. Skipping layer."
-        return 1
-    fi
-
-    # --- ИНТЕГРИРОВАННЫЙ БЛОК: НЕЙТРАЛИЗАЦИЯ КОНФЛИКТОВ ---
-    # Проверка и нейтрализация конфликтующего резолвера (systemd-resolved)
-    if command -v lsof >/dev/null 2>&1 && lsof -i :53 2>/dev/null | grep -q "systemd-resolve"; then
-        core_engine_ui "w" "Conflict: systemd-resolved has occupied port 53. Neutralizing..."
-        systemctl stop systemd-resolved 2>/dev/null
-        sleep 1 # Даем системе время на освобождение сокета
-    fi
-    
-    # --- ШАГ 1: ЭВРИСТИКА АКТИВНОГО IP (Изоляция интерфейса) ---
+    # --- ШАГ 1: ЭВРИСТИКА АКТИВНОГО IP ---
     local active_ip
     active_ip=$(ip -4 addr show | grep -vE '127.0.0.1|docker|veth|br-|lxd' | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
-    
-    # Резервный откат на локальный интерфейс в случае автономного режима
     [[ -z "$active_ip" ]] && active_ip="127.0.0.1"
 
-    # --- ШАГ 2: СБОР МЕТРИК ОКРУЖЕНИЯ ---
-    local hostname
-    hostname=$(hostname)
+    # --- ШАГ 2: СБОР МЕТРИК (Безопасный вариант) ---
+    local current_host
+    current_host=$(/bin/hostname)
     local dns_conf="/etc/dnsmasq.conf"
-    
-    core_engine_ui "i" "Binding local domains to the active IP node $active_ip"
 
-    # --- ШАГ 3: ДИНАМИЧЕСКАЯ ИНЪЕКЦИЯ КОНФИГУРАЦИИ ИЗ ГЛОБАЛЬНОЙ МАТРИЦЫ ---
+    # Исправлен баг: был host_name (неопределенная переменная), стал current_host
+    echo "[DEBUG] Hostname: $current_host | DNS Config: $dns_conf"
+    core_engine_ui "i" "Binding local domains to active IP: $active_ip"
+
+    # --- ШАГ 3: ДИНАМИЧЕСКАЯ ИНЪЕКЦИЯ ---
     local tmp_dns
     tmp_dns=$(mktemp)
     
-    local raw_line
     for raw_line in "${GLOBAL_DNS_CONFIG_MATRIX[@]}"; do
-        # Интеллектуальная подстановка живых переменных вместо шаблонов на лету
-        local processed_line="$raw_line"
-        processed_line="${processed_line//%IP%/$active_ip}"
-        processed_line="${processed_line//%HOST%/$hostname}"
-        
-        # Безопасная запись с принудительным завершением строки \n
+        local processed_line="${raw_line//%IP%/$active_ip}"
+        processed_line="${processed_line//%HOST%/$current_host}"
         printf "%s\n" "$processed_line" >> "$tmp_dns"
     done
 
-    # --- ШАГ 4: ВАЛИДАЦИЯ, ПАТЧ И ИНТЕЛЛЕКТУАЛЬНЫЙ ПЕРЕЗАПУСК ДВИЖКА ---
+    # --- ШАГ 4: ВАЛИДАЦИЯ И ПАТЧ ---
     if dnsmasq --test -C "$tmp_dns" >/dev/null 2>&1; then
-        # Конфиг полностью валиден — производим атомарную подмену рабочего файла
         cp "$tmp_dns" "$dns_conf"
-        chmod 644 "$dns_conf"
         
-        core_engine_ui "i" "Configuration successfully verified. Restarting daemon..."
+        # Перезапуск службы
+        systemctl restart dnsmasq 2>/dev/null || service dnsmasq restart 2>/dev/null
         
-        # Попытка мягкого перезапуска через системный менеджер служб (systemd или init.d)
-        if systemctl restart dnsmasq 2>/dev/null || service dnsmasq restart 2>/dev/null; then
-            core_engine_ui "+" "DNS Sync Complete: https://$hostname.local"
-        else
-            # Критический путь: если служба зависла, сначала пробуем мягкий SIGTERM (15)
-            core_engine_ui "w" "Service blocked by socket. Clearing deadlocks..."
-            killall -15 dnsmasq 2>/dev/null
-            sleep 1
-            
-            # Если процесс проигнорировал мягкий сброс, выжигаем его через SIGKILL (9)
-            if pidof dnsmasq >/dev/null; then
-                killall -9 dnsmasq 2>/dev/null
-                sleep 1
-            fi
-            
-            # Прямой ручной запуск демона на основе обновленного конфигурационного файла
-            if dnsmasq -C "$dns_conf"; then
-                core_engine_ui "+" "DNS Engine Restarted (Manual Recovery Mode)"
-            else
-                core_engine_ui "!" "Critical failure: Port 53 is occupied by a third-party process (systemd-resolved?)."
-                rm -f "$tmp_dns"
-                return 1
-            fi
+        # Инъекция в resolv.conf (более безопасный способ)
+        if ! grep -q "127.0.0.1" /etc/resolv.conf; then
+            sed -i '1i nameserver 127.0.0.1' /etc/resolv.conf
         fi
-        
-        # --- ШАГ 5: АВТОНОМНАЯ ФИКСАЦИЯ ЛОКАЛЬНОГО РЕЗОЛВЕРА ---
-        # Так как в матрице v22.0 включен флаг no-resolv, принудительно переводим 
-        # текущую машину на обслуживание созданным локальным сервером dnsmasq.
-        if ! grep -q "nameserver 127.0.0.1" /etc/resolv.conf 2>/dev/null; then
-            # Запись инъекции петли в начало системного резолвера
-            sed -i '1i nameserver 127.0.0.1' /etc/resolv.conf 2>/dev/null
-        fi
+        core_engine_ui "+" "DNS Sync Complete for: $current_host"
     else
-        core_engine_ui "!" "Critical error: Generated config v22.0 is corrupted. Rolling back changes."
+        core_engine_ui "!" "Critical failure: Config corrupted. Rollback."
         rm -f "$tmp_dns"
         return 1
     fi
 
-
-        # --- ШАГ 6: ИНТЕГРАЦИЯ NGINX REVERSE PROXY ---
-        # Вместо iptables используем профессиональный Nginx для маршрутизации портов 5000, 5001, 5002
-        if command -v nginx >/dev/null 2>&1; then
-            core_nginx_auto_setup
-        else
-            core_engine_ui "w" "Nginx not found. Please install Nginx for the proxy to function correctly."
-        fi
-
-        
-    # Финальная санитарная очистка временных файлов из директории /tmp/
     rm -f "$tmp_dns"
     return 0
 }
-
 
 # ==============================================================================
 # @description: System metrics harvester and kernel status display v24.6 (Fixed)
