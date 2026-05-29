@@ -4086,8 +4086,8 @@ async def searinfo():
         render_prime_page("ENTITY SEARCH REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
     )
     
+
 if __name__ == '__main__':
-    # Запуск сервера на оригинальном порту 5000 для бесшовной интеграции
     app.run(host='0.0.0.0', port=5000, debug=False)
 EOF
 }
