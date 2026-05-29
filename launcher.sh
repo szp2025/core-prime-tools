@@ -9307,6 +9307,7 @@ echo "[+] NEXUS Engine successfully deployed with PID: $PID"
 
     core_engine_wait
 
+} 
 
 # --- STEALTH COMMS: NODE DESTROYER v1.0 ---
 run_node_clean() {
