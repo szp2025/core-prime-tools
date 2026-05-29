@@ -4070,75 +4070,64 @@ async def searinfo():
         "phone": request.form.get("phone")
     }
 
-    # Черный список доменов-агрегаторов для фильтрации "шума"
-    BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com"]
+    BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
 
-    async def fetch_dork(session, query):
-        # Добавляем рандомную задержку для имитации поведения человека
-        await asyncio.sleep(random.uniform(1.5, 3.5))
-        
+    async def fetch_advanced_dork(session, query, engine="google"):
+        await asyncio.sleep(random.uniform(0.5, 1.5))
         headers = {"User-Agent": random.choice(GLOBAL_NETWORK_UA)}
-        # Используем расширенный DORK с поддержкой поиска файлов
-        url = f"https://www.google.com/search?q={quote(query)}&num=10&hl=ru"
         
+        # Интеллектуальное формирование URL
+        if engine == "bing":
+            url = f"https://www.bing.com/search?q={quote(query)}"
+        elif engine == "duckduckgo":
+            url = f"https://html.duckduckgo.com/html/?q={quote(query)}"
+        else:
+            url = f"https://www.google.com/search?q={quote(query)}&num=10"
+
         try:
-            async with session.get(url, headers=headers, timeout=20) as r:
-                if r.status != 200:
-                    return f"[TARGET]: {query}\n[STATUS]: BLOCKED ({r.status})"
-                
+            async with session.get(url, headers=headers, timeout=25) as r:
                 html = await r.text()
-                
-                # Извлечение всех ссылок
-                all_links = re.findall(r'href="(https?://[^"]+)"', html)
-                # Фильтруем ссылки: убираем гугл и домены из черного списка
-                clean_links = [l for l in set(all_links) if "google.com" not in l and not any(d in l for d in BAD_DOMAINS)]
-                
-                # Парсинг сниппетов для контекста
-                snippets = re.findall(r'<div[^>]*VwiC3b[^>]*>(.*?)</div>', html, re.DOTALL)
-                clean_snippets = [re.sub('<[^<]+?>', '', s).strip() for s in snippets[:3]]
-                
-                links_output = "\n".join([f"  -> {l}" for l in clean_links[:5]])
-                snippets_output = "\n".join([f"  > {s[:100]}..." for s in clean_snippets])
-                
-                return (f"[TARGET]: {query}\n"
-                        f"[ARTIFACTS/LINKS FOUND]:\n{links_output if links_output else '  -> None'}\n"
-                        f"[CONTEXT SNIPPETS]:\n{snippets_output if snippets_output else '  -> None'}\n"
-                        f"{'-'*60}")
-        except Exception as e:
-            return f"[TARGET]: {query}\n[STATUS]: ERROR {str(e)}\n{'-'*60}"
+                # Извлекаем ссылки и фильтруем шум
+                links = re.findall(r'https?://[^\s"\'<>]+', html)
+                clean = [l for l in set(links) if not any(d in l for d in BAD_DOMAINS) and len(l) > 20]
+                return f"[{engine.upper()}] -> {len(clean)} artifacts found\n" + "\n".join([f"  > {l}" for l in clean[:5]])
+        except Exception:
+            return f"[{engine.upper()}] -> OFFLINE"
 
-    # Формирование расширенной матрицы задач
-    all_dork_tasks = []
-    
-    # Расширенный поиск по ФИО (включая файлы)
+    # РАСШИРЕННАЯ МАТРИЦА ДОРКОВ (Полный пакет)
+    dorks = []
     if query_data['fio']:
-        all_dork_tasks.extend([
-            f'"{query_data["fio"]}" -site:pinterest.com',
-            f'"{query_data["fio"]}" filetype:pdf OR filetype:docx OR filetype:xlsx OR filetype:txt'
+        base = query_data['fio']
+        dorks.extend([
+            f'"{base}"',
+            f'"{base}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx',
+            f'"{base}" inurl:index.of OR inurl:admin', # Поиск открытых директорий
+            f'site:linkedin.com "{base}" OR site:facebook.com "{base}"'
         ])
-        
-    # Расширенный поиск по телефону (включая документы)
     if query_data['phone']:
-        all_dork_tasks.extend([
-            f'"{query_data["phone"]}"',
-            f'"{query_data["phone"]}" filetype:pdf OR filetype:xlsx'
+        p = query_data['phone']
+        dorks.extend([
+            f'"{p}"',
+            f'"{p}" filetype:pdf',
+            f'"{p}" site:avito.ru OR site:cian.ru OR site:hh.ru'
         ])
-        
-    # Поиск по адресу
-    if query_data['address']:
-        all_dork_tasks.append(f'"{query_data["address"]}"')
 
+    # Запуск параллельного сканирования
+    tasks = []
     async with aiohttp.ClientSession() as session:
-        # Выполняем запросы
-        results = await asyncio.gather(*[fetch_dork(session, d) for d in all_dork_tasks])
+        for d in dorks:
+            tasks.append(fetch_advanced_dork(session, d, "google"))
+            tasks.append(fetch_advanced_dork(session, d, "bing"))
+        results = await asyncio.gather(*tasks)
 
-    report = ["=== [NEXUS DEEP-SCAN: NETWORK MATRIX ACTIVE] ==="]
+    report = ["=== [NEXUS ULTIMATE OSINT MATRIX ACTIVE] ==="]
     report.extend(results)
     report.append("=== [END OF ANALYSIS] ===")
 
     return render_template_string(
-        render_prime_page("ENTITY SEARCH REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
+        render_prime_page("ULTIMATE REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
     )
+
 
     
 
