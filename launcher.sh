@@ -9279,27 +9279,7 @@ run_live_service() {
 
     
 
-# --- [ДИНАМИЧЕСКИЙ БЛОК ЗАПУСКА NEXUS] ---
-
-# 1. Установка лимитов
-ulimit -m 524288 2>/dev/null
-ulimit -v 1048576 2>/dev/null
-
-# 2. Очистка порта (используем переменную $port вместо 5000)
-if fuser "$port/tcp" > /dev/null 2>&1; then
-    echo "[!] Port $port busy. Cleaning..."
-    fuser -k "$port/tcp"
-    sleep 1
-fi
-
-# 3. Запуск (используем $service_name и $port из начала функции)
-echo "[+] Deploying NEXUS engine on $service_name:$port..."
-nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
-
-# 4. Фиксация ID процесса
-PID=$!
-echo "[+] NEXUS Engine successfully deployed with PID: $PID"
-    
+NEXUS Engine successfully deployed with PID    
 
     core_engine_progress 2 "NODE_STABILIZATION"
 
