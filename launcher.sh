@@ -4071,27 +4071,48 @@ async def searinfo():
     }
 
     async def fetch_dork(session, query):
-        # Используем GLOBAL_NETWORK_UA из глобальной области
-        ua = random.choice(GLOBAL_NETWORK_UA)
-        headers = {"User-Agent": ua}
-        url = f"https://www.google.com/search?q={quote(query)}"
+        # Использование матрицы User-Agent для обхода блокировок
+        headers = {"User-Agent": random.choice(GLOBAL_NETWORK_UA)}
+        # Добавляем параметры Google для получения более точных данных
+        url = f"https://www.google.com/search?q={quote(query)}&num=5&hl=ru"
+        
         try:
-            async with session.get(url, headers=headers, timeout=10) as r:
-                return f"[DORK: {query[:25]}...] : {'SUCCESS' if r.status == 200 else 'BLOCKED'}"
+            async with session.get(url, headers=headers, timeout=15) as r:
+                if r.status != 200:
+                    return f"[TARGET]: {query}\n[STATUS]: BLOCKED ({r.status})"
+                
+                html = await r.text()
+                
+                # Извлечение количества результатов (оценка масштаба присутствия)
+                stats_match = re.search(r'id="result-stats">[^<]*([0-9\s]+)', html)
+                stats = stats_match.group(1).strip() if stats_match else "N/A"
+                
+                # Парсинг описаний (сниппетов) для получения контекста
+                snippets = re.findall(r'<div[^>]*VwiC3b[^>]*>(.*?)</div>', html, re.DOTALL)
+                clean_snippets = [re.sub('<[^<]+?>', '', s).strip() for s in snippets[:3]]
+                
+                details = "\n".join([f"  > {s[:100]}..." for s in clean_snippets])
+                
+                return (f"[TARGET]: {query}\n"
+                        f"[RESULTS FOUND]: ~{stats}\n"
+                        f"[CONTEXT SNIPPETS]:\n{details if details else '  > No relevant data'}\n"
+                        f"{'-'*50}")
         except Exception as e:
-            return f"[DORK: {query[:25]}...] : ERROR {str(e)}"
+            return f"[TARGET]: {query}\n[STATUS]: CRITICAL ERROR: {str(e)}\n{'-'*50}"
 
-    # Собираем список всех корутин сразу
+    # Формирование матрицы задач
     all_dork_tasks = []
     if query_data['fio']:
         all_dork_tasks.extend([f'"{query_data["fio"]}" -site:pinterest.com', f'site:vk.com "{query_data["fio"]}"'])
     if query_data['phone']:
         all_dork_tasks.extend([f'"{query_data["phone"]}"', f'site:avito.ru "{query_data["phone"]}"'])
+    if query_data['address']:
+        all_dork_tasks.append(f'"{query_data["address"]}"')
 
     async with aiohttp.ClientSession() as session:
-        # Выполняем все запросы параллельно в один поток gather
         results = await asyncio.gather(*[fetch_dork(session, d) for d in all_dork_tasks])
 
+    # Сборка итогового отчета
     report = ["=== [NEXUS DEEP-SCAN: NETWORK MATRIX ACTIVE] ==="]
     report.extend(results)
     report.append("=== [END OF ANALYSIS] ===")
@@ -4099,6 +4120,7 @@ async def searinfo():
     return render_template_string(
         render_prime_page("ENTITY SEARCH REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
     )
+
     
 
 if __name__ == '__main__':
