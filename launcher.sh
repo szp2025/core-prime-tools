@@ -4097,21 +4097,26 @@ async def searinfo():
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
     
-    # ПРОВЕРКА: Файл должен существовать и быть доступен для чтения
-    if cert_path and os.path.exists(cert_path) and os.access(cert_path, os.R_OK):
-        print(f"[*] Starting HTTPS Server with cert: {cert_path}")
-        try:
-            # Важно: ssl_context требует tuple (cert, key)
-            # Если ваш файл объединен, передаем его дважды
-            context = (cert_path, cert_path)
-            app.run(host='0.0.0.0', port=5000, ssl_context=context, debug=False)
-        except Exception as e:
-            print(f"[!] SSL Context Error: {e}. Falling back to HTTP.")
-            app.run(host='0.0.0.0', port=5000, debug=False)
-    else:
-        print("[*] No valid cert found. Starting HTTP Server.")
-        app.run(host='0.0.0.0', port=5000, debug=False)
+    # Расширенная отладка
+    print(f"[DEBUG] Environment PRIME_CERT_PATH: {cert_path}")
     
+    if cert_path and os.path.exists(cert_path):
+        # Проверка размера файла (пустой файл = нерабочий сертификат)
+        if os.path.getsize(cert_path) > 0:
+            print(f"[*] Validating cert at: {cert_path}")
+            context = (cert_path, cert_path)
+            try:
+                # Добавляем host='0.0.0.0' для доступности из внешней сети
+                app.run(host='0.0.0.0', port=5000, ssl_context=context, debug=False)
+            except Exception as e:
+                print(f"[CRITICAL] SSL Failure: {e}")
+                # Если SSL упал, мы НЕ должны запускать HTTP, 
+                # чтобы не нарушать безопасность системы
+        else:
+            print("[!] Cert file is empty!")
+    else:
+        print("[!] No cert found. Check environment variables.")
+        
 EOF
 }
 
