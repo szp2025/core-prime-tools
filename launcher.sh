@@ -4070,49 +4070,68 @@ async def searinfo():
         "phone": request.form.get("phone")
     }
 
+    # Черный список доменов-агрегаторов для фильтрации "шума"
+    BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com"]
+
     async def fetch_dork(session, query):
-        # Использование матрицы User-Agent для обхода блокировок
+        # Добавляем рандомную задержку для имитации поведения человека
+        await asyncio.sleep(random.uniform(1.5, 3.5))
+        
         headers = {"User-Agent": random.choice(GLOBAL_NETWORK_UA)}
-        # Добавляем параметры Google для получения более точных данных
-        url = f"https://www.google.com/search?q={quote(query)}&num=5&hl=ru"
+        # Используем расширенный DORK с поддержкой поиска файлов
+        url = f"https://www.google.com/search?q={quote(query)}&num=10&hl=ru"
         
         try:
-            async with session.get(url, headers=headers, timeout=15) as r:
+            async with session.get(url, headers=headers, timeout=20) as r:
                 if r.status != 200:
                     return f"[TARGET]: {query}\n[STATUS]: BLOCKED ({r.status})"
                 
                 html = await r.text()
                 
-                # Извлечение количества результатов (оценка масштаба присутствия)
-                stats_match = re.search(r'id="result-stats">[^<]*([0-9\s]+)', html)
-                stats = stats_match.group(1).strip() if stats_match else "N/A"
+                # Извлечение всех ссылок
+                all_links = re.findall(r'href="(https?://[^"]+)"', html)
+                # Фильтруем ссылки: убираем гугл и домены из черного списка
+                clean_links = [l for l in set(all_links) if "google.com" not in l and not any(d in l for d in BAD_DOMAINS)]
                 
-                # Парсинг описаний (сниппетов) для получения контекста
+                # Парсинг сниппетов для контекста
                 snippets = re.findall(r'<div[^>]*VwiC3b[^>]*>(.*?)</div>', html, re.DOTALL)
                 clean_snippets = [re.sub('<[^<]+?>', '', s).strip() for s in snippets[:3]]
                 
-                details = "\n".join([f"  > {s[:100]}..." for s in clean_snippets])
+                links_output = "\n".join([f"  -> {l}" for l in clean_links[:5]])
+                snippets_output = "\n".join([f"  > {s[:100]}..." for s in clean_snippets])
                 
                 return (f"[TARGET]: {query}\n"
-                        f"[RESULTS FOUND]: ~{stats}\n"
-                        f"[CONTEXT SNIPPETS]:\n{details if details else '  > No relevant data'}\n"
-                        f"{'-'*50}")
+                        f"[ARTIFACTS/LINKS FOUND]:\n{links_output if links_output else '  -> None'}\n"
+                        f"[CONTEXT SNIPPETS]:\n{snippets_output if snippets_output else '  -> None'}\n"
+                        f"{'-'*60}")
         except Exception as e:
-            return f"[TARGET]: {query}\n[STATUS]: CRITICAL ERROR: {str(e)}\n{'-'*50}"
+            return f"[TARGET]: {query}\n[STATUS]: ERROR {str(e)}\n{'-'*60}"
 
-    # Формирование матрицы задач
+    # Формирование расширенной матрицы задач
     all_dork_tasks = []
+    
+    # Расширенный поиск по ФИО (включая файлы)
     if query_data['fio']:
-        all_dork_tasks.extend([f'"{query_data["fio"]}" -site:pinterest.com', f'site:vk.com "{query_data["fio"]}"'])
+        all_dork_tasks.extend([
+            f'"{query_data["fio"]}" -site:pinterest.com',
+            f'"{query_data["fio"]}" filetype:pdf OR filetype:docx OR filetype:xlsx OR filetype:txt'
+        ])
+        
+    # Расширенный поиск по телефону (включая документы)
     if query_data['phone']:
-        all_dork_tasks.extend([f'"{query_data["phone"]}"', f'site:avito.ru "{query_data["phone"]}"'])
+        all_dork_tasks.extend([
+            f'"{query_data["phone"]}"',
+            f'"{query_data["phone"]}" filetype:pdf OR filetype:xlsx'
+        ])
+        
+    # Поиск по адресу
     if query_data['address']:
         all_dork_tasks.append(f'"{query_data["address"]}"')
 
     async with aiohttp.ClientSession() as session:
+        # Выполняем запросы
         results = await asyncio.gather(*[fetch_dork(session, d) for d in all_dork_tasks])
 
-    # Сборка итогового отчета
     report = ["=== [NEXUS DEEP-SCAN: NETWORK MATRIX ACTIVE] ==="]
     report.extend(results)
     report.append("=== [END OF ANALYSIS] ===")
