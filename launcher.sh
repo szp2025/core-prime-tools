@@ -3622,6 +3622,20 @@ def index():
     btn_text="INITIATE ENTITY DEEP SCAN"
     )
 
+    form_html2 = render_prime_form(
+        "/audit/dispatch", 
+        fields=[
+            {
+                "type": "text", 
+                "name": "input", 
+                "label": "", # Если лейбл не нужен, оставляем пустым
+                "placeholder": "Enter IBAN, Phone, Domain, IP, or Email..."
+            },
+            {"type": "hidden", "name": "action", "value": "analyse_data"}
+        ], 
+        btn_text="ANALYZE DATA"
+    )
+        
     current_os = platform.system().lower()
     btn_map = {
         "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
@@ -3638,7 +3652,7 @@ def index():
         <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
         """
 
-    body = form_html + f"""             
+    body = form_html +  f"""             
     <div style="margin-top: 20px; padding: 20px; border: 2px solid #2196f3; border-radius: 8px; background:#121216;">
         <h3>[ GLOBAL INTELLIGENCE DISPATCHER ]</h3>
         <form action="/audit/dispatch" method="POST">
