@@ -4087,8 +4087,8 @@ async def searinfo():
     )
     
 if __name__ == '__main__':
-app.run(host='0.0.0.0', port=5000, debug=False)
-
+    # Запуск сервера на оригинальном порту 5000 для бесшовной интеграции
+    app.run(host='0.0.0.0', port=5000, debug=False)
 EOF
 }
 
