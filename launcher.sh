@@ -2829,8 +2829,8 @@ core_network_dns_sync() {
     [[ -z "$active_ip" ]] && active_ip="127.0.0.1"
 
     # --- ШАГ 2: СБОР МЕТРИК ОКРУЖЕНИЯ ---
-    #local hostname
-   local hostname=$(hostname)
+    local hostname
+    hostname=$(hostname)
     local dns_conf="/etc/dnsmasq.conf"
     
     core_engine_ui "i" "Binding local domains to the active IP node $active_ip"
@@ -2860,7 +2860,7 @@ core_network_dns_sync() {
         
         # Попытка мягкого перезапуска через системный менеджер служб (systemd или init.d)
         if systemctl restart dnsmasq 2>/dev/null || service dnsmasq restart 2>/dev/null; then
-            core_engine_ui "+" "DNS Sync Complete: http://$hostname.local"
+            core_engine_ui "+" "DNS Sync Complete: https://$hostname.local"
         else
             # Критический путь: если служба зависла, сначала пробуем мягкий SIGTERM (15)
             core_engine_ui "w" "Service blocked by socket. Clearing deadlocks..."
