@@ -4062,7 +4062,7 @@ async def audit_dispatch():
 
 
 
-@app.route('/searinfo', methods=['POST'])
+@@app.route('/searinfo', methods=['POST'])
 async def searinfo():
     query_data = {
         "fio": request.form.get("fio"),
@@ -4071,59 +4071,50 @@ async def searinfo():
     }
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
-
-    async def fetch_advanced_dork(session, query, engine="google"):
-        await asyncio.sleep(random.uniform(0.5, 1.5))
-        headers = {"User-Agent": random.choice(GLOBAL_NETWORK_UA)}
-        
-        # Интеллектуальное формирование URL
-        if engine == "bing":
-            url = f"https://www.bing.com/search?q={quote(query)}"
-        elif engine == "duckduckgo":
-            url = f"https://html.duckduckgo.com/html/?q={quote(query)}"
-        else:
-            url = f"https://www.google.com/search?q={quote(query)}&num=10"
-
-        try:
-            async with session.get(url, headers=headers, timeout=25) as r:
-                html = await r.text()
-                # Извлекаем ссылки и фильтруем шум
-                links = re.findall(r'https?://[^\s"\'<>]+', html)
-                clean = [l for l in set(links) if not any(d in l for d in BAD_DOMAINS) and len(l) > 20]
-                return f"[{engine.upper()}] -> {len(clean)} artifacts found\n" + "\n".join([f"  > {l}" for l in clean[:5]])
-        except Exception:
-            return f"[{engine.upper()}] -> OFFLINE"
-
-    # РАСШИРЕННАЯ МАТРИЦА ДОРКОВ (Полный пакет)
+    
+    # Расширенная матрица дорков
     dorks = []
     if query_data['fio']:
-        base = query_data['fio']
-        dorks.extend([
-            f'"{base}"',
-            f'"{base}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx',
-            f'"{base}" inurl:index.of OR inurl:admin', # Поиск открытых директорий
-            f'site:linkedin.com "{base}" OR site:facebook.com "{base}"'
-        ])
+        b = query_data['fio']
+        dorks.extend([f'"{b}"', f'"{b}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx', f'"{b}" inurl:index.of', f'site:linkedin.com "{b}" OR site:facebook.com "{b}"'])
     if query_data['phone']:
         p = query_data['phone']
-        dorks.extend([
-            f'"{p}"',
-            f'"{p}" filetype:pdf',
-            f'"{p}" site:avito.ru OR site:cian.ru OR site:hh.ru'
-        ])
+        dorks.extend([f'"{p}"', f'"{p}" filetype:pdf OR filetype:xlsx', f'"{p}" site:avito.ru OR site:cian.ru OR site:hh.ru'])
 
-    # Запуск параллельного сканирования
-    tasks = []
     async with aiohttp.ClientSession() as session:
+        tasks = []
         for d in dorks:
-            tasks.append(fetch_advanced_dork(session, d, "google"))
-            tasks.append(fetch_advanced_dork(session, d, "bing"))
-        results = await asyncio.gather(*tasks)
+            # Запросы к Google и Bing одновременно
+            for eng, url in [("GOOGLE", f"https://www.google.com/search?q={quote(d)}&num=10"), 
+                            ("BING", f"https://www.bing.com/search?q={quote(d)}")]:
+                tasks.append((eng, d, url))
 
-    report = ["=== [NEXUS ULTIMATE OSINT MATRIX ACTIVE] ==="]
-    report.extend(results)
-    report.append("=== [END OF ANALYSIS] ===")
+        async def exec_task(eng, d, url):
+            await asyncio.sleep(random.uniform(0.3, 0.8))
+            try:
+                async with session.get(url, headers={"User-Agent": random.choice(GLOBAL_NETWORK_UA)}, timeout=20) as r:
+                    html = await r.text()
+                    links = re.findall(r'https?://[^\s"\'<>]+', html)
+                    clean = [l for l in set(links) if not any(dm in l for dm in BAD_DOMAINS) and len(l) > 20]
+                    
+                    # Глубокий анализ найденных ссылок (авто-распознавание)
+                    found_data = []
+                    for link in clean[:3]: # Берем топ-3 для анализа содержимого
+                        if any(ext in link.lower() for ext in ['.pdf', '.txt', '.doc']):
+                            try:
+                                async with session.get(link, timeout=5) as r_doc:
+                                    doc_text = await r_doc.text(errors='ignore')
+                                    if query_data['fio'] and query_data['fio'].lower() in doc_text.lower():
+                                        found_data.append(f"    [!] MATCH IN DOC: {link}")
+                            except: continue
+                    
+                    return f"[{eng}] Query: {d[:20]}... | Artifacts: {len(clean)}\n" + "\n".join([f"  > {l}" for l in clean[:3]]) + ("\n" + "\n".join(found_data) if found_data else "")
+            except: return f"[{eng}] -> OFFLINE"
 
+        results = await asyncio.gather(*[exec_task(e, d, u) for e, d, u in tasks])
+
+    report = ["=== [NEXUS ULTIMATE OSINT MATRIX ACTIVE] ===", *results, "=== [END OF ANALYSIS] ==="]
+    
     return render_template_string(
         render_prime_page("ULTIMATE REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
     )
