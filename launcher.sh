@@ -4109,54 +4109,50 @@ async def audit_dispatch():
 
 @app.route('/searinfo', methods=['POST'])
 async def searinfo():
-    # 1. Сбор параметров
     query_data = {
         "fio": request.form.get("fio"),
         "address": request.form.get("address"),
         "phone": request.form.get("phone")
     }
 
-    # 2. Вспомогательная функция выполнения запроса
     async def fetch_dork(session, query):
+        # Выбор случайного профиля из матрицы
+        headers = {"User-Agent": random.choice(GLOBAL_NETWORK_UA)}
         url = f"https://www.google.com/search?q={quote(query)}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"}
+        
         try:
-            async with session.get(url, headers=headers, timeout=8) as r:
-                return f"[DORK: {query[:30]}...] : {'FOUND' if r.status == 200 else 'BLOCKED'}"
-        except: return f"[DORK: {query[:30]}...] : TIMEOUT"
+            async with session.get(url, headers=headers, timeout=10) as r:
+                status_text = "SUCCESS (200)" if r.status == 200 else f"BLOCKED ({r.status})"
+                return f"[DORK: {query[:25]}...] : {status_text} | UA: {headers['User-Agent'][:20]}..."
+        except Exception as e:
+            return f"[DORK: {query[:25]}...] : TIMEOUT"
 
-    # 3. Генерация векторов поиска
+    # Генерация задач
     tasks = []
     async with aiohttp.ClientSession() as session:
         if query_data['fio']:
-            dorks = [f'"{query_data["fio"]}" -site:pinterest.com', f'site:vk.com "{query_data["fio"]}"', f'"{query_data["fio"]}" "адрес"']
-            tasks.append(asyncio.create_task(asyncio.gather(*[fetch_dork(session, d) for d in dorks])))
+            dorks = [f'"{query_data["fio"]}" -site:pinterest.com', f'site:vk.com "{query_data["fio"]}"']
+            tasks.append(asyncio.gather(*[fetch_dork(session, d) for d in dorks]))
         
         if query_data['phone']:
-            dorks = [f'"{query_data["phone"]}"', f'site:avito.ru "{query_data["phone"]}"', f'site:cian.ru "{query_data["phone"]}"']
-            tasks.append(asyncio.create_task(asyncio.gather(*[fetch_dork(session, d) for d in dorks])))
+            dorks = [f'"{query_data["phone"]}"', f'site:avito.ru "{query_data["phone"]}"']
+            tasks.append(asyncio.gather(*[fetch_dork(session, d) for d in dorks]))
 
-        if query_data['address']:
-            dorks = [f'"{query_data["address"]}"', f'site:maps.google.com "{query_data["address"]}"']
-            tasks.append(asyncio.create_task(asyncio.gather(*[fetch_dork(session, d) for d in dorks])))
-
-        # 4. Выполнение
         results = await asyncio.gather(*tasks)
 
-    # 5. Формирование отчета
-    report = ["=== [NEXUS DEEP-SCAN: ENTITY ANALYSIS] ==="]
+    # Формирование Forensic-отчета
+    report = ["=== [NEXUS DEEP-SCAN: NETWORK MATRIX ACTIVE] ==="]
     for group in results:
         report.extend(group)
     report.append("=== [END OF ANALYSIS] ===")
 
-    # 6. Вывод результата
     return render_template_string(
         render_prime_page(
             "ENTITY SEARCH REPORT", 
             f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>"
         )
-    )    
-
+    )
+    
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
     
