@@ -3670,6 +3670,16 @@ def verify_iban(iban):
 def index():
     # Теперь render_prime_form доступен, так как он был вставлен выше
     form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
+    form_html += render_prime_form(
+    "/searinfo", 
+    fields=[
+        {"type": "text", "name": "fio", "label": "FULL NAME (ФИО)", "placeholder": "Иванов Иван Иванович"},
+        {"type": "text", "name": "address", "label": "PHYSICAL ADDRESS", "placeholder": "Город, Улица, Дом"},
+        {"type": "tel", "name": "phone", "label": "PHONE NUMBER", "placeholder": "+7XXXXXXXXXX"},
+        {"type": "hidden", "name": "action", "value": "initiate_deep_scan"}
+    ], 
+    btn_text="INITIATE ENTITY DEEP SCAN"
+    )
 
     current_os = platform.system().lower()
     btn_map = {
@@ -3971,7 +3981,7 @@ async def audit_dispatch():
             except Exception as e: report.append(f"[PHN] {'ERROR':<14} : {str(e)}")
             report.append("=== [END OF ANALYSIS] ===")
 
-# --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
+        # --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
             report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
@@ -4049,7 +4059,7 @@ async def audit_dispatch():
             report.extend(await asyncio.gather(*[check(n, u) for n, u in platforms.items()]))
             report.append("=== [END OF ANALYSIS] ===")
 
-# --- 5. ДОМЕН / IP / SERVER: NEXUS DEEP-RECON MODULE ---
+        # --- 5. ДОМЕН / IP / SERVER: NEXUS DEEP-RECON MODULE ---
         elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
             report.append(f"\n=== [NEXUS DEEP-RECON: {clean_data}] ===")
             loop = asyncio.get_event_loop()
@@ -4095,6 +4105,57 @@ async def audit_dispatch():
             
     return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))                                  
 
+
+
+@app.route('/searinfo', methods=['POST'])
+async def searinfo():
+    # 1. Сбор параметров
+    query_data = {
+        "fio": request.form.get("fio"),
+        "address": request.form.get("address"),
+        "phone": request.form.get("phone")
+    }
+
+    # 2. Вспомогательная функция выполнения запроса
+    async def fetch_dork(session, query):
+        url = f"https://www.google.com/search?q={quote(query)}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"}
+        try:
+            async with session.get(url, headers=headers, timeout=8) as r:
+                return f"[DORK: {query[:30]}...] : {'FOUND' if r.status == 200 else 'BLOCKED'}"
+        except: return f"[DORK: {query[:30]}...] : TIMEOUT"
+
+    # 3. Генерация векторов поиска
+    tasks = []
+    async with aiohttp.ClientSession() as session:
+        if query_data['fio']:
+            dorks = [f'"{query_data["fio"]}" -site:pinterest.com', f'site:vk.com "{query_data["fio"]}"', f'"{query_data["fio"]}" "адрес"']
+            tasks.append(asyncio.create_task(asyncio.gather(*[fetch_dork(session, d) for d in dorks])))
+        
+        if query_data['phone']:
+            dorks = [f'"{query_data["phone"]}"', f'site:avito.ru "{query_data["phone"]}"', f'site:cian.ru "{query_data["phone"]}"']
+            tasks.append(asyncio.create_task(asyncio.gather(*[fetch_dork(session, d) for d in dorks])))
+
+        if query_data['address']:
+            dorks = [f'"{query_data["address"]}"', f'site:maps.google.com "{query_data["address"]}"']
+            tasks.append(asyncio.create_task(asyncio.gather(*[fetch_dork(session, d) for d in dorks])))
+
+        # 4. Выполнение
+        results = await asyncio.gather(*tasks)
+
+    # 5. Формирование отчета
+    report = ["=== [NEXUS DEEP-SCAN: ENTITY ANALYSIS] ==="]
+    for group in results:
+        report.extend(group)
+    report.append("=== [END OF ANALYSIS] ===")
+
+    # 6. Вывод результата
+    return render_template_string(
+        render_prime_page(
+            "ENTITY SEARCH REPORT", 
+            f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>"
+        )
+    )    
 
 if __name__ == '__main__':
     cert_path = os.environ.get('PRIME_CERT_PATH')
