@@ -9303,7 +9303,7 @@ echo "[+] NEXUS Engine successfully deployed with PID: $PID"
         else
             echo "[!] Logs empty. Process never started."
         fi
-
+fi
 
     core_engine_wait
 
