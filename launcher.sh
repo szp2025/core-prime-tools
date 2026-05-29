@@ -3534,7 +3534,7 @@ import dns.asyncresolver
 from phonenumbers import geocoder, carrier, number_type
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-
+from urllib.parse import quote
 
 from datetime import datetime
 
@@ -4057,66 +4057,38 @@ async def searinfo():
     }
 
     async def fetch_dork(session, query):
-        # Выбор случайного профиля из матрицы
-        headers = {"User-Agent": random.choice(GLOBAL_NETWORK_UA)}
+        # Используем GLOBAL_NETWORK_UA из глобальной области
+        ua = random.choice(GLOBAL_NETWORK_UA)
+        headers = {"User-Agent": ua}
         url = f"https://www.google.com/search?q={quote(query)}"
-        
         try:
             async with session.get(url, headers=headers, timeout=10) as r:
-                status_text = "SUCCESS (200)" if r.status == 200 else f"BLOCKED ({r.status})"
-                return f"[DORK: {query[:25]}...] : {status_text} | UA: {headers['User-Agent'][:20]}..."
+                return f"[DORK: {query[:25]}...] : {'SUCCESS' if r.status == 200 else 'BLOCKED'}"
         except Exception as e:
-            return f"[DORK: {query[:25]}...] : TIMEOUT"
+            return f"[DORK: {query[:25]}...] : ERROR {str(e)}"
 
-    # Генерация задач
-    tasks = []
+    # Собираем список всех корутин сразу
+    all_dork_tasks = []
+    if query_data['fio']:
+        all_dork_tasks.extend([f'"{query_data["fio"]}" -site:pinterest.com', f'site:vk.com "{query_data["fio"]}"'])
+    if query_data['phone']:
+        all_dork_tasks.extend([f'"{query_data["phone"]}"', f'site:avito.ru "{query_data["phone"]}"'])
+
     async with aiohttp.ClientSession() as session:
-        if query_data['fio']:
-            dorks = [f'"{query_data["fio"]}" -site:pinterest.com', f'site:vk.com "{query_data["fio"]}"']
-            tasks.append(asyncio.gather(*[fetch_dork(session, d) for d in dorks]))
-        
-        if query_data['phone']:
-            dorks = [f'"{query_data["phone"]}"', f'site:avito.ru "{query_data["phone"]}"']
-            tasks.append(asyncio.gather(*[fetch_dork(session, d) for d in dorks]))
+        # Выполняем все запросы параллельно в один поток gather
+        results = await asyncio.gather(*[fetch_dork(session, d) for d in all_dork_tasks])
 
-        results = await asyncio.gather(*tasks)
-
-    # Формирование Forensic-отчета
     report = ["=== [NEXUS DEEP-SCAN: NETWORK MATRIX ACTIVE] ==="]
-    for group in results:
-        report.extend(group)
+    report.extend(results)
     report.append("=== [END OF ANALYSIS] ===")
 
     return render_template_string(
-        render_prime_page(
-            "ENTITY SEARCH REPORT", 
-            f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>"
-        )
+        render_prime_page("ENTITY SEARCH REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
     )
     
 if __name__ == '__main__':
-    cert_path = os.environ.get('PRIME_CERT_PATH')
-    
-    # Расширенная отладка
-    print(f"[DEBUG] Environment PRIME_CERT_PATH: {cert_path}")
-    
-    if cert_path and os.path.exists(cert_path):
-        # Проверка размера файла (пустой файл = нерабочий сертификат)
-        if os.path.getsize(cert_path) > 0:
-            print(f"[*] Validating cert at: {cert_path}")
-            context = (cert_path, cert_path)
-            try:
-                # Добавляем host='0.0.0.0' для доступности из внешней сети
-                app.run(host='0.0.0.0', port=5000, ssl_context=context, debug=False)
-            except Exception as e:
-                print(f"[CRITICAL] SSL Failure: {e}")
-                # Если SSL упал, мы НЕ должны запускать HTTP, 
-                # чтобы не нарушать безопасность системы
-        else:
-            print("[!] Cert file is empty!")
-    else:
-        print("[!] No cert found. Check environment variables.")
-        
+app.run(host='0.0.0.0', port=5000, debug=False)
+
 EOF
 }
 
