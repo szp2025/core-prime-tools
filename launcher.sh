@@ -9279,32 +9279,29 @@ run_live_service() {
 
     
 
-# --- [ИНТЕГРИРОВАННЫЙ БЛОК ЗАПУСКА NEXUS] ---
+# --- [ДИНАМИЧЕСКИЙ БЛОК ЗАПУСКА NEXUS] ---
 
-# 1. Установка лимитов для предотвращения принудительного завершения ядром (OOM Killer)
-# Лимит на 512МБ (524288 КБ) физической памяти и 1ГБ виртуальной
+# 1. Установка лимитов
 ulimit -m 524288 2>/dev/null
 ulimit -v 1048576 2>/dev/null
 
-# 2. Очистка порта перед запуском (санитария)
-if fuser 5000/tcp > /dev/null 2>&1; then
-    echo "[!] Port 5000 busy. Cleaning..."
-    fuser -k 5000/tcp
+# 2. Очистка порта (используем переменную $port вместо 5000)
+if fuser "$port/tcp" > /dev/null 2>&1; then
+    echo "[!] Port $port busy. Cleaning..."
+    fuser -k "$port/tcp"
     sleep 1
 fi
 
-# 3. Финальный запуск с защитой от разрыва сессии (nohup) и пониженным приоритетом (nice)
-# Мы заменяем вашу старую строку на этот оптимизированный блок
-echo "[+] Deploying NEXUS engine on app0.nexus:5000..."
+# 3. Запуск (используем $service_name и $port из начала функции)
+echo "[+] Deploying NEXUS engine on $service_name:$port..."
 nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
 
-# 4. Фиксация ID процесса для мониторинга
+# 4. Фиксация ID процесса
 PID=$!
 echo "[+] NEXUS Engine successfully deployed with PID: $PID"
-
     
 
-    #core_engine_progress 2 "NODE_STABILIZATION"
+    core_engine_progress 2 "NODE_STABILIZATION"
 
 
 
@@ -9327,8 +9324,7 @@ echo "[+] NEXUS Engine successfully deployed with PID: $PID"
         # Теперь Nginx узнает о новом узле сразу после подтверждения его работы
 
         core_nginx_auto_setup "$service_name:$port"
-
-        
+       
 
         # Авто-регистрация в луте
 
