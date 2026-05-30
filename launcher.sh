@@ -4070,55 +4070,75 @@ async def searinfo():
         "phone": request.form.get("phone")
     }
 
-    # Матрица для полной фильтрации мусора
+    # Матрица безопасности и фильтрации
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
     
-    # Расширенная матрица дорков для сбора данных
+    # Криминалистические паттерны для выявления утечек
+    PATTERNS = {
+        "EMAIL": r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
+        "PASSWORD": r'(?:pass(?:word)?|pwd|пароль|secret)[:\s]+([^\s\n]{4,20})',
+        "FINANCIAL": r'(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\s?(?:руб|rub|usd|eur|долл)'
+    }
+
+    # Матрица сбора данных (все дорки)
     dorks = []
     if query_data['fio']:
         b = query_data['fio']
-        dorks.extend([f'"{b}"', f'"{b}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xlsx', f'"{b}" inurl:index.of', f'site:linkedin.com "{b}"'])
+        dorks.extend([f'"{b}"', f'"{b}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx OR filetype:txt', f'"{b}" inurl:index.of OR inurl:admin', f'site:linkedin.com "{b}" OR site:facebook.com "{b}"'])
     if query_data['phone']:
         p = query_data['phone']
-        dorks.extend([f'"{p}"', f'"{p}" filetype:pdf', f'"{p}" site:avito.ru OR site:hh.ru'])
+        dorks.extend([f'"{p}"', f'"{p}" filetype:pdf OR filetype:xlsx OR filetype:txt', f'"{p}" site:avito.ru OR site:cian.ru OR site:hh.ru'])
+    if query_data['address']:
+        a = query_data['address']
+        dorks.append(f'"{a}"')
 
     async with aiohttp.ClientSession() as session:
         tasks = []
         for d in dorks:
-            # Опрашиваем Google и Bing для максимального охвата
+            # Опрашиваем основные поисковые системы
             for eng, url in [("GOOGLE", f"https://www.google.com/search?q={quote(d)}&num=10"), ("BING", f"https://www.bing.com/search?q={quote(d)}")]:
                 tasks.append((eng, d, url))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(0.2, 0.6))
+            await asyncio.sleep(random.uniform(0.5, 1.2))
             try:
-                async with session.get(url, headers={"User-Agent": random.choice(GLOBAL_NETWORK_UA)}, timeout=15) as r:
+                async with session.get(url, headers={"User-Agent": random.choice(GLOBAL_NETWORK_UA)}, timeout=25) as r:
                     html = await r.text()
-                    links = re.findall(r'https?://[^\s"\'<>]+', html)
-                    clean = [l for l in set(links) if not any(dm in l for dm in BAD_DOMAINS) and len(l) > 20]
                     
-                    # Продвинутый парсинг (глубинная проверка ссылок)
-                    hits = []
-                    for link in clean[:5]: # Проверка 5 наиболее релевантных ссылок
-                        if any(ext in link.lower() for ext in ['.pdf', '.txt', '.doc', '.xlsx']):
+                    # Извлечение данных
+                    snippets = re.findall(r'<div[^>]*VwiC3b[^>]*>(.*?)</div>', html, re.DOTALL)
+                    links = list(set(re.findall(r'https?://[^\s"\'<>]+', html)))
+                    clean_links = [l for l in links if not any(dm in l for dm in BAD_DOMAINS) and len(l) > 20]
+                    
+                    output = [f"[{eng}] TARGET: {d}", f"  [FOUND LINKS]: {len(clean_links)}"]
+                    output.append(f"  [SNIPPETS]: " + " | ".join([re.sub('<[^<]+?>', '', s).strip() for s in snippets[:3]]))
+
+                    # Глубокий криминалистический анализ документов
+                    for link in clean_links[:5]:
+                        if any(ext in link.lower() for ext in ['.pdf', '.txt', '.doc', '.xlsx', '.csv']):
                             try:
-                                async with session.get(link, timeout=4) as r_doc:
+                                async with session.get(link, timeout=6) as r_doc:
                                     text = await r_doc.text(errors='ignore')
-                                    # Распознавание ФИО или телефона в теле документа
-                                    if any(q in text.lower() for q in [query_data['fio'], query_data['phone']] if q):
-                                        hits.append(f"    [!] FOUND IN DOC: {link}")
+                                    # Поиск совпадений
+                                    if any(val for val in [query_data['fio'], query_data['phone']] if val and val.lower() in text.lower()):
+                                        match_line = f"    [!] MATCH FOUND IN DOC: {link}"
+                                        output.append(match_line)
+                                        # Поиск критических данных (утечки)
+                                        for k, regex in PATTERNS.items():
+                                            found = re.findall(regex, text, re.IGNORECASE)
+                                            if found: output.append(f"      -> [CRITICAL {k}]: {', '.join(set(found))[:100]}")
                             except: continue
-                    
-                    return f"[{eng}] Query: {d[:15]}... | Artifacts found: {len(clean)}\n" + "\n".join([f"  > {l}" for l in clean[:3]]) + ("\n" + "\n".join(hits) if hits else "")
-            except: return f"[{eng}] -> SCAN ERROR"
+                    return "\n".join(output) + "\n" + "-"*60
+            except Exception as e: return f"[{eng}] -> SCAN ERROR: {str(e)}"
 
         results = await asyncio.gather(*[scan_worker(e, d, u) for e, d, u in tasks])
 
-    report = ["=== [NEXUS ULTIMATE OSINT MATRIX ACTIVE] ===", *results, "=== [END OF ANALYSIS] ==="]
+    report = ["=== [NEXUS ULTIMATE FORENSIC DOSSIER ACTIVE] ===", *results, "=== [END OF ANALYSIS] ==="]
     
     return render_template_string(
-        render_prime_page("ULTIMATE OSINT REPORT", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
+        render_prime_page("FORENSIC DOSSIER", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
     )
+
 
 
     
