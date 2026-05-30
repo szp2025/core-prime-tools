@@ -4071,16 +4071,15 @@ async def searinfo():
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
     
-    # Строгие криминалистические паттерны (исключаем ложные срабатывания на хэши)
     PATTERNS = {
         "EMAIL": r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b',
-        "PASSWORD": r'(?:pass(?:word)?|pwd|пароль|secret)[:\s=]+/^\s\n/+',
+        "PASSWORD": r'(?:pass(?:word)?|pwd|пароль|secret)[:\s=]+([^\s\n]{4,20})',
         "FINANCIAL": r'\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\s?(?:руб|rub|usd|eur|долл|€|\$)\b',
         "CRYPTO_BTC": r'\b(?:bc1|[13])[a-km-zA-HJ-NP-Z1-9]{25,34}\b',
         "CRYPTO_ETH": r'\b0x[a-fA-F0-9]{40}\b',
         "CARD": r'\b(?:\d[ -]*?){13,16}\b',
-        "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|poste|profession|directeur)[:\s]+([^\.\n]{5,50})',
-        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|condamnation|procès|justice)[:\s]+([^\.\n]{5,60})'
+        "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|место работы|poste|profession|directeur|nommé|décret|procureur)[:\s=]+([^\.\n]{5,60})',
+        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|condamnation|procès|justice|enquête|audience)[:\s=]+([^\.\n]{5,70})'
     }
 
     dorks = []
@@ -4089,83 +4088,90 @@ async def searinfo():
         dorks.extend([
             f'"{b}"', 
             f'"{b}" site:gouv.fr', 
-            f'"{b}" "condamnation" OR "jugement" filetype:pdf', 
-            f'"{b}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx OR filetype:txt OR filetype:csv', 
-            f'"{b}" inurl:index.of OR inurl:admin', 
-            f'site:linkedin.com "{b}" OR site:facebook.com "{b}"'
+            f'"{b}" "condamnation" OR "jugement" OR "biographie"', 
+            f'"{b}" filetype:pdf OR filetype:docx OR filetype:xlsx', 
+            f'site:linkedin.com "{b}"'
         ])
     if query_data['phone']:
         p = query_data['phone']
-        dorks.extend([
-            f'"{p}"', 
-            f'"{p}" filetype:pdf OR filetype:xlsx OR filetype:txt OR filetype:csv', 
-            f'"{p}" site:avito.ru OR site:cian.ru OR site:hh.ru'
-        ])
-    if query_data['address']:
-        dorks.append(f'"{query_data["address"]}"')
+        dorks.append(f'"{p}"')
 
     async with aiohttp.ClientSession(headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept-Language": "fr-FR,fr;q=0.9,ru-RU;q=0.8,en-US;q=0.7,en;q=0.6"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cache-Control": "max-age=0"
     }) as session:
         tasks = []
         for d in dorks:
-            for eng, url in [
-                ("GOOGLE", f"https://www.google.com/search?q={quote(d)}&num=10"), 
-                ("BING", f"https://www.bing.com/search?q={quote(d)}"),
-                ("DUCKDUCKGO", f"https://html.duckduckgo.com/html/?q={quote(d)}")
-            ]:
-                tasks.append((eng, d, url))
+            # Запрашиваем по 30 результатов (&num=30 / &count=30) для увеличения объема данных
+            tasks.append(("GOOGLE", d, f"https://www.google.com/search?q={quote(d)}&num=30"))
+            tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(1.0, 2.5)) # Задержка для предотвращения блокировок
+            await asyncio.sleep(random.uniform(1.5, 3.0)) # Увеличенная пауза для минимизации банов
             try:
-                async with session.get(url, timeout=30) as r:
+                async with session.get(url, timeout=35) as r:
                     html = await r.text()
                     
-                    # ГЛУБОКАЯ ОЧИСТКА HTML: полностью вырезаем скрипты и стили вместе с содержимым
+                    # Жесткая зачистка системного JS кода поисковиков
                     html_clean = re.sub(r'<script[^>]*>([\s\S]*?)</script>', ' ', html)
                     html_clean = re.sub(r'<style[^>]*>([\s\S]*?)</style>', ' ', html_clean)
                     
-                    # Теперь убираем оставшиеся теги, оставляя чистый текст выдачи
+                    # Пытаемся вытащить текстовые блоки описаний сайтов (сниппеты) до очистки тегов
+                    # Для Google это обычно b_caption или аналогичные структуры, для Bing - b_caption
+                    raw_snippets = re.findall(r'(?:<p[^>]*>|<div[^>]*class="[^"]*(?:b_caption|VwiC3b)[^"]*"[^>]*>)(.*?)(?:</p>|</div>)', html_clean, re.DOTALL)
+                    extracted_snippets = [re.sub('<[^<]+?>', '', s).strip() for s in raw_snippets if len(s) > 15]
+                    
                     visible_text = re.sub(r'<[^<]+?>', ' ', html_clean)
-                    visible_text = re.sub(r'\s+', ' ', visible_text) # Нормализуем пробелы
+                    visible_text = re.sub(r'\s+', ' ', visible_text)
                     
                     output = [f"[{eng}] QUERY: {d}"]
                     found_something = False
                     
-                    # Проверка текста поисковой выдачи
-                    if any(val for val in [query_data['fio'], query_data['phone']] if val and val.lower() in visible_text.lower()):
-                        output.append("  [!] CRITICAL CONTEXT MATCH FOUND IN ISSUANCE")
+                    # Сбор данных из общего тела страницы выдачи
+                    if query_data['fio'].lower() in visible_text.lower():
                         found_something = True
+                        
+                        # Добавляем в отчет собранные текстовые сниппеты (история, факты)
+                        if extracted_snippets:
+                            output.append("  [NEWS & PUBLIC RECOGNITION]:")
+                            for snip in list(set(extracted_snippets))[:5]:
+                                if query_data['fio'].lower() in snip.lower():
+                                    output.append(f"    - {snip[:250]}")
+                        
+                        # Парсинг регулярных выражений
+                        output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         for k, regex in PATTERNS.items():
                             found = re.findall(regex, visible_text, re.IGNORECASE)
                             if found:
-                                # Дополнительная фильтрация служебных строк
-                                clean_found = [f for f in set(found) if "chatprompt" not in str(f).lower() and "surface" not in str(f).lower()]
+                                # Дополнительный фильтр мусорных совпадений
+                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "window"])]
                                 if clean_found:
-                                    output.append(f"    -> [{k}]: {', '.join(clean_found)[:200]}")
+                                    output.append(f"    -> [{k}]: {', '.join(clean_found)[:300]}")
                     
-                    # Анализ связанных документов (PDF/DOC/XLSX)
+                    # Попытка парсинга прямых ссылок (документов)
                     links = list(set(re.findall(r'https?://[^\s"\'<>]+', html)))
                     clean_links = [l for l in links if not any(dm in l for dm in BAD_DOMAINS)]
                     
-                    for link in [l for l in clean_links if any(ext in l.lower() for ext in ['.pdf', '.txt', '.doc', '.docx', '.xlsx', '.csv'])][:5]:
+                    for link in [l for l in clean_links if any(ext in l.lower() for ext in ['.pdf', '.txt', '.docx', '.xlsx'])][:4]:
                         try:
-                            async with session.get(link, timeout=10) as r_doc:
-                                doc_text = await r_doc.text(errors='ignore')
-                                if any(val for val in [query_data['fio'], query_data['phone']] if val and val.lower() in doc_text.lower()):
-                                    output.append(f"    [!] DIRECT MATCH IN DOCUMENT: {link}")
-                                    found_something = True
-                                    for k, regex in PATTERNS.items():
-                                        found_doc = re.findall(regex, doc_text, re.IGNORECASE)
-                                        if found_doc:
-                                            output.append(f"      -> [{k}]: {', '.join(set(found_doc))[:200]}")
-                        except: 
+                            # Имитируем переход с поисковика (Referer) для обхода защиты 403 Forbidden
+                            headers_doc = {"Referer": url, "User-Agent": "Mozilla/5.0"}
+                            async with session.get(link, headers=headers_doc, timeout=8) as r_doc:
+                                if r_doc.status == 200:
+                                    doc_text = await r_doc.text(errors='ignore')
+                                    if query_data['fio'].lower() in doc_text.lower():
+                                        output.append(f"    [!] FILE DEEP MATCH: {link}")
+                                        for k, regex in PATTERNS.items():
+                                            found_doc = re.findall(regex, doc_text, re.IGNORECASE)
+                                            if found_doc:
+                                                output.append(f"      -> [{k}]: {', '.join(set(found_doc))[:200]}")
+                        except:
                             continue
-                        
+                            
                     return "\n".join(output) + "\n" + "-"*80 if found_something else None
-            except: 
+            except:
                 return None
 
         results = [r for r in await asyncio.gather(*[scan_worker(e, d, u) for e, d, u in tasks]) if r]
