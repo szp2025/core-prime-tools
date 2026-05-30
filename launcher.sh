@@ -4104,24 +4104,26 @@ async def searinfo():
     }) as session:
         tasks = []
         for d in dorks:
-            # Запрашиваем по 30 результатов (&num=30 / &count=30) для увеличения объема данных
             tasks.append(("GOOGLE", d, f"https://www.google.com/search?q={quote(d)}&num=30"))
-            tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
+            tasks.append(("BING", f"https://www.bing.com/search?q={quote(d)}&count=30"))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(1.5, 3.0)) # Увеличенная пауза для минимизации банов
+            await asyncio.sleep(random.uniform(1.5, 3.0))
             try:
                 async with session.get(url, timeout=35) as r:
                     html = await r.text()
                     
-                    # Жесткая зачистка системного JS кода поисковиков
+                    # Очистка от служебного скриптового мусора поисковиков
                     html_clean = re.sub(r'<script[^>]*>([\s\S]*?)</script>', ' ', html)
                     html_clean = re.sub(r'<style[^>]*>([\s\S]*?)</style>', ' ', html_clean)
                     
-                    # Пытаемся вытащить текстовые блоки описаний сайтов (сниппеты) до очистки тегов
-                    # Для Google это обычно b_caption или аналогичные структуры, для Bing - b_caption
-                    raw_snippets = re.findall(r'(?:<p[^>]*>|<div[^>]*class="[^"]*(?:b_caption|VwiC3b)[^"]*"[^>]*>)(.*?)(?:</p>|</div>)', html_clean, re.DOTALL)
-                    extracted_snippets = [re.sub('<[^<]+?>', '', s).strip() for s in raw_snippets if len(s) > 15]
+                    # Динамический сбор блоков текста (универсальный поиск контекста вокруг ФИО)
+                    raw_blocks = re.findall(r'<[^>]+>([^<]{20,300})</[^>]+>', html_clean)
+                    extracted_snippets = []
+                    for block in raw_blocks:
+                        clean_block = block.strip()
+                        if query_data['fio'].lower() in clean_block.lower() and len(clean_block) > 30:
+                            extracted_snippets.append(re.sub(r'\s+', ' ', clean_block))
                     
                     visible_text = re.sub(r'<[^<]+?>', ' ', html_clean)
                     visible_text = re.sub(r'\s+', ' ', visible_text)
@@ -4129,34 +4131,30 @@ async def searinfo():
                     output = [f"[{eng}] QUERY: {d}"]
                     found_something = False
                     
-                    # Сбор данных из общего тела страницы выдачи
                     if query_data['fio'].lower() in visible_text.lower():
                         found_something = True
                         
-                        # Добавляем в отчет собранные текстовые сниппеты (история, факты)
+                        # Вывод текстового контента, если он обнаружен
                         if extracted_snippets:
                             output.append("  [NEWS & PUBLIC RECOGNITION]:")
-                            for snip in list(set(extracted_snippets))[:5]:
-                                if query_data['fio'].lower() in snip.lower():
-                                    output.append(f"    - {snip[:250]}")
+                            for snip in list(set(extracted_snippets))[:6]:
+                                output.append(f"    - {snip}")
                         
-                        # Парсинг регулярных выражений
+                        # Извлечение артефактов по регулярным выражениям
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         for k, regex in PATTERNS.items():
                             found = re.findall(regex, visible_text, re.IGNORECASE)
                             if found:
-                                # Дополнительный фильтр мусорных совпадений
-                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "window"])]
+                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "window", "display"])]
                                 if clean_found:
                                     output.append(f"    -> [{k}]: {', '.join(clean_found)[:300]}")
                     
-                    # Попытка парсинга прямых ссылок (документов)
+                    # Проверка вложенных документов
                     links = list(set(re.findall(r'https?://[^\s"\'<>]+', html)))
                     clean_links = [l for l in links if not any(dm in l for dm in BAD_DOMAINS)]
                     
                     for link in [l for l in clean_links if any(ext in l.lower() for ext in ['.pdf', '.txt', '.docx', '.xlsx'])][:4]:
                         try:
-                            # Имитируем переход с поисковика (Referer) для обхода защиты 403 Forbidden
                             headers_doc = {"Referer": url, "User-Agent": "Mozilla/5.0"}
                             async with session.get(link, headers=headers_doc, timeout=8) as r_doc:
                                 if r_doc.status == 200:
