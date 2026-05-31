@@ -4060,9 +4060,9 @@ async def audit_dispatch():
             
     return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))                                  
 
-
 @app.route('/searinfo', methods=['POST'])
 async def searinfo():
+    # Собираем входные параметры (Parameters)
     query_data = {
         "fio": request.form.get("fio"),
         "address": request.form.get("address"),
@@ -4071,7 +4071,7 @@ async def searinfo():
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
     
-    # Расширенные регулярные паттерны для тотального автоматического разбора текста
+    # Регулярные выражения для глубокого форензик-анализа (Forensic Patterns)
     PATTERNS = {
         "EMAIL": r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b',
         "PASSWORD": r'(?:pass(?:word)?|pwd|пароль|secret)[:\s=]+([^\s\n]{4,20})',
@@ -4081,10 +4081,10 @@ async def searinfo():
         "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|condamnation|procès|justice|enquête|audience)[:\s=]+([^\.\n]{5,80})'
     }
 
-    # Вспомогательные форензик-паттерны для сборки динамической мастер-карточки
+    # Вспомогательные экстракторы для Мастер-Карточки
     DYNAMIC_EXTRACTORS = {
-        "BIRTH": r'(?:né[e]? le|родился|дата рождения|birth(?:\s?date)?|naissance)[:\s=]*([0-9]{1,2}[./\s][0-9]{1,2}[./\s][0-9]{4}|[0-9]{1,2}\s(?:[a-zéûа-я]+)\s[0-9]{4})',
-        "PHONE_PARSER": r'(?:\+?[\d\s\-()]{7,16})',
+        "BIRTH": r'(?:né[e]? le|родился|дата рождения|birth(?:\s?date)?|naissance)[:\s=]*([0-9]{1,2}[./\s][0-9]{1,2}[./\s][0-9]{4}|[0-9]{1,2}\s(?:[a-zA-Zéûа-яА-Я]+)\s[0-9]{4})',
+        "PHONE_PARSER": r'(?:\+?[\d\s\-()]{9,16})',
         "ADDRESS_PARSER": r'(?:\d{1,4}\s(?:rue|avenue|boulevard|place|allée|parvis|parc|route|ул\.|пер\.)[^\.\n]{10,80})'
     }
 
@@ -4094,8 +4094,8 @@ async def searinfo():
         dorks.extend([
             f'"{b}"', 
             f'"{b}" site:gouv.fr', 
-            f'"{b}" "biographie" OR "parcours" OR "carrière"', 
-            f'"{b}" "tribunal" OR "procureur" OR "contact" OR "societe"',
+            f'"{b}" "biographie" OR "parcours"', 
+            f'"{b}" "tribunal" OR "procureur"',
             f'site:fr.wikipedia.org "{b}"'
         ])
     if query_data['phone']:
@@ -4104,22 +4104,23 @@ async def searinfo():
         dorks.append(f'"{query_data["address"]}"')
 
     session_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
         "Cache-Control": "max-age=0",
         "Connection": "keep-alive"
     }
 
-    # ИНИЦИАЛИЗАЦИЯ ПОЛНОСТЬЮ ПУСТОГО И ДИНАМИЧЕСКОГО ПРОФИЛЯ
-    dynamic_profile = {
+    # Глобальный контейнер для агрегации данных (чтобы избежать изоляции асинхронных тасок)
+    aggregated_profile = {
         "FULL_NAME": query_data['fio'] or "NOT_SPECIFIED",
         "ESTIMATED_POST": "NOT_FOUND",
         "BIRTH_INFO": "NOT_FOUND",
         "OFFICIAL_ADDRESS": query_data['address'] or "NOT_FOUND",
         "CONTACT_PHONES": query_data['phone'] or "NOT_FOUND",
-        "FOUND_EMAILS": [],
-        "DYNAMIC_CHRONOLOGY": []
+        "FOUND_EMAILS": set(),
+        "CHRONOLOGY": set(),
+        "DETECTED_URLS": set()
     }
 
     async with aiohttp.ClientSession(headers=session_headers) as session:
@@ -4130,110 +4131,113 @@ async def searinfo():
             tasks.append(("DUCKDUCKGO", d, f"https://html.duckduckgo.com/html/?q={quote(d)}"))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(1.0, 2.5))
+            await asyncio.sleep(random.uniform(0.5, 2.0))
             try:
-                async with session.get(url, timeout=35) as r:
-                    if r.status != 200:
-                        return None
+                async with session.get(url, timeout=30) as r:
                     html = await r.text()
                     
+                    # Очищаем бинарный мусор
                     html_clean = re.sub(r'<script[^>]*>([\s\S]*?)</script>', ' ', html)
                     html_clean = re.sub(r'<style[^>]*>([\s\S]*?)</style>', ' ', html_clean)
                     
+                    # Превращаем HTML в чистый плоский текст
                     visible_text = re.sub(r'<[^<]+?>', ' ', html_clean)
                     visible_text = re.sub(r'\s+', ' ', visible_text)
                     
-                    if "recherche" in visible_text.lower() and len(visible_text) < 2000:
-                        return None
+                    # Собираем абсолютно все ссылки на ресурсы из выдачи, чтобы не потерять след
+                    all_links = re.findall(r'https?://[^\s"\'<>]+', html)
+                    for l in all_links:
+                        if not any(dm in l for dm in BAD_DOMAINS) and len(l) < 120:
+                            if any(x in l.lower() for x in ["wikipedia", "gouv", "lemonde", "bfmtv", "linkedin", "justice"]):
+                                aggregated_profile["DETECTED_URLS"].add(l)
 
-                    output = [f"[{eng}] QUERY: {d}"]
-                    found_something = False
+                    output = [f"[{eng}] QUERY: {d}", f"  [URL TRACE]: {url}"]
                     
-                    target_name = dynamic_profile["FULL_NAME"]
-                    if target_name.lower() in visible_text.lower():
-                        found_something = True
-                        
-                        # 1. Извлечение сниппетов
-                        extracted_snippets = []
-                        for match in re.finditer(re.escape(target_name), visible_text, re.IGNORECASE):
-                            start = max(0, match.start() - 150)
-                            end = min(len(visible_text), match.end() + 150)
-                            snippet = visible_text[start:end].strip()
-                            if not any(x in snippet.lower() for x in ["параметры", "настройки", "cookies"]):
-                                extracted_snippets.append(f"...{snippet}...")
-
-                        if extracted_snippets:
-                            output.append("  [NEWS & PUBLIC RECOGNITION]:")
-                            for snip in list(set(extracted_snippets))[:6]:
-                                output.append(f"    - {snip}")
-                        
-                        # 2. ПОЛНОСТЬЮ ДИНАМИЧЕСКИЙ АНАЛИЗ ТЕКСТА ДЛЯ КАРТОЧКИ
-                        # Ищем дату рождения
-                        if dynamic_profile["BIRTH_INFO"] == "NOT_FOUND":
-                            birth_match = re.search(DYNAMIC_EXTRACTORS["BIRTH"], visible_text, re.IGNORECASE)
-                            if birth_match:
-                                dynamic_profile["BIRTH_INFO"] = birth_match.group(1).strip()
-
-                        # Ищем адреса
-                        if dynamic_profile["OFFICIAL_ADDRESS"] == "NOT_FOUND":
-                            addr_match = re.search(DYNAMIC_EXTRACTORS["ADDRESS_PARSER"], visible_text, re.IGNORECASE)
-                            if addr_match:
-                                dynamic_profile["OFFICIAL_ADDRESS"] = addr_match.group(0).strip()
-
-                        # Ищем телефоны (если не были заданы пользователем)
-                        if dynamic_profile["CONTACT_PHONES"] == "NOT_FOUND":
-                            phone_matches = re.findall(DYNAMIC_EXTRACTORS["PHONE_PARSER"], visible_text)
-                            clean_phones = [p.strip() for p in phone_matches if len(re.sub(r'\D', '', p)) >= 10]
-                            if clean_phones:
-                                dynamic_profile["CONTACT_PHONES"] = clean_phones[0]
-
-                        # Собираем почты динамически
-                        emails_found = re.findall(PATTERNS["EMAIL"], visible_text, re.IGNORECASE)
-                        for em in emails_found:
-                            if em.lower() not in dynamic_profile["FOUND_EMAILS"]:
-                                dynamic_profile["FOUND_EMAILS"].append(em.lower())
-
-                        # Динамический сбор карьеры по хронологическим маркерам (Год + текст)
-                        chronology_matches = re.findall(r'\b(19\d{2}|20\d{2})\b[^.\n]{10,120}', visible_text)
-                        for chron in chronology_matches:
-                            clean_chron = chron.strip()
-                            if any(m in clean_chron.lower() for m in ["nommé", "décret", "procureur", "juge", "directeur", "работа", "должность", "суд"]):
-                                if clean_chron not in dynamic_profile["DYNAMIC_CHRONOLOGY"]:
-                                    dynamic_profile["DYNAMIC_CHRONOLOGY"].append(clean_chron)
-
-                        # Извлечение базовых артефактов
-                        output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
-                        for k, regex in PATTERNS.items():
-                            found = re.findall(regex, visible_text, re.IGNORECASE)
-                            if found:
-                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "display"])]
-                                if clean_found:
-                                    output.append(f"    -> [{k}]: {', '.join(clean_found)[:400]}")
-                                    # Попытка вытащить должность из паттерна CAREER
-                                    if k == "CAREER" and dynamic_profile["ESTIMATED_POST"] == "NOT_FOUND":
-                                        dynamic_profile["ESTIMATED_POST"] = list(clean_found)[0]
+                    # Ослабляем условия проверки: ищем по фрагментам (например, только фамилию)
+                    search_token = aggregated_profile["FULL_NAME"].split()[0].lower() if aggregated_profile["FULL_NAME"] else "___"
                     
-                    return "\n".join(output) + "\n" + "-"*80 if found_something else None
-            except:
-                return None
+                    # 1. Извлечение контекстных сниппетов
+                    extracted_snippets = []
+                    for match in re.finditer(re.escape(search_token), visible_text, re.IGNORECASE):
+                        start = max(0, match.start() - 150)
+                        end = min(len(visible_text), match.end() + 150)
+                        snippet = visible_text[start:end].strip()
+                        if len(snippet) > 40:
+                            extracted_snippets.append(f"... {snippet} ...")
+
+                    if extracted_snippets:
+                        output.append("  [NEWS & PUBLIC RECOGNITION]:")
+                        for snip in list(set(extracted_snippets))[:4]:
+                            output.append(f"    - {snip}")
+                    
+                    # 2. Прямой парсинг регулярных выражений в глобальный профиль
+                    # Ищем Дату Рождения
+                    birth_match = re.search(DYNAMIC_EXTRACTORS["BIRTH"], visible_text, re.IGNORECASE)
+                    if birth_match:
+                        aggregated_profile["BIRTH_INFO"] = birth_match.group(1).strip()
+
+                    # Ищем Адреса
+                    addr_match = re.search(DYNAMIC_EXTRACTORS["ADDRESS_PARSER"], visible_text, re.IGNORECASE)
+                    if addr_match:
+                        aggregated_profile["OFFICIAL_ADDRESS"] = addr_match.group(0).strip()
+
+                    # Ищем Телефоны
+                    phone_matches = re.findall(DYNAMIC_EXTRACTORS["PHONE_PARSER"], visible_text)
+                    for p in phone_matches:
+                        digits = re.sub(r'\D', '', p)
+                        if 10 <= len(digits) <= 15:
+                            aggregated_profile["CONTACT_PHONES"] = p.strip()
+
+                    # Ищем Электронные Почты
+                    emails = re.findall(PATTERNS["EMAIL"], visible_text, re.IGNORECASE)
+                    for em in emails:
+                        aggregated_profile["FOUND_EMAILS"].add(em.lower())
+
+                    # Ищем элементы хронологии карьеры
+                    chronology_events = re.findall(r'\b(19\d{2}|20\d{2})\b[^.\n]{10,100}', visible_text)
+                    for ev in chronology_events:
+                        if any(m in ev.lower() for m in ["nommé", "décret", "procureur", "juge", "tribunal", "работа", "должность"]):
+                            aggregated_profile["CHRONOLOGY"].add(ev.strip())
+
+                    # Извлекаем стандартные форензик-артефакты
+                    output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
+                    for k, regex in PATTERNS.items():
+                        found = re.findall(regex, visible_text, re.IGNORECASE)
+                        if found:
+                            clean_found = [str(f).strip() for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "window"])]
+                            if clean_found:
+                                output.append(f"    -> [{k}]: {', '.join(clean_found)[:250]}")
+                                if k == "CAREER" and aggregated_profile["ESTIMATED_POST"] == "NOT_FOUND":
+                                    aggregated_profile["ESTIMATED_POST"] = clean_found[0]
+
+                    return "\n".join(output) + "\n" + "-"*80
+            except Exception as e:
+                return f"[{eng}] WORKER ERROR ON DIRTY STREAM: {str(e)}\n" + "-"*80
 
         results = [r for r in await asyncio.gather(*[scan_worker(e, d, u) for e, d, u in tasks]) if r]
 
-    # СБОРКА АВТОМАТИЧЕСКОГО ФИНАЛЬНОГО ОТЧЕТА (БЕЗ ХАРДКОДА)
+    # СБОРКА ИТОГОВОГО СВЕРХДЕТАЛЬНОГО ОТЧЕТА
     report = []
     report.append("================================================================================")
     report.append("=== [NEXUS COMPREHENSIVE FORENSIC DOSSIER PRIMARY IDENTIFICATION MASTER-CARD] ===")
     report.append("================================================================================")
-    report.append(f"  [+] TARGET IDENTITY : {dynamic_profile['FULL_NAME'].upper()}")
-    report.append(f"  [+] CURRENT STATUS  : {dynamic_profile['ESTIMATED_POST']}")
-    report.append(f"  [+] DATE/PLACE BIRTH: {dynamic_profile['BIRTH_INFO']}")
-    report.append(f"  [+] REGISTRATION ADDR: {dynamic_profile['OFFICIAL_ADDRESS']}")
-    report.append(f"  [+] TELEPHONE LINES : {dynamic_profile['CONTACT_PHONES']}")
-    report.append(f"  [+] CAPTURED EMAILS : {', '.join(dynamic_profile['FOUND_EMAILS']) if dynamic_profile['FOUND_EMAILS'] else 'NOT_FOUND'}")
+    report.append(f"  [+] TARGET IDENTITY : {aggregated_profile['FULL_NAME'].upper()}")
+    report.append(f"  [+] CURRENT STATUS  : {aggregated_profile['ESTIMATED_POST']}")
+    report.append(f"  [+] DATE/PLACE BIRTH: {aggregated_profile['BIRTH_INFO']}")
+    report.append(f"  [+] REGISTRATION ADDR: {aggregated_profile['OFFICIAL_ADDRESS']}")
+    report.append(f"  [+] TELEPHONE LINES : {aggregated_profile['CONTACT_PHONES']}")
+    report.append(f"  [+] CAPTURED EMAILS : {', '.join(aggregated_profile['FOUND_EMAILS']) if aggregated_profile['FOUND_EMAILS'] else 'NOT_FOUND'}")
     
+    report.append("\n  [+] TARGET INTELLIGENCE NETWORK LOCATIONS (DIRECT TARGET SITES):")
+    if aggregated_profile["DETECTED_URLS"]:
+        for url_node in list(aggregated_profile["DETECTED_URLS"])[:15]:
+            report.append(f"    [URL] -> {url_node}")
+    else:
+        report.append("    -> NO DIRECT OUTCOMING LINKS DETECTED IN HTML STREAMS")
+
     report.append("\n  [+] DYNAMICALLY EXTRACTED CAREER CHRONOLOGY & EVENTS:")
-    if dynamic_profile["DYNAMIC_CHRONOLOGY"]:
-        for rank in sorted(list(set(dynamic_profile["DYNAMIC_CHRONOLOGY"])))[:15]:
+    if aggregated_profile["CHRONOLOGY"]:
+        for rank in sorted(list(aggregated_profile["CHRONOLOGY"]))[:15]:
             report.append(f"    -> {rank}")
     else:
         report.append("    -> NO LOGISTICAL TIMELINES EXTRACTED FROM SNIPPETS")
