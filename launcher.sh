@@ -4070,17 +4070,18 @@ async def searinfo():
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
     
+    # Расширенные паттерны регулярных выражений для детекции артефактов любого типа
     PATTERNS = {
         "EMAIL": r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b',
         "PASSWORD": r'(?:pass(?:word)?|pwd|пароль|secret)[:\s=]+([^\s\n]{4,20})',
         "FINANCIAL": r'\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\s?(?:руб|rub|usd|eur|долл|€|\$)\b',
         "CARD": r'\b(?:\d[ -]*?){13,16}\b',
-        "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|место работы|poste|profession|directeur|nommé|décret|procureur)[:\s=]+([^\.\n]{5,80})',
-        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|condamnation|procès|justice|enquête|audience)[:\s=]+([^\.\n]{5,80})'
+        "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|место работы|основатель|poste|profession|directeur|nommé|décret|fondateur|président|pdg|ceo)[:\s=]+([^\.\n]{5,80})',
+        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|скандал|condamnation|procès|justice|enquête|audience|faillite)[:\s=]+([^\.\n]{5,80})'
     }
 
     DYNAMIC_EXTRACTORS = {
-        "BIRTH": r'(?:né[e]? le|родился|дата рождения|birth(?:\s?date)?|naissance)[:\s=]*([0-9]{1,2}[./\s][0-9]{1,2}[./\s][0-9]{4}|[0-9]{1,2}\s(?:[a-zA-Zéûа-яА-Я]+)\s[0-9]{4})',
+        "BIRTH": r'(?:né[e]? le|родился|родилась|дата рождения|birth(?:\s?date)?|naissance)[:\s=]*([0-9]{1,2}[./\s][0-9]{1,2}[./\s][0-9]{4}|[0-9]{1,2}\s(?:[a-zA-Zéûа-яА-ЯёЁ]+)\s[0-9]{4}[^\.\,\)]*)',
         "PHONE_PARSER": r'(?:\+?[\d\s\-()]{9,16})',
         "ADDRESS_PARSER": r'(?:\d{1,4}\s(?:rue|avenue|boulevard|place|allée|parvis|parc|route|ул\.|пер\.)[^\.\n]{10,80})'
     }
@@ -4116,8 +4117,7 @@ async def searinfo():
 
     async with aiohttp.ClientSession(headers=session_headers) as session:
         
-        # Модуль 1: Автономный обходной коннектор к Wikipedia API
-        # Запускается напрямую по ФИО, игнорируя баны поисковиков
+        # Модуль 1: Автономный универсальный коннектор к Wikipedia API
         if query_data['fio']:
             formatted_name = query_data['fio'].replace(" ", "_")
             wiki_api_url = f"https://fr.wikipedia.org/api/rest_v1/page/html/{quote(formatted_name)}"
@@ -4125,22 +4125,73 @@ async def searinfo():
                 async with session.get(wiki_api_url, timeout=15) as wp_r:
                     if wp_r.status == 200:
                         wp_html = await wp_r.text()
-                        # Вычищаем HTML-теги движка Википедии
+                        
+                        # Комплексная очистка HTML-тегов вики-разметки
                         wp_clean = re.sub(r'<[^>]+>', ' ', wp_html)
-                        wp_clean = re.sub(r'\s+', ' ', wp_clean)
-                        aggregated_profile["WIKI_DUMP"] = wp_clean.strip()
+                        wp_clean = re.sub(r'\s+', ' ', wp_clean).strip()
+                        aggregated_profile["WIKI_DUMP"] = wp_clean
                         aggregated_profile["DETECTED_URLS"].add(f"https://fr.wikipedia.org/wiki/{formatted_name}")
                         
-                        # Крос-парсинг данных прямо из дампа Википедии
+                        # Извлечение данных рождения (поддержка разных языковых форматов)
                         birth_m = re.search(DYNAMIC_EXTRACTORS["BIRTH"], wp_clean, re.IGNORECASE)
                         if birth_m:
-                            aggregated_profile["BIRTH_INFO"] = birth_m.group(1).strip()
+                            raw_birth = birth_m.group(1).strip()
+                            aggregated_profile["BIRTH_INFO"] = re.sub(r'[\)\}\]]', '', raw_birth).strip()
                             
-                        # Вытягиваем все даты карьеры из текста статьи
-                        dates = re.findall(r'\b(19\d{2}|20\d{2})\b[^.\n]{15,90}', wp_clean)
-                        for d_ev in dates:
-                            if any(x in d_ev.lower() for x in ["nommé", "décret", "procureur", "juge", "magistrat", "tribunal"]):
-                                aggregated_profile["CHRONOLOGY"].add(d_ev.strip())
+                        # --- Интеллектуальное динамическое определение текущей должности (CURRENT STATUS) ---
+                        detected_status = "NOT_FOUND"
+                        global_markers = [
+                            "Président", "Directeur", "PDG", "CEO", "Ministre", "Député", "Procureur", 
+                            "Juge", "Avocat", "Fondateur", "Actionnaire", "Scientifique", "Ingénieur",
+                            "Magistrat", "Écrivain", "Artiste", "Professeur", "Chercheur", "Gérant", 
+                            "Homme d'affaires", "Femme d'affaires", "Maire", "Sénateur"
+                        ]
+                        
+                        for marker in global_markers:
+                            marker_pattern = rf"\b{marker}[e]?\b"
+                            if re.search(marker_pattern, wp_clean[:500], re.IGNORECASE):
+                                context_match = re.search(rf"\b{marker}[e]?\s+(?:de|du|d'|en|à)\s+([A-Z][a-zA-Zа-яА-ЯёЁ\s\-\d]+)(?:\b|,|\.)", wp_clean[:700])
+                                if context_match:
+                                    detected_status = context_match.group(0).strip()
+                                    detected_status = re.sub(r'[,.\(\)]+$', '', detected_status).strip()
+                                    break
+                                else:
+                                    detected_status = marker
+                                    break
+                                    
+                        if detected_status != "NOT_FOUND":
+                            aggregated_profile["ESTIMATED_POST"] = detected_status
+                        else:
+                            status_match = re.search(r'(?:est un|est une|est un[e]?\s+([a-zA-Zа-яА-ЯёЁ\s\-]+)(?:français|française|international))', wp_clean[:400], re.IGNORECASE)
+                            if status_match:
+                                aggregated_profile["ESTIMATED_POST"] = status_match.group(0).strip()
+
+                        # --- Универсальный попредложенческий лингвистический парсер хронологии ---
+                        sentences = re.split(r'\s*\.\s*', wp_clean)
+                        UNIVERSAL_CAREER_TRIGGERS = [
+                            "nommé", "décret", "élut", "élu", "recruté", "fondateur", "fonde", "dirige", 
+                            "travaille", "débute", "carrière", "diplômé", "étudie", "rejoint", "succède", 
+                            "crée", "quitte", "arrêté", "condamné", "publie", "obtient", "devient", "rejoint",
+                            "назначен", "указ", "избран", "основал", "руководит", "работает", "начал", 
+                            "карьера", "диплом", "окончил", "учился", "присоединился", "создал", "покинул", 
+                            "арестован", "осужден", "опубликовал", "получил", "стал", "возглавил",
+                            "appointed", "decree", "elected", "founded", "manages", "works", "started", 
+                            "career", "graduated", "studied", "joined", "created", "left", "became", "headed"
+                        ]
+
+                        for sentence in sentences:
+                            sentence = sentence.strip()
+                            year_match = re.search(r'\b(19\d{2}|20\d{2})\b', sentence)
+                            if year_match:
+                                found_year = year_match.group(1)
+                                if any(trigger in sentence.lower() for trigger in UNIVERSAL_CAREER_TRIGGERS):
+                                    clean_sentence = re.sub(r'\[\s*\d+\s*\]', '', sentence)
+                                    clean_sentence = re.sub(r'\{\{[\s\S]*?\}\}', '', clean_sentence)
+                                    clean_sentence = re.sub(r'\s+', ' ', clean_sentence).strip()
+                                    
+                                    if len(clean_sentence) > 25 and not any(bad in clean_sentence.lower() for bad in ["chatprompt", "json", "script", "surface", "window"]):
+                                        formatted_event = f"[{found_year}] -> {clean_sentence}"
+                                        aggregated_profile["CHRONOLOGY"].add(formatted_event)
             except:
                 pass
 
@@ -4156,7 +4207,6 @@ async def searinfo():
                 async with session.get(url, timeout=25) as r:
                     html = await r.text()
                     
-                    # Проверка на капчу/блокировку
                     if "défi" in html.lower() or "captcha" in html.lower() or r.status == 429:
                         return f"[{eng}] DETECTED ANTI-BOT BLOCKADE (CAPTCHA TRIPPED). STREAM TERMINATED.\n" + "-"*80
                     
@@ -4169,7 +4219,6 @@ async def searinfo():
                     search_token = aggregated_profile["FULL_NAME"].split()[0].lower()
                     
                     if search_token in visible_text.lower():
-                        # Извлекаем сниппеты
                         extracted_snippets = []
                         for match in re.finditer(re.escape(search_token), visible_text, re.IGNORECASE):
                             start = max(0, match.start() - 130)
@@ -4183,13 +4232,11 @@ async def searinfo():
                             for snip in list(set(extracted_snippets))[:3]:
                                 output.append(f"    - {snip}")
                         
-                        # Собираем почты
                         emails = re.findall(PATTERNS["EMAIL"], visible_text, re.IGNORECASE)
                         for em in emails:
                             if "duckduckgo" not in em.lower():
                                 aggregated_profile["FOUND_EMAILS"].add(em.lower())
 
-                        # Текстовые артефакты
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         for k, regex in PATTERNS.items():
                             found = re.findall(regex, visible_text, re.IGNORECASE)
@@ -4206,7 +4253,7 @@ async def searinfo():
 
         results = [r for r in await asyncio.gather(*[scan_worker(e, d, u) for e, d, u in tasks]) if r]
 
-    # СБОРКА ИТОГОВОГО ОТЧЕТА С ИСПОЛЬЗОВАНИЕМ АВТОНОМНОГО ДАМПА
+    # СБОРКА ИТОГОВОГО УНИВЕРСАЛЬНОГО ОТЧЕТА
     report = []
     report.append("================================================================================")
     report.append("=== [NEXUS COMPREHENSIVE FORENSIC DOSSIER PRIMARY IDENTIFICATION MASTER-CARD] ===")
@@ -4225,7 +4272,7 @@ async def searinfo():
             
     report.append("\n  [+] DYNAMICALLY EXTRACTED CAREER CHRONOLOGY & EVENTS:")
     if aggregated_profile["CHRONOLOGY"]:
-        for rank in sorted(list(aggregated_profile["CHRONOLOGY"]))[:20]:
+        for rank in sorted(list(aggregated_profile["CHRONOLOGY"]))[:25]:
             report.append(f"    -> {rank}")
     else:
         report.append("    -> NO LOGISTICAL TIMELINES EXTRACTED FROM SNIPPETS")
@@ -4234,7 +4281,6 @@ async def searinfo():
         report.append("\n================================================================================")
         report.append("=== [DIRECT REST-API OVERRIDE DUMP: BIOGRAPHY DEEP TEXT STREAM] ===")
         report.append("================================================================================\n")
-        # Выдаем огромный массив текста биографии цели целиком
         report.append(aggregated_profile["WIKI_DUMP"][:6000])
 
     report.append("\n================================================================================")
