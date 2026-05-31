@@ -4071,15 +4071,21 @@ async def searinfo():
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
     
+    # Расширенные регулярные паттерны для тотального автоматического разбора текста
     PATTERNS = {
         "EMAIL": r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b',
         "PASSWORD": r'(?:pass(?:word)?|pwd|пароль|secret)[:\s=]+([^\s\n]{4,20})',
         "FINANCIAL": r'\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\s?(?:руб|rub|usd|eur|долл|€|\$)\b',
-        "CRYPTO_BTC": r'\b(?:bc1|[13])[a-km-zA-HJ-NP-Z1-9]{25,34}\b',
-        "CRYPTO_ETH": r'\b0x[a-fA-F0-9]{40}\b',
         "CARD": r'\b(?:\d[ -]*?){13,16}\b',
-        "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|место работы|poste|profession|directeur|nommé|décret|procureur)[:\s=]+([^\.\n]{5,60})',
-        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|condamnation|procès|justice|enquête|audience)[:\s=]+([^\.\n]{5,70})'
+        "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|место работы|poste|profession|directeur|nommé|décret|procureur)[:\s=]+([^\.\n]{5,80})',
+        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|condamnation|procès|justice|enquête|audience)[:\s=]+([^\.\n]{5,80})'
+    }
+
+    # Вспомогательные форензик-паттерны для сборки динамической мастер-карточки
+    DYNAMIC_EXTRACTORS = {
+        "BIRTH": r'(?:né[e]? le|родился|дата рождения|birth(?:\s?date)?|naissance)[:\s=]*([0-9]{1,2}[./\s][0-9]{1,2}[./\s][0-9]{4}|[0-9]{1,2}\s(?:[a-zéûа-я]+)\s[0-9]{4})',
+        "PHONE_PARSER": r'(?:\+?[\d\s\-()]{7,16})',
+        "ADDRESS_PARSER": r'(?:\d{1,4}\s(?:rue|avenue|boulevard|place|allée|parvis|parc|route|ул\.|пер\.)[^\.\n]{10,80})'
     }
 
     dorks = []
@@ -4088,117 +4094,158 @@ async def searinfo():
         dorks.extend([
             f'"{b}"', 
             f'"{b}" site:gouv.fr', 
-            f'"{b}" "condamnation" OR "jugement" OR "biographie"', 
-            f'"{b}" filetype:pdf OR filetype:docx', 
-            f'site:linkedin.com "{b}"'
+            f'"{b}" "biographie" OR "parcours" OR "carrière"', 
+            f'"{b}" "tribunal" OR "procureur" OR "contact" OR "societe"',
+            f'site:fr.wikipedia.org "{b}"'
         ])
     if query_data['phone']:
-        p = query_data['phone']
-        dorks.append(f'"{p}"')
+        dorks.append(f'"{query_data["phone"]}"')
+    if query_data['address']:
+        dorks.append(f'"{query_data["address"]}"')
 
-    # Глубокая мимикрия под реальную сессию macOS/Chrome для обхода защиты "Recherche"
     session_headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
+        "Cache-Control": "max-age=0",
         "Connection": "keep-alive"
+    }
+
+    # ИНИЦИАЛИЗАЦИЯ ПОЛНОСТЬЮ ПУСТОГО И ДИНАМИЧЕСКОГО ПРОФИЛЯ
+    dynamic_profile = {
+        "FULL_NAME": query_data['fio'] or "NOT_SPECIFIED",
+        "ESTIMATED_POST": "NOT_FOUND",
+        "BIRTH_INFO": "NOT_FOUND",
+        "OFFICIAL_ADDRESS": query_data['address'] or "NOT_FOUND",
+        "CONTACT_PHONES": query_data['phone'] or "NOT_FOUND",
+        "FOUND_EMAILS": [],
+        "DYNAMIC_CHRONOLOGY": []
     }
 
     async with aiohttp.ClientSession(headers=session_headers) as session:
         tasks = []
         for d in dorks:
-            # Расширяем пул за счет DuckDuckGo HTML, который не выдает заглушки
-            tasks.append(("GOOGLE", d, f"https://www.google.com/search?q={quote(d)}&num=30"))
-            tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
+            tasks.append(("GOOGLE", d, f"https://www.google.com/search?q={quote(d)}&num=40"))
+            tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=40"))
             tasks.append(("DUCKDUCKGO", d, f"https://html.duckduckgo.com/html/?q={quote(d)}"))
 
         async def scan_worker(eng, d, url):
-            # Разнородные задержки, чтобы поисковые радары не зафиксировали тайминг бота
-            await asyncio.sleep(random.uniform(2.0, 4.5))
+            await asyncio.sleep(random.uniform(1.0, 2.5))
             try:
                 async with session.get(url, timeout=35) as r:
                     if r.status != 200:
                         return None
-                        
                     html = await r.text()
                     
-                    # Полная зачистка кода
                     html_clean = re.sub(r'<script[^>]*>([\s\S]*?)</script>', ' ', html)
                     html_clean = re.sub(r'<style[^>]*>([\s\S]*?)</style>', ' ', html_clean)
                     
-                    # Текстовый контент без тегов
                     visible_text = re.sub(r'<[^<]+?>', ' ', html_clean)
                     visible_text = re.sub(r'\s+', ' ', visible_text)
                     
-                    # Проверяем, не подсунули ли нам пустую страницу поиска
-                    # Если в тексте есть маркеры формы, но нет контекстных слов — это пустышка
-                    if "recherche" in visible_text.lower() and len(visible_text) < 2500:
-                        # Если это Bing/Google и он дал сбой, надеемся на DuckDuckGo в общем пуле
+                    if "recherche" in visible_text.lower() and len(visible_text) < 2000:
                         return None
 
                     output = [f"[{eng}] QUERY: {d}"]
                     found_something = False
                     
-                    if query_data['fio'].lower() in visible_text.lower():
+                    target_name = dynamic_profile["FULL_NAME"]
+                    if target_name.lower() in visible_text.lower():
                         found_something = True
                         
-                        # НОВЫЙ АЛГОРИТМ СНИППЕТОВ: Режем текст на куски по 200 символов вокруг искомого ФИО
+                        # 1. Извлечение сниппетов
                         extracted_snippets = []
-                        fio_len = len(query_data['fio'])
-                        for match in re.finditer(re.escape(query_data['fio']), visible_text, re.IGNORECASE):
-                            start = max(0, match.start() - 120)
-                            end = min(len(visible_text), match.end() + 120)
+                        for match in re.finditer(re.escape(target_name), visible_text, re.IGNORECASE):
+                            start = max(0, match.start() - 150)
+                            end = min(len(visible_text), match.end() + 150)
                             snippet = visible_text[start:end].strip()
-                            # Исключаем попадание поисковых заголовков меню в сниппеты
-                            if not any(x in snippet.lower() for x in ["параметры", "настройки", "конфиденциальность", "cookies", "recherche"]):
+                            if not any(x in snippet.lower() for x in ["параметры", "настройки", "cookies"]):
                                 extracted_snippets.append(f"...{snippet}...")
 
                         if extracted_snippets:
                             output.append("  [NEWS & PUBLIC RECOGNITION]:")
-                            for snip in list(set(extracted_snippets))[:5]:
+                            for snip in list(set(extracted_snippets))[:6]:
                                 output.append(f"    - {snip}")
                         
-                        # Извлечение артефактов
+                        # 2. ПОЛНОСТЬЮ ДИНАМИЧЕСКИЙ АНАЛИЗ ТЕКСТА ДЛЯ КАРТОЧКИ
+                        # Ищем дату рождения
+                        if dynamic_profile["BIRTH_INFO"] == "NOT_FOUND":
+                            birth_match = re.search(DYNAMIC_EXTRACTORS["BIRTH"], visible_text, re.IGNORECASE)
+                            if birth_match:
+                                dynamic_profile["BIRTH_INFO"] = birth_match.group(1).strip()
+
+                        # Ищем адреса
+                        if dynamic_profile["OFFICIAL_ADDRESS"] == "NOT_FOUND":
+                            addr_match = re.search(DYNAMIC_EXTRACTORS["ADDRESS_PARSER"], visible_text, re.IGNORECASE)
+                            if addr_match:
+                                dynamic_profile["OFFICIAL_ADDRESS"] = addr_match.group(0).strip()
+
+                        # Ищем телефоны (если не были заданы пользователем)
+                        if dynamic_profile["CONTACT_PHONES"] == "NOT_FOUND":
+                            phone_matches = re.findall(DYNAMIC_EXTRACTORS["PHONE_PARSER"], visible_text)
+                            clean_phones = [p.strip() for p in phone_matches if len(re.sub(r'\D', '', p)) >= 10]
+                            if clean_phones:
+                                dynamic_profile["CONTACT_PHONES"] = clean_phones[0]
+
+                        # Собираем почты динамически
+                        emails_found = re.findall(PATTERNS["EMAIL"], visible_text, re.IGNORECASE)
+                        for em in emails_found:
+                            if em.lower() not in dynamic_profile["FOUND_EMAILS"]:
+                                dynamic_profile["FOUND_EMAILS"].append(em.lower())
+
+                        # Динамический сбор карьеры по хронологическим маркерам (Год + текст)
+                        chronology_matches = re.findall(r'\b(19\d{2}|20\d{2})\b[^.\n]{10,120}', visible_text)
+                        for chron in chronology_matches:
+                            clean_chron = chron.strip()
+                            if any(m in clean_chron.lower() for m in ["nommé", "décret", "procureur", "juge", "directeur", "работа", "должность", "суд"]):
+                                if clean_chron not in dynamic_profile["DYNAMIC_CHRONOLOGY"]:
+                                    dynamic_profile["DYNAMIC_CHRONOLOGY"].append(clean_chron)
+
+                        # Извлечение базовых артефактов
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         for k, regex in PATTERNS.items():
                             found = re.findall(regex, visible_text, re.IGNORECASE)
                             if found:
-                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "window", "display", "image", "button"])]
+                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "display"])]
                                 if clean_found:
-                                    output.append(f"    -> [{k}]: {', '.join(clean_found)[:300]}")
+                                    output.append(f"    -> [{k}]: {', '.join(clean_found)[:400]}")
+                                    # Попытка вытащить должность из паттерна CAREER
+                                    if k == "CAREER" and dynamic_profile["ESTIMATED_POST"] == "NOT_FOUND":
+                                        dynamic_profile["ESTIMATED_POST"] = list(clean_found)[0]
                     
-                    # Проверка вложенных файлов
-                    links = list(set(re.findall(r'https?://[^\s"\'<>]+', html)))
-                    clean_links = [l for l in links if not any(dm in l for dm in BAD_DOMAINS)]
-                    
-                    for link in [l for l in clean_links if any(ext in l.lower() for ext in ['.pdf', '.txt', '.docx'])][:3]:
-                        try:
-                            headers_doc = {"Referer": url, "User-Agent": "Mozilla/5.0"}
-                            async with session.get(link, headers=headers_doc, timeout=8) as r_doc:
-                                if r_doc.status == 200:
-                                    doc_text = await r_doc.text(errors='ignore')
-                                    if query_data['fio'].lower() in doc_text.lower():
-                                        output.append(f"    [!] FILE DEEP MATCH: {link}")
-                                        for k, regex in PATTERNS.items():
-                                            found_doc = re.findall(regex, doc_text, re.IGNORECASE)
-                                            if found_doc:
-                                                output.append(f"      -> [{k}]: {', '.join(set(found_doc))[:200]}")
-                        except:
-                            continue
-                            
                     return "\n".join(output) + "\n" + "-"*80 if found_something else None
             except:
                 return None
 
         results = [r for r in await asyncio.gather(*[scan_worker(e, d, u) for e, d, u in tasks]) if r]
 
-    report = ["=== [NEXUS MAXIMUM FORENSIC DOSSIER ACTIVE] ===", *results, "=== [END OF ANALYSIS] ==="]
+    # СБОРКА АВТОМАТИЧЕСКОГО ФИНАЛЬНОГО ОТЧЕТА (БЕЗ ХАРДКОДА)
+    report = []
+    report.append("================================================================================")
+    report.append("=== [NEXUS COMPREHENSIVE FORENSIC DOSSIER PRIMARY IDENTIFICATION MASTER-CARD] ===")
+    report.append("================================================================================")
+    report.append(f"  [+] TARGET IDENTITY : {dynamic_profile['FULL_NAME'].upper()}")
+    report.append(f"  [+] CURRENT STATUS  : {dynamic_profile['ESTIMATED_POST']}")
+    report.append(f"  [+] DATE/PLACE BIRTH: {dynamic_profile['BIRTH_INFO']}")
+    report.append(f"  [+] REGISTRATION ADDR: {dynamic_profile['OFFICIAL_ADDRESS']}")
+    report.append(f"  [+] TELEPHONE LINES : {dynamic_profile['CONTACT_PHONES']}")
+    report.append(f"  [+] CAPTURED EMAILS : {', '.join(dynamic_profile['FOUND_EMAILS']) if dynamic_profile['FOUND_EMAILS'] else 'NOT_FOUND'}")
+    
+    report.append("\n  [+] DYNAMICALLY EXTRACTED CAREER CHRONOLOGY & EVENTS:")
+    if dynamic_profile["DYNAMIC_CHRONOLOGY"]:
+        for rank in sorted(list(set(dynamic_profile["DYNAMIC_CHRONOLOGY"])))[:15]:
+            report.append(f"    -> {rank}")
+    else:
+        report.append("    -> NO LOGISTICAL TIMELINES EXTRACTED FROM SNIPPETS")
+        
+    report.append("\n================================================================================")
+    report.append("=== [RAW SEARCH ENGINE ANALYTICAL ENGINE WORKER TRACKS] ===")
+    report.append("================================================================================\n")
+    
+    for res in results:
+        report.append(res)
+        
+    report.append("=== [END OF ANALYSIS — MAXIMUM FORENSIC RECORD COMPLETION] ===")
     
     return render_template_string(
         render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
