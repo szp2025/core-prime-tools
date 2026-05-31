@@ -4072,7 +4072,7 @@ async def searinfo():
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
     
-    # Расширенные паттерны регулярных выражений для детекции артефактов любого типа
+    # Регулярные выражения для анализа сырого текстового контента выдачи
     PATTERNS = {
         "EMAIL": r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b',
         "PASSWORD": r'(?:pass(?:word)?|pwd|пароль|secret)[:\s=]+([^\s\n]{4,20})',
@@ -4138,7 +4138,7 @@ async def searinfo():
 
     async with aiohttp.ClientSession(headers=session_headers) as session:
         
-        # Модуль 1: Автономный универсальный коннектор к Wikipedia API
+        # Модуль 1: Википедия (для таргета по ФИО)
         if query_data['fio']:
             formatted_name = query_data['fio'].replace(" ", "_")
             wiki_api_url = f"https://fr.wikipedia.org/api/rest_v1/page/html/{quote(formatted_name)}"
@@ -4159,9 +4159,7 @@ async def searinfo():
                         detected_status = "NOT_FOUND"
                         global_markers = [
                             "Président", "Directeur", "PDG", "CEO", "Ministre", "Député", "Procureur", 
-                            "Juge", "Avocat", "Fondateur", "Actionnaire", "Scientifique", "Ingénieur",
-                            "Magistrat", "Écrivain", "Artiste", "Professeur", "Chercheur", "Gérant", 
-                            "Homme d'affaires", "Femme d'affaires", "Maire", "Sénateur"
+                            "Juge", "Avocat", "Fondateur", "Actionnaire", "Scientifique", "Ingénieur"
                         ]
                         
                         for marker in global_markers:
@@ -4178,22 +4176,9 @@ async def searinfo():
                                     
                         if detected_status != "NOT_FOUND":
                             aggregated_profile["ESTIMATED_POST"] = detected_status
-                        else:
-                            status_match = re.search(r'(?:est un|est une|est un[e]?\s+([a-zA-Zа-яА-ЯёЁ\s\-]+)(?:français|française|international))', wp_clean[:400], re.IGNORECASE)
-                            if status_match:
-                                aggregated_profile["ESTIMATED_POST"] = status_match.group(0).strip()
 
                         sentences = re.split(r'\s*\.\s*', wp_clean)
-                        UNIVERSAL_CAREER_TRIGGERS = [
-                            "nommé", "décret", "élut", "élu", "recruté", "fondateur", "fonde", "dirige", 
-                            "travaille", "débute", "carrière", "diplômé", "étudie", "rejoint", "succède", 
-                            "crée", "quitte", "arrêté", "condamné", "publie", "obtient", "devient", "rejoint",
-                            "назначен", "указ", "избран", "основал", "руководит", "работает", "начал", 
-                            "карьера", "диплом", "окончил", "учился", "присоединился", "создал", "покинул", 
-                            "арестован", "осужден", "опубликовал", "получил", "стал", "возглавил",
-                            "appointed", "decree", "elected", "founded", "manages", "works", "started", 
-                            "career", "graduated", "studied", "joined", "created", "left", "became", "headed"
-                        ]
+                        UNIVERSAL_CAREER_TRIGGERS = ["nommé", "décret", "élut", "élu", "recruté", "fondateur", "carrière", "devient", "назначен", "указ", "избран", "основал"]
 
                         for sentence in sentences:
                             sentence = sentence.strip()
@@ -4202,23 +4187,20 @@ async def searinfo():
                                 found_year = year_match.group(1)
                                 if any(trigger in sentence.lower() for trigger in UNIVERSAL_CAREER_TRIGGERS):
                                     clean_sentence = re.sub(r'\[\s*\d+\s*\]', '', sentence)
-                                    clean_sentence = re.sub(r'\{\{[\s\S]*?\}\}', '', clean_sentence)
                                     clean_sentence = re.sub(r'\s+', ' ', clean_sentence).strip()
-                                    
-                                    if len(clean_sentence) > 25 and not any(bad in clean_sentence.lower() for bad in ["chatprompt", "json", "script", "surface", "window"]):
-                                        formatted_event = f"[{found_year}] -> {clean_sentence}"
-                                        aggregated_profile["CHRONOLOGY"].add(formatted_event)
+                                    if len(clean_sentence) > 25 and not any(bad in clean_sentence.lower() for bad in ["chatprompt", "script"]):
+                                        aggregated_profile["CHRONOLOGY"].add(f"[{found_year}] -> {clean_sentence}")
             except:
                 pass
 
-        # Модуль 2: Стандартные поисковые воркеры (с детекцией капчи)
+        # Модуль 2: Обработка поисковых систем
         tasks = []
         for d in dorks:
             tasks.append(("GOOGLE", d, f"https://www.google.com/search?q={quote(d)}&num=30"))
             tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(1.5, 3.5))
+            await asyncio.sleep(random.uniform(2.0, 4.0)) # Увеличиваем задержку для обхода CAPTCHA
             try:
                 async with session.get(url, timeout=25) as r:
                     html = await r.text()
@@ -4256,12 +4238,13 @@ async def searinfo():
 
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         
-                        # Расширенный блэклист для подавления локализованного интерфейсного шума Bing/Google
+                        # Глобальный блэклист интерфейсных стоп-слов
                         UI_BLACKLIST = [
                             "pertinence", "recherche", "images", "vidéos", "cartes", "actualité", "outils", 
                             "rechercher", "loading", "propri", "or", "and", "site", "chiffres", "lettres",
                             "vendeur", "propriétaire", "собственник", "владелец", "les associ", "associées", 
-                            "les associés", "recherches", "recherches associées", "tri par", "filtrer"
+                            "les associés", "recherches", "recherches associées", "tri par", "filtrer",
+                            "journalistes", "les journalistes", "les journalistes d"
                         ]
 
                         for k, regex in PATTERNS.items():
@@ -4278,23 +4261,29 @@ async def searinfo():
                                     if len(val) < 2 or any(op in val for op in ["(", ")", "OR", "site:"]):
                                         continue
                                         
-                                    # Фильтрация точных совпадений и вхождений интерфейсного мусора
+                                    # КРИТИЧЕСКИЙ СТРУКТУРНЫЙ ФИЛЬТР ДЛЯ ИМЕНИ ВЛАДЕЛЬЦА
                                     if k == "OWNER_NAME":
-                                        if val_lower in UI_BLACKLIST or any(ui in val_lower for ui in ["les associ", "recherches"]):
+                                        # 1. Проверка по базовому блэклисту
+                                        if val_lower in UI_BLACKLIST or any(ui in val_lower for ui in ["les associ", "recherches", "journaliste"]):
                                             continue
-                                        # Отсекаем строки, начинающиеся со служебных французских артиклей/предлогов, за которыми идет мусор
-                                        if val_lower.startswith("les ") or val_lower.startswith("des ") or val_lower.startswith("par "):
-                                            if any(ui in val_lower for ui in ["associ", "recherche", "option", "page"]):
-                                                continue
+                                            
+                                        # 2. Отсечение множественных чисел и общих французских маркеров UI
+                                        if val_lower.startswith("les ") or val_lower.startswith("des ") or val_lower.startswith("par ") or val_lower.startswith("parми "):
+                                            continue
+                                            
+                                        # 3. Защита от «обрубков» фраз (если строка заканчивается на одиночный предлог/букву)
+                                        if re.search(r'\s[a-z]$', val_lower):
+                                            continue
+                                            
+                                        # 4. Валидация длины (слишком короткие или фрагментированные фразы)
+                                        if len(val_lower.split()) < 2 and val_lower in ["de", "par", "nom", "sur"]:
+                                            continue
 
                                     clean_found.append(val)
 
                                 if clean_found:
                                     output.append(f"    -> [{k}]: {', '.join(clean_found)[:200]}")
                                     
-                                    if k == "CAREER" and aggregated_profile["ESTIMATED_POST"] == "NOT_FOUND" and query_data['fio']:
-                                        aggregated_profile["ESTIMATED_POST"] = clean_found[0]
-                                        
                                     if k == "OWNER_NAME" and aggregated_profile["FULL_NAME"].startswith("NOT_SPECIFIED"):
                                         aggregated_profile["FULL_NAME"] = clean_found[0].upper() + " (IDENTIFIED VIA VEHICLE)"
                         
@@ -4308,7 +4297,7 @@ async def searinfo():
 
         results = [r for r in await asyncio.gather(*[scan_worker(e, d, u) for e, d, u in tasks]) if r]
 
-    # СБОРКА ИТОГОВОГО УНИВЕРСАЛЬНОГО ОТЧЕТА
+    # СБОРКА ИТОГОВОГО ОТЧЕТА
     report = []
     report.append("================================================================================")
     report.append("=== [NEXUS COMPREHENSIVE FORENSIC DOSSIER PRIMARY IDENTIFICATION MASTER-CARD] ===")
@@ -4324,29 +4313,16 @@ async def searinfo():
     report.append(f"  [+] DATE/PLACE BIRTH: {aggregated_profile['BIRTH_INFO']}")
     report.append(f"  [+] REGISTRATION ADDR: {aggregated_profile['OFFICIAL_ADDRESS']}")
     report.append(f"  [+] TELEPHONE LINES : {aggregated_profile['CONTACT_PHONES']}")
-    
-    if query_data['immatriculation'] and query_data['fio']:
-        report.append(f"  [+] ATTACHED VEHICLE: {query_data['immatriculation'].upper()}")
-        
     report.append(f"  [+] CAPTURED EMAILS : {', '.join(aggregated_profile['FOUND_EMAILS']) if aggregated_profile['FOUND_EMAILS'] else 'NOT_FOUND'}")
     
     report.append("\n  [+] TARGET INTELLIGENCE NETWORK LOCATIONS (DIRECT TARGET SITES):")
-    if aggregated_profile["DETECTED_URLS"]:
-        for url_node in list(aggregated_profile["DETECTED_URLS"]):
-            report.append(f"    [URL] -> {url_node}")
-            
+    
     report.append("\n  [+] DYNAMICALLY EXTRACTED CAREER CHRONOLOGY & EVENTS:")
     if aggregated_profile["CHRONOLOGY"]:
         for rank in sorted(list(aggregated_profile["CHRONOLOGY"]))[:25]:
             report.append(f"    -> {rank}")
     else:
         report.append("    -> NO LOGISTICAL TIMELINES EXTRACTED FROM SNIPPETS")
-
-    if aggregated_profile["WIKI_DUMP"]:
-        report.append("\n================================================================================")
-        report.append("=== [DIRECT REST-API OVERRIDE DUMP: BIOGRAPHY DEEP TEXT STREAM] ===")
-        report.append("================================================================================\n")
-        report.append(aggregated_profile["WIKI_DUMP"][:6000])
 
     report.append("\n================================================================================")
     report.append("=== [RAW SEARCH ENGINE ANALYTICAL ENGINE WORKER TRACKS] ===")
@@ -4355,11 +4331,12 @@ async def searinfo():
     for res in results:
         report.append(res)
         
-    report.append("=== [END of ANALYSIS — MAXIMUM FORENSIC RECORD COMPLETION] ===")
+    report.append("=== [END OF ANALYSIS — MAXIMUM FORENSIC RECORD COMPLETION] ===")
     
     return render_template_string(
         render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
     )
+
 
 
 
