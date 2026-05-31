@@ -4240,8 +4240,7 @@ async def searinfo():
                             end = min(len(visible_text), match.end() + 130)
                             snippet = visible_text[start:end].strip()
                             
-                            # Жесткий пре-фильтр служебного мусора поисковых систем в сниппетах
-                            if len(snippet) > 40 and not any(x in snippet.lower() for x in ["error-lite", "commentaires sur", "accessibilité", "passer au contenu", "recherche images"]):
+                            if len(snippet) > 40 and not any(x in snippet.lower() for x in ["error-lite", "commentaires sur", "accessibilité", "passer au contenu", "recherche images", "recherches associées"]):
                                 extracted_snippets.append(f"... {snippet} ...")
 
                         if extracted_snippets:
@@ -4257,11 +4256,12 @@ async def searinfo():
 
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         
-                        # Блок глобальных стоп-слов (UI-мусор поисковой выдачи)
+                        # Расширенный блэклист для подавления локализованного интерфейсного шума Bing/Google
                         UI_BLACKLIST = [
                             "pertinence", "recherche", "images", "vidéos", "cartes", "actualité", "outils", 
                             "rechercher", "loading", "propri", "or", "and", "site", "chiffres", "lettres",
-                            "vendeur", "propriétaire", "собственник", "владелец"
+                            "vendeur", "propriétaire", "собственник", "владелец", "les associ", "associées", 
+                            "les associés", "recherches", "recherches associées", "tri par", "filtrer"
                         ]
 
                         for k, regex in PATTERNS.items():
@@ -4270,19 +4270,23 @@ async def searinfo():
                                 clean_found = []
                                 for item in set(found):
                                     val = str(item).strip()
+                                    val_lower = val.lower()
                                     
-                                    # 1. Защита от попадания элементов технических инструкций
-                                    if any(bad in val.lower() for bad in ["chatprompt", "surface", "window"]):
+                                    if any(bad in val_lower for bad in ["chatprompt", "surface", "window"]):
                                         continue
                                         
-                                    # 2. Исключение ложного захвата самого текста дорка/запроса
                                     if len(val) < 2 or any(op in val for op in ["(", ")", "OR", "site:"]):
                                         continue
                                         
-                                    # 3. Фильтрация по черному списку системных интерфейсных слов
-                                    if k == "OWNER_NAME" and val.lower() in UI_BLACKLIST:
-                                        continue
-                                        
+                                    # Фильтрация точных совпадений и вхождений интерфейсного мусора
+                                    if k == "OWNER_NAME":
+                                        if val_lower in UI_BLACKLIST or any(ui in val_lower for ui in ["les associ", "recherches"]):
+                                            continue
+                                        # Отсекаем строки, начинающиеся со служебных французских артиклей/предлогов, за которыми идет мусор
+                                        if val_lower.startswith("les ") or val_lower.startswith("des ") or val_lower.startswith("par "):
+                                            if any(ui in val_lower for ui in ["associ", "recherche", "option", "page"]):
+                                                continue
+
                                     clean_found.append(val)
 
                                 if clean_found:
@@ -4291,12 +4295,9 @@ async def searinfo():
                                     if k == "CAREER" and aggregated_profile["ESTIMATED_POST"] == "NOT_FOUND" and query_data['fio']:
                                         aggregated_profile["ESTIMATED_POST"] = clean_found[0]
                                         
-                                    # Фиксация реального очищенного имени владельца ТС
                                     if k == "OWNER_NAME" and aggregated_profile["FULL_NAME"].startswith("NOT_SPECIFIED"):
-                                        # Берем первое имя, прошедшее валидацию против блэклиста (например, "Noe")
                                         aggregated_profile["FULL_NAME"] = clean_found[0].upper() + " (IDENTIFIED VIA VEHICLE)"
                         
-                        # Если в выводе не осталось полезных артефактов, удаляем пустой заголовок
                         if output[-1] == "  [EXHAUSTIVE EXTRACTED ARTIFACTS]:":
                             output.pop()
                             
@@ -4354,7 +4355,7 @@ async def searinfo():
     for res in results:
         report.append(res)
         
-    report.append("=== [END OF ANALYSIS — MAXIMUM FORENSIC RECORD COMPLETION] ===")
+    report.append("=== [END of ANALYSIS — MAXIMUM FORENSIC RECORD COMPLETION] ===")
     
     return render_template_string(
         render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
