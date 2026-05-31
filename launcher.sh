@@ -3617,6 +3617,7 @@ def index():
         {"type": "text", "name": "fio", "label": "FULL NAME (ФИО)", "placeholder": "Иванов Иван Иванович"},
         {"type": "text", "name": "address", "label": "PHYSICAL ADDRESS", "placeholder": "Город, Улица, Дом"},
         {"type": "tel", "name": "phone", "label": "PHONE NUMBER", "placeholder": "+7XXXXXXXXXX"},
+     {"type": "text", "name": "immatriculation", "label": "IMMAT", "placeholder": "Immatriculation"},      
         {"type": "hidden", "name": "action", "value": "initiate_deep_scan"}
     ], 
     btn_text="INITIATE ENTITY DEEP SCAN"
