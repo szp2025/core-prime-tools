@@ -4089,72 +4089,95 @@ async def searinfo():
             f'"{b}"', 
             f'"{b}" site:gouv.fr', 
             f'"{b}" "condamnation" OR "jugement" OR "biographie"', 
-            f'"{b}" filetype:pdf OR filetype:docx OR filetype:xlsx', 
+            f'"{b}" filetype:pdf OR filetype:docx', 
             f'site:linkedin.com "{b}"'
         ])
     if query_data['phone']:
         p = query_data['phone']
         dorks.append(f'"{p}"')
 
-    async with aiohttp.ClientSession(headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    # Глубокая мимикрия под реальную сессию macOS/Chrome для обхода защиты "Recherche"
+    session_headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Cache-Control": "max-age=0"
-    }) as session:
+        "Accept-Encoding": "gzip, deflate, br",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Connection": "keep-alive"
+    }
+
+    async with aiohttp.ClientSession(headers=session_headers) as session:
         tasks = []
         for d in dorks:
-            # ИСПРАВЛЕНО: Теперь для BING передаются все 3 обязательных параметра (eng, d, url)
+            # Расширяем пул за счет DuckDuckGo HTML, который не выдает заглушки
             tasks.append(("GOOGLE", d, f"https://www.google.com/search?q={quote(d)}&num=30"))
             tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
+            tasks.append(("DUCKDUCKGO", d, f"https://html.duckduckgo.com/html/?q={quote(d)}"))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(1.5, 3.0))
+            # Разнородные задержки, чтобы поисковые радары не зафиксировали тайминг бота
+            await asyncio.sleep(random.uniform(2.0, 4.5))
             try:
                 async with session.get(url, timeout=35) as r:
+                    if r.status != 200:
+                        return None
+                        
                     html = await r.text()
                     
-                    # Очистка от служебного скриптового мусора поисковиков
+                    # Полная зачистка кода
                     html_clean = re.sub(r'<script[^>]*>([\s\S]*?)</script>', ' ', html)
                     html_clean = re.sub(r'<style[^>]*>([\s\S]*?)</style>', ' ', html_clean)
                     
-                    # Динамический сбор блоков текста (универсальный поиск контекста вокруг ФИО)
-                    raw_blocks = re.findall(r'<[^>]+>([^<]{20,300})</[^>]+>', html_clean)
-                    extracted_snippets = []
-                    for block in raw_blocks:
-                        clean_block = block.strip()
-                        if query_data['fio'].lower() in clean_block.lower() and len(clean_block) > 30:
-                            extracted_snippets.append(re.sub(r'\s+', ' ', clean_block))
-                    
+                    # Текстовый контент без тегов
                     visible_text = re.sub(r'<[^<]+?>', ' ', html_clean)
                     visible_text = re.sub(r'\s+', ' ', visible_text)
                     
+                    # Проверяем, не подсунули ли нам пустую страницу поиска
+                    # Если в тексте есть маркеры формы, но нет контекстных слов — это пустышка
+                    if "recherche" in visible_text.lower() and len(visible_text) < 2500:
+                        # Если это Bing/Google и он дал сбой, надеемся на DuckDuckGo в общем пуле
+                        return None
+
                     output = [f"[{eng}] QUERY: {d}"]
                     found_something = False
                     
                     if query_data['fio'].lower() in visible_text.lower():
                         found_something = True
                         
-                        # Вывод текстового контента, если он обнаружен
+                        # НОВЫЙ АЛГОРИТМ СНИППЕТОВ: Режем текст на куски по 200 символов вокруг искомого ФИО
+                        extracted_snippets = []
+                        fio_len = len(query_data['fio'])
+                        for match in re.finditer(re.escape(query_data['fio']), visible_text, re.IGNORECASE):
+                            start = max(0, match.start() - 120)
+                            end = min(len(visible_text), match.end() + 120)
+                            snippet = visible_text[start:end].strip()
+                            # Исключаем попадание поисковых заголовков меню в сниппеты
+                            if not any(x in snippet.lower() for x in ["параметры", "настройки", "конфиденциальность", "cookies", "recherche"]):
+                                extracted_snippets.append(f"...{snippet}...")
+
                         if extracted_snippets:
                             output.append("  [NEWS & PUBLIC RECOGNITION]:")
-                            for snip in list(set(extracted_snippets))[:6]:
+                            for snip in list(set(extracted_snippets))[:5]:
                                 output.append(f"    - {snip}")
                         
-                        # Извлечение артефактов по регулярным выражениям
+                        # Извлечение артефактов
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         for k, regex in PATTERNS.items():
                             found = re.findall(regex, visible_text, re.IGNORECASE)
                             if found:
-                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "window", "display"])]
+                                clean_found = [f for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "component", "window", "display", "image", "button"])]
                                 if clean_found:
                                     output.append(f"    -> [{k}]: {', '.join(clean_found)[:300]}")
                     
-                    # Проверка вложенных документов
+                    # Проверка вложенных файлов
                     links = list(set(re.findall(r'https?://[^\s"\'<>]+', html)))
                     clean_links = [l for l in links if not any(dm in l for dm in BAD_DOMAINS)]
                     
-                    for link in [l for l in clean_links if any(ext in l.lower() for ext in ['.pdf', '.txt', '.docx', '.xlsx'])][:4]:
+                    for link in [l for l in clean_links if any(ext in l.lower() for ext in ['.pdf', '.txt', '.docx'])][:3]:
                         try:
                             headers_doc = {"Referer": url, "User-Agent": "Mozilla/5.0"}
                             async with session.get(link, headers=headers_doc, timeout=8) as r_doc:
