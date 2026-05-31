@@ -4104,8 +4104,9 @@ async def searinfo():
     }) as session:
         tasks = []
         for d in dorks:
+            # ИСПРАВЛЕНО: Теперь для BING передаются все 3 обязательных параметра (eng, d, url)
             tasks.append(("GOOGLE", d, f"https://www.google.com/search?q={quote(d)}&num=30"))
-            tasks.append(("BING", f"https://www.bing.com/search?q={quote(d)}&count=30"))
+            tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
 
         async def scan_worker(eng, d, url):
             await asyncio.sleep(random.uniform(1.5, 3.0))
