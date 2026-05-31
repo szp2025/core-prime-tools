@@ -4065,7 +4065,8 @@ async def searinfo():
     query_data = {
         "fio": request.form.get("fio"),
         "address": request.form.get("address"),
-        "phone": request.form.get("phone")
+        "phone": request.form.get("phone"),
+        "immatriculation": request.form.get("immatriculation")  # Новое поле: регистрационный номер / марка автомобиля
     }
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
@@ -4077,7 +4078,10 @@ async def searinfo():
         "FINANCIAL": r'\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?\s?(?:руб|rub|usd|eur|долл|€|\$)\b',
         "CARD": r'\b(?:\d[ -]*?){13,16}\b',
         "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|место работы|основатель|poste|profession|directeur|nommé|décret|fondateur|président|pdg|ceo)[:\s=]+([^\.\n]{5,80})',
-        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|скандал|condamnation|procès|justice|enquête|audience|faillite)[:\s=]+([^\.\n]{5,80})'
+        "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|скандал|condamnation|procès|justice|enquête|audience|faillite)[:\s=]+([^\.\n]{5,80})',
+        "OWNER_NAME": r'(?:propriétaire|vendeur|titulaire|владелец|продавец|собственник|par|nom)[:\s=]+([A-Z][a-zA-Zа-яА-ЯёЁ]+(?:\s+[A-Z][a-zA-Zа-яА-ЯёЁ]+)?)',
+        "VEHICLE_LOCATION": r'(?:ville|région|adresse|город|регион|ул\.|rue)[:\s=]+([^\.\n]{5,50})',
+        "SALE_DETAILS": r'(?:leboncoin|lacentrale|auto\.ru|avito|argus|prix|proбег|km|vendu|продажа)[:\s=]+([^\.\n]{5,60})'
     }
 
     DYNAMIC_EXTRACTORS = {
@@ -4087,13 +4091,33 @@ async def searinfo():
     }
 
     dorks = []
+    search_token = ""
+
+    # Определение стратегии генерации поисковых дорков (ФИО / Транспортное средство)
     if query_data['fio']:
+        search_token = query_data['fio'].split()[0].lower()
         b = query_data['fio']
         dorks.extend([
             f'"{b}"', 
             f'"{b}" site:gouv.fr', 
             f'"{b}" "biographie" OR "parcours"',
             f'site:fr.wikipedia.org "{b}"'
+        ])
+    elif query_data['immatriculation']:
+        # Разделение строки для выделения точного регистрационного знака
+        raw_plate = query_data['immatriculation'].strip()
+        search_token = raw_plate.split()[0].lower()
+        
+        # Генерация альтернативного слитного написания номера без пробелов и дефисов
+        clean_plate = re.sub(r'[\s\-]', '', raw_plate.split()[0])
+        
+        dorks.extend([
+            f'"{raw_plate}"',                                      # Полная строка: "AA-123-AA Toyota Aygo"
+            f'"{raw_plate.split()[0]}"',                          # Только номер: "AA-123-AA"
+            f'"{clean_plate}"',                                   # Слитный номер: "AA123AA"
+            f'"{raw_plate.split()[0]}" (vendeur OR propriétaire OR "carte grise" OR владелец OR собственник)',
+            f'"{raw_plate.split()[0]}" (site:leboncoin.fr OR site:lacentrale.fr OR site:forum-auto.caradisiac.com)',
+            f'"{raw_plate.split()[0]}" (site:auto.ru OR site:avito.ru OR site:drive2.ru)'
         ])
 
     session_headers = {
@@ -4104,7 +4128,7 @@ async def searinfo():
     }
 
     aggregated_profile = {
-        "FULL_NAME": query_data['fio'] or "NOT_SPECIFIED",
+        "FULL_NAME": query_data['fio'] or "NOT_SPECIFIED (VEHICLE-BASED TARGETING)",
         "ESTIMATED_POST": "NOT_FOUND",
         "BIRTH_INFO": "NOT_FOUND",
         "OFFICIAL_ADDRESS": query_data['address'] or "NOT_FOUND",
@@ -4117,7 +4141,7 @@ async def searinfo():
 
     async with aiohttp.ClientSession(headers=session_headers) as session:
         
-        # Модуль 1: Автономный универсальный коннектор к Wikipedia API
+        # Модуль 1: Автономный универсальный коннектор к Wikipedia API (активен только при наличии ФИО)
         if query_data['fio']:
             formatted_name = query_data['fio'].replace(" ", "_")
             wiki_api_url = f"https://fr.wikipedia.org/api/rest_v1/page/html/{quote(formatted_name)}"
@@ -4215,10 +4239,9 @@ async def searinfo():
                     visible_text = re.sub(r'<[^<]+?>', ' ', html_clean)
                     visible_text = re.sub(r'\s+', ' ', visible_text)
                     
-                    output = [f"[{eng}] QUERY: {d}", f"  [URL TRACE]: {url}"]
-                    search_token = aggregated_profile["FULL_NAME"].split()[0].lower()
+                    output = [f"[{eng}] QUERY: {d}", f"  https://www.merriam-webster.com/dictionary/trace: {url}"]
                     
-                    if search_token in visible_text.lower():
+                    if search_token and search_token in visible_text.lower():
                         extracted_snippets = []
                         for match in re.finditer(re.escape(search_token), visible_text, re.IGNORECASE):
                             start = max(0, match.start() - 130)
@@ -4228,7 +4251,9 @@ async def searinfo():
                                 extracted_snippets.append(f"... {snippet} ...")
 
                         if extracted_snippets:
-                            output.append("  [NEWS & PUBLIC RECOGNITION]:")
+                            # Изменение метки вывода в зависимости от типа входных данных
+                            label = "[VEHICLE ONLINE MENTIONS & TRACES]" if query_data['immatriculation'] else "[NEWS & PUBLIC RECOGNITION]"
+                            output.append(f"  {label}:")
                             for snip in list(set(extracted_snippets))[:3]:
                                 output.append(f"    - {snip}")
                         
@@ -4244,8 +4269,14 @@ async def searinfo():
                                 clean_found = [str(f).strip() for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "window"])]
                                 if clean_found:
                                     output.append(f"    -> [{k}]: {', '.join(clean_found)[:200]}")
-                                    if k == "CAREER" and aggregated_profile["ESTIMATED_POST"] == "NOT_FOUND":
+                                    
+                                    # Фиксация карьерного статуса, если велся поиск по ФИО
+                                    if k == "CAREER" and aggregated_profile["ESTIMATED_POST"] == "NOT_FOUND" and query_data['fio']:
                                         aggregated_profile["ESTIMATED_POST"] = clean_found[0]
+                                        
+                                    # Обратная замена: если ФИО отсутствовало, но обнаружено имя владельца в объявлении
+                                    if k == "OWNER_NAME" and aggregated_profile["FULL_NAME"].startswith("NOT_SPECIFIED"):
+                                        aggregated_profile["FULL_NAME"] = clean_found[0].upper() + " (IDENTIFIED VIA VEHICLE)"
                         return "\n".join(output) + "\n" + "-"*80
                     return None
             except:
@@ -4258,11 +4289,22 @@ async def searinfo():
     report.append("================================================================================")
     report.append("=== [NEXUS COMPREHENSIVE FORENSIC DOSSIER PRIMARY IDENTIFICATION MASTER-CARD] ===")
     report.append("================================================================================")
-    report.append(f"  [+] TARGET IDENTITY : {aggregated_profile['FULL_NAME'].upper()}")
-    report.append(f"  [+] CURRENT STATUS  : {aggregated_profile['ESTIMATED_POST']}")
+    
+    # Адаптация заголовков мастер-карты под текущий поисковый контекст
+    if query_data['immatriculation'] and not query_data['fio']:
+        report.append(f"  [+] VEHICLE TARGET  : {query_data['immatriculation'].upper()}")
+        report.append(f"  [+] DETECTED OWNER  : {aggregated_profile['FULL_NAME']}")
+    else:
+        report.append(f"  [+] TARGET IDENTITY : {aggregated_profile['FULL_NAME'].upper()}")
+        report.append(f"  [+] CURRENT STATUS  : {aggregated_profile['ESTIMATED_POST']}")
+        
     report.append(f"  [+] DATE/PLACE BIRTH: {aggregated_profile['BIRTH_INFO']}")
     report.append(f"  [+] REGISTRATION ADDR: {aggregated_profile['OFFICIAL_ADDRESS']}")
     report.append(f"  [+] TELEPHONE LINES : {aggregated_profile['CONTACT_PHONES']}")
+    
+    if query_data['immatriculation'] and query_data['fio']:
+        report.append(f"  [+] ATTACHED VEHICLE: {query_data['immatriculation'].upper()}")
+        
     report.append(f"  [+] CAPTURED EMAILS : {', '.join(aggregated_profile['FOUND_EMAILS']) if aggregated_profile['FOUND_EMAILS'] else 'NOT_FOUND'}")
     
     report.append("\n  [+] TARGET INTELLIGENCE NETWORK LOCATIONS (DIRECT TARGET SITES):")
