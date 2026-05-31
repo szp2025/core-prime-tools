@@ -4067,7 +4067,7 @@ async def searinfo():
         "fio": request.form.get("fio"),
         "address": request.form.get("address"),
         "phone": request.form.get("phone"),
-        "immatriculation": request.form.get("immatriculation")  # Новое поле: регистрационный номер / марка автомобиля
+        "immatriculation": request.form.get("immatriculation")
     }
 
     BAD_DOMAINS = ["yandex.ru", "mail.ru", "ok.ru", "dzen.ru", "youtube.com", "pinterest.com"]
@@ -4080,7 +4080,7 @@ async def searinfo():
         "CARD": r'\b(?:\d[ -]*?){13,16}\b',
         "CAREER": r'(?:работал|должность|профессия|компания|директор|менеджер|опыт|место работы|основатель|poste|profession|directeur|nommé|décret|fondateur|président|pdg|ceo)[:\s=]+([^\.\n]{5,80})',
         "REPUTATION": r'(?:суд|иск|репутация|задолженность|взыскание|уволен|штраф|скандал|condamnation|procès|justice|enquête|audience|faillite)[:\s=]+([^\.\n]{5,80})',
-        "OWNER_NAME": r'(?:propriétaire|vendeur|titulaire|владелец|продавец|собственник|par|nom)[:\s=]+([A-Z][a-zA-Zа-яА-ЯёЁ]+(?:\s+[A-Z][a-zA-Zа-яА-ЯёЁ]+)?)',
+        "OWNER_NAME": r'(?:propriétaire|vendeur|titulaire|владелец|продавец|собственник|par|nom)[:\s=]+([a-zA-Zа-яА-ЯёЁ\-\s]{3,30})',
         "VEHICLE_LOCATION": r'(?:ville|région|adresse|город|регион|ул\.|rue)[:\s=]+([^\.\n]{5,50})',
         "SALE_DETAILS": r'(?:leboncoin|lacentrale|auto\.ru|avito|argus|prix|proбег|km|vendu|продажа)[:\s=]+([^\.\n]{5,60})'
     }
@@ -4094,7 +4094,6 @@ async def searinfo():
     dorks = []
     search_token = ""
 
-    # Определение стратегии генерации поисковых дорков (ФИО / Транспортное средство)
     if query_data['fio']:
         search_token = query_data['fio'].split()[0].lower()
         b = query_data['fio']
@@ -4105,17 +4104,14 @@ async def searinfo():
             f'site:fr.wikipedia.org "{b}"'
         ])
     elif query_data['immatriculation']:
-        # Разделение строки для выделения точного регистрационного знака
         raw_plate = query_data['immatriculation'].strip()
         search_token = raw_plate.split()[0].lower()
-        
-        # Генерация альтернативного слитного написания номера без пробелов и дефисов
         clean_plate = re.sub(r'[\s\-]', '', raw_plate.split()[0])
         
         dorks.extend([
-            f'"{raw_plate}"',                                      # Полная строка: "AA-123-AA Toyota Aygo"
-            f'"{raw_plate.split()[0]}"',                          # Только номер: "AA-123-AA"
-            f'"{clean_plate}"',                                   # Слитный номер: "AA123AA"
+            f'"{raw_plate}"', 
+            f'"{raw_plate.split()[0]}"', 
+            f'"{clean_plate}"', 
             f'"{raw_plate.split()[0]}" (vendeur OR propriétaire OR "carte grise" OR владелец OR собственник)',
             f'"{raw_plate.split()[0]}" (site:leboncoin.fr OR site:lacentrale.fr OR site:forum-auto.caradisiac.com)',
             f'"{raw_plate.split()[0]}" (site:auto.ru OR site:avito.ru OR site:drive2.ru)'
@@ -4142,7 +4138,7 @@ async def searinfo():
 
     async with aiohttp.ClientSession(headers=session_headers) as session:
         
-        # Модуль 1: Автономный универсальный коннектор к Wikipedia API (активен только при наличии ФИО)
+        # Модуль 1: Автономный универсальный коннектор к Wikipedia API
         if query_data['fio']:
             formatted_name = query_data['fio'].replace(" ", "_")
             wiki_api_url = f"https://fr.wikipedia.org/api/rest_v1/page/html/{quote(formatted_name)}"
@@ -4150,20 +4146,16 @@ async def searinfo():
                 async with session.get(wiki_api_url, timeout=15) as wp_r:
                     if wp_r.status == 200:
                         wp_html = await wp_r.text()
-                        
-                        # Комплексная очистка HTML-тегов вики-разметки
                         wp_clean = re.sub(r'<[^>]+>', ' ', wp_html)
                         wp_clean = re.sub(r'\s+', ' ', wp_clean).strip()
                         aggregated_profile["WIKI_DUMP"] = wp_clean
                         aggregated_profile["DETECTED_URLS"].add(f"https://fr.wikipedia.org/wiki/{formatted_name}")
                         
-                        # Извлечение данных рождения (поддержка разных языковых форматов)
                         birth_m = re.search(DYNAMIC_EXTRACTORS["BIRTH"], wp_clean, re.IGNORECASE)
                         if birth_m:
                             raw_birth = birth_m.group(1).strip()
                             aggregated_profile["BIRTH_INFO"] = re.sub(r'[\)\}\]]', '', raw_birth).strip()
                             
-                        # --- Интеллектуальное динамическое определение текущей должности (CURRENT STATUS) ---
                         detected_status = "NOT_FOUND"
                         global_markers = [
                             "Président", "Directeur", "PDG", "CEO", "Ministre", "Député", "Procureur", 
@@ -4191,7 +4183,6 @@ async def searinfo():
                             if status_match:
                                 aggregated_profile["ESTIMATED_POST"] = status_match.group(0).strip()
 
-                        # --- Универсальный попредложенческий лингвистический парсер хронологии ---
                         sentences = re.split(r'\s*\.\s*', wp_clean)
                         UNIVERSAL_CAREER_TRIGGERS = [
                             "nommé", "décret", "élut", "élu", "recruté", "fondateur", "fonde", "dirige", 
@@ -4227,7 +4218,7 @@ async def searinfo():
             tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(1.0, 3.0))
+            await asyncio.sleep(random.uniform(1.5, 3.5))
             try:
                 async with session.get(url, timeout=25) as r:
                     html = await r.text()
@@ -4248,11 +4239,12 @@ async def searinfo():
                             start = max(0, match.start() - 130)
                             end = min(len(visible_text), match.end() + 130)
                             snippet = visible_text[start:end].strip()
-                            if len(snippet) > 40 and "error-lite" not in snippet:
+                            
+                            # Жесткий пре-фильтр служебного мусора поисковых систем в сниппетах
+                            if len(snippet) > 40 and not any(x in snippet.lower() for x in ["error-lite", "commentaires sur", "accessibilité", "passer au contenu", "recherche images"]):
                                 extracted_snippets.append(f"... {snippet} ...")
 
                         if extracted_snippets:
-                            # Изменение метки вывода в зависимости от типа входных данных
                             label = "[VEHICLE ONLINE MENTIONS & TRACES]" if query_data['immatriculation'] else "[NEWS & PUBLIC RECOGNITION]"
                             output.append(f"  {label}:")
                             for snip in list(set(extracted_snippets))[:3]:
@@ -4264,20 +4256,50 @@ async def searinfo():
                                 aggregated_profile["FOUND_EMAILS"].add(em.lower())
 
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
+                        
+                        # Блок глобальных стоп-слов (UI-мусор поисковой выдачи)
+                        UI_BLACKLIST = [
+                            "pertinence", "recherche", "images", "vidéos", "cartes", "actualité", "outils", 
+                            "rechercher", "loading", "propri", "or", "and", "site", "chiffres", "lettres",
+                            "vendeur", "propriétaire", "собственник", "владелец"
+                        ]
+
                         for k, regex in PATTERNS.items():
                             found = re.findall(regex, visible_text, re.IGNORECASE)
                             if found:
-                                clean_found = [str(f).strip() for f in set(found) if not any(x in str(f).lower() for x in ["chatprompt", "surface", "window"])]
+                                clean_found = []
+                                for item in set(found):
+                                    val = str(item).strip()
+                                    
+                                    # 1. Защита от попадания элементов технических инструкций
+                                    if any(bad in val.lower() for bad in ["chatprompt", "surface", "window"]):
+                                        continue
+                                        
+                                    # 2. Исключение ложного захвата самого текста дорка/запроса
+                                    if len(val) < 2 or any(op in val for op in ["(", ")", "OR", "site:"]):
+                                        continue
+                                        
+                                    # 3. Фильтрация по черному списку системных интерфейсных слов
+                                    if k == "OWNER_NAME" and val.lower() in UI_BLACKLIST:
+                                        continue
+                                        
+                                    clean_found.append(val)
+
                                 if clean_found:
                                     output.append(f"    -> [{k}]: {', '.join(clean_found)[:200]}")
                                     
-                                    # Фиксация карьерного статуса, если велся поиск по ФИО
                                     if k == "CAREER" and aggregated_profile["ESTIMATED_POST"] == "NOT_FOUND" and query_data['fio']:
                                         aggregated_profile["ESTIMATED_POST"] = clean_found[0]
                                         
-                                    # Обратная замена: если ФИО отсутствовало, но обнаружено имя владельца в объявлении
+                                    # Фиксация реального очищенного имени владельца ТС
                                     if k == "OWNER_NAME" and aggregated_profile["FULL_NAME"].startswith("NOT_SPECIFIED"):
+                                        # Берем первое имя, прошедшее валидацию против блэклиста (например, "Noe")
                                         aggregated_profile["FULL_NAME"] = clean_found[0].upper() + " (IDENTIFIED VIA VEHICLE)"
+                        
+                        # Если в выводе не осталось полезных артефактов, удаляем пустой заголовок
+                        if output[-1] == "  [EXHAUSTIVE EXTRACTED ARTIFACTS]:":
+                            output.pop()
+                            
                         return "\n".join(output) + "\n" + "-"*80
                     return None
             except:
@@ -4291,7 +4313,6 @@ async def searinfo():
     report.append("=== [NEXUS COMPREHENSIVE FORENSIC DOSSIER PRIMARY IDENTIFICATION MASTER-CARD] ===")
     report.append("================================================================================")
     
-    # Адаптация заголовков мастер-карты под текущий поисковый контекст
     if query_data['immatriculation'] and not query_data['fio']:
         report.append(f"  [+] VEHICLE TARGET  : {query_data['immatriculation'].upper()}")
         report.append(f"  [+] DETECTED OWNER  : {aggregated_profile['FULL_NAME']}")
