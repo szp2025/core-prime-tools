@@ -4200,7 +4200,7 @@ async def searinfo():
             tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
 
         async def scan_worker(eng, d, url):
-            await asyncio.sleep(random.uniform(2.0, 4.0)) # Увеличиваем задержку для обхода CAPTCHA
+            await asyncio.sleep(random.uniform(2.0, 4.0))
             try:
                 async with session.get(url, timeout=25) as r:
                     html = await r.text()
@@ -4213,7 +4213,9 @@ async def searinfo():
                     visible_text = re.sub(r'<[^<]+?>', ' ', html_clean)
                     visible_text = re.sub(r'\s+', ' ', visible_text)
                     
-                    output = [f"[{eng}] QUERY: {d}", f"  https://www.merriam-webster.com/dictionary/trace: {url}"]
+                    # ИСПРАВЛЕНО: Убран мусорный префикс со ссылкой на посторонний словарь
+                    clean_trace_url = str(url).strip()
+                    output = [f"[{eng}] QUERY: {d}", f"  [URL TRACE]: {clean_trace_url}"]
                     
                     if search_token and search_token in visible_text.lower():
                         extracted_snippets = []
@@ -4238,7 +4240,6 @@ async def searinfo():
 
                         output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                         
-                        # Глобальный блэклист интерфейсных стоп-слов
                         UI_BLACKLIST = [
                             "pertinence", "recherche", "images", "vidéos", "cartes", "actualité", "outils", 
                             "rechercher", "loading", "propri", "or", "and", "site", "chiffres", "lettres",
@@ -4261,21 +4262,16 @@ async def searinfo():
                                     if len(val) < 2 or any(op in val for op in ["(", ")", "OR", "site:"]):
                                         continue
                                         
-                                    # КРИТИЧЕСКИЙ СТРУКТУРНЫЙ ФИЛЬТР ДЛЯ ИМЕНИ ВЛАДЕЛЬЦА
                                     if k == "OWNER_NAME":
-                                        # 1. Проверка по базовому блэклисту
                                         if val_lower in UI_BLACKLIST or any(ui in val_lower for ui in ["les associ", "recherches", "journaliste"]):
                                             continue
                                             
-                                        # 2. Отсечение множественных чисел и общих французских маркеров UI
                                         if val_lower.startswith("les ") or val_lower.startswith("des ") or val_lower.startswith("par ") or val_lower.startswith("parми "):
                                             continue
                                             
-                                        # 3. Защита от «обрубков» фраз (если строка заканчивается на одиночный предлог/букву)
                                         if re.search(r'\s[a-z]$', val_lower):
                                             continue
                                             
-                                        # 4. Валидация длины (слишком короткие или фрагментированные фразы)
                                         if len(val_lower.split()) < 2 and val_lower in ["de", "par", "nom", "sur"]:
                                             continue
 
@@ -4333,10 +4329,12 @@ async def searinfo():
         
     report.append("=== [END OF ANALYSIS — MAXIMUM FORENSIC RECORD COMPLETION] ===")
     
+    # ИСПРАВЛЕНО: Слияние строк вынесено в отдельную переменную за пределы f-строки
+    final_text_report = "\n".join(report)
+    
     return render_template_string(
-        render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
+        render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{final_text_report}</pre><br><a href='/'>[ RETURN ]</a>")
     )
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
