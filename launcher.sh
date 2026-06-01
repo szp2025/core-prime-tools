@@ -4683,9 +4683,9 @@ generate_upload_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Сборка тела сценария. 
-    # Используем конкатенацию строк (+), чтобы избежать конфликтов с тройными кавычками.
-    # Все знаки доллара (\$ и \f) экранированы для Bash.
+    # 2. Сборка тела сценария.
+    # Заменяем внутри строк двойные кавычки HTML на одинарные кавычки (style='...'),
+    # чтобы полностью исключить конфликты экранирования при инжекции.
     local aio_body="
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
@@ -4694,17 +4694,17 @@ if not os.path.exists(UPLOAD_DIR):
 
 def dynamic_handler():
     if request.method == 'GET':
-        fields = [{\"type\": \"file\", \"name\": \"file\", \"label\": \"SELECT_UPLINK_DATA\"}]
-        form_html = render_prime_form(\"/upload\", fields=fields, btn_text=\"INITIATE SECURE UPLOAD\")
-        return render_template_string(render_prime_page(\"INBOUND_DROP_BOX_v2.1\", form_html))
+        fields = [{'type': 'file', 'name': 'file', 'label': 'SELECT_UPLINK_DATA'}]
+        form_html = render_prime_form('/upload', fields=fields, btn_text='INITIATE SECURE UPLOAD')
+        return render_template_string(render_prime_page('INBOUND_DROP_BOX_v2.1', form_html))
 
     elif request.method == 'POST':
         if 'file' not in request.files: 
-            return \"TRANSFER_ERROR\", 400
+            return 'TRANSFER_ERROR', 400
             
         f = request.files['file']
         if f.filename == '': 
-            return \"EMPTY_FILENAME\", 400
+            return 'EMPTY_FILENAME', 400
         
         tmp_path = os.path.join('/tmp', f.filename)
         f.save(tmp_path)
@@ -4728,32 +4728,32 @@ def dynamic_handler():
                 compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
                 for i, line in enumerate(text_content.splitlines(), 1):
                     if compiled_regex.search(line):
-                        matches.append(f\"Line {i}: {line.strip()[:100]}\")
+                        matches.append(f'Line {i}: {line.strip()[:100]}')
             except Exception as regex_err:
-                matches.append(f\"REGEX_CORE_ERR: {str(regex_err)}\")
+                matches.append(f'REGEX_CORE_ERR: {str(regex_err)}')
                 
             if total_bytes > 1000 and readable_ratio < 12:
                 is_infected = True
-                report.append(\"CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).\")
+                report.append('CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).')
                 
             if matches:
                 is_infected = True
-                report.append(f\"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.\")
+                report.append(f'MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.')
                 
             if is_infected:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
                 
-                # Безопасное конструирование строк без использования тройных кавычек
-                report_str = \"\\\\n\".join(report)
-                content = \"<div class=\\\"status-box infected\\\" style=\\\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\\\">\"
-                content += \"CRITICAL DETECTION: THREAT TOTALLY DESTROYED\"
-                content += \"</div>\"
-                content += f\"<p style=\\\"font-size:12px; color:var(--accent-color);\\\">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>\"
-                content += f\"<pre style=\\\"background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;\\\">{report_str}</pre>\"
-                content += \"<div style=\\\"margin-top:20px;\\\"><a href=\\\"/\\\" class=\\\"btn\\\">[ RETURN ]</a></div>\"
+                # Собираем строки атомарно, используя одинарные кавычки для HTML атрибутов
+                report_str = '\\\\n'.join(report)
+                content = '<div class=\'status-box infected\' style=\'padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\'>'
+                content += 'CRITICAL DETECTION: THREAT TOTALLY DESTROYED'
+                content += '</div>'
+                content += f'<p style=\'font-size:12px; color:var(--accent-color);\'>File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>'
+                content += f'<pre style=\'background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;\'>{report_str}</pre>'
+                content += '<div style=\'margin-top:20px;\'><a href=\'/\' class=\'btn\'>[ RETURN ]</a></div>'
                 
-                return render_template_string(render_prime_page(\"GATEWAY_THREAT_ANNIHILATION\", content))
+                return render_template_string(render_prime_page('GATEWAY_THREAT_ANNIHILATION', content))
                 
             else:
                 final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
@@ -4762,18 +4762,18 @@ def dynamic_handler():
                     
                 shutil.move(tmp_path, final_dest_path)
                 
-                content = \"<div class=\\\"status-box clean\\\" style=\\\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;\\\">\"
-                content += \"SUCCESS: UPLOAD VERIFIED\"
-                content += \"</div>\"
-                content += f\"<p style=\\\"font-size:12px;\\\">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>\"
-                content += \"<div style=\\\"margin-top:20px;\\\"><a href=\\\"/\\\" class=\\\"btn\\\">[ UPLOAD ANOTHER FILE ]</a></div>\"
+                content = '<div class=\'status-box clean\' style=\'padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;\'>'
+                content += 'SUCCESS: UPLOAD VERIFIED'
+                content += '</div>'
+                content += f'<p style=\'font-size:12px;\'>File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>'
+                content += '<div style=\'margin-top:20px;\'><a href=\'/\' class=\'btn\'>[ UPLOAD ANOTHER FILE ]</a></div>'
                 
-                return render_template_string(render_prime_page(\"TRANSFER_COMPLETE\", content))
+                return render_template_string(render_prime_page('TRANSFER_COMPLETE', content))
                 
         except Exception as e:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
-            return f\"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}\", 500
+            return f'GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}', 500
 
 result = dynamic_handler()
 "
@@ -4781,7 +4781,7 @@ result = dynamic_handler()
     # 3. Передача в тотальный генератор шаблона
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
-    # 4. Монолитный каркас
+    # 4. Монолитный каркас с точкой входа
     local raw_python_code=$(cat << 'EOF'
 # === СБОРОЧНЫЙ МОДУЛЬ NEXUS UPLOAD CORE ===
 __NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__
@@ -4795,11 +4795,12 @@ if __name__ == '__main__':
 EOF
 )
 
-    # 5. Инжекция кода
+    # 5. Инжекция кода в маркер
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
 
     echo -e "$raw_python_code"
 }
+
 
 generate_upload_server_code_rawold() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
