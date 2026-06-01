@@ -3511,7 +3511,7 @@ generate_av_server_code_raw() {
     local form_tpl="$(generate_core_form_template)"
 
     # Используем cat с 'EOF', чтобы Bash не интерпретировал $ внутри Python-кода
-    cat << 'EOF' > /tmp/av_server.py
+    cat << EOF > /tmp/av_server.py
 from flask import Flask, request, render_template_string, session
 import re
 import os
