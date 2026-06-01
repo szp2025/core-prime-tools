@@ -3515,8 +3515,8 @@ generate_aio_template() {
     local core_layout=$(generate_core_template)
     local form_layout=$(generate_core_form_template)
 
-    # 3. Собираем каркас сервера. Обратите внимание: маркер выровнен по левому краю!
-    local template_body=$(cat << 'EOF'
+    # 3. Собираем каркас сервера через классический EOF с защитой внутренних элементов Python
+    cat << EOF
 # --- СИСТЕМНЫЕ ИМПОРТЫ И ЗАВИСИМОСТИ ---
 from flask import Flask, request, render_template_string, session
 import re
@@ -3548,12 +3548,12 @@ app = Flask(__name__)
 app.secret_key = 'nexus_secure_channel_key'
 
 # --- [КОНФИГУРАЦИЯ И СИГНАТУРЫ CAME] ---
-GLOBAL_AV_PIPE_REGEX = r"""__NEXUS_REGEX_PLACEHOLDER__"""
+GLOBAL_AV_PIPE_REGEX = r"""$incoming_regex"""
 
 GLOBAL_HASH_MATRIX = [
     r"\b(password|pwd|hash|secret|token|access_token)[ \t]*[:=]{1,2}[ \t]*['\"]?([a-fA-F0-9]{32,128})['\"]?",
     r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?([A-Za-z0-9\-_]{20,})['\"]?",
-    r"\b(password|pwd|secret|key)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#$%^&*()_+]{8,32})['\"]"
+    r"\b(password|pwd|secret|key)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#\$%^&*()_+]{8,32})['\"]"
 ]
 
 GLOBAL_NETWORK_UA = [
@@ -3579,11 +3579,11 @@ def verify_iban(iban):
     return int(numeric) % 97 == 1
 
 # --- UI КОМПОНЕНТЫ ЛАУНЧЕРА ---
-__NEXUS_CORE_LAYOUT__
-__NEXUS_FORM_LAYOUT__
+$core_layout
+$form_layout
 
 # --- ДИНАМИЧЕСКИЙ СЛОЙ МАРШРУТИЗАЦИИ ---
-@app.route('__NEXUS_ROUTE_PATH__', methods=__NEXUS_ROUTE_METHODS__)
+@app.route('$route_path', methods=$formatted_methods)
 def dynamic_nexus_processor():
     """Абсолютно динамический процессор."""
     local_context = {
@@ -3596,22 +3596,11 @@ def dynamic_nexus_processor():
         'platform': platform
     }
     try:
-__NEXUS_INCOMING_BODY_MARKER__
+$incoming_body
         return result
     except Exception as e:
         return f"<pre style='color:red; background:#000; padding:10px;'>[ NEXUS_EXEC_ERR: {str(e)} ]</pre>", 500
 EOF
-)
-
-    # 4. Производим безопасную подстановку параметров
-    template_body="${template_body//__NEXUS_REGEX_PLACEHOLDER__/$incoming_regex}"
-    template_body="${template_body//__NEXUS_CORE_LAYOUT__/$core_layout}"
-    template_body="${template_body//__NEXUS_FORM_LAYOUT__/$form_layout}"
-    template_body="${template_body//__NEXUS_ROUTE_PATH__/$route_path}"
-    template_body="${template_body//__NEXUS_ROUTE_METHODS__/$formatted_methods}"
-    template_body="${template_body//__NEXUS_INCOMING_BODY_MARKER__/$incoming_body}"
-
-    echo "$template_body"
 }
 
 
