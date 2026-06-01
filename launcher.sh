@@ -3513,23 +3513,9 @@ generate_av_server_code_raw() {
     # Используем cat с 'EOF', чтобы Bash не интерпретировал $ внутри Python-кода
     cat << 'EOF' > /tmp/av_server.py
 from flask import Flask, request, render_template_string, session
-import re
-import os
-import shutil
-import subprocess
-import platform
-import requests
-import ssl
-import urllib3
-import math
-import socket
-import random
-import time
-import phonenumbers
-import asyncio
-import aiodns
-import aiohttp
-import smtplib
+import re, os, shutil, subprocess, platform, requests, ssl
+import urllib3, math, socket, random,time, phonenumbers
+import asyncio, aiodns, aiohttp, smtplib
 import dns.asyncresolver
 from phonenumbers import geocoder, carrier, number_type
 from cryptography import x509
@@ -3668,6 +3654,400 @@ def index():
     </div>
     """
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
+
+
+@app.route('/scan', methods=['POST'])
+def scan():
+    f = request.files.get('file')
+    if not f: return "Empty Payload", 400
+    
+    file_content = f.read()
+    f.seek(0)
+    entropy_val = calculate_entropy(file_content)
+    
+    tmp = os.path.join('/tmp', f.filename)
+    f.save(tmp)
+    
+    report = [
+        f"=== [CAME-NEXUS: FULL-STACK SCAN ENGINE] ===", 
+        f"Target: {f.filename}",
+        f"Entropy Score: {entropy_val:.4f} ({'HIGH' if entropy_val > 7.5 else 'NORMAL'})"
+    ]
+    threat_count = 0
+    
+    try:
+        # --- БЛОК 1: СИГНАТУРНЫЙ АНАЛИЗ + ПУТИ (STRINGS) ---
+        # Используем 'strings' для всего: и для сигнатур, и для поиска путей
+        strings_output = subprocess.check_output(['strings', tmp], text=True)
+        
+        # 1.1 Поиск путей (В ТРИ КОЛОНКИ)
+        path_matches = sorted(list(set(re.findall(r"(?:/|C:\\)[\w./\\-]+", strings_output))))
+        if path_matches:
+            report.append("\n--- [FOUND FILE PATHS / ARTIFACTS] ---")
+            
+            # Логика разбиения на 3 колонки
+            rows = (len(path_matches) + 2) // 3
+            col1 = path_matches[:rows]
+            col2 = path_matches[rows:2*rows]
+            col3 = path_matches[2*rows:]
+            
+            # Форматирование: выравнивание по 30 символов на колонку
+            for i in range(rows):
+                item1 = col1[i] if i < len(col1) else ""
+                item2 = col2[i] if i < len(col2) else ""
+                item3 = col3[i] if i < len(col3) else ""
+                report.append(f"{item1:<30} | {item2:<30} | {item3:<30}")
+            
+        # 1.2 Сигнатурный анализ (основной)
+        for line in strings_output.splitlines():
+            for hsig in GLOBAL_HASH_MATRIX:
+                match = re.search(hsig, line)
+                if match: report.append(f"[SECRET FOUND]: {match.group(0)[:30]}...")
+            for layer in GLOBAL_AV_MATRIX:
+                if re.search(layer, line, re.I):
+                    report.append(f"[!!! THREAT: {layer} !!!]")
+                    threat_count += 1
+        
+        # --- БЛОК 2: DEEP FORENSIC (MAXIMUM ENGINE) ---
+        report.append("\n=== [INITIATING DEEP FORENSIC ANALYSIS] ===")
+        
+        # 1. Глубокие метаданные (Максимальное покрытие)
+        try:
+            # Использование '-G -a -u -U -ee' дает исчерпывающий дамп всего, что есть в файле
+            meta = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-U', '-ee', tmp], 
+                                           stderr=subprocess.STDOUT, text=True)
+            report.append(f"\n--- [FULL METADATA DUMP]\n{meta}")
+        except subprocess.CalledProcessError as e:
+            report.append(f"\n--- [METADATA ERROR]: {e.output}")
+        except Exception as e:
+            report.append(f"\n--- [METADATA: UNAVAILABLE] ({e})")
+
+        # 2. Листинг ZIP-структуры (для обнаружения скрытых вложений в контейнерах)
+        # Если файл — это контейнер (pptx, docx, apk, jar), мы увидим все его компоненты
+        if f.filename.lower().endswith(('.pptx', '.docx', '.xlsx', '.jar', '.apk', '.zip')):
+            report.append("\n--- [INTERNAL ZIP-CONTAINER STRUCTURE]")
+            try:
+                zip_content = subprocess.check_output(['unzip', '-l', tmp], stderr=subprocess.STDOUT, text=True)
+                report.append(zip_content)
+            except:
+                report.append("[!] Internal structure analysis unavailable.")
+                
+
+        # --- АНАЛИЗАТОР ЦИФРОВОГО СЛЕДА (FORENSIC MASTER ENGINE) ---
+        report.append("\n--- [DIGITAL FOOTPRINT ANALYSIS - MASTER]")
+        
+        footprint_tags = {
+            "PLATFORM": r"Application|Software|OperatingSystem|Platform|Tool",
+            "AUTHORSHIP": r"Creator|Author|LastModifiedBy|Company|Manager",
+            "GEOLOCATION": r"GPSLatitude|GPSLongitude|City|Location|Country|Region",
+            "NETWORK_ARTIFACTS": r"IPAddress|HostName|MACAddress|NetworkName",
+            "TIMESTAMP_SYNC": r"CreateDate|ModifyDate|DateTimeOriginal|DigitalCreationDate"
+        }
+        
+        dates = {} # Для проверки аномалий времени
+        
+        # 1. Сбор данных и поиск аномалий
+        for category, pattern in footprint_tags.items():
+            matches = re.findall(rf"^\[.*?\]\s+.*?(?:{pattern}).*?:\s+(.*)$", meta, re.IGNORECASE | re.MULTILINE)
+            for m in sorted(set(matches)):
+                val = m.strip()
+                if val and val.lower() != "unknown":
+                    report.append(f"[+] {category:<18} : {val}")
+                    # Собираем даты для анализа
+                    if category == "TIMESTAMP_SYNC":
+                        dates[pattern] = val
+
+        # 2. СЕТЕВОЙ РАДАР (IP + MAC)
+        # Ищем не только IP, но и MAC-адреса, которые часто выдают реальное устройство
+        ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+        mac_pattern = r'([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})'
+        
+        for ip in sorted(set(re.findall(ip_pattern, meta))):
+            if not ip.startswith(('127.', '0.', '255.')):
+                report.append(f"[!] NETWORK IP DETECTED : {ip}")
+        
+        for mac in sorted(set(re.findall(mac_pattern, meta))):
+            report.append(f"[!] MAC ADDR DETECTED  : {mac[0]}")
+
+        # 3. АНАЛИЗАТОР АНОМАЛИЙ (Time-Travel Detector)
+        # Если ModifyDate < CreateDate -> Файл подвергался манипуляции (Anti-Forensics)
+        if "CreateDate" in dates and "ModifyDate" in dates:
+            if dates["ModifyDate"] < dates["CreateDate"]:
+                report.append("[!!!] SECURITY ALERT: METADATA MANIPULATION DETECTED (Time-Travel Anomaly)")
+                
+
+
+        # --- БАНКОВСКИЕ АРТЕФАКТЫ (ИСПРАВЛЕННЫЙ ПАРСЕР) ---
+        report.append("\n--- [FINANCIAL/BANKING AUDIT]")
+        content_str = file_content.decode('utf-8', errors='ignore')
+        
+        patterns = {
+            "IBAN": r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
+            # Строгий SWIFT: 8 или 11 символов, буквы и цифры
+            "BIC/SWIFT": r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b",
+            "RIB (FR)": r"\b\d{5}\s?\d{5}\s?\d{11}\s?\d{2}\b"
+        }
+
+        found_financial = False
+        for name, pattern in patterns.items():
+            # Используем findall. Если паттерн содержит группы (), findall вернет список кортежей.
+            # Нам нужно достать только полное совпадение (index 0).
+            matches = re.findall(pattern, content_str)
+            
+            # Уникальные значения
+            unique_matches = set()
+            for m in matches:
+                # Если m - кортеж (из-за групп в BIC), берем первое значение
+                val = str(m[0] if isinstance(m, tuple) else m).strip()
+                if len(val) > 4: # Фильтр мусора: BIC должен быть не короче 8 символов
+                    unique_matches.add(val)
+            
+            for m in unique_matches:
+                risk_level = "HIGH" if name == "IBAN" else "MEDIUM"
+                report.append(f"[ALERT] FOUND {name}: {m} | RISK: {risk_level}")
+                found_financial = True
+        
+        if not found_financial:
+            report.append("No valid financial/banking artifacts detected.")
+            
+
+        # --- КРИПТОГРАФИЧЕСКИЙ АНАЛИЗ (CERTIFICATE ANALYSIS) ---
+        report.append("\n--- [CERTIFICATE ANALYSIS]")
+        try:
+            # Запускаем OpenSSL для получения полного текста сертификата
+            cert_raw = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text'], 
+                                               stderr=subprocess.STDOUT, text=True)
+            
+            # Извлекаем самое важное для аудита
+            issuer = re.search(r"Issuer: (.*)", cert_raw)
+            expiry = re.search(r"Not After : (.*)", cert_raw)
+            subject = re.search(r"Subject: (.*)", cert_raw)
+            
+            report.append(f"[+] Subject: {subject.group(1) if subject else 'N/A'}")
+            report.append(f"[+] Issuer : {issuer.group(1) if issuer else 'N/A'}")
+            report.append(f"[+] Expires: {expiry.group(1) if expiry else 'N/A'}")
+            
+            # Добавляем предупреждение, если срок истек (сравнение даты можно добавить в будущем)
+            report.append("[+] Status : ANALYZED")
+            
+        except subprocess.CalledProcessError:
+            report.append("[!] File is not a valid certificate or analysis failed.")
+        except Exception as e:
+            report.append(f"[!] Analysis Error: {e}")
+            
+        # Финал
+        verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
+        session['last_verdict'] = verdict
+        report.append(f"\n=== FINAL VERDICT: {verdict} ===")
+
+    except Exception as e:
+        report.append(f"CRITICAL ENGINE FAILURE: {e}")
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
+        
+    return render_template_string(render_prime_page("FULL REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))
+    
+
+# --- ИНИЦИАЛИЗАЦИЯ NEXUS-МАТРИЦЫ (Конфигурация) ---
+GLOBAL_FUZZ_WORDLIST = [".env", ".env.local", ".htaccess", ".htpasswd", "config.php", "wp-config.php", "backup.sql", ".git/config", "phpinfo.php", "debug.log"]
+GLOBAL_STATIC_SIGNATURES = r"(https?|ftp|sftp|ws|wss):\/\/[^\s\"'\`>]+|\/etc\/(passwd|shadow)|\b(Authorization|Bearer|X-API-Key|token|secret_key|api_key|passwd|password|private_key|id_rsa)\b"
+
+
+@app.route('/audit/dispatch', methods=['POST'])
+async def audit_dispatch():
+    data = request.form.get('input', '').strip()
+    clean_data = data.replace(" ", "")
+    
+    if not data: 
+        return "Empty Input", 400
+
+    report = [f"=== [NEXUS DEEP-SCAN ANALYSIS: {data}] ==="]
+
+    async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/1.0'}) as session:
+        
+        # --- 1. IBAN: АНАЛИЗАТОР ФИНАНСОВЫХ ПОТОКОВ ---
+        if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
+            is_valid = verify_iban(clean_data)
+            report.append(f"\n=== [IBAN FORENSIC: {clean_data}] ===")
+            report.append(f"[IBN] {'MOD97 CHECK':<14} : {'PASSED' if is_valid else 'CRITICAL FAILURE'}")
+            
+            bic = clean_data[4:12] 
+            nodes = [
+                ("https://api.openiban.org/validate/{}", clean_data),
+                ("https://relais.epsoft.fr/api/iban/{}", clean_data),
+                ("https://bank-code.net/api/v1/bic/{}", bic)
+            ]
+            
+            found_nodes_count = 0
+            for url_template, param in nodes:
+                try:
+                    target_url = url_template.format(param)
+                    resp = await session.get(target_url, timeout=7)
+                    if resp.status == 200:
+                        data_json = await resp.json()
+                        bd = data_json.get('bankData') or data_json.get('bank') or data_json
+                        report.append(f"--- [SOURCE: {url_template.split('/')[2]}] ---")
+                        report.extend([
+                            f"[IBN] {'INSTITUTION':<14} : {bd.get('name') or bd.get('bankName') or 'N/A'}",
+                            f"[IBN] {'BIC/SWIFT':<14} : {bd.get('bic') or bd.get('swift') or 'N/A'}",
+                            f"[IBN] {'LOCATION':<14} : {bd.get('city') or 'N/A'}, {bd.get('country') or 'N/A'}"
+                        ])
+                        found_nodes_count += 1
+                except: continue
+            
+            report.append(f"[IBN] {'NODES REACHED':<14} : {found_nodes_count}")
+            report.append(f"\n--- [SECURITY & FORENSIC SUMMARY]")
+            report.extend([
+                f"[SEC] {'RISK SCORE':<14} : {'LOW' if found_nodes_count > 0 else 'MEDIUM'}",
+                f"[SEC] {'INTEGRITY':<14} : {'VERIFIED' if is_valid else 'COMPROMISED'}"
+            ])
+            report.append("=== [END OF ANALYSIS] ===")
+
+        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
+        elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
+            report.append(f"\n=== [PHONE INTEL: {clean_data}] ===")
+            try:
+                p = phonenumbers.parse(clean_data, "FR")
+                if phonenumbers.is_valid_number(p):
+                    ntype = phonenumbers.number_type(p)
+                    report.extend([
+                        f"[PHN] {'REGION':<14} : {geocoder.description_for_number(p, 'en')}",
+                        f"[PHN] {'CARRIER':<14} : {carrier.name_for_number(p, 'en')}",
+                        f"[PHN] {'TYPE':<14} : {ntype}",
+                        f"[PHN] {'E164':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
+                    ])
+                    # DEEP SCAPPER
+                    report.append(f"\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
+                    for name, url in {"Telegram": f"https://t.me/{clean_data.lstrip('+')}", "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}", "Google": f"https://www.google.com/search?q=%22{clean_data}%22"}.items():
+                        report.append(f"[PHN] {name:<14} : SCAN INITIALIZED")
+                else: report.append("[PHN] {'STATUS':<14} : INVALID FORMAT")
+            except Exception as e: report.append(f"[PHN] {'ERROR':<14} : {str(e)}")
+            report.append("=== [END OF ANALYSIS] ===")
+
+        # --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
+        elif '@' in clean_data:
+            domain = clean_data.split('@')[-1]
+            report.append(f"\n=== [EMAIL FORENSIC: {clean_data}] ===")
+            report.append(f"[EML] {'TARGET DOMAIN':<14} : {domain}")
+            
+            dns_resolver = aiodns.DNSResolver()
+            dns_records = ['MX', 'TXT', 'SPF', 'SOA', 'NS', 'CNAME', 'PTR', 'CAA', 'SRV']
+            
+            # 1. Параллельный DNS сбор
+            async def get_dns(rec):
+                try:
+                    res = await dns_resolver.query(domain, rec)
+                    return f"[DNS] {rec:<12} : {str(res[0])}"
+                except: return f"[DNS] {rec:<12} : NOT FOUND"
+            
+            report.extend(await asyncio.gather(*[get_dns(r) for r in dns_records]))
+            
+            # 2. Экспертный слой безопасности (DMARC + SSL)
+            report.append("\n--- [EXPERT FORENSIC LAYER]")
+            try:
+                dmarc = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
+                report.append(f"[SEC] {'DMARC POLICY':<14} : {str(dmarc[0])}")
+            except: report.append(f"[SEC] {'DMARC POLICY':<14} : NOT CONFIGURED")
+            
+            # Анализ SSL (криминалистический отпечаток)
+            try:
+                import ssl, socket
+                ctx = ssl.create_default_context()
+                with ctx.wrap_socket(socket.socket(), server_hostname=domain) as s:
+                    s.settimeout(3)
+                    s.connect((domain, 443))
+                    cert = s.getpeercert()
+                    issuer = dict(x[0] for x in cert.get('issuer', []))
+                    report.append(f"[SSL] {'ISSUER':<14} : {issuer.get('organizationName', 'Unknown')}")
+            except: report.append(f"[SSL] {'ISSUER':<14} : UNABLE TO VERIFY")
+            
+            # 3. Breach Intel
+            try:
+                async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=4) as r:
+                    data_br = await r.json()
+                    report.append(f"[SEC] {'BREACH STATUS':<14} : {'[!!!] BREACHED' if data_br.get('found') else 'CLEAN'}")
+            except: report.append(f"[SEC] {'BREACH STATUS':<14} : UNAVAILABLE")
+            
+            # 4. SMTP VALIDATION (Threaded)
+            report.append("\n--- [MAILBOX VALIDATION (THREADED)]")
+            def smtp_check():
+                try:
+                    from dns import resolver as sync_resolver
+                    import smtplib
+                    mx = sync_resolver.resolve(domain, 'MX')[0].exchange
+                    with smtplib.SMTP(str(mx), timeout=5) as s:
+                        s.helo(); s.mail('audit@security.test')
+                        code, _ = s.rcpt(clean_data)
+                        return f"[SMTP] {'STATUS':<14} : {'ACTIVE' if code == 250 else 'INACTIVE'} (Code: {code})"
+                except: return f"[SMTP] {'STATUS':<14} : PROTECTED/BLOCKED"
+            
+            report.append(await asyncio.to_thread(smtp_check))
+            
+            # 5. Эвристическая оценка риска
+            risk = "LOW" if ("gmail" in domain or "outlook" in domain) else "MEDIUM"
+            if "[!!!] BREACHED" in report[-3]: risk = "CRITICAL"
+            report.append(f"[SEC] {'RISK LEVEL':<14} : {risk}")
+            
+            report.append("=== [END OF ANALYSIS] ===")
+            
+        # --- 4. NICKNAME: ЦИФРОВОЙ СЛЕД ---
+        elif re.match(r'^[a-zA-Z0-9_]{3,20}$', data):
+            report.append(f"\n=== [DIGITAL FOOTPRINT: {data}] ===")
+            platforms = {'GitHub': 'https://github.com/{}', 'Twitter': 'https://twitter.com/{}', 'Reddit': 'https://www.reddit.com/user/{}', 'Steam': 'https://steamcommunity.com/id/{}', 'TikTok': 'https://www.tiktok.com/@{}'}
+            async def check(n, u):
+                try:
+                    async with session.get(u.format(data), timeout=5) as r:
+                        return f"[USR] {n:<14} : {'MATCH FOUND (200)' if r.status == 200 else 'NOT FOUND'}"
+                except: return f"[USR] {n:<14} : ERROR/TIMEOUT"
+            report.extend(await asyncio.gather(*[check(n, u) for n, u in platforms.items()]))
+            report.append("=== [END OF ANALYSIS] ===")
+
+        # --- 5. ДОМЕН / IP / SERVER: NEXUS DEEP-RECON MODULE ---
+        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
+            report.append(f"\n=== [NEXUS DEEP-RECON: {clean_data}] ===")
+            loop = asyncio.get_event_loop()
+            
+            # 1. SSL/TLS CERTIFICATE FORENSIC (Проверка реального владельца инфраструктуры)
+            report.append(f"\n--- [SSL/TLS HANDSHAKE ANALYZER]")
+            try:
+                cmd_ssl = f"echo | openssl s_client -connect {clean_data}:443 -servername {clean_data} 2>/dev/null | openssl x509 -noout -subject -issuer -dates"
+                res = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True))
+                if res.returncode == 0:
+                    report.extend([f"[SSL] {line.strip()}" for line in res.stdout.splitlines()])
+                else:
+                    report.append("[SSL] {'STATUS':<14} : HANDSHAKE REJECTED/PROTECTED")
+            except Exception as e: report.append(f"[SSL] {'ERROR':<14} : {str(e)}")
+
+            # 2. NETWORK PATH & GEO-LOCATION (Определение физического расположения узла)
+            report.append(f"\n--- [INFRASTRUCTURE GEOPOSITIONING]")
+            try:
+                # Извлекаем IP через DNS
+                import socket
+                ip = socket.gethostbyname(clean_data)
+                report.append(f"[NET] {'RESOLVED IP':<14} : {ip}")
+                
+                # Доп. инфо через API
+                async with session.get(f"http://ip-api.com/json/{ip}", timeout=5) as r:
+                    geo = await r.json()
+                    report.extend([
+                        f"[NET] {'ISP/ORG':<14} : {geo.get('isp')}",
+                        f"[NET] {'REGION/CITY':<14} : {geo.get('city')}, {geo.get('country')}"
+                    ])
+            except: report.append("[NET] {'GEO':<14} : UNABLE TO LOCATE")
+
+            # 3. NMAP VULNERABILITY SURFACE (Анализ открытых векторов атак)
+            report.append(f"\n--- [ACTIVE PROBE: VULNERABILITY SURFACE]")
+            cmd_nmap = ['nmap', '-F', '-sV', '-T4', clean_data]
+            res = await loop.run_in_executor(None, lambda: subprocess.run(cmd_nmap, capture_output=True, text=True))
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if '/' in line and ('open' in line or 'closed' in line):
+                        report.append(f"[NMP] {line.strip()}")
+            
+            report.append("=== [END OF ANALYSIS] ===")
+            
+    return render_template_string(render_prime_page("FULL dispatch REPORT", f"<pre>{chr(10).join(report)}</pre><a href='/'>RETURN</a>"))                                  
+
 
 @app.route('/searinfo', methods=['POST'])
 async def searinfo():
