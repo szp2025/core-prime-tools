@@ -4683,7 +4683,9 @@ generate_upload_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Формируем Base64 payload через чистый heredoc без двойных кавычек и комментариев
+    # 2. Формируем Base64 payload через heredoc. 
+    # Внутри Python-кода полностью отсутствуют двойные кавычки в HTML-разметке,
+    # они заменены на HEX-декодирование, что исключает конфликт экранирования.
     local b64_payload
     b64_payload=$(cat << 'EOF' | base64 | tr -d '\n' | tr -d '\r'
 import os
@@ -4748,14 +4750,22 @@ def dynamic_handler():
                     os.remove(tmp_path)
                 
                 report_str = chr(10).join(report)
-                q = chr(34)
                 
-                content = f"<div class={q}status-box infected{q} style={q}padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;{q}>"
-                content += "CRITICAL DETECTION: THREAT TOTALLY DESTROYED"
-                content += "</div>"
-                content += f"<p style={q}font-size:12px; color:var(--accent-color);{q}>File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>"
-                content += f"<pre style={q}background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;{q}>{report_str}</pre>"
-                content += f"<div style={q}margin-top:20px;{q}><a href={q}/{q} class={q}btn{q}>[ RETURN ]</a></div>"
+                # Использование bytes.fromhex() полностью уничтожает кавычки в исходном коде:
+                # h_div_inf: '<div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">'
+                h_div_inf = bytes.fromhex('3c64697620636c6173733d227374617475732d626f7820696e66656374656422207374796c653d2270616464696e673a313570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d7765696768743a626f6c643b206d617267696e2d626f74746f6d3a323070783b20746578742d616c69676e3a63656e7465723b20626f726465723a31307078206461736865643b223e').decode('utf-8')
+                # h_p_inf: '<p style="font-size:12px; color:var(--accent-color);">File <b>'
+                h_p_inf = bytes.fromhex('3c70207374796c653d22666f6e742d73697a653a313270783b20636f6c6f723a766172282d2d616363656e742d636f6c6f72293b223e46696c65203c623e').decode('utf-8')
+                # h_p_inf_mid: '</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>'
+                h_p_inf_mid = bytes.fromhex('3c2f623e20627265616368656420636f6d706c69616e636520706f6c696369657320616e6d20776173203c623e7065726d616e656e746c792064656c657465643c2f623e2066726f6d2074686520656e7669726f6e6d656e742e3c2f703e').decode('utf-8')
+                # h_pre_inf: '<pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">'
+                h_pre_inf = bytes.fromhex('3c707265207374796c653d226261636b67726f756e643a233131313b20636f6c6f723a236666336430303b2070616464696e673a313570783b20626f726465722d7261646975733a3570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d73697a653a313170783b223e').decode('utf-8')
+                # h_btn_inf: '</div><div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>'
+                h_btn_inf = bytes.fromhex('3c2f7072653e3c646976207374796c653d226d617267696e2d746f703a323070783b223e3a6120687265663d222f2220636c6173733d2262746e223e5b2052455455524e205d3c2f613e3c2f6469763e').decode('utf-8')
+
+                content = h_div_inf + "CRITICAL DETECTION: THREAT TOTALLY DESTROYED</div>"
+                content += h_p_inf + str(f.filename) + h_p_inf_mid
+                content += h_pre_inf + str(report_str) + h_btn_inf
                 
                 return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
                 
@@ -4766,12 +4776,15 @@ def dynamic_handler():
                     
                 shutil.move(tmp_path, final_dest_path)
                 
-                q = chr(34)
-                content = f"<div class={q}status-box clean{q} style={q}padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;{q}>"
-                content += "SUCCESS: UPLOAD VERIFIED"
-                content += "</div>"
-                content += f"<p style={q}font-size:12px;{q}>File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>"
-                content += f"<div style={q}margin-top:20px;{q}><a href={q}/{q} class={q}btn{q}>[ UPLOAD ANOTHER FILE ]</a></div>"
+                # h_div_cln: '<div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">'
+                h_div_cln = bytes.fromhex('3c64697620636c6173733d227374617475732d626f7820636c65616e22207374796c653d2270616464696e673a313570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d7765696768743a626f6c643b206d617267696e2d626f74746f6d3a323070783b20746578742d616c69676e3a63656e7465723b223e').decode('utf-8')
+                # h_p_cln: '<p style="font-size:12px;">File <b>'
+                h_p_cln = bytes.fromhex('3c70207374796c653d22666f6e742d73697a653a313270783b20223e46696c65203c623e').decode('utf-8')
+                # h_p_cln_mid: '</b> successfully verified by CAME engine and written to secure sector.</p><div style="margin-top:20px;"><a href="/" class="btn">[ UPLOAD ANOTHER FILE ]</a></div>'
+                h_p_cln_mid = bytes.fromhex('3c2f623e207375636365737366756c6c792076657269666965642062792043414d4520656e67696e6520616e64207772697474656e20746f2073656375726520736563746f722e3c2f703e3c646976207374796c653d226d617267696e2d746f703a323070783b223e3c6120687265663d222f2220636c6173733d2262746e223e5b2055504c4f414420414e4f544845522046494c45205d3c2f613e3c2f6469763e').decode('utf-8')
+
+                content = h_div_cln + "SUCCESS: UPLOAD VERIFIED</div>"
+                content += h_p_cln + str(f.filename) + h_p_cln_mid
                 
                 return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
                 
@@ -4804,7 +4817,7 @@ if __name__ == '__main__':
 EOF
 )
 
-    # 6. Вклейка шаблона
+    # 6. Вклейка шаблона в маркер
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
 
     echo -e "$raw_python_code"
