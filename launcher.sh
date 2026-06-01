@@ -4344,7 +4344,7 @@ EOF
 
 
 
-generate_aio_server_code_rawtest(){
+generate_aio_server_code_raw(){
 
     # Генерируем содержимое шаблонов в переменные
     local core_tpl="$(generate_core_template)"
