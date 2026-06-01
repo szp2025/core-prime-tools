@@ -94,6 +94,7 @@ GLOBAL_MENU_REGISTRY=(
 
     "STEALTH_COMMS:Live_Node_AV|run_av_server" "STEALTH_COMMS:Shared_Node_Store|run_share_server"
     "STEALTH_COMMS:Upload_Portal|run_upload_server" "STEALTH_COMMS:Node_Destroy|run_node_clean"
+     "STEALTH_COMMS:AIO_SERVER|run_aio_server"
 
     "NEXUS:Full_Pipeline|run_nexus_full_pipeline"
 )
@@ -9227,6 +9228,7 @@ run_live_service() {
         "av")      service_name="app0.nexus" ;;
         "scanner") service_name="app1.nexus" ;;
         "auth")    service_name="app2.nexus" ;;
+        "aio")     service_name="app3.nexus" ;;
         *)         service_name="prime.portal" ;;
     esac
 
@@ -9302,6 +9304,10 @@ run_live_service() {
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         local final_url="$protocol://$service_name:$port"
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
+
+
+        local final_url2="$protocol://$active_ip:$port"
+        core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url2"
         
         # 1. Регистрация в DNS
         core_network_dns_register "$service_name" "$active_ip"
@@ -9403,9 +9409,25 @@ run_av_server() {
     core_engine_loot "security" "NEXUS Core Analytical Gateway initiated on port 5000"
 }
 
-ru_aio_server(){
-generate_aio_server_code_rawtest
+run_aio_server(){
+#generate_aio_server_code_rawtest
+    # Слой 1: Заголовок через Голос [1] (Адаптирован под реальный контекст ноды)
+    core_engine_ui "PRIME SECURITY HUB: NETWORK SCANNER GATEWAY"
 
+    # Слой 2: Валидация фундамента через Мозг [5]
+    core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
+    
+    # ИСПРАВЛЕНО: Полностью удален блок проверки command -v clamscan и принудительной установки apt-get.
+    # Сервер теперь разворачивается мгновенно, не требуя root-прав для установки пакетов.
+
+    # Слой 3: Запуск через «Живой движок» (Live Node)
+    # Используем обновленный динамический run_live_service для полной стерильности
+    # Передаем тип "av" (основной движок ядра) и выделенный порт 5000
+    run_live_service "aio" "5000"
+    
+    # Слой 4: Интеграция в Сборщик трофеев [11]
+    # ИСПРАВЛЕНО: Логирование отражает реальный статус запущенной подсистемы
+    core_engine_loot "security" "NEXUS Core Analytical Gateway initiated on port 5000"
 
 }
 run_share_server() {
