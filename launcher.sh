@@ -3639,13 +3639,7 @@ def index():
     )
         
     current_os = platform.system().lower()
-    btn_map = {
-        "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
-        "linux": ("INJECT LINUX PURGE", "/inject/linux", "#e91e63"),
-        "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
-    }
-    label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
-
+    
     verdict = session.get('last_verdict', 'CLEAN')
     injection_kit_html = ""
     if verdict == 'INFECTED':
@@ -4379,7 +4373,6 @@ from urllib.parse import quote
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'super_secret_key_for_came_gateway'
 
 # --- ШАБЛОНЫ (ВСТАВЛЕНЫ АВТОМАТИЧЕСКИ) ---
 EOF
