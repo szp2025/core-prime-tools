@@ -40,7 +40,7 @@ fi
 
 # 4. Скачивание новой версии из GitHub
 echo -e "${Y}[*] Downloading new version...${NC}"
-curl -s -L "$REPO_URL" -o "$TARGET_FILE"
+curl -s -L -k "$REPO_URL" -o "$TARGET_FILE"
 
 # 5. Проверка результата и настройка доступа
 if [ -f "$TARGET_FILE" ]; then
