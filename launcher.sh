@@ -9272,6 +9272,15 @@ run_live_service() {
         # Авто-регистрация в луте
         core_engine_loot "node_startup" "Service ${service_type} deployed & proxied at $final_url"
     else
+      # 1. Регистрация в DNS
+        core_network_dns_register "$service_name" "$active_ip"
+    
+        # --- ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ В NGINX ---
+        core_nginx_auto_setup "$service_name:$port"
+       
+        # Авто-регистрация в луте
+        core_engine_loot "node_startup" "Service ${service_type} deployed & proxied at $final_url"
+        
         core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
         core_engine_ui "line"
 
