@@ -4683,9 +4683,7 @@ generate_upload_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Генерируем Base64 payload напрямую через защищенный heredoc.
-    # Обратите внимание: синтаксис << 'EOF' в одинарных кавычках запрещает Bash выполнять
-    # какие-либо подстановки фигурных скобок {f.filename}. Внутри кода полностью удалены комментарии '#'.
+    # 2. Формируем Base64 payload через чистый heredoc без двойных кавычек и комментариев
     local b64_payload
     b64_payload=$(cat << 'EOF' | base64 | tr -d '\n' | tr -d '\r'
 import os
@@ -4750,13 +4748,14 @@ def dynamic_handler():
                     os.remove(tmp_path)
                 
                 report_str = chr(10).join(report)
+                q = chr(34)
                 
-                content = "<div class=\"status-box infected\" style=\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\">"
+                content = f"<div class={q}status-box infected{q} style={q}padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;{q}>"
                 content += "CRITICAL DETECTION: THREAT TOTALLY DESTROYED"
                 content += "</div>"
-                content += f"<p style=\"font-size:12px; color:var(--accent-color);\">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>"
-                content += f"<pre style=\"background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;\">{report_str}</pre>"
-                content += "<div style=\"margin-top:20px;\"><a href=\"/\" class=\"btn\">[ RETURN ]</a></div>"
+                content += f"<p style={q}font-size:12px; color:var(--accent-color);{q}>File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>"
+                content += f"<pre style={q}background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;{q}>{report_str}</pre>"
+                content += f"<div style={q}margin-top:20px;{q}><a href={q}/{q} class={q}btn{q}>[ RETURN ]</a></div>"
                 
                 return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
                 
@@ -4767,11 +4766,12 @@ def dynamic_handler():
                     
                 shutil.move(tmp_path, final_dest_path)
                 
-                content = "<div class=\"status-box clean\" style=\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;\">"
+                q = chr(34)
+                content = f"<div class={q}status-box clean{q} style={q}padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;{q}>"
                 content += "SUCCESS: UPLOAD VERIFIED"
                 content += "</div>"
-                content += f"<p style=\"font-size:12px;\">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>"
-                content += "<div style=\"margin-top:20px;\"><a href=\"/\" class=\"btn\">[ UPLOAD ANOTHER FILE ]</a></div>"
+                content += f"<p style={q}font-size:12px;{q}>File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>"
+                content += f"<div style={q}margin-top:20px;{q}><a href={q}/{q} class={q}btn{q}>[ UPLOAD ANOTHER FILE ]</a></div>"
                 
                 return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
                 
@@ -4784,14 +4784,13 @@ result = dynamic_handler()
 EOF
 )
 
-    # 4. Формируем строго линейную строку обертки, разделяя каждую инструкцию точкой с запятой (;).
-    # Код гарантированно защищен от схлопывания строк интерпретатором шаблонов.
+    # 3. Формируем линейную строку обертки
     local aio_body="import base64; exec_globals = globals().copy(); exec_globals.update(local_context); exec_locals = {}; exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals); result = exec_locals.get('result') or exec_globals.get('result')"
 
-    # 5. Передаем готовую защищенную инструкцию в ваш оригинальный генератор generate_aio_template
+    # 4. Передаем в генератор шаблонов
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
-    # 6. Собираем финальный монолитный каркас лаунчера
+    # 5. Собираем финальный каркас лаунчера
     local raw_python_code=$(cat << 'EOF'
 # === СБОРОЧНЫЙ МОДУЛЬ NEXUS UPLOAD CORE ===
 __NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__
@@ -4805,10 +4804,9 @@ if __name__ == '__main__':
 EOF
 )
 
-    # 7. Производим бесшовную вклейку шаблона в маркер
+    # 6. Вклейка шаблона
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
 
-    # Возвращаем полностью скомпилированный скрипт сервера
     echo -e "$raw_python_code"
 }
 
