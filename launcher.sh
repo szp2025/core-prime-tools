@@ -9205,8 +9205,113 @@ update_all_dns_records() {
     core_engine_ui "+" "DNS Registry: ALL domains synchronized to IP $ip"
 }
 
-
 run_live_service() {
+    local service_type="$1"
+    local port="${2:-8080}"
+    local log_file="$HOME/prime_node.log"
+    local protocol="http"
+
+    core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
+
+    # --- 1. АДАПТИВНАЯ СЕТЬ (ПРЯМОЙ IP-РЕЖИМ) ---
+    # Мы пропускаем синхронизацию dnsmasq, так как работаем напрямую через IP.
+    # Динамически перехватываем текущий IP-адрес сетевой карты (LAN)
+    local lan_ip
+    lan_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    
+    # Резервный метод определения IP, если hostname -I не сработал
+    if [[ -z "$lan_ip" ]]; then
+        lan_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}')
+    fi
+    
+    # Если устройство не подключено к сети
+    if [[ -z "$lan_ip" ]]; then
+        lan_ip="127.0.0.1"
+        core_engine_ui "w" "Network disconnected. Using loopback mode."
+    fi
+
+    # Назначаем имя сервиса равным текущему IP-адресу для корректной работы логов
+    local service_name="$lan_ip"
+
+    # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
+    # Оставляем проверку на случай, если вы захотите поднять HTTPS на IP
+    if command -v openssl >/dev/null 2>&1; then
+        local active_cert
+        active_cert=$(core_get_service_cert "$service_name" 2>/dev/null)
+        
+        if [[ -f "$active_cert" ]]; then
+            protocol="https"
+            export PRIME_CERT_PATH="$active_cert"
+        fi
+    fi
+
+    # --- 3. САНИТАРИЯ ПОРТОВ ---
+    core_engine_ui "i" "Sanitizing port $port..."
+    fuser -k -n tcp -9 "$port" >/dev/null 2>&1
+    pkill -9 -f "python3" >/dev/null 2>&1
+    sleep 1.2
+
+    # --- 4. ЗАПУСК ДВИЖКА ---
+    local code_gen_func="generate_${service_type}_server_code_raw"
+    if ! command -v "$code_gen_func" >/dev/null; then
+        core_engine_ui "e" "Fatal: $code_gen_func not found."
+        core_engine_wait; return
+    fi
+
+    local temp_service_file="/tmp/${service_type}_server.py"
+    export PRIME_CERT_PATH="$active_cert"
+    
+    core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
+    export PRIME_LOOT PRIME_SHARE
+    
+    # Генерация сырого кода Flask
+    "$code_gen_func" > "$temp_service_file"
+    
+    # Ограничения памяти (Защита NEXUS Core)
+    ulimit -m 524288 2>/dev/null
+    ulimit -v 1048576 2>/dev/null
+
+    # Финальный фоновый запуск через nohup
+    nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
+    PID=$!
+    
+    core_engine_progress 2 "NODE_STABILIZATION"
+
+    # --- 5. ФИНАЛЬНАЯ ДИАГНОСТИКА И ВЫВОД ССЫЛОК ---
+    if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
+        
+        # Интерактивная матрица адресов. Теперь она показывает реальный живой IP!
+        echo -e "\n\033[1;32m[+]\033[0m \033[1;36mNEXUS CORE ENGINE ONLINE (PID: $PID)\033[0m"
+        echo -e "--------------------------------------------------------"
+        echo -e "  \033[1;34m[>] LOCAL ACCESS :\033[0m  $protocol://127.0.0.1:${port}"
+        echo -e "  \033[1;35m[>] LAN ACCESS   :\033[0m  \033[1;32m$protocol://${lan_ip}:${port}\033[0m  <-- КЛИКАТЬ СЮДА"
+        echo -e "--------------------------------------------------------\n"
+        
+        # Запись в локальный лог трофеев
+        core_engine_loot "node_startup" "Service ${service_type} deployed directly at $protocol://${lan_ip}:${port}"
+    else
+        core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
+        core_engine_ui "line"
+
+        if [[ -f "$log_file" ]]; then
+            echo "[!] LAST 20 LINES OF LOG:"
+            tail -n 20 "$log_file"
+            core_engine_ui "line"
+            
+            if grep -q "Killed" "$log_file"; then
+                echo "[CRITICAL] OOM Killer detected."
+            elif grep -q "Traceback" "$log_file"; then
+                echo "[ERROR] Python Exception Traceback detected."
+            elif grep -q "Address already in use" "$log_file"; then
+                echo "[ERROR] Port collision: Port $port is already in use."
+            fi
+        fi
+    fi
+
+    core_engine_wait
+}
+
+run_live_serviceold() {
     local service_type="$1"
     local port="${2:-8080}"
     local log_file="$HOME/prime_node.log"
