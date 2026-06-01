@@ -3512,7 +3512,7 @@ generate_av_server_code_raw() {
     local form_tpl="$(generate_core_form_template)"
 
     # Используем cat с 'EOF', чтобы Bash не интерпретировал $ внутри Python-кода
-    cat << EOF > /tmp/av_server.py
+    cat << 'EOF' > /tmp/av_server.py
 from flask import Flask, request, render_template_string, session
 import re
 import os
@@ -4338,14 +4338,14 @@ EOF
 
 
 
-generate_aio_server_code_raw(){
-
-    # Генерируем содержимое шаблонов в переменные
+generate_aio_server_code_raw() {
+    # 1. Сборка UI шаблонов в локальные переменные для бесшовной интеграции
     local core_tpl="$(generate_core_template)"
     local form_tpl="$(generate_core_form_template)"
 
-    # Используем cat с 'EOF', чтобы Bash не интерпретировал $ внутри Python-кода
-    cat << 'EOF' > /tmp/aio_server.py
+    # 2. ВЫВОД ПЕРВОЙ ЧАСТИ (Импорты и инициализация Flask)
+    # Убрано перенаправление '> /tmp/aio_server.py', теперь поток идет наружу
+    cat << 'EOF'
 from flask import Flask, request, render_template_string, session
 import re
 import os
@@ -4369,7 +4369,6 @@ from phonenumbers import geocoder, carrier, number_type
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from urllib.parse import quote
-
 from datetime import datetime
 
 app = Flask(__name__)
@@ -4377,26 +4376,28 @@ app = Flask(__name__)
 # --- ШАБЛОНЫ (ВСТАВЛЕНЫ АВТОМАТИЧЕСКИ) ---
 EOF
 
-    # Добавляем сгенерированные шаблоны в файл без кавычек Bash, чтобы они записались как текст
-    echo "$core_tpl" >> /tmp/av_server.py
-    echo "$form_tpl" >> /tmp/av_server.py
+    # 3. ВЫВОД ШАБЛОНОВ В ОБЩИЙ ПОТОК
+    echo "$core_tpl"
+    echo "$form_tpl"
 
-    # Продолжаем запись основного кода
-    cat << 'EOF' >> /tmp/av_server.py
+    # 4. ВЫВОД ФИНАЛЬНОЙ ЧАСТИ ЛОГИКИ И СЕРВЕРА
+    # Убрано перенаправление '>> /tmp/aio_server.py' и исправлен синтаксис роута Python
+    cat << 'EOF'
 
 # --- ВНУТРЕННИЕ ФУНКЦИИ (NEXUS ENGINE) ---
-   
+
 @app.route('/')
+def index():
+    # Инициализация контекста страницы для CAME_HYBRID_GATEWAY
+    body = "<div style='text-align:center;'><h3>NEXUS AIO HYBRID SYSTEM ONLINE</h3><p>Secure sector connection verified.</p></div>"
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 
 if __name__ == '__main__':
-    # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции
+    # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции наружу
     app.run(host='0.0.0.0', port=5002, debug=False)
 EOF
-
 }
-
 
 
 # ==============================================================================
