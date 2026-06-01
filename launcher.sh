@@ -4841,7 +4841,7 @@ UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'i
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-$templates
+   $templates
 
 @app.route('/')
 def index():
