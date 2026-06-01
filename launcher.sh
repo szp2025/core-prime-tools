@@ -95,6 +95,9 @@ GLOBAL_MENU_REGISTRY=(
     "STEALTH_COMMS:Live_Node_AV|run_av_server" "STEALTH_COMMS:Shared_Node_Store|run_share_server"
     "STEALTH_COMMS:Upload_Portal|run_upload_server" "STEALTH_COMMS:Node_Destroy|run_node_clean"
      "STEALTH_COMMS:AIO_SERVER|run_aio_server"
+     "STEALTH_COMMS:Upload_Portalv2|run_upload_server"
+     
+     
 
     "NEXUS:Full_Pipeline|run_nexus_full_pipeline"
 )
@@ -4670,7 +4673,7 @@ EOF
 # АРХИТЕКТУРА: Flask-интерфейс, защита целевого хранилища PRIME_LOOT от записи малвари
 # ==============================================================================
 
-generate_upload_server_code_raw() {
+generate_uploadv2_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
@@ -4813,7 +4816,7 @@ EOF
 }
 
 
-generate_upload_server_code_rawold() {
+generate_upload_server_code_raw() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
     local templates="$(generate_core_template)
 $(generate_core_form_template)"
@@ -9717,6 +9720,27 @@ run_upload_server() {
     # Фиксация события запуска в системном логе
     core_engine_loot "service" "Secure Uplink (Upload) initiated on port 5001"
 }
+
+run_uploadv2_server() {
+    # Слой 1: Визуализация через Голос [1]
+    core_engine_ui "h" "INBOUND DROP BOX: SECURE UPLINK"
+
+    # Слой 2: Валидация фундамента через Мозг [5]
+    # Проверка наличия интерпретатора Python3 для запуска сервера
+    core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
+
+    # Слой 3: Динамический запуск через Live Node [22]
+    # Запуск сервера на порту 5001 в режиме MEMORY_ONLY.
+    # Код сервера передается через пайп, исключая создание .py файлов на диске.
+    run_live_service "uploadv2" "5001"
+
+
+    
+    # Слой 4: Регистрация в Сборщике трофеев [11]
+    # Фиксация события запуска в системном логе
+    core_engine_loot "service" "Secure Uplink (Uploadv2) initiated on port 5001"
+}
+
 
 # ==============================================================================
 # @description: OSINT NEXUS v23.8 - ZERO-DEPENDENCY BLUETOOTH MESH BRIDGE
