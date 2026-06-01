@@ -4683,49 +4683,56 @@ generate_upload_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Сборка тела сценария.
-    # Оборачиваем ВСЁ тело в одинарные кавычки Bash ('...').
-    # Теперь внутри Python-кода можно свободно использовать стандартные двойные кавычки ("),
-    # а знаки доллара ($) больше не нужно экранировать! Символ \n передается напрямую.
-    local aio_body='
-UPLOAD_DIR = os.path.join(os.environ.get("PRIME_LOOT") or "/root/prime_loot", "inbound")
+    # 2. Формируем ЧИСТЫЙ Python-код для обработки логики загрузки.
+    # Этот кусок кода запишется в Base64, поэтому здесь мы пишем свободный, красивый Python-код 
+    # без единого костыля экранирования!
+    local raw_payload_code=$(cat << 'EOF'
+import os
+import re
+import shutil
+
+UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def dynamic_handler():
-    if request.method == "GET":
+    if request.method == 'GET':
+        # Вызов генератора форм лаунчера
         fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
         form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
         return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
 
-    elif request.method == "POST":
-        if "file" not in request.files: 
+    elif request.method == 'POST':
+        # --- ВЕКТОР ПР ПРОВЕРКИ И БЕССЛЕДНОГО УНИЧТОЖЕНИЯ ---
+        if 'file' not in request.files: 
             return "TRANSFER_ERROR", 400
             
-        f = request.files["file"]
-        if f.filename == "": 
+        f = request.files['file']
+        if f.filename == '': 
             return "EMPTY_FILENAME", 400
         
-        tmp_path = os.path.join("/tmp", f.filename)
+        tmp_path = os.path.join('/tmp', f.filename)
         f.save(tmp_path)
         
         is_infected = False
         report = []
         
         try:
-            with open(tmp_path, "rb") as file_buffer:
+            with open(tmp_path, 'rb') as file_buffer:
                 raw_content = file_buffer.read()
                 
             total_bytes = len(raw_content)
             
+            # Анализ плотности ASCII (Выявление обфускации)
             printable_chars = len([b for b in raw_content if 32 <= b <= 126])
             readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
             
-            text_content = raw_content.decode("utf-8", errors="ignore")
+            text_content = raw_content.decode('utf-8', errors='ignore')
             
             matches = []
             try:
+                # GLOBAL_AV_PIPE_REGEX доступна из глобального контекста лаунчера aio
                 compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
                 for i, line in enumerate(text_content.splitlines(), 1):
                     if compiled_regex.search(line):
@@ -4745,9 +4752,7 @@ def dynamic_handler():
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
                 
-                # Теперь \n передается чисто, без разрывов строк в Bash
                 report_str = "\n".join(report)
-                
                 content = "<div class=\"status-box infected\" style=\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\">"
                 content += "CRITICAL DETECTION: THREAT TOTALLY DESTROYED"
                 content += "</div>"
@@ -4777,32 +4782,51 @@ def dynamic_handler():
                 os.remove(tmp_path)
             return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
 
+# Инжектируем результат выполнения функции в глобальное пространство exec лога
 result = dynamic_handler()
-'
+EOF
+)
 
-    # 3. Передача в тотальный генератор шаблона
+    # 3. Кодируем чистый Python-код в base64 строку (убираем переносы строк самой утилиты base64)
+    local b64_payload=$(echo "$raw_payload_code" | base64 | tr -d '\n' | tr -d '\r')
+
+    # 4. Формируем тело-обертку (`incoming_body`), которое проглотит твой generate_aio_template.
+    # Эта обертка просто декодирует base64 строку и выполнит её внутри контекста Flask.
+    # Используем одинарные кавычки, чтобы cat << EOF шаблона не ломал структуру.
+    local aio_body="
+import base64
+exec_globals = globals().copy()
+exec_globals.update(local_context)
+exec_locals = {}
+exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)
+result = exec_locals.get('result') or exec_globals.get('result')
+"
+
+    # 5. Вызываем твой ОРИГИНАЛЬНЫЙ генератор шаблона, передавая роуты на /upload
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
-    # 4. Монолитный каркас с точкой входа
+    # 6. Собираем финальный монолитный каркас лаунчера
     local raw_python_code=$(cat << 'EOF'
 # === СБОРОЧНЫЙ МОДУЛЬ NEXUS UPLOAD CORE ===
 __NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__
 
-@app.route('/')
+# Дополнительный роут перенаправления для удобства, если стучатся в корень сервера
+@app.route('/', methods=['GET'])
 def index_redirect():
     return dynamic_nexus_processor()
 
 if __name__ == '__main__':
+    # Корректный старт ядра CAME на порту 5001
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 )
 
-    # 5. Инжекция кода в маркер
+    # 7. Производим бесшовную вклейку шаблона в маркер
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
 
+    # Отдаем чистый готовый скрипт наружу
     echo -e "$raw_python_code"
 }
-
 
 
 generate_upload_server_code_rawold() {
