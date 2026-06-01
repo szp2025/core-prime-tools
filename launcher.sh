@@ -4391,34 +4391,6 @@ EOF
     # Продолжаем запись основного кода
     cat << 'EOF' >> /tmp/av_server.py
 
-# [КОНФИГУРАЦИЯ ЯДРА]
-GLOBAL_HASH_MATRIX = [
-    r"\b(password|pwd|hash|secret|token|access_token)[ \t]*[:=]{1,2}[ \t]*['\"]?([a-fA-F0-9]{32,128})['\"]?",
-    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?([A-Za-z0-9\-_]{20,})['\"]?",
-    r"\b(password|pwd|secret|key)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#$%^&*()_+]{8,32})['\"]",
-    r"\b(AKIA[0-9A-Z]{16})\b"
-]
-
-GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
-
-# Матрицы для Nexus-движка
-GLOBAL_NETWORK_UA = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/605.1.15"
-]
-
-GLOBAL_SECURITY_MATRIX = [
-    r"\b(cloudflare|akamai|sucuri|incapsula|imperva|aws-waf|429|too many requests)\b",
-    r"\b(select|union|drop|exec|xp_cmdshell|eval\(|base64_decode)\b"
-]
-
-GLOBAL_PHONE_RISK_MATRIX = {
-    "VOIP": "HIGH_RISK",
-    "UNKNOWN_CARRIER": "MEDIUM_RISK",
-    "INTERNATIONAL_OFFSHORE": "CRITICAL_RISK"
-}
 
 def is_encrypted_container(file_path):
     try:
