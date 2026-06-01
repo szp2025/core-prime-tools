@@ -4394,65 +4394,6 @@ EOF
 # --- ВНУТРЕННИЕ ФУНКЦИИ (NEXUS ENGINE) ---
    
 @app.route('/')
-def index():
-    # Теперь render_prime_form доступен, так как он был вставлен выше
-    form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
-    form_html += render_prime_form(
-    "/searinfo", 
-    fields=[
-        {"type": "text", "name": "fio", "label": "FULL NAME (ФИО)", "placeholder": "Иванов Иван Иванович"},
-        {"type": "text", "name": "address", "label": "PHYSICAL ADDRESS", "placeholder": "Город, Улица, Дом"},
-        {"type": "tel", "name": "phone", "label": "PHONE NUMBER", "placeholder": "+7XXXXXXXXXX"},
-     {"type": "text", "name": "immatriculation", "label": "IMMAT", "placeholder": "Immatriculation"},      
-        {"type": "hidden", "name": "action", "value": "initiate_deep_scan"}
-    ], 
-    btn_text="INITIATE ENTITY DEEP SCAN"
-    )
-
-    form_html2 = render_prime_form(
-        "/audit/dispatch", 
-        fields=[
-            {
-                "type": "text", 
-                "name": "input", 
-                "label": "", # Если лейбл не нужен, оставляем пустым
-                "placeholder": "Enter IBAN, Phone, Domain, IP, or Email..."
-            },
-            {"type": "hidden", "name": "action", "value": "analyse_data"}
-        ], 
-        btn_text="ANALYZE DATA"
-    )
-        
-    current_os = platform.system().lower()
-    btn_map = {
-        "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
-        "linux": ("INJECT LINUX PURGE", "/inject/linux", "#e91e63"),
-        "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
-    }
-    label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
-
-    verdict = session.get('last_verdict', 'CLEAN')
-    injection_kit_html = ""
-    if verdict == 'INFECTED':
-        injection_kit_html = f"""
-        <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
-        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
-        """
-
-    body = form_html +  f"""             
-    <div style="margin-top: 20px; padding: 20px; border: 2px solid #2196f3; border-radius: 8px; background:#121216;">
-        <h3>[ GLOBAL INTELLIGENCE DISPATCHER ]</h3>
-        <form action="/audit/dispatch" method="POST">
-            <input type="text" name="input" 
-                   placeholder="Enter IBAN, Phone, Domain, IP, or Email..." 
-                   style="width: 70%; padding: 10px;" required>
-            <button type="submit" class="btn" style="background:#2196f3; color:#fff; padding:10px;">ANALYZE DATA</button>
-        </form>
-    </div>
-    
-        {injection_kit_html}
-    </div>
-    """
     return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
 
 
