@@ -4151,7 +4151,6 @@ async def searinfo():
             tasks.append(("BING", d, f"https://www.bing.com/search?q={quote(d)}&count=30"))
 
         async def scan_worker(eng, d, url):
-            # Мягкая задержка для рассредоточения запросов
             await asyncio.sleep(random.uniform(3.0, 6.0))
             
             session.headers.update({
@@ -4176,13 +4175,11 @@ async def searinfo():
                 
                 output = [f"[{eng}] QUERY: {d}", f"  [URL TRACE]: {url}"]
                 
-                # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №1: Ищем дату рождения прямо в тексте сниппета поисковика
                 birth_search = re.search(DYNAMIC_EXTRACTORS["BIRTH"], visible_text, re.IGNORECASE)
                 if birth_search and aggregated_profile["BIRTH_INFO"] == "NOT_FOUND":
                     raw_birth_snippet = birth_search.group(1).strip()
                     aggregated_profile["BIRTH_INFO"] = re.sub(r'[\)\}\],;>]+$', '', raw_birth_snippet).strip()
 
-                # Ищем статус/профессию прямо в тексте сниппета поисковика
                 FR_STATUS_MARKERS = ["procureure de paris", "procureur de", "magistrate française", "magistrat", "directeur de", "président de"]
                 for marker in FR_STATUS_MARKERS:
                     if marker in visible_text.lower() and aggregated_profile["ESTIMATED_POST"] == "NOT_FOUND":
@@ -4214,7 +4211,6 @@ async def searinfo():
 
                     output.append("  [EXHAUSTIVE EXTRACTED ARTIFACTS]:")
                     
-                    # ИСПРАВЛЕНИЕ УЯЗВИМОСТИ №2: Глубокий черный список структур UI и ложных сущностей
                     UI_BLACKLIST = [
                         "pertinence", "recherche", "images", "vidéos", "cartes", "actualité", "outils", 
                         "rechercher", "loading", "propri", "or", "and", "site", "chiffres", "lettres",
@@ -4237,10 +4233,8 @@ async def searinfo():
                                 if k == "OWNER_NAME":
                                     if val_lower in UI_BLACKLIST or any(ui in val_lower for ui in UI_BLACKLIST):
                                         continue
-                                    # Отсекаем строки, начинающиеся с женских/мужских/неопределенных артиклей (признак текстового шума)
                                     if val_lower.startswith(("les ", "des ", "par ", "la ", "le ", "l'", "une ", "un ", "du ")):
                                         continue
-                                    # Проверка на обрубок строки
                                     if re.search(r'\s[a-z]$', val_lower):
                                         continue
 
@@ -4310,10 +4304,12 @@ async def searinfo():
         
     report.append("=== [END OF ANALYSIS — MAXIMUM FORENSIC RECORD COMPLETION] ===")
     
+    # Решение проблемы: собираем текст через стандартный перенос строки вне f-строки
+    final_text_report = "\n".join(report)
+    
     return render_template_string(
-        render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{chr(10).join(report)}</pre><br><a href='/'>[ RETURN ]</a>")
+        render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{final_text_report}</pre><br><a href='/'>[ RETURN ]</a>")
     )
-
 
 
 if __name__ == '__main__':
