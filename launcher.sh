@@ -4769,22 +4769,14 @@ result = dynamic_handler()
 EOF
 )
 
-    # 3. Формируем aio_body со СТРОГИМ сдвигом в 8 пробелов для каждой строки, 
-    # чтобы идеально вписать код внутрь блока try: функции-обработчика
-    local aio_body=$(cat << EOF
-        import base64
-        exec_globals = globals().copy()
-        exec_globals.update(local_context)
-        exec_locals = {}
-        exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)
-        result = exec_locals.get('result') or exec_globals.get('result')
-EOF
-)
+    # 3. Формируем тело aio_body с жестким сдвигом в 8 пробелов на уровне Bash
+    local aio_body="        import base64\n        exec_globals = globals().copy()\n        exec_globals.update(local_context)\n        exec_locals = {}\n        exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)\n        result = exec_locals.get('result') or exec_globals.get('result')"
 
     # 4. Передаем параметры в генератор шаблонов
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
-    # 5. Собираем финальный монолитный каркас лаунчера
+    # 5. Собираем финальный монолитный каркас лаунчера.
+    # Здесь мы используем обычную замену подстроки без применения капризных седов.
     local raw_python_code=$(cat << 'EOF'
 # === СБОРОЧНЫЙ МОДУЛЬ NEXUS UPLOAD CORE ===
 __NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__
