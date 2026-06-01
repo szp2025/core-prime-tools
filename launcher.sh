@@ -4684,8 +4684,7 @@ generate_upload_server_code_raw() {
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
     # 2. Сборка тела сценария.
-    # Заменяем внутри строк двойные кавычки HTML на одинарные кавычки (style='...'),
-    # чтобы полностью исключить конфликты экранирования при инжекции.
+    # Используем chr(10) вместо '\n', чтобы предотвратить разрыв строк парсером.
     local aio_body="
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
@@ -4744,8 +4743,9 @@ def dynamic_handler():
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
                 
-                # Собираем строки атомарно, используя одинарные кавычки для HTML атрибутов
-                report_str = '\\\\n'.join(report)
+                # Использование chr(10) гарантирует отсутствие скрытых переносов строк в шаблонизаторе
+                report_str = chr(10).join(report)
+                
                 content = '<div class=\'status-box infected\' style=\'padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\'>'
                 content += 'CRITICAL DETECTION: THREAT TOTALLY DESTROYED'
                 content += '</div>'
@@ -4800,6 +4800,7 @@ EOF
 
     echo -e "$raw_python_code"
 }
+
 
 
 generate_upload_server_code_rawold() {
