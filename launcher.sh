@@ -4351,7 +4351,7 @@ generate_aio_server_code_raw(){
     local form_tpl="$(generate_core_form_template)"
 
     # Используем cat с 'EOF', чтобы Bash не интерпретировал $ внутри Python-кода
-    cat << EOF > /tmp/av_server.py
+    cat << 'EOF' > /tmp/av_server.py
 from flask import Flask, request, render_template_string, session
 import re
 import os
@@ -4390,32 +4390,6 @@ EOF
 
     # Продолжаем запись основного кода
     cat << 'EOF' >> /tmp/av_server.py
-
-
-def is_encrypted_container(file_path):
-    try:
-        with open(file_path, 'rb') as f:
-            header = f.read(4)
-            return header in [b'PK\x03\x04', b'PK\x05\x06']
-    except:
-        return False
-
-def calculate_entropy(data):
-    if not data: return 0
-    entropy = 0
-    for x in range(256):
-        p_x = float(data.count(x)) / len(data)
-        if p_x > 0:
-            entropy += - p_x * math.log(p_x, 2)
-    return entropy
-
-def verify_iban(iban):
-    iban = iban.replace(" ", "").upper()
-    if len(iban) < 4: return False
-    rearranged = iban[4:] + iban[:4]
-    numeric = "".join(str(int(c, 36)) for c in rearranged)
-    return int(numeric) % 97 == 1    
-
 
 # --- ВНУТРЕННИЕ ФУНКЦИИ (NEXUS ENGINE) ---
    
@@ -4506,7 +4480,7 @@ generate_share_server_code_raw() {
     local template=$(generate_core_template)
 
     # 3. Твой оригинальный код (теперь используем сформированную строку)
-    cat << EOF
+    cat << 'EOF'
 from flask import Flask, render_template_string, send_from_directory, abort
 import os
 import re
@@ -4654,7 +4628,7 @@ $(generate_core_form_template)"
 local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
     # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
-    cat << EOF
+    cat << 'EOF'
 from flask import Flask, request, render_template_string
 import os
 import re
