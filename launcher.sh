@@ -4683,9 +4683,8 @@ generate_upload_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Формируем ЧИСТЫЙ Python-код для обработки логики загрузки.
-    # Этот кусок кода запишется в Base64, поэтому здесь мы пишем свободный, красивый Python-код 
-    # без единого костыля экранирования!
+    # 2. Формируем красивый и чистый Python-код без единого костыля экранирования.
+    # Этот кусок изолирован внутри cat << 'EOF' с одинарными кавычками, что защищает его от Bash.
     local raw_payload_code=$(cat << 'EOF'
 import os
 import re
@@ -4698,13 +4697,11 @@ if not os.path.exists(UPLOAD_DIR):
 
 def dynamic_handler():
     if request.method == 'GET':
-        # Вызов генератора форм лаунчера
         fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
         form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
         return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
 
     elif request.method == 'POST':
-        # --- ВЕКТОР ПР ПРОВЕРКИ И БЕССЛЕДНОГО УНИЧТОЖЕНИЯ ---
         if 'file' not in request.files: 
             return "TRANSFER_ERROR", 400
             
@@ -4724,7 +4721,6 @@ def dynamic_handler():
                 
             total_bytes = len(raw_content)
             
-            # Анализ плотности ASCII (Выявление обфускации)
             printable_chars = len([b for b in raw_content if 32 <= b <= 126])
             readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
             
@@ -4732,7 +4728,6 @@ def dynamic_handler():
             
             matches = []
             try:
-                # GLOBAL_AV_PIPE_REGEX доступна из глобального контекста лаунчера aio
                 compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
                 for i, line in enumerate(text_content.splitlines(), 1):
                     if compiled_regex.search(line):
@@ -4782,17 +4777,16 @@ def dynamic_handler():
                 os.remove(tmp_path)
             return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
 
-# Инжектируем результат выполнения функции в глобальное пространство exec лога
 result = dynamic_handler()
 EOF
 )
 
-    # 3. Кодируем чистый Python-код в base64 строку (убираем переносы строк самой утилиты base64)
-    local b64_payload=$(echo "$raw_payload_code" | base64 | tr -d '\n' | tr -d '\r')
+    # 3. Используем Python для генерации "чистой" Base64 строки в одну линию без переносов.
+    # Это на 100% убирает влияние пробелов операционной системы или утилиты base64.
+    local b64_payload=$(python3 -c "import base64; print(base64.b64encode('''$raw_payload_code'''.encode('utf-8')).decode('utf-8'))" | tr -d '\n' | tr -d '\r')
 
-    # 4. Формируем тело-обертку (`incoming_body`), которое проглотит твой generate_aio_template.
-    # Эта обертка просто декодирует base64 строку и выполнит её внутри контекста Flask.
-    # Используем одинарные кавычки, чтобы cat << EOF шаблона не ломал структуру.
+    # 4. Формируем тело-обертку (aio_body), строго соблюдая выравнивание в 4 пробела для exec.
+    # Внутренний код пишется в одну строку, что гарантирует отсутствие IndentationError.
     local aio_body="
 import base64
 exec_globals = globals().copy()
@@ -4802,7 +4796,7 @@ exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals
 result = exec_locals.get('result') or exec_globals.get('result')
 "
 
-    # 5. Вызываем твой ОРИГИНАЛЬНЫЙ генератор шаблона, передавая роуты на /upload
+    # 5. Вызываем оригинальный генератор шаблона generate_aio_template
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
     # 6. Собираем финальный монолитный каркас лаунчера
@@ -4810,24 +4804,21 @@ result = exec_locals.get('result') or exec_globals.get('result')
 # === СБОРОЧНЫЙ МОДУЛЬ NEXUS UPLOAD CORE ===
 __NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__
 
-# Дополнительный роут перенаправления для удобства, если стучатся в корень сервера
 @app.route('/', methods=['GET'])
 def index_redirect():
     return dynamic_nexus_processor()
 
 if __name__ == '__main__':
-    # Корректный старт ядра CAME на порту 5001
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 )
 
-    # 7. Производим бесшовную вклейку шаблона в маркер
+    # 7. Производим вклейку шаблона в маркер
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
 
-    # Отдаем чистый готовый скрипт наружу
+    # Отдаем готовый рабочий скрипт в stdout
     echo -e "$raw_python_code"
 }
-
 
 generate_upload_server_code_rawold() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
