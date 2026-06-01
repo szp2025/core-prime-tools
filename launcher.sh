@@ -3504,7 +3504,7 @@ generate_aio_template() {
     local route_path="${3:-/}"       # По умолчанию "/"
     local route_methods="${4:-GET}"   # По умолчанию "GET"
 
-    # 1. Форматируем методы для Python: преобразуем "GET, POST" в ['GET', 'POST']
+    # 1. Форматируем методы для Python
     local formatted_methods=$(echo "$route_methods" | sed "s/ //g" | sed "s/,/','/g")
     formatted_methods="['${formatted_methods}']"
 
@@ -3512,8 +3512,7 @@ generate_aio_template() {
     local core_layout=$(generate_core_template)
     local form_layout=$(generate_core_form_template)
 
-    # 3. Собираем каркас сервера с использованием защищенного heredoc.
-    # Кавычки вокруг 'EOF' гарантируют, что внутренний синтаксис Python останется нетронутым.
+    # 3. Собираем каркас сервера. Обратите внимание: маркер выровнен по левому краю!
     local template_body=$(cat << 'EOF'
 # --- СИСТЕМНЫЕ ИМПОРТЫ И ЗАВИСИМОСТИ ---
 from flask import Flask, request, render_template_string, session
@@ -3583,8 +3582,7 @@ __NEXUS_FORM_LAYOUT__
 # --- ДИНАМИЧЕСКИЙ СЛОЙ МАРШРУТИЗАЦИИ ---
 @app.route('__NEXUS_ROUTE_PATH__', methods=__NEXUS_ROUTE_METHODS__)
 def dynamic_nexus_processor():
-    """Абсолютно динамический процессор: выполняет впрыснутый контент."""
-    
+    """Абсолютно динамический процессор."""
     local_context = {
         'app': app,
         'request': request,
@@ -3594,23 +3592,15 @@ def dynamic_nexus_processor():
         'render_prime_form': render_prime_form,
         'platform': platform
     }
-    
-    # Прямое исполнение без использования промежуточных строковых литералов во избежание unterminated string
     try:
-        exec_globals = globals().copy()
-        exec_globals.update(local_context)
-        exec_locals = {}
-        
-        # Выполнение динамического сценария (инструкция подставляется напрямую разработчиком)
-        __NEXUS_INCOMING_BODY_MARKER__
-        
+__NEXUS_INCOMING_BODY_MARKER__
         return result
     except Exception as e:
         return f"<pre style='color:red; background:#000; padding:10px;'>[ NEXUS_EXEC_ERR: {str(e)} ]</pre>", 500
 EOF
 )
 
-    # 4. Производим безопасную подстановку всех параметров через механизмы замены Bash
+    # 4. Производим безопасную подстановку параметров
     template_body="${template_body//__NEXUS_REGEX_PLACEHOLDER__/$incoming_regex}"
     template_body="${template_body//__NEXUS_CORE_LAYOUT__/$core_layout}"
     template_body="${template_body//__NEXUS_FORM_LAYOUT__/$form_layout}"
@@ -3618,10 +3608,8 @@ EOF
     template_body="${template_body//__NEXUS_ROUTE_METHODS__/$formatted_methods}"
     template_body="${template_body//__NEXUS_INCOMING_BODY_MARKER__/$incoming_body}"
 
-    # 5. Возвращаем чистый готовый шаблон
     echo "$template_body"
 }
-
 
 
 # Функция-генератор для AV-Server (v1.2)
@@ -4683,10 +4671,10 @@ EOF
 # ==============================================================================
 
 generate_upload_server_code_raw() {
-    # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
+    # 1. Извлекаем глобальный регулярный супер-конвейер CAME
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Формируем Base64 payload через чистый heredoc без двойных кавычек в разметке и комментариев.
+    # 2. Формируем Base64 payload через чистый heredoc
     local b64_payload
     b64_payload=$(cat << 'EOF' | base64 | tr -d '\n' | tr -d '\r'
 import os
@@ -4755,7 +4743,7 @@ def dynamic_handler():
                 h_div_inf = bytes.fromhex('3c64697620636c6173733d227374617475732d626f7820696e66656374656422207374796c653d2270616464696e673a313570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d7765696768743a626f6c643b206d617267696e2d626f74746f6d3a323070783b20746578742d616c69676e3a63656e7465723b20626f726465723a31307078206461736865643b223e').decode('utf-8')
                 h_p_inf = bytes.fromhex('3c70207374796c653d22666f6e742d73697a653a313270783b20636f6c6f723a766172282d2d616363656e742d636f6c6f72293b223e46696c65203c623e').decode('utf-8')
                 h_p_inf_mid = bytes.fromhex('3c2f623e20627265616368656420636f6d706c69616e636520706f6c696369657320616e6d20776173203c623e7065726d616e656e746c792064656c657465643c2f623e2066726f6d2074686520656e7669726f6e6d656e742e3c2f703e').decode('utf-8')
-                h_pre_inf = bytes.fromhex('3c707265207374796c653d226261636b67726f756e643a233131313b20636f6c6f723a236666336430303b2070616464696e673a313570783b20626f726465722d7261646975733a3570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d7765696768743a626f6c643b20666f6e742d73697a653a313170783b223e').decode('utf-8')
+                h_pre_inf = bytes.fromhex('3c707265207374796c653d226261636b67726f756e643a233131313b20636f6c6f723a236666336430303b2070616464696e673a313570783b20626f726465722d7261646975733a3570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d73697a653a313170783b223e').decode('utf-8')
                 h_btn_inf = bytes.fromhex('3c2f7072653e3c646976207374796c653d226d617267696e2d746f703a323070783b223e3c6120687265663d222f2220636c6173733d2262746e223e5b2052455455524e205d3c2f613e3c2f6469763e').decode('utf-8')
 
                 content = h_div_inf + "CRITICAL DETECTION: THREAT TOTALLY DESTROYED</div>"
@@ -4789,20 +4777,19 @@ result = dynamic_handler()
 EOF
 )
 
-    # 3. Переписываем aio_body на СТРОГИЙ СТРУКТУРИРОВАННЫЙ PYTHON-БЛОК.
-    # Больше никаких точек с запятой на верхнем уровне! Блок подставляется с правильными
-    # четырьмя отступами (индексацией), органично встраиваясь внутрь dynamic_nexus_processor().
+    # 3. Формируем aio_body со СТРОГИМ сдвигом в 8 пробелов для каждой строки, 
+    # чтобы идеально вписать код внутрь блока try: функции-обработчика
     local aio_body=$(cat << EOF
-    import base64
-    exec_globals = globals().copy()
-    exec_globals.update(local_context)
-    exec_locals = {}
-    exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)
-    result = exec_locals.get('result') or exec_globals.get('result')
+        import base64
+        exec_globals = globals().copy()
+        exec_globals.update(local_context)
+        exec_locals = {}
+        exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)
+        result = exec_locals.get('result') or exec_globals.get('result')
 EOF
 )
 
-    # 4. Передаем в генератор обновленных шаблонов
+    # 4. Передаем параметры в генератор шаблонов
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
     # 5. Собираем финальный монолитный каркас лаунчера
@@ -4822,7 +4809,6 @@ EOF
     # 6. Вклейка шаблона в маркер
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
 
-    # Возвращаем полностью скомпилированный скрипт сервера
     echo -e "$raw_python_code"
 }
 
