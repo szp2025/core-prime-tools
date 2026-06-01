@@ -4683,9 +4683,11 @@ generate_upload_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Формируем чистый, структурированный Python-код логики загрузки.
-    # Код обернут в одинарные кавычки cat << 'EOF', чтобы Bash никак его не модифицировал.
-    local raw_payload_code=$(cat << 'EOF'
+    # 2. Генерируем Base64 payload напрямую через защищенный heredoc.
+    # Обратите внимание: синтаксис << 'EOF' в одинарных кавычках запрещает Bash выполнять
+    # какие-либо подстановки фигурных скобок {f.filename}. Внутри кода полностью удалены комментарии '#'.
+    local b64_payload
+    b64_payload=$(cat << 'EOF' | base64 | tr -d '\n' | tr -d '\r'
 import os
 import re
 import shutil
@@ -4747,7 +4749,6 @@ def dynamic_handler():
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
                 
-                # Заменяем физический перенос строки внутри строки логов на безопасный chr(10)
                 report_str = chr(10).join(report)
                 
                 content = "<div class=\"status-box infected\" style=\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\">"
@@ -4783,12 +4784,8 @@ result = dynamic_handler()
 EOF
 )
 
-    # 3. Кодируем Python-код логики в одну сплошную строку Base64 с помощью вызова python3.
-    # Это полностью нивелирует разницу в версиях утилиты base64 в различных дистрибутивах Linux.
-    local b64_payload=$(python3 -c "import base64; print(base64.b64encode('''$raw_payload_code'''.encode('utf-8')).decode('utf-8'))" | tr -d '\n' | tr -d '\r')
-
     # 4. Формируем строго линейную строку обертки, разделяя каждую инструкцию точкой с запятой (;).
-    # Теперь, даже если Bash схлопнет всю эту переменную в одну строку, Python выполнит ее корректно.
+    # Код гарантированно защищен от схлопывания строк интерпретатором шаблонов.
     local aio_body="import base64; exec_globals = globals().copy(); exec_globals.update(local_context); exec_locals = {}; exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals); result = exec_locals.get('result') or exec_globals.get('result')"
 
     # 5. Передаем готовую защищенную инструкцию в ваш оригинальный генератор generate_aio_template
