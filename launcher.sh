@@ -4683,8 +4683,8 @@ generate_upload_server_code_raw() {
     # 1. Извлекаем глобальный регулярный супер-конвейер CAME (Слои 1-4)
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # 2. Формируем красивый и чистый Python-код без единого костыля экранирования.
-    # Этот кусок изолирован внутри cat << 'EOF' с одинарными кавычками, что защищает его от Bash.
+    # 2. Формируем красивый, структурированный Python-код логики загрузки.
+    # Пишем стандартный читаемый код с отступами в 4 пробела.
     local raw_payload_code=$(cat << 'EOF'
 import os
 import re
@@ -4747,7 +4747,9 @@ def dynamic_handler():
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
                 
-                report_str = "\n".join(report)
+                # Заменяем физический разрыв строки на ASCII символ chr(10) внутри Base64
+                report_str = chr(10).join(report)
+                
                 content = "<div class=\"status-box infected\" style=\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\">"
                 content += "CRITICAL DETECTION: THREAT TOTALLY DESTROYED"
                 content += "</div>"
@@ -4781,22 +4783,14 @@ result = dynamic_handler()
 EOF
 )
 
-    # 3. Используем Python для генерации "чистой" Base64 строки в одну линию без переносов.
-    # Это на 100% убирает влияние пробелов операционной системы или утилиты base64.
+    # 3. Генерируем монолитную Base64 строку без переносов через Python
     local b64_payload=$(python3 -c "import base64; print(base64.b64encode('''$raw_payload_code'''.encode('utf-8')).decode('utf-8'))" | tr -d '\n' | tr -d '\r')
 
-    # 4. Формируем тело-обертку (aio_body), строго соблюдая выравнивание в 4 пробела для exec.
-    # Внутренний код пишется в одну строку, что гарантирует отсутствие IndentationError.
-    local aio_body="
-import base64
-exec_globals = globals().copy()
-exec_globals.update(local_context)
-exec_locals = {}
-exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)
-result = exec_locals.get('result') or exec_globals.get('result')
-"
+    # 4. Формируем ОДНОСТРОЧНОЕ тело с явными точками с запятой.
+    # Даже если ваш generate_aio_template выстроит это в одну полосу — синтаксис останется безупречным.
+    local aio_body="import base64; exec_globals = globals().copy(); exec_globals.update(local_context); exec_locals = {}; exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals); result = exec_locals.get('result') or exec_globals.get('result')"
 
-    # 5. Вызываем оригинальный генератор шаблона generate_aio_template
+    # 5. Передаем готовую строковую инструкцию в ваш оригинальный generate_aio_template
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
     # 6. Собираем финальный монолитный каркас лаунчера
@@ -4813,12 +4807,12 @@ if __name__ == '__main__':
 EOF
 )
 
-    # 7. Производим вклейку шаблона в маркер
+    # 7. Производим бесшовную вклейку шаблона в маркер
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
 
-    # Отдаем готовый рабочий скрипт в stdout
     echo -e "$raw_python_code"
 }
+
 
 generate_upload_server_code_rawold() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
