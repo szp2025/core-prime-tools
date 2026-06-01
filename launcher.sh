@@ -4684,8 +4684,10 @@ generate_upload_server_code_raw() {
     local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
     # 2. Упаковываем всю логику обработки и маршрутизации в один мощный блок Python-кода.
-    # Внутренние знаки доллара (\$ и \f) экранируем, чтобы Bash не интерпретировал их.
+    # Внутренние знаки доллара (\$ и \f) экранируем. Внутренние кавычки HTML экранируем.
     local aio_body="
+import textwrap
+
 UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
 
 # Гарантируем существование директории приема данных
@@ -4755,15 +4757,17 @@ def dynamic_handler():
                     os.remove(tmp_path)
                 
                 # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
-                report_str = \"\\\n\".join(report)
-                content = f\"\"\"
-                <div class=\"status-box infected\" style=\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\">
-                    CRITICAL DETECTION: THREAT TOTALLY DESTROYED
-                </div>
-                <p style=\"font-size:12px; color:var(--accent-color);\">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
-                <pre style=\"background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;\">{report_str}</pre>
-                <div style=\"margin-top:20px;\"><a href=\"/\" class=\"btn\">[ RETURN ]</a></div>
-                \"\"\"
+                report_str = \"\\\\n\".join(report)
+                
+                raw_content_html = \"\"\"
+<div class=\\\"status-box infected\\\" style=\\\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;\\\">
+    CRITICAL DETECTION: THREAT TOTALLY DESTROYED
+</div>
+<p style=\\\"font-size:12px; color:var(--accent-color);\\\">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
+<pre style=\\\"background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;\\\">{report_str}</pre>
+<div style=\\\"margin-top:20px;\\\"><a href=\\\"/\\\" class=\\\"btn\\\">[ RETURN ]</a></div>
+\"\"\"
+                content = textwrap.dedent(raw_content_html).strip()
                 return render_template_string(render_prime_page(\"GATEWAY_THREAT_ANNIHILATION\", content))
                 
             else:
@@ -4775,13 +4779,14 @@ def dynamic_handler():
                     
                 shutil.move(tmp_path, final_dest_path)
                 
-                content = f\"\"\"
-                <div class=\"status-box clean\" style=\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;\">
-                    SUCCESS: UPLOAD VERIFIED
-                </div>
-                <p style=\"font-size:12px;\">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
-                <div style=\"margin-top:20px;\"><a href=\"/\" class=\"btn\">[ UPLOAD ANOTHER FILE ]</a></div>
-                \"\"\"
+                raw_clean_html = \"\"\"
+<div class=\\\"status-box clean\\\" style=\\\"padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;\\\">
+    SUCCESS: UPLOAD VERIFIED
+</div>
+<p style=\\\"font-size:12px;\\\">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
+<div style=\\\"margin-top:20px;\\\"><a href=\\\"/\\\" class=\\\"btn\\\">[ UPLOAD ANOTHER FILE ]</a></div>
+\"\"\"
+                content = textwrap.dedent(raw_clean_html).strip()
                 return render_template_string(render_prime_page(\"TRANSFER_COMPLETE\", content))
                 
         except Exception as e:
@@ -4793,8 +4798,7 @@ def dynamic_handler():
 result = dynamic_handler()
 "
 
-    # 3. Вызываем тотальный генератор, перенаправляя логику на маршрут "/upload" с методами GET и POST.
-    # Так как форма отправляет данные на /upload, мы вешаем обработчик именно на этот эндпоинт.
+    # 3. Вызываем тотальный генератор шаблона
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
     # 4. Формируем минималистичный исполняемый каркас
@@ -4808,7 +4812,6 @@ def index_redirect():
     return dynamic_nexus_processor()
 
 if __name__ == '__main__':
-    # Стабильный запуск изолированной архитектуры на порту 5001
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 )
@@ -4819,6 +4822,7 @@ EOF
     # Финальный выплеск готового монолитного скрипта в STDOUT
     echo -e "$raw_python_code"
 }
+
 
 generate_upload_server_code_rawold() {
     # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
