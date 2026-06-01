@@ -4491,145 +4491,6 @@ EOF
 
 
 
-generate_share_server_code_raworigin() {
-    # Загружаем только базовый шаблон страницы в локальную переменную
-    local template=$(generate_core_template)
-
-    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
-    cat << EOF
-from flask import Flask, render_template_string, send_from_directory, abort
-import os
-import re
-
-app = Flask(__name__)
-
-# Проброс глобального регулярного выражения CAME из ядра Bash в Python
-GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
-
-SHARE_DIR = '/root/share'
-
-if not os.path.exists(SHARE_DIR):
-    os.makedirs(SHARE_DIR, exist_ok=True)
-
-$template
-
-def get_file_icon(filename):
-    """Определяет иконку в зависимости от расширения файла."""
-    ext = filename.split('.')[-1].lower() if '.' in filename else ''
-    icons = {
-        'pdf': '📕',
-        'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'webp': '🖼️',
-        'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
-        'py': '💻', 'js': '💻', 'html': '💻', 'sh': '💻', 'css': '💻',
-        'txt': '📄', 'md': '📝', 'doc': '📄', 'docx': '📄',
-        'mp4': '🎬', 'mkv': '🎬', 'mov': '🎬',
-        'mp3': '🎵', 'wav': '🎵', 'flac': '🎵'
-    }
-    return icons.get(ext, '📄')
-
-@app.route('/')
-def index():
-    try:
-        files = sorted(os.listdir(SHARE_DIR))
-    except:
-        files = []
-    
-    # Формируем сетку файлов с использованием оригинальных стилей .file-grid и .file-item
-    grid_content = '<div class="file-grid">'
-    for f in files:
-        icon = get_file_icon(f)
-        grid_content += f"""
-        <a href="/get/{f}" class="file-item" target="_blank">
-            <span class="file-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px;">{icon}</span>
-            <div style="font-size: 0.8rem; word-break: break-all; line-height: 1.2;">{f}</div>
-        </a>
-        """
-    
-    if not files:
-        grid_content += '<p style="color: var(--accent); font-style: italic; grid-column: 1/-1; opacity: 0.5;">[ SECTOR_EMPTY: No data detected ]</p>'
-    
-    grid_content += '</div>'
-    grid_content += f'<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 0.7rem; opacity: 0.5;">MOUNT_POINT: {SHARE_DIR}</div>'
-
-    return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION_v2.0", grid_content))
-
-@app.route('/get/<filename>')
-def get_file(filename):
-    # Обеспечение базовой безопасности путей (предотвращение Path Traversal)
-    target_path = os.path.normpath(os.path.join(SHARE_DIR, filename))
-    if not target_path.startswith(SHARE_DIR) or not os.path.exists(target_path):
-        abort(404)
-        
-    # Игнорируем директории, если они случайно попали в запрос
-    if os.path.isdir(target_path):
-        abort(400)
-
-    is_infected = False
-    report = []
-
-    try:
-        # --- ВЕКТОР ПРЕДВАРИТЕЛЬНОГО ОУТПУТ-КОНТРОЛЯ CAME ---
-        with open(target_path, 'rb') as file_buffer:
-            raw_content = file_buffer.read()
-
-        total_bytes = len(raw_content)
-
-        # Вычисление плотности ASCII (Борьба со скрытыми крипторами / паккерами)
-        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
-        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
-
-        # Декодирование содержимого для проверки регулярными выражениями Слоев 1-4
-        text_content = raw_content.decode('utf-8', errors='ignore')
-
-        matches = []
-        try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
-            for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
-                    matches.append(f"Line {i}: {line.strip()[:100]}")
-        except Exception as regex_err:
-            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
-
-        # Анализ полученных данных
-        if total_bytes > 1000 and readable_ratio < 12:
-            is_infected = True
-            report.append("CRITICAL ANOMALY: High Entropy / Encrypted code signature detected.")
-
-        if matches:
-            is_infected = True
-            report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
-
-        # --- РУБЕЖ РЕШЕНИЯ И АННИГИЛЯЦИИ ---
-        if is_infected:
-            # Файл грязный — полное стирание с жесткого диска сервера, чтобы никто больше не смог его запросить
-            if os.path.exists(target_path):
-                os.remove(target_path)
-
-            # Вместо скачивания файла возвращаем пользователю жесткую веб-страницу с алармом
-            content = f"""
-            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
-                CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED
-            </div>
-            <p style="font-size:12px; color:var(--accent-color);">The requested object <b>{filename}</b> failed outbound security compliance and was <b>permanently purged</b> from the storage node.</p>
-           <pre style='background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;'>{'\\n'.join(report)}</pre>
-            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN TO DISTRIBUTION ]</a></div>
-            """
-            return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
-
-        else:
-            # Файл чист — беспрепятственно отдаем клиенту
-            return send_from_directory(SHARE_DIR, filename)
-
-    except Exception as e:
-        return f"DISTRIBUTION_INTEGRITY_ERROR: {str(e)}", 500
-
-if __name__ == '__main__':
-    # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции
-    app.run(host='0.0.0.0', port=5002, debug=False)
-EOF
-}
-
-
 
 # ==============================================================================
 # @description: Интегрированный кросс-платформенный генератор веб-панели Upload-Server v2.1
@@ -9305,213 +9166,122 @@ update_all_dns_records() {
 
 
 run_live_service() {
-
     local service_type="$1"
-
     local port="${2:-8080}"
-
     local log_file="$HOME/prime_node.log"
-
     local cert_file="$HOME/prime_node.pem"
-
     local protocol="http"
-
-
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
-
-
     # --- 1. АДАПТИВНЫЙ DNS & IP ---
-
     # 1. Сначала подготавливаем сеть
-
     update_all_dns_records
-
     
-
     # Вызываем синхронизацию (она сама найдет лучший IP и обновит dnsmasq)
-
     core_network_dns_sync || core_engine_ui "w" "DNS Sync bypassed, using raw IP."
-
     
-
-# Эвристика домена: используем массив или case для назначения appN.nexus
-
+    # Эвристика домена: используем массив или case для назначения appN.nexus
     local service_name="app0.nexus" # Дефолт
-
     case "$service_type" in
-
         "av")      service_name="app0.nexus" ;;
-
         "scanner") service_name="app1.nexus" ;;
-
         "auth")    service_name="app2.nexus" ;;
-
         *)         service_name="prime.portal" ;;
-
     esac
 
-
-
-# --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
-
+    # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
     if command -v openssl >/dev/null 2>&1; then
-
         # Вызываем нашу динамическую функцию
-
         local active_cert
-
         active_cert=$(core_get_service_cert "$service_name")
-
         
-
         if [[ -f "$active_cert" ]]; then
-
             protocol="https"
-
             export PRIME_CERT_PATH="$active_cert"
-
             
-
             # Логируем тип сертификата
-
             if [[ "$active_cert" == *"/prime_certs/"* ]]; then
-
                 core_engine_ui "s" "SSL: Trusted CA Mode active for $service_name"
-
             else
-
                 core_engine_ui "w" "SSL: Ephemeral Mode active (Warning)"
-
             fi
-
         fi
-
     fi
-
-    
-
-
 
     # --- 3. ГАРАНТИРОВАННАЯ ОЧИСТКА ---
-
     core_engine_ui "i" "Sanitizing port $port..."
-
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
-
     pkill -9 -f "python3" >/dev/null 2>&1
-
     sleep 1.2
 
-
-
     # --- 4. SMART IGNITION (Запуск через файл в /tmp) ---
-
     local code_gen_func="generate_${service_type}_server_code_raw"
-
     if ! command -v "$code_gen_func" >/dev/null; then
-
         core_engine_ui "e" "Fatal: $code_gen_func not found."
-
         core_engine_wait; return
-
     fi
 
-
-
     # Определяем путь к временному серверному файлу
-
     local temp_service_file="/tmp/${service_type}_server.py"
 
-
-
     # ЭКСПОРТИРУЕМ ПУТЬ К СЕРТИФИКАТУ В ОКРУЖЕНИЕ
-
-    # Используем переменную active_cert, которую мы определили в блоке #2
-
     export PRIME_CERT_PATH="$active_cert"
-
     
-
     core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
-
     export PRIME_LOOT PRIME_SHARE
-
     
-
     # Генерируем код сразу в файл
-
-   "$code_gen_func" > "$temp_service_file"
-
+    "$code_gen_func" > "$temp_service_file"
     
+    # --- [ИНТЕГРИРОВАННЫЙ БЛОК ЗАПУСКА NEXUS — ПОЛНОСТЬЮ ДИНАМИЧЕСКИЙ] ---
+    # 1. Установка лимитов для предотвращения принудительного завершения ядром (OOM Killer)
+    ulimit -m 524288 2>/dev/null
+    ulimit -v 1048576 2>/dev/null
 
-# --- [ИНТЕГРИРОВАННЫЙ БЛОК ЗАПУСКА NEXUS] ---
+    # 2. Очистка динамического порта перед запуском (санитария)
+    if fuser "$port"/tcp > /dev/null 2>&1; then
+        echo "[!] Port $port busy. Cleaning..."
+        fuser -k "$port"/tcp
+        sleep 1
+    fi
 
-# 1. Установка лимитов для предотвращения принудительного завершения ядром (OOM Killer)
-# Лимит на 512МБ (524288 КБ) физической памяти и 1ГБ виртуальной
-ulimit -m 524288 2>/dev/null
-ulimit -v 1048576 2>/dev/null
+    # 3. Финальный запуск с защитой от разрыва сессии (nohup) и динамическим выводом адреса
+    # ИСПРАВЛЕНО: Теперь адрес наружу генерируется динамически на основе параметров ноды
+    echo "[+] Deploying NEXUS engine on ${service_name}:${port}..."
+    nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
 
-# 2. Очистка порта перед запуском (санитария)
-if fuser 5000/tcp > /dev/null 2>&1; then
-    echo "[!] Port 5000 busy. Cleaning..."
-    fuser -k 5000/tcp
-    sleep 1
-fi
-
-# 3. Финальный запуск с защитой от разрыва сессии (nohup) и пониженным приоритетом (nice)
-# Мы заменяем вашу старую строку на этот оптимизированный блок
-echo "[+] Deploying NEXUS engine on app0.nexus:5000..."
-nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
-
-# 4. Фиксация ID процесса для мониторинга
-PID=$!
-echo "[+] NEXUS Engine successfully deployed with PID: $PID"
-echo "[DEBUG] Service: $service_name | Port: $port | Protocol: $protocol"
+    # 4. Фиксация ID процесса для мониторинга
+    PID=$!
+    echo "[+] NEXUS Engine successfully deployed with PID: $PID"
+    echo "[DEBUG] Service: $service_name | Port: $port | Protocol: $protocol"
     
-
     core_engine_progress 2 "NODE_STABILIZATION"
 
-
-
     # --- 5. ДИАГНОСТИКА & АВТО-ЛОГ ---
-
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
-
         local final_url="$protocol://$service_name:$port"
-
         core_engine_ui "s" "ADAPTIVE SERVICE ONLINE: $final_url"
-
+        
         # 1. Регистрация в DNS
-
-    core_network_dns_register "$service_name" "$active_ip"
-
+        core_network_dns_register "$service_name" "$active_ip"
     
-
         # --- ДИНАМИЧЕСКАЯ РЕГИСТРАЦИЯ В NGINX ---
-
-        # Теперь Nginx узнает о новом узле сразу после подтверждения его работы
-
         core_nginx_auto_setup "$service_name:$port"
        
-
         # Авто-регистрация в луте
-
         core_engine_loot "node_startup" "Service ${service_type} deployed & proxied at $final_url"
-
     else
         core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
         core_engine_ui "line"
 
         if [[ -f "$log_file" ]]; then
-            # Ищем последние 20 строк, но приоритет отдаем ключевым словам ошибки
             echo "[!] LAST 20 LINES OF LOG:"
             tail -n 20 "$log_file"
             
             core_engine_ui "line"
             
-            # Экспертный поиск причины падения
+            # Экспертный поиск причины падения с учетом динамического порта
             if grep -q "Killed" "$log_file"; then
                 echo "[CRITICAL] OOM Killer detected: Process was terminated due to memory pressure."
                 echo "Check 'dmesg | grep -i oom' for system-wide memory exhaustion."
@@ -9519,19 +9289,17 @@ echo "[DEBUG] Service: $service_name | Port: $port | Protocol: $protocol"
                 echo "[ERROR] Python Exception Traceback detected:"
                 grep -A 5 "Traceback" "$log_file"
             elif grep -q "Address already in use" "$log_file"; then
-                echo "[ERROR] Port collision: Port 5000 is already in use by another process."
+                echo "[ERROR] Port collision: Port $port is already in use by another process."
             else
                 echo "[INFO] No specific crash signature found. Check log file for details."
             fi
         else
             echo "[!] Logs empty. Process never started."
         fi
-fi
+    fi
 
     core_engine_wait
-
-} 
-
+}
 
 # --- STEALTH COMMS: NODE DESTROYER v1.0 ---
 run_node_clean() {
