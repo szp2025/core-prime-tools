@@ -4342,6 +4342,182 @@ EOF
 }
 
 
+
+generate_aio_server_code_rawtest(){
+
+    # Генерируем содержимое шаблонов в переменные
+    local core_tpl="$(generate_core_template)"
+    local form_tpl="$(generate_core_form_template)"
+
+    # Используем cat с 'EOF', чтобы Bash не интерпретировал $ внутри Python-кода
+    cat << EOF > /tmp/av_server.py
+from flask import Flask, request, render_template_string, session
+import re
+import os
+import shutil
+import subprocess
+import platform
+import requests
+import ssl
+import urllib3
+import math
+import socket
+import random
+import time
+import phonenumbers
+import asyncio
+import aiodns
+import aiohttp
+import smtplib
+import dns.asyncresolver
+from phonenumbers import geocoder, carrier, number_type
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from urllib.parse import quote
+
+from datetime import datetime
+
+app = Flask(__name__)
+app.secret_key = 'super_secret_key_for_came_gateway'
+
+# --- ШАБЛОНЫ (ВСТАВЛЕНЫ АВТОМАТИЧЕСКИ) ---
+EOF
+
+    # Добавляем сгенерированные шаблоны в файл без кавычек Bash, чтобы они записались как текст
+    echo "$core_tpl" >> /tmp/av_server.py
+    echo "$form_tpl" >> /tmp/av_server.py
+
+    # Продолжаем запись основного кода
+    cat << 'EOF' >> /tmp/av_server.py
+
+# [КОНФИГУРАЦИЯ ЯДРА]
+GLOBAL_HASH_MATRIX = [
+    r"\b(password|pwd|hash|secret|token|access_token)[ \t]*[:=]{1,2}[ \t]*['\"]?([a-fA-F0-9]{32,128})['\"]?",
+    r"\b(DB_PASSWORD|APP_SECRET|API_KEY|CLIENT_SECRET|PRIVATE_KEY)[ \t]*[:=]{1,2}[ \t]*['\"]?([A-Za-z0-9\-_]{20,})['\"]?",
+    r"\b(password|pwd|secret|key)[ \t]*=[ \t]*['\"]([A-Za-z0-9!@#$%^&*()_+]{8,32})['\"]",
+    r"\b(AKIA[0-9A-Z]{16})\b"
+]
+
+GLOBAL_AV_MATRIX = [r"malware", r"rootkit", r"inject", r"cryptor", r"shellcode"]
+
+# Матрицы для Nexus-движка
+GLOBAL_NETWORK_UA = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/605.1.15"
+]
+
+GLOBAL_SECURITY_MATRIX = [
+    r"\b(cloudflare|akamai|sucuri|incapsula|imperva|aws-waf|429|too many requests)\b",
+    r"\b(select|union|drop|exec|xp_cmdshell|eval\(|base64_decode)\b"
+]
+
+GLOBAL_PHONE_RISK_MATRIX = {
+    "VOIP": "HIGH_RISK",
+    "UNKNOWN_CARRIER": "MEDIUM_RISK",
+    "INTERNATIONAL_OFFSHORE": "CRITICAL_RISK"
+}
+
+def is_encrypted_container(file_path):
+    try:
+        with open(file_path, 'rb') as f:
+            header = f.read(4)
+            return header in [b'PK\x03\x04', b'PK\x05\x06']
+    except:
+        return False
+
+def calculate_entropy(data):
+    if not data: return 0
+    entropy = 0
+    for x in range(256):
+        p_x = float(data.count(x)) / len(data)
+        if p_x > 0:
+            entropy += - p_x * math.log(p_x, 2)
+    return entropy
+
+def verify_iban(iban):
+    iban = iban.replace(" ", "").upper()
+    if len(iban) < 4: return False
+    rearranged = iban[4:] + iban[:4]
+    numeric = "".join(str(int(c, 36)) for c in rearranged)
+    return int(numeric) % 97 == 1    
+
+
+# --- ВНУТРЕННИЕ ФУНКЦИИ (NEXUS ENGINE) ---
+   
+@app.route('/')
+def index():
+    # Теперь render_prime_form доступен, так как он был вставлен выше
+    form_html = render_prime_form("/scan", fields=[{"type": "file", "name": "file", "label": "TARGET_OBJECT"}], btn_text="INITIATE CAME DEEP SCAN")
+    form_html += render_prime_form(
+    "/searinfo", 
+    fields=[
+        {"type": "text", "name": "fio", "label": "FULL NAME (ФИО)", "placeholder": "Иванов Иван Иванович"},
+        {"type": "text", "name": "address", "label": "PHYSICAL ADDRESS", "placeholder": "Город, Улица, Дом"},
+        {"type": "tel", "name": "phone", "label": "PHONE NUMBER", "placeholder": "+7XXXXXXXXXX"},
+     {"type": "text", "name": "immatriculation", "label": "IMMAT", "placeholder": "Immatriculation"},      
+        {"type": "hidden", "name": "action", "value": "initiate_deep_scan"}
+    ], 
+    btn_text="INITIATE ENTITY DEEP SCAN"
+    )
+
+    form_html2 = render_prime_form(
+        "/audit/dispatch", 
+        fields=[
+            {
+                "type": "text", 
+                "name": "input", 
+                "label": "", # Если лейбл не нужен, оставляем пустым
+                "placeholder": "Enter IBAN, Phone, Domain, IP, or Email..."
+            },
+            {"type": "hidden", "name": "action", "value": "analyse_data"}
+        ], 
+        btn_text="ANALYZE DATA"
+    )
+        
+    current_os = platform.system().lower()
+    btn_map = {
+        "windows": ("INJECT WINDOWS FIXED", "/inject/windows", "#9c27b0"),
+        "linux": ("INJECT LINUX PURGE", "/inject/linux", "#e91e63"),
+        "darwin": ("INJECT MACOS UNLOAD", "/inject/macos", "#673ab7")
+    }
+    label, route, color = btn_map.get(current_os, ("INJECT GENERIC PATCH", "/inject/linux", "#607d8b"))
+
+    verdict = session.get('last_verdict', 'CLEAN')
+    injection_kit_html = ""
+    if verdict == 'INFECTED':
+        injection_kit_html = f"""
+        <h3 style="color: var(--accent-color); margin-top:20px;">[ DIRECT SYSTEM INJECTION KIT ]</h3>
+        <a href="{route}" class="btn" style="background:{color}; color:#fff; display:block; text-align:center; padding:12px;">{label}</a>
+        """
+
+    body = form_html +  f"""             
+    <div style="margin-top: 20px; padding: 20px; border: 2px solid #2196f3; border-radius: 8px; background:#121216;">
+        <h3>[ GLOBAL INTELLIGENCE DISPATCHER ]</h3>
+        <form action="/audit/dispatch" method="POST">
+            <input type="text" name="input" 
+                   placeholder="Enter IBAN, Phone, Domain, IP, or Email..." 
+                   style="width: 70%; padding: 10px;" required>
+            <button type="submit" class="btn" style="background:#2196f3; color:#fff; padding:10px;">ANALYZE DATA</button>
+        </form>
+    </div>
+    
+        {injection_kit_html}
+    </div>
+    """
+    return render_template_string(render_prime_page("CAME_HYBRID_GATEWAY_v2.5", body))
+
+
+if __name__ == '__main__':
+    # Запуск сервера на оригинальном порту 5002 для бесшовной интеграции
+    app.run(host='0.0.0.0', port=5002, debug=False)
+EOF
+
+}
+
+
+
 # ==============================================================================
 # @description: Интегрированный кросс-платформенный генератор веб-панели Share-Server v2.0
 # МОДЕРНИЗАЦИЯ: Внедрение сквозного пре-даунлоад контроля CAME с логикой TOTAL OUTBOUND PURGE
@@ -4490,8 +4666,6 @@ EOF
 }
 
 
-
-
 # ==============================================================================
 # @description: Интегрированный кросс-платформенный генератор веб-панели Upload-Server v2.1
 # МОДЕРНИЗАЦИЯ: Внедрение сквозного пре-лоад контроля CAME с логикой TOTAL DESTRUCTION
@@ -4630,140 +4804,6 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 }
-
-
-
-generate_upload_server_code_raworigin() {
-    # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
-    local templates="$(generate_core_template)
-$(generate_core_form_template)"
-
-    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
-    cat << EOF
-from flask import Flask, request, render_template_string
-import os
-import re
-
-app = Flask(__name__)
-
-# Проброс глобального регулярного выражения CAME из ядра Bash в Python
-GLOBAL_AV_PIPE_REGEX = r"""$GLOBAL_AV_ENGINE_PIPE"""
-
-# Сохраняем во входящую папку внутри PRIME_LOOT
-UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'inbound')
-
-# Инициализация безопасной структуры каталогов (только папка для чистых файлов)
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-$templates
-
-@app.route('/')
-def index():
-    # Главная страница: Интуитивная защищенная форма загрузки данных в Drop-Box
-    fields = [{"type": "file", "name": "file", "label": "SELECT_UPLINK_DATA"}]
-    form_html = render_prime_form("/upload", fields=fields, btn_text="INITIATE SECURE UPLOAD")
-    return render_template_string(render_prime_page("INBOUND_DROP_BOX_v2.1", form_html))
-
-@app.route('/upload', methods=['POST'])
-def upload():
-    # --- ВЕКТОР ПРОВЕРКИ И БЕССЛЕДНОГО УНИЧТОЖЕНИЯ (PRE-UPLOAD TOTAL PURGE) ---
-    if 'file' not in request.files: 
-        return "TRANSFER_ERROR", 400
-        
-    f = request.files['file']
-    if f.filename == '': 
-        return "EMPTY_FILENAME", 400
-    
-    # 1. Первичный прием потока данных во временную буферную зону /tmp
-    tmp_path = os.path.join('/tmp', f.filename)
-    f.save(tmp_path)
-    
-    is_infected = False
-    report = []
-    
-    try:
-        # 2. Чтение бинарного дампа загруженного объекта для структурного аудита CAME
-        with open(tmp_path, 'rb') as file_buffer:
-            raw_content = file_buffer.read()
-            
-        total_bytes = len(raw_content)
-        
-        # Анализ плотности ASCII (Выявление обфускации / Высокой энтропии)
-        printable_chars = len([b for b in raw_content if 32 <= b <= 126])
-        readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
-        
-        # Декодирование в текстовый стрим для сигнатурного матчинга
-        text_content = raw_content.decode('utf-8', errors='ignore')
-        
-        matches = []
-        # Запуск сканирования по Слоям 1-4
-        try:
-            compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
-            for i, line in enumerate(text_content.splitlines(), 1):
-                if compiled_regex.search(line):
-                    matches.append(f"Line {i}: {line.strip()[:100]}")
-        except Exception as regex_err:
-            matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
-            
-        # 3. Принятие решения на основе полученных эвристических метрик
-        if total_bytes > 1000 and readable_ratio < 12:
-            is_infected = True
-            report.append("CRITICAL: High Entropy Detected (Encrypted or Obfuscated Payload).")
-            
-        if matches:
-            is_infected = True
-            report.append(f"MALICIOUS_INTENT_FOUND: Matched {len(matches)} signatures.")
-            
-        # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
-        if is_infected:
-            # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
-            # Файл ЗАРАЖЕН — Полное удаление с диска без создания карантинных копий
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            
-            # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
-            content = f"""
-            <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
-                CRITICAL DETECTION: THREAT TOTALLY DESTROYED
-            </div>
-            <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
-            <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
-            """
-            return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
-            
-        else:
-            # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
-            final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
-            
-            # На случай, если файл с таким именем уже существовал, безопасно перезаписываем его
-            if os.path.exists(final_dest_path):
-                os.remove(final_dest_path)
-                
-            shutil.move(tmp_path, final_dest_path)
-            
-            content = f"""
-            <div class="status-box clean" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center;">
-                SUCCESS: UPLOAD VERIFIED
-            </div>
-            <p style="font-size:12px;">File <b>{f.filename}</b> successfully verified by CAME engine and written to secure sector.</p>
-            <div style="margin-top:20px;"><a href="/" class="btn">[ UPLOAD ANOTHER FILE ]</a></div>
-            """
-            return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
-            
-    except Exception as e:
-        # Гарантированная зачистка временного буфера в случае критического сбоя выполнения
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
-EOF
-}
-
-
 
 
 # ==============================================================================
@@ -9344,29 +9384,30 @@ run_node_clean() {
 
 
 run_av_server() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "PRIME SECURITY HUB: CLAMAV GATEWAY"
+    # Слой 1: Заголовок через Голос [1] (Адаптирован под реальный контекст ноды)
+    core_engine_ui "PRIME SECURITY HUB: NETWORK SCANNER GATEWAY"
 
     # Слой 2: Валидация фундамента через Мозг [5]
     core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
     
-    # Проверка бинарной зависимости ClamAV через Санитара [8]
-    if ! command -v clamscan >/dev/null 2>&1; then
-        core_engine_ui "w" "ClamAV not found. Attempting deployment..."
-        # Используем системный менеджер пакетов для развертывания
-        sudo apt-get update && sudo apt-get install -y clamav clamav-daemon
-    fi
+    # ИСПРАВЛЕНО: Полностью удален блок проверки command -v clamscan и принудительной установки apt-get.
+    # Сервер теперь разворачивается мгновенно, не требуя root-прав для установки пакетов.
 
     # Слой 3: Запуск через «Живой движок» (Live Node)
-    # Используем созданный ранее run_live_service для полной стерильности
-    # Передаем тип "av" (аудио-визуальный/антивирусный контекст) и выделенный порт 5000
+    # Используем обновленный динамический run_live_service для полной стерильности
+    # Передаем тип "av" (основной движок ядра) и выделенный порт 5000
     run_live_service "av" "5000"
     
     # Слой 4: Интеграция в Сборщик трофеев [11]
-    core_engine_loot "security" "ClamAV Gateway initiated on port 5000"
+    # ИСПРАВЛЕНО: Логирование отражает реальный статус запущенной подсистемы
+    core_engine_loot "security" "NEXUS Core Analytical Gateway initiated on port 5000"
 }
 
+ru_aio_server(){
+generate_aio_server_code_rawtest
 
+
+}
 run_share_server() {
     # Слой 1: Визуализация через Голос [1]
     core_engine_ui "SHARE SECTOR: SECURE FILE DISTRIBUTION"
