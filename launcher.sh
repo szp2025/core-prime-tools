@@ -95,7 +95,7 @@ GLOBAL_MENU_REGISTRY=(
     "STEALTH_COMMS:Live_Node_AV|run_av_server" "STEALTH_COMMS:Shared_Node_Store|run_share_server"
     "STEALTH_COMMS:Upload_Portal|run_upload_server" "STEALTH_COMMS:Node_Destroy|run_node_clean"
      "STEALTH_COMMS:AIO_SERVER|run_aio_server"
-     "STEALTH_COMMS:Upload_Portalv2|run_upload_server"
+     "STEALTH_COMMS:Upload_Portalv2|run_uploadv2_server"
      
      
 
