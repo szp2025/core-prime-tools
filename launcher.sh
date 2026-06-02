@@ -4798,21 +4798,24 @@ EOF
 
 
 generate_upload_server_code_raw() {
-    # Загружаем UI шаблоны лаунчера в локальные переменные для впрыска в HTML генерацию
-    local templates="$(generate_core_template)
-$(generate_core_form_template)"
+    # 1. Загружаем UI шаблоны лаунчера в локальные переменные
+    local core_layout=$(generate_core_template)
+    local form_layout=$(generate_core_form_template)
 
-local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
+    # 2. Формируем регулярное выражение из матрицы
+    local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
 
-    # Экранируем и пробрасываем глобальный регулярный супер-конвейер CAME (Слои 1-4) во Flask
-    cat << 'EOF'
+    # 3. Выводим монолитный Python-код. Использование неэкранированного EOF 
+    # позволяет Bash подставить переменные, а системные знаки $ для Python экранированы как \$
+    cat << EOF
 from flask import Flask, request, render_template_string
 import os
 import re
+import shutil
 
 app = Flask(__name__)
 
-# ПРОБРОС МАТРИЦЫ CAME: Интеграция 8 слоев фильтрации
+# ПРОБРОС МАТРИЦЫ CAME: Интеграция слоев фильтрации
 GLOBAL_AV_PIPE_REGEX = r"""$regex_pattern"""
 
 # Сохраняем во входящую папку внутри PRIME_LOOT
@@ -4822,7 +4825,9 @@ UPLOAD_DIR = os.path.join(os.environ.get('PRIME_LOOT') or '/root/prime_loot', 'i
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    $templates
+# ВПРЫСК ГЛОБАЛЬНЫХ UI ШАБЛОНОВ ИЗ ЛАУНЧЕРА (Выровнены по левому краю во избежание IndentationError)
+$core_layout
+$form_layout
 
 @app.route('/')
 def index():
@@ -4863,7 +4868,7 @@ def upload():
         text_content = raw_content.decode('utf-8', errors='ignore')
         
         matches = []
-        # Запуск сканирования по Слоям 1-4
+        # Запуск сканирования
         try:
             compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
             for i, line in enumerate(text_content.splitlines(), 1):
@@ -4884,26 +4889,24 @@ def upload():
         # 4. Финальная маршрутизация файла в зависимости от вердикта безопасности
         if is_infected:
             # --- РУБЕЖ УНИЧТОЖЕНИЯ ---
-            # Файл ЗАРАЖЕН — Полное удаление с диска без создания карантинных копий
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
             
-            # Рендерим страницу с жестким уведомлением об аннигиляции угрозы
+            report_str = "\n".join(report)
             content = f"""
             <div class="status-box infected" style="padding:15px; font-family:monospace; font-weight:bold; margin-bottom:20px; text-align:center; border:1px dashed;">
                 CRITICAL DETECTION: THREAT TOTALLY DESTROYED
             </div>
             <p style="font-size:12px; color:var(--accent-color);">File <b>{f.filename}</b> breached compliance policies and was <b>permanently deleted</b> from the environment.</p>
-            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{"\n".join(report)}</pre>
+            <pre style="background:#111; color:#ff3d00; padding:15px; border-radius:5px; font-family:monospace; font-size:11px;">{report_str}</pre>
             <div style="margin-top:20px;"><a href="/" class="btn">[ RETURN ]</a></div>
             """
             return render_template_string(render_prime_page("GATEWAY_THREAT_ANNIHILATION", content))
             
         else:
-            # Файл ЧИСТ — Переносим в постоянное хранилище PRIME_LOOT/inbound
+            # Файл ЧИСТ — Переносим в постоянное хранилище
             final_dest_path = os.path.join(UPLOAD_DIR, f.filename)
             
-            # На случай, если файл с таким именем уже существовал, безопасно перезаписываем его
             if os.path.exists(final_dest_path):
                 os.remove(final_dest_path)
                 
@@ -4919,7 +4922,6 @@ def upload():
             return render_template_string(render_prime_page("TRANSFER_COMPLETE", content))
             
     except Exception as e:
-        # Гарантированная зачистка временного буфера в случае критического сбоя выполнения
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         return f"GATEWAY_INTERNAL_SECURITY_ERROR: {str(e)}", 500
@@ -4928,7 +4930,6 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 }
-
 
 # ==============================================================================
 # @description: Модуль глубокого анализа виртуальной памяти процессов AV-Server Core v2.5
