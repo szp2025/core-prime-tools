@@ -4639,7 +4639,7 @@ EOF
     # 3. Формируем тело aio_body с жестким сдвигом в 8 пробелов на уровне Bash
     local aio_body="        import base64\n        exec_globals = globals().copy()\n        exec_globals.update(local_context)\n        exec_locals = {}\n        exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)\n        result = exec_locals.get('result') or exec_globals.get('result')"
 
-    # 4. Передаем параметры в генератор шаблонов (обрабатывает корни "/" и "/get/<filename>")
+    # 4. Передаем параметры в генератор шаблонов
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/" "GET")
 
     # 5. Собираем монолитную структуру для раздачи файлов (порт 5002)
@@ -4883,7 +4883,7 @@ def dynamic_handler():
                 
                 h_div_inf = bytes.fromhex('3c64697620636c6173733d227374617475732d626f7820696e66656374656422207374796c653d2270616464696e673a313570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d7765696768743a626f6c643b206d617267696e2d626f74746f6d3a323070783b20746578742d616c69676e3a63656e7465723b20626f726465723a31307078206461736865643b223e').decode('utf-8')
                 h_p_inf = bytes.fromhex('3c70207374796c653d22666f6e742d73697a653a313270783b20636f6c6f723a766172282d2d616363656e742d636f6c6f72293b223e46696c65203c623e').decode('utf-8')
-                h_p_inf_mid = bytes.fromhex('3c2f623e20627265616368656420636f6d706c69616e636520706f6c696369657320616e6d20776173203c623e7065726d616e656e746c792064656c657465643c2f623e2066726f6d2074686520656e7669726f6e6d656e742e3c2f703e').decode('utf-8')
+                h_p_inf_mid = bytes.fromhex('3c2f623e206breached20compliance20policies20and20was203c623epermanently20deleted3c2f623e20from20the20environment2e3c2f703e').decode('utf-8')
                 h_pre_inf = bytes.fromhex('3c707265207374796c653d226261636b67726f756e643a233131313b20636f6c6f723a236666336430303b2070616464696e673a313570783b20626f726465722d7261646975733a3570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d73697a653a313170783b223e').decode('utf-8')
                 h_btn_inf = bytes.fromhex('3c2f7072653e3c646976207374796c653d226d617267696e2d746f703a323070783b223e3c6120687265663d222f2220636c6173733d2262746e223e5b2052455455524e205d3c2f613e3c2f6469763e').decode('utf-8')
 
@@ -4902,7 +4902,7 @@ def dynamic_handler():
                 
                 h_div_cln = bytes.fromhex('3c64697620636c6173733d227374617475732d626f7820636c65616e22207374796c653d2270616464696e673a313570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d7765696768743a626f6c643b206d617267696e2d626f74746f6d3a323070783b20746578742d616c69676e3a63656e7465723b223e').decode('utf-8')
                 h_p_cln = bytes.fromhex('3c70207374796c653d22666f6e742d73697a653a313270783b20223e46696c65203c623e').decode('utf-8')
-                h_p_cln_mid = bytes.fromhex('3c2f623e207375636365737366756c6c792076657269666965642062792043414d4520656e67696e6520616e64207772697474656e20746f2073656375726520736563746f722e3c2f703e3c646976207374796c653d226d617267696e2d746f703a323070783b223e3c6120687265663d222f2220636c6173733d2262746e223e5b2055504c4f414420414e4f544845522046494c45205d3c2f613e3c2f6469763e').decode('utf-8')
+                h_p_cln_mid = bytes.fromhex('3c2f623e207375636365737366756c6c7920766572696669656420627y2043414d4520656e67696e6520616e64207772697474656e20746f2073656375726520736563746f722e3c2f703e3c646976207374796c653d226d617267696e2d746f703a323070783b223e3c6120687265663d222f2220636c6173733d2262746e223e5b2055504c4f414420414e4f544845522046494c45205d3c2f613e3c2f6469763e').decode('utf-8')
 
                 content = h_div_cln + "SUCCESS: UPLOAD VERIFIED</div>"
                 content += h_p_cln + str(f.filename) + h_p_cln_mid
@@ -4925,7 +4925,6 @@ EOF
     local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/upload" "GET, POST")
 
     # 5. Собираем финальный монолитный каркас лаунчера.
-    # Здесь мы используем обычную замену подстроки без применения капризных седов.
     local raw_python_code=$(cat << 'EOF'
 # === СБОРОЧНЫЙ МОДУЛЬ NEXUS UPLOAD CORE ===
 __NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__
@@ -4938,6 +4937,13 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
 EOF
 )
+
+    # 6. Вклейка шаблона в маркер
+    raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
+
+    echo -e "$raw_python_code"
+}
+
 
     # 6. Вклейка шаблона в маркер
     raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
@@ -9481,33 +9487,27 @@ update_all_dns_records() {
 run_live_service() {
     local service_type="$1"
     local port="${2:-8080}"
-    local log_file="$HOME/prime_node.log"
+    local log_file="$HOME/prime_node_${port}.log"  # Изолируем логи под каждый порт отдельно
     local protocol="http"
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
     # --- 1. АДАПТИВНАЯ СЕТЬ (ПРЯМОЙ IP-РЕЖИМ) ---
-    # Мы пропускаем синхронизацию dnsmasq, так как работаем напрямую через IP.
-    # Динамически перехватываем текущий IP-адрес сетевой карты (LAN)
     local lan_ip
     lan_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     
-    # Резервный метод определения IP, если hostname -I не сработал
     if [[ -z "$lan_ip" ]]; then
         lan_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}')
     fi
     
-    # Если устройство не подключено к сети
     if [[ -z "$lan_ip" ]]; then
         lan_ip="127.0.0.1"
         core_engine_ui "w" "Network disconnected. Using loopback mode."
     fi
 
-    # Назначаем имя сервиса равным текущему IP-адресу для корректной работы логов
     local service_name="$lan_ip"
 
     # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
-    # Оставляем проверку на случай, если вы захотите поднять HTTPS на IP
     if command -v openssl >/dev/null 2>&1; then
         local active_cert
         active_cert=$(core_get_service_cert "$service_name" 2>/dev/null)
@@ -9518,11 +9518,17 @@ run_live_service() {
         fi
     fi
 
-    # --- 3. САНИТАРИЯ ПОРТОВ ---
-    core_engine_ui "i" "Sanitizing port $port..."
+    # --- 3. ТОЧЕЧНАЯ САНИТАРИЯ ПОРТОВ (БЕЗ УБИЙСТВА ДРУГИХ PYTHON СЕРВЕРОВ) ---
+    core_engine_ui "i" "Sanitizing target port $port..."
+    
+    # Ищем конкретный PID, удерживающий ТОЛЬКО этот порт, и мягко очищаем его
+    local target_pid
+    target_pid=$(lsof -t -i :"$port" 2>/dev/null)
+    if [[ -n "$target_pid" ]]; then
+        kill -9 "$target_pid" >/dev/null 2>&1
+    fi
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
-    pkill -9 -f "python3" >/dev/null 2>&1
-    sleep 1.2
+    sleep 0.5
 
     # --- 4. ЗАПУСК ДВИЖКА ---
     local code_gen_func="generate_${service_type}_server_code_raw"
@@ -9540,27 +9546,25 @@ run_live_service() {
     # Генерация сырого кода Flask
     "$code_gen_func" > "$temp_service_file"
     
-    # Ограничения памяти (Защита NEXUS Core)
+    # Ограничения памяти
     ulimit -m 524288 2>/dev/null
     ulimit -v 1048576 2>/dev/null
 
-    # Финальный фоновый запуск через nohup
+    # Финальный фоновый запуск без уничтожения соседей
     nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
     PID=$!
     
     core_engine_progress 2 "NODE_STABILIZATION"
 
     # --- 5. ФИНАЛЬНАЯ ДИАГНОСТИКА И ВЫВОД ССЫЛОК ---
+    sleep 1.0 # Даем сетевому стеку Flask время на биндинг сокета
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
-        
-        # Интерактивная матрица адресов. Теперь она показывает реальный живой IP!
         echo -e "\n\033[1;32m[+]\033[0m \033[1;36mNEXUS CORE ENGINE ONLINE (PID: $PID)\033[0m"
         echo -e "--------------------------------------------------------"
         echo -e "  \033[1;34m[>] LOCAL ACCESS :\033[0m  $protocol://127.0.0.1:${port}"
         echo -e "  \033[1;35m[>] LAN ACCESS   :\033[0m  \033[1;32m$protocol://${lan_ip}:${port}\033[0m  <-- КЛИКАТЬ СЮДА"
         echo -e "--------------------------------------------------------\n"
         
-        # Запись в локальный лог трофеев
         core_engine_loot "node_startup" "Service ${service_type} deployed directly at $protocol://${lan_ip}:${port}"
     else
         core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
@@ -9570,14 +9574,6 @@ run_live_service() {
             echo "[!] LAST 20 LINES OF LOG:"
             tail -n 20 "$log_file"
             core_engine_ui "line"
-            
-            if grep -q "Killed" "$log_file"; then
-                echo "[CRITICAL] OOM Killer detected."
-            elif grep -q "Traceback" "$log_file"; then
-                echo "[ERROR] Python Exception Traceback detected."
-            elif grep -q "Address already in use" "$log_file"; then
-                echo "[ERROR] Port collision: Port $port is already in use."
-            fi
         fi
     fi
 
@@ -9810,26 +9806,16 @@ run_aio_server(){
 }
 
 run_sharev2_server() {
-    # Слой 1: Визуализация через Голос [1]
     core_engine_ui "SHARE SECTOR: SECURE FILE DISTRIBUTION"
-
     local share_dir="${HOME}/prime_share"
     
-    # Слой 2: Подготовка инфраструктуры через Санитара [8]
     if [[ ! -d "$share_dir" ]]; then
         mkdir -p "$share_dir"
         core_engine_ui "i" "Created transmission sector at $share_dir"
     fi
 
-    # Слой 3: Валидация фундамента через Мозг [5]
     core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
-
-    # Слой 4: Динамический запуск через Live Node [22]
-    # Используем тип "share" на порту 5002
     run_live_service "sharev2" "5002"
-
-    
-    # Слой 5: Регистрация в Сборщике трофеев [11]
     core_engine_loot "service" "Share Sector (Uplink) active on port 5002"
 }
 
@@ -9878,25 +9864,11 @@ run_upload_server() {
 }
 
 run_uploadv2_server() {
-    # Слой 1: Визуализация через Голос [1]
     core_engine_ui "h" "INBOUND DROP BOX: SECURE UPLINK"
-
-    # Слой 2: Валидация фундамента через Мозг [5]
-    # Проверка наличия интерпретатора Python3 для запуска сервера
     core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
-
-    # Слой 3: Динамический запуск через Live Node [22]
-    # Запуск сервера на порту 5001 в режиме MEMORY_ONLY.
-    # Код сервера передается через пайп, исключая создание .py файлов на диске.
     run_live_service "uploadv2" "5001"
-
-
-    
-    # Слой 4: Регистрация в Сборщике трофеев [11]
-    # Фиксация события запуска в системном логе
     core_engine_loot "service" "Secure Uplink (Uploadv2) initiated on port 5001"
 }
-
 
 # ==============================================================================
 # @description: OSINT NEXUS v23.8 - ZERO-DEPENDENCY BLUETOOTH MESH BRIDGE
