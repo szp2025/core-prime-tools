@@ -9813,6 +9813,7 @@ run_sharev2_server() {
     core_engine_loot "service" "Share Sector (Uplink) active on port 5002"
 }
 
+
 run_share_server() {
     # Слой 1: Визуализация через Голос [1]
     core_engine_ui "SHARE SECTOR: SECURE FILE DISTRIBUTION"
@@ -9836,6 +9837,7 @@ run_share_server() {
     # Слой 5: Регистрация в Сборщике трофеев [11]
     core_engine_loot "service" "Share Sector (Uplink) active on port 5002"
 }
+
 
 run_upload_server() {
     # Слой 1: Визуализация через Голос [1]
