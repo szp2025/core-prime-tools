@@ -9481,7 +9481,7 @@ update_all_dns_records() {
 run_live_service() {
     local service_type="$1"
     local port="${2:-8080}"
-    local log_file="$HOME/prime_node_${port}.log"  # Изолируем логи под каждый порт отдельно
+    local log_file="$HOME/prime_node_${port}.log"  # Изолированный лог под каждый порт
     local protocol="http"
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
@@ -9512,15 +9512,17 @@ run_live_service() {
         fi
     fi
 
-    # --- 3. ТОЧЕЧНАЯ САНИТАРИЯ ПОРТОВ (БЕЗ УБИЙСТВА ДРУГИХ PYTHON СЕРВЕРОВ) ---
+    # --- 3. БЕЗОПАСНАЯ ТОЧЕЧНАЯ САНИТАРИЯ ПОРТОВ ---
     core_engine_ui "i" "Sanitizing target port $port..."
     
-    # Ищем конкретный PID, удерживающий ТОЛЬКО этот порт, и мягко очищаем его
+    # Находим конкретный PID процесса, который удерживает именно этот порт
     local target_pid
     target_pid=$(lsof -t -i :"$port" 2>/dev/null)
     if [[ -n "$target_pid" ]]; then
         kill -9 "$target_pid" >/dev/null 2>&1
     fi
+    
+    # Резервная очистка сокета для данного порта
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
     sleep 0.5
 
@@ -9537,26 +9539,30 @@ run_live_service() {
     core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
     export PRIME_LOOT PRIME_SHARE
     
-    # Генерация сырого кода Flask
+    # Генерация сырого Python кода во временный файл
     "$code_gen_func" > "$temp_service_file"
     
-    # Ограничения памяти
+    # Ограничения памяти (Защита NEXUS Core)
     ulimit -m 524288 2>/dev/null
     ulimit -v 1048576 2>/dev/null
 
-    # Финальный фоновый запуск без уничтожения соседей
-    nohup nice -n 15 python3 "$temp_service_file" > "$log_file" 2>&1 &
+    # Стабильный фоновый запуск:
+    # </dev/null изолирует процесс от прерываний терминала меню
+    # disown полностью отвязывает PID от текущей сессии Bash
+    nohup nice -n 15 python3 "$temp_service_file" < /dev/null > "$log_file" 2>&1 &
     PID=$!
+    disown -h $PID
     
     core_engine_progress 2 "NODE_STABILIZATION"
 
-    # --- 5. ФИНАЛЬНАЯ ДИАГНОСТИКА И ВЫВОД ССЫЛОК ---
-    sleep 1.0 # Даем сетевому стеку Flask время на биндинг сокета
+    # --- 5. ДИАГНОСТИКА И ВЫВОД ЗЕЛЕНОЙ МАТРИЦЫ АДРЕСОВ ---
+    sleep 1.5 # Пауза, необходимая Flask для успешного биндинга сокета в системе
+    
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
         echo -e "\n\033[1;32m[+]\033[0m \033[1;36mNEXUS CORE ENGINE ONLINE (PID: $PID)\033[0m"
         echo -e "--------------------------------------------------------"
         echo -e "  \033[1;34m[>] LOCAL ACCESS :\033[0m  $protocol://127.0.0.1:${port}"
-        echo -e "  \033[1;35m[>] LAN ACCESS   :\033[0m  \033[1;32m$protocol://${lan_ip}:${port}\033[0m  <-- КЛИКАТЬ СЮДА"
+        echo -e "  \033[1;35m[>] LAN ACCESS   :\033[0m  \033[1;32m$protocol://${lan_ip}:${port}\033[0m"
         echo -e "--------------------------------------------------------\n"
         
         core_engine_loot "node_startup" "Service ${service_type} deployed directly at $protocol://${lan_ip}:${port}"
@@ -9565,7 +9571,7 @@ run_live_service() {
         core_engine_ui "line"
 
         if [[ -f "$log_file" ]]; then
-            echo "[!] LAST 20 LINES OF LOG:"
+            echo "[!] LAST 20 LINES OF LOG ($log_file):"
             tail -n 20 "$log_file"
             core_engine_ui "line"
         fi
