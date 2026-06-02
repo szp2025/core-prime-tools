@@ -95,7 +95,7 @@ GLOBAL_MENU_REGISTRY=(
     "STEALTH_COMMS:Live_Node_AV|run_av_server" "STEALTH_COMMS:Shared_Node_Store|run_share_server"
     "STEALTH_COMMS:Upload_Portal|run_upload_server" "STEALTH_COMMS:Node_Destroy|run_node_clean"
      "STEALTH_COMMS:AIO_SERVER|run_aio_server" "STEALTH_COMMS:Upload_Portalv2|run_uploadv2_server"
-     "STEALTH_COMMS:Shared_Node_Storev2|run_sharev2_server"
+     "STEALTH_COMMS:Shared_Nodev2|run_sharev2_server"
      
      
 
@@ -9823,7 +9823,7 @@ run_sharev2_server() {
 
     # Слой 4: Динамический запуск через Live Node [22]
     # Используем тип "share" на порту 5002
-    run_live_service "share" "5002"
+    run_live_service "sharev2" "5002"
 
     
     # Слой 5: Регистрация в Сборщике трофеев [11]
