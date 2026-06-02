@@ -9486,29 +9486,39 @@ run_live_service() {
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
-    # --- 1. СВЕРХНАДЕЖНЫЙ ПОИСК РЕАЛЬНОГО IP (TERMUX & NETHUNTER ROOT/NON-ROOT) ---
+    # --- 1. АБСОЛЮТНЫЙ ИСПРАВЛЕННЫЙ ПОИСК ФИЗИЧЕСКОГО IP АППАРАТА (БЕЗ LOOPBACK) ---
     local lan_ip=""
 
-    if command -v getprop >/dev/null 2>&1; then
+    if command -v dumpsys >/dev/null 2>&1; then
+        lan_ip=$(dumpsys connectivity 2>/dev/null | grep -E "LinkProperties" | grep -v "127.0.0.1" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
+    fi
+
+    if [[ -z "$lan_ip" ]] && command -v getprop >/dev/null 2>&1; then
         lan_ip=$(getprop dhcp.wlan0.ipaddress 2>/dev/null)
-        [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet0.ipaddress 2>/dev/null)
+        [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.wlan1.ipaddress 2>/dev/null)
+    fi
+
+    if [[ -z "$lan_ip" ]] && command -v getprop >/dev/null 2>&1; then
+        lan_ip=$(getprop dhcp.rmnet0.ipaddress 2>/dev/null)
         [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet_data0.ipaddress 2>/dev/null)
+        [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet_data1.ipaddress 2>/dev/null)
+        [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet_data2.ipaddress 2>/dev/null)
     fi
 
     if [[ -z "$lan_ip" ]]; then
-        lan_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}')
+        lan_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | grep -v '127.0.0.1')
     fi
 
     if [[ -z "$lan_ip" ]]; then
-        lan_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        lan_ip=$(ifconfig 2>/dev/null | grep -Eo 'inet (addr:)?([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)' | awk '{print $2}' | sed 's/addr://' | grep -v '127.0.0.1' | head -n 1)
     fi
 
     if [[ -z "$lan_ip" ]]; then
-        lan_ip=$(ifconfig 2>/dev/null | grep -Eo 'inet (addr:)?([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)' | grep -v '127.0.0.1' | awk '{print $2}' | sed 's/addr://' | head -n 1)
+        lan_ip=$(ip -4 addr show 2>/dev/null | grep -v '127.0.0.1' | grep -Eo 'inet ([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)' | awk '{print $2}' | head -n 1)
     fi
 
-    if [[ -z "$lan_ip" ]]; then
-        lan_ip="127.0.0.1"
+    if [[ -z "$lan_ip" || "$lan_ip" == "127.0.0.1" ]]; then
+        lan_ip="[ОШИБКА: НЕТ АКТИВНОГО ПОДКЛЮЧЕНИЯ К СЕТИ НА АППАРАТЕ]"
     fi
 
     local service_name="$lan_ip"
@@ -9535,7 +9545,7 @@ run_live_service() {
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
     sleep 0.5
 
-    # --- 4. ГЕНЕРАЦИЯ И ЗАПУСК ---
+    # --- 4. ГЕНЕРАЦИЯ И ЗАПУСК Python ДВИЖКА ---
     local code_gen_func="generate_${service_type}_server_code_raw"
     if ! command -v "$code_gen_func" >/dev/null; then
         core_engine_ui "e" "Fatal: $code_gen_func not found."
@@ -9548,17 +9558,17 @@ run_live_service() {
     core_engine_ui "w" "Deploying $protocol engine on 0.0.0.0:$port..."
     export PRIME_LOOT PRIME_SHARE
     
-    # Генерация python-кода во временный файл
+    # Генерация сырого кода
     "$code_gen_func" > "$temp_service_file"
     
-    # Сверхстабильный фоновый запуск (без ulimit лимитов памяти, во избежание Killed)
+    # Сверхстабильный запуск фонового демона (ulimit отключен для предотвращения Killed)
     nohup python3 "$temp_service_file" < /dev/null > "$log_file" 2>&1 &
     PID=$!
     disown -h $PID
     
     core_engine_progress 2 "NODE_STABILIZATION"
 
-    # Ожидание инициализации сокета Flask
+    # Пауза для корректной инициализации сокета Flask в фоне Android-системы
     sleep 2.5 
     
     # --- 5. ФУНКЦИЯ ПРИНУДИТЕЛЬНОГО ВЫВОДА МАТРИЦЫ АДРЕСОВ ---
@@ -9572,16 +9582,16 @@ run_live_service() {
         echo -e "--------------------------------------------------------\n"
     }
 
-    # --- 6. АНАЛИЗ И ОТРИСОВКА ИНТЕРФЕЙСА ---
+    # --- 6. АНАЛИЗ СОСТОЯНИЯ И ОТРИСОВКА ИНТЕРФЕЙСА ЛАУНЧЕРА ---
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
-        # Сценарий А: Полный успех детекции сокета
+        # Автоматический успех детекции сокета
         print_network_matrix "\033[1;32m[+]\033[0m \033[1;36mNEXUS CORE ENGINE ONLINE (PID: $PID)\033[0m"
         core_engine_loot "node_startup" "Service ${service_type} deployed fully at 0.0.0.0:$port"
     else
-        # Сценарий Б: BOOT FAILURE (проверка lsof не успела), но адреса выводим ВСЁ РАВНО
+        # Сбой детекции сокета через lsof, но матрицу адресов выводим все равно
         core_engine_ui "e" "BOOT FAILURE. Socket verification timeout or crash encountered."
         
-        # Принудительно выводим адреса с реальным IP, так как Flask поднялся в фоне
+        # Вывод матрицы сетевых адресов
         print_network_matrix "\033[1;33m[!]\033[0m \033[1;33mEXPECTED TARGET CONFIGURATION (VERIFY LOGS BELOW):\033[0m"
         
         core_engine_ui "line"
@@ -9594,7 +9604,6 @@ run_live_service() {
 
     core_engine_wait
 }
-
 
 run_live_serviceold() {
     local service_type="$1"
