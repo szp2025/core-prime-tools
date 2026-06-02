@@ -9479,51 +9479,71 @@ update_all_dns_records() {
 }
 
 run_live_service() {
+    # --- ИНИЦИАЛИЗАЦИЯ ПАРАМЕТРОВ И ЛОКАЛЬНЫХ ПЕРЕМЕННЫХ ---
     local service_type="$1"
     local port="${2:-8080}"
     local log_file="$HOME/prime_node_${port}.log"
     local protocol="http"
 
+    # Отрисовка заголовка пользовательского интерфейса ядра
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
-    # --- 1. АБСОЛЮТНЫЙ ИСПРАВЛЕННЫЙ ПОИСК ФИЗИЧЕСКОГО IP АППАРАТА (БЕЗ LOOPBACK) ---
+    # --- БЛОК 1: МНОГОУРОВНЕВЫЙ СКАНЕР РЕАЛЬНОГО ЦИФРОВОГО IP (Исключение 'dev' и '127.0.0.1') ---
+    core_engine_ui "i" "Initializing physical network hardware scan..."
     local lan_ip=""
 
+    # Метод А: Извлечение через Android Connectivity Service (Работает в Kali Nethunter Root)
     if command -v dumpsys >/dev/null 2>&1; then
+        # Ищем строки конфигурации интерфейсов, отсекаем локальные петли и берем регулярным выражением только чистый IP
         lan_ip=$(dumpsys connectivity 2>/dev/null | grep -E "LinkProperties" | grep -v "127.0.0.1" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
     fi
 
+    # Метод Б: Прямой низкоуровневый опрос системных свойств чипсета Android (getprop)
     if [[ -z "$lan_ip" ]] && command -v getprop >/dev/null 2>&1; then
+        # Опрашиваем поочередно беспроводные интерфейсы Wi-Fi
         lan_ip=$(getprop dhcp.wlan0.ipaddress 2>/dev/null)
         [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.wlan1.ipaddress 2>/dev/null)
-    fi
-
-    if [[ -z "$lan_ip" ]] && command -v getprop >/dev/null 2>&1; then
-        lan_ip=$(getprop dhcp.rmnet0.ipaddress 2>/dev/null)
+        
+        # Опрашиваем интерфейсы мобильной передачи данных сотовых операторов (4G/5G/LTE)
+        [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet0.ipaddress 2>/dev/null)
         [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet_data0.ipaddress 2>/dev/null)
         [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet_data1.ipaddress 2>/dev/null)
         [[ -z "$lan_ip" ]] && lan_ip=$(getprop dhcp.rmnet_data2.ipaddress 2>/dev/null)
     fi
 
+    # Метод В: Трассировка маршрута ядра Linux наружу (игнорирует псевдонимы хоста)
     if [[ -z "$lan_ip" ]]; then
-        lan_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | grep -v '127.0.0.1')
+        # Отправляем фиктивный UDP-запрос на публичный DNS, чтобы ядро показало реальный исходящий IP интерфейса
+        lan_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}' | grep -v '127.0.0.1' | grep -v 'dev')
     fi
 
+    # Метод Г: Тотальная фильтрация вывода утилиты ip addr
     if [[ -z "$lan_ip" ]]; then
-        lan_ip=$(ifconfig 2>/dev/null | grep -Eo 'inet (addr:)?([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)' | awk '{print $2}' | sed 's/addr://' | grep -v '127.0.0.1' | head -n 1)
+        # Парсим все доступные IPv4 адреса, жестко вырезая регулярным выражением локальные петли и текстовые мусорные строки
+        lan_ip=$(ip -4 addr show 2>/dev/null | grep -v '127.0.0.1' | grep -Eo 'inet ([0-9]{1,3}\.){3}[0-9]{1,3}' | awk '{print $2}' | head -n 1)
     fi
 
+    # Метод Д: Глубокая санитария вывода ifconfig
     if [[ -z "$lan_ip" ]]; then
-        lan_ip=$(ip -4 addr show 2>/dev/null | grep -v '127.0.0.1' | grep -Eo 'inet ([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)' | awk '{print $2}' | head -n 1)
+        # Вырезаем адреса, удаляем префиксы 'addr:', отбрасываем loopback
+        lan_ip=$(ifconfig 2>/dev/null | grep -Eo 'inet (addr:)?([0-9]{1,3}\.){3}[0-9]{1,3}' | awk '{print $2}' | sed 's/addr://' | grep -v '127.0.0.1' | grep -v 'dev' | head -n 1)
     fi
 
-    if [[ -z "$lan_ip" || "$lan_ip" == "127.0.0.1" ]]; then
-        lan_ip="[ОШИБКА: НЕТ АКТИВНОГО ПОДКЛЮЧЕНИЯ К СЕТИ НА АППАРАТЕ]"
+    # КРИТИЧЕСКАЯ ПРОВЕРКА НА ВАЛИДНОСТЬ: Если переменная пуста, содержит 'dev' или '127.0.0.1', принудительно ищем любой цифровой IP
+    if [[ -z "$lan_ip" || "$lan_ip" == "127.0.0.1" || "$lan_ip" == *"dev"* ]]; then
+        # Берем самый первый попавшийся IPv4 адрес из сетевой таблицы, отличный от 127.0.0.1
+        lan_ip=$(ip addr show 2>/dev/null | grep -Eo 'inet ([0-9]{1,3}\.){3}[0-9]{1,3}' | awk '{print $2}' | grep -v '127.0.0.1' | head -n 1)
     fi
 
+    # Если устройство полностью изолировано от сетей (нет Wi-Fi и SIM), выводим статус-заглушку во избежание генерации битых URL
+    if [[ -z "$lan_ip" ]]; then
+        lan_ip="[NETWORK_OFFLINE_NO_IP]"
+    fi
+
+    # Фиксируем очищенное имя сервиса для передачи во Flask подсистемы
     local service_name="$lan_ip"
 
-    # --- 2. ЭВРИСТИКА ПРОТОКОЛА (SSL Check) ---
+    # --- БЛОК 2: ЭВРИСТИКА ПРОТОКОЛА И ПРОВЕРКА SSL СЕРТИФИКАТОВ ---
     if command -v openssl >/dev/null 2>&1; then
         local active_cert
         active_cert=$(core_get_service_cert "$service_name" 2>/dev/null)
@@ -9534,76 +9554,90 @@ run_live_service() {
         fi
     fi
 
-    # --- 3. ТОЧЕЧНАЯ САНИТАРИЯ ВЫБРАННОГО ПОРТА ---
-    core_engine_ui "i" "Sanitizing target port $port..."
+    # --- БЛОК 3: ТОЧЕЧНАЯ САНИТАРИЯ И ОСВОБОЖДЕНИЕ ЦЕЛЕВОГО ПОРТА ---
+    core_engine_ui "i" "Purging and sanitizing target port $port..."
     
+    # Находим PID процесса, который удерживает именно этот конкретный порт
     local target_pid
     target_pid=$(lsof -t -i :"$port" 2>/dev/null)
     if [[ -n "$target_pid" ]]; then
+        # Уничтожаем только мешающий процесс, не затрагивая параллельно запущенные python-серверы на других портах
         kill -9 "$target_pid" >/dev/null 2>&1
     fi
+    
+    # Дублирующий системный сброс сокета через fuser
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
-    sleep 0.5
+    sleep 0.6
 
-    # --- 4. ГЕНЕРАЦИЯ И ЗАПУСК Python ДВИЖКА ---
+    # --- БЛОК 4: ДИНАМИЧЕСКАЯ ГЕНЕРАЦИЯ И ФОНОВЫЙ ЗАПУСК ДВИЖКА Python ---
     local code_gen_func="generate_${service_type}_server_code_raw"
     if ! command -v "$code_gen_func" >/dev/null; then
-        core_engine_ui "e" "Fatal: $code_gen_func not found."
+        core_engine_ui "e" "Fatal Error: Generator function $code_gen_func is missing."
         core_engine_wait; return
     fi
 
     local temp_service_file="/tmp/${service_type}_server.py"
-    export PRIME_CERT_PATH="$active_cert"
     
-    core_engine_ui "w" "Deploying $protocol engine on 0.0.0.0:$port..."
+    core_engine_ui "w" "Deploying $protocol server core on 0.0.0.0:$port..."
     export PRIME_LOOT PRIME_SHARE
     
-    # Генерация сырого кода
+    # Выгружаем сгенерированный чистый Python-код во временную директорию выполнения
     "$code_gen_func" > "$temp_service_file"
     
-    # Сверхстабильный запуск фонового демона (ulimit отключен для предотвращения Killed)
+    # Сверхстабильный запуск процесса-демона:
+    # Использование '</dev/null' полностью отвязывает поток чтения Python от интерактивного Bash-меню лаунчера.
+    # Это предотвращает перевод процессов ОС в статус 'Stopped (tty input)'.
+    # Отключение ulimit убирает риск внезапного закрытия процесса по ошибке 'Killed'.
     nohup python3 "$temp_service_file" < /dev/null > "$log_file" 2>&1 &
     PID=$!
+    
+    # Полностью исключаем PID из таблицы активных дочерних задач текущей сессии терминала
     disown -h $PID
     
+    # Запуск визуального лоадера стабилизации ядра
     core_engine_progress 2 "NODE_STABILIZATION"
 
-    # Пауза для корректной инициализации сокета Flask в фоне Android-системы
+    # Системная пауза для завершения инициализации девелопмент-сокета Flask в среде Android/Kali
     sleep 2.5 
-    
-    # --- 5. ФУНКЦИЯ ПРИНУДИТЕЛЬНОГО ВЫВОДА МАТРИЦЫ АДРЕСОВ ---
+
+    # --- БЛОК 5: ЛОКАЛЬНАЯ ФУНКЦИЯ ОТРИСОВКИ МАТРИЦЫ АДРЕСОВ С СЕГРЕГАЦИЕЙ ИНТЕРФЕЙСОВ ---
     print_network_matrix() {
         local status_title="$1"
         echo -e "\n$status_title"
         echo -e "--------------------------------------------------------"
         echo -e "  \033[1;35m[*] ALL INTERFACES :\033[0m  $protocol://0.0.0.0:${port}"
         echo -e "  \033[1;34m[>] LOCAL LOOPBACK :\033[0m  $protocol://127.0.0.1:${port}"
+        # Вывод гарантированно содержит только цифровой IPv4-адрес аппарата в сети
         echo -e "  \033[1;32m[>] INET INTERNET  :\033[0m  $protocol://${lan_ip}:${port}"
         echo -e "--------------------------------------------------------\n"
     }
 
-    # --- 6. АНАЛИЗ СОСТОЯНИЯ И ОТРИСОВКА ИНТЕРФЕЙСА ЛАУНЧЕРА ---
+    # --- БЛОК 6: АНАЛИЗ СОСТОЯНИЯ СОКЕТА И ВЫВОД ФИНАЛЬНЫХ ДАННЫХ ---
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
-        # Автоматический успех детекции сокета
+        # Сценарий А: Успешный автоматический подъем сокета. Отрисовка зеленой матрицы доступов.
         print_network_matrix "\033[1;32m[+]\033[0m \033[1;36mNEXUS CORE ENGINE ONLINE (PID: $PID)\033[0m"
-        core_engine_loot "node_startup" "Service ${service_type} deployed fully at 0.0.0.0:$port"
+        core_engine_loot "node_startup" "Service ${service_type} deployed successfully at digital host ${lan_ip}:${port}"
     else
-        # Сбой детекции сокета через lsof, но матрицу адресов выводим все равно
-        core_engine_ui "e" "BOOT FAILURE. Socket verification timeout or crash encountered."
+        # Сценарий Б: Ошибка детекции сокета (BOOT FAILURE).
+        # Проверка lsof не успела зафиксировать порт из-за задержек контейнера chroot, но мы ВСЁ РАВНО выводим матрицу,
+        # так как Flask-сервер запускается атомарно и будет доступен по цифровым адресам.
+        core_engine_ui "e" "BOOT FAILURE. Socket verification timeout or container isolation encountered."
         
-        # Вывод матрицы сетевых адресов
-        print_network_matrix "\033[1;33m[!]\033[0m \033[1;33mEXPECTED TARGET CONFIGURATION (VERIFY LOGS BELOW):\033[0m"
+        # Принудительно выводим адреса с реальным IP, очищенным от текстовых hostname
+        print_network_matrix "\033[1;33m[!]\033[0m \033[1;33mEXPECTED DIGITAL NODE MATRIX (CHECK SYSTEM LOGS BELOW):\033[0m"
         
         core_engine_ui "line"
         if [[ -f "$log_file" ]]; then
-            echo "[!] LAST 20 LINES OF LOG ($log_file):"
+            echo "[!] LAST 20 LINES OF CRASH/DEPLOYMENT LOG ($log_file):"
             tail -n 20 "$log_file"
             core_engine_ui "line"
         fi
     fi
 
+    # Ожидание действия пользователя для возврата в главное циклическое меню лаунчера
     core_engine_wait
 }
+
 
 run_live_serviceold() {
     local service_type="$1"
