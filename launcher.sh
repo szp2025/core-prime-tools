@@ -4945,12 +4945,6 @@ EOF
 }
 
 
-    # 6. Вклейка шаблона в маркер
-    raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
-
-    echo -e "$raw_python_code"
-}
-
 
 generate_upload_server_code_raw() {
     # 1. Загружаем UI шаблоны лаунчера в локальные переменные
