@@ -94,8 +94,8 @@ GLOBAL_MENU_REGISTRY=(
 
     "STEALTH_COMMS:Live_Node_AV|run_av_server" "STEALTH_COMMS:Shared_Node_Store|run_share_server"
     "STEALTH_COMMS:Upload_Portal|run_upload_server" "STEALTH_COMMS:Node_Destroy|run_node_clean"
-     "STEALTH_COMMS:AIO_SERVER|run_aio_server"
-     "STEALTH_COMMS:Upload_Portalv2|run_uploadv2_server"
+     "STEALTH_COMMS:AIO_SERVER|run_aio_server" "STEALTH_COMMS:Upload_Portalv2|run_uploadv2_server"
+     "STEALTH_COMMS:Shared_Node_Storev2|run_sharev2_server"
      
      
 
@@ -4513,6 +4513,152 @@ EOF
 # ФУНКЦИОНАЛ: Сканирование файлов «на лету» перед отдачей, моментальное удаление угроз с хоста
 # АРХИТЕКТУРА: Flask-интерфейс, защита сетевых клиентов от скачивания деструктивных векторов
 # ==============================================================================
+
+
+generate_sharev2_server_code_raw() {
+    # 1. Извлекаем глобальный регулярный супер-конвейер CAME
+    local regex_pattern=$(IFS="|"; echo "${GLOBAL_AV_MATRIX[*]}")
+
+    # 2. Формируем Base64 payload для логики раздачи файлов через чистый heredoc
+    local b64_payload
+    b64_payload=$(cat << 'EOF' | base64 | tr -d '\n' | tr -d '\r'
+from flask import send_from_directory, abort
+import os
+import re
+
+SHARE_DIR = '/root/share'
+
+if not os.path.exists(SHARE_DIR):
+    os.makedirs(SHARE_DIR, exist_ok=True)
+
+def get_file_icon(filename):
+    ext = filename.split('.')[-1].lower() if '.' in filename else ''
+    icons = {
+        'pdf': '📕',
+        'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'webp': '🖼️',
+        'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
+        'py': '💻', 'js': '💻', 'html': '💻', 'sh': '💻', 'css': '💻',
+        'txt': '📄', 'md': '📝', 'doc': '📄', 'docx': '📄',
+        'mp4': '🎬', 'mkv': '🎬', 'mov': '🎬',
+        'mp3': '🎵', 'wav': '🎵', 'flac': '🎵'
+    }
+    return icons.get(ext, '📄')
+
+def dynamic_handler(filename=None):
+    if request.method == 'GET' and not filename:
+        try:
+            files = sorted(os.listdir(SHARE_DIR))
+        except:
+            files = []
+        
+        grid_content = '<div class="file-grid">'
+        for f in files:
+            icon = get_file_icon(f)
+            grid_content += f"""
+            <a href="/get/{f}" class="file-item" target="_blank">
+                <span class="file-icon" style="font-size: 2.5rem; display: block; margin-bottom: 10px;">{icon}</span>
+                <div style="font-size: 0.8rem; word-break: break-all; line-height: 1.2;">{f}</div>
+            </a>
+            """
+        
+        if not files:
+            grid_content += '<p style="color: var(--accent); font-style: italic; grid-column: 1/-1; opacity: 0.5;">[ SECTOR_EMPTY: No data detected ]</p>'
+        
+        grid_content += '</div>'
+        grid_content += f'<div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-family: monospace; font-size: 0.7rem; opacity: 0.5;">MOUNT_POINT: {SHARE_DIR}</div>'
+        
+        return render_template_string(render_prime_page("SECURE_FILE_DISTRIBUTION_v2.0", grid_content))
+
+    elif request.method == 'GET' and filename:
+        target_path = os.path.normpath(os.path.join(SHARE_DIR, filename))
+        if not target_path.startswith(SHARE_DIR) or not os.path.exists(target_path):
+            abort(404)
+            
+        if os.path.isdir(target_path):
+            abort(400)
+
+        is_infected = False
+        report = []
+
+        try:
+            with open(target_path, 'rb') as file_buffer:
+                raw_content = file_buffer.read()
+
+            total_bytes = len(raw_content)
+            printable_chars = len([b for b in raw_content if 32 <= b <= 126])
+            readable_ratio = 100 if total_bytes == 0 else int((printable_chars * 100) / total_bytes)
+
+            text_content = raw_content.decode('utf-8', errors='ignore')
+
+            matches = []
+            try:
+                compiled_regex = re.compile(GLOBAL_AV_PIPE_REGEX, re.IGNORECASE | re.MULTILINE)
+                for i, line in enumerate(text_content.splitlines(), 1):
+                    if compiled_regex.search(line):
+                        matches.append(f"Line {i}: {line.strip()[:100]}")
+            except Exception as regex_err:
+                matches.append(f"REGEX_CORE_ERR: {str(regex_err)}")
+
+            if total_bytes > 1000 and readable_ratio < 12:
+                is_infected = True
+                report.append("CRITICAL ANOMALY: High Entropy / Encrypted code signature detected.")
+
+            if matches:
+                is_infected = True
+                report.append(f"MALICIOUS INTENT ISOLATED: Matched {len(matches)} active signatures.")
+
+            if is_infected:
+                if os.path.exists(target_path):
+                    os.remove(target_path)
+
+                report_str = chr(10).join(report)
+
+                h_div_inf = bytes.fromhex('3c64697620636c6173733d227374617475732d626f7820696e66656374656422207374796c653d2270616464696e673a313570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d7765696768743a626f6c643b206d617267696e2d626f74746f6d3a323070783b20746578742d616c69676e3a63656e7465723b20626f726465723a31307078206461736865643b223e').decode('utf-8')
+                h_p_inf = bytes.fromhex('3c70207374796c653d22666f6e742d73697a653a313270783b20636f6c6f723a766172282d2d616363656e742d636f6c6f72293b223e54686520726571756573746564206f626a656374203c623e').decode('utf-8')
+                h_p_inf_mid = bytes.fromhex('3c2f623e206661696c6564206f7574626f756e6420736563757269747920636f6d706c69616e636520616e6420776173203c623e7065726d616e656e746c79207075726765643c2f623e2066726f6d207468652073746f72616765206e6f64652e3c2f703e').decode('utf-8')
+                h_pre_inf = bytes.fromhex('3c707265207374796c653d226261636b67726f756e643a233131313b20636f6c6f723a236666336430303b2070616464696e673a313570783b20626f726465722d7261646975733a3570783b20666f6e742d66616d696c793a6d6f6e6f73706163653b20666f6e742d73697a653a313170783b223e').decode('utf-8')
+                h_btn_inf = bytes.fromhex('3c2f7072653e3c646976207374796c653d226d617267696e2d746f703a323070783b223e3c6120687265663d222f2220636c6173733d2262746e223e5b2052455455524e20544f20444953545249425554494f4e205d3c2f613e3c2f6469763e').decode('utf-8')
+
+                content = h_div_inf + "CRITICAL WARNING: OUTBOUND MALWARE ANNIHILATED</div>"
+                content += h_p_inf + str(filename) + h_p_inf_mid
+                content += h_pre_inf + str(report_str) + h_btn_inf
+                
+                return render_template_string(render_prime_page("OUTBOUND_SECURITY_BLOCK", content)), 403
+            else:
+                return send_from_directory(SHARE_DIR, filename)
+        except Exception as e:
+            return f"DISTRIBUTION_INTEGRITY_ERROR: {str(e)}", 500
+
+result = dynamic_handler(filename=request.view_args.get('filename'))
+EOF
+)
+
+    # 3. Формируем тело aio_body с жестким сдвигом в 8 пробелов на уровне Bash
+    local aio_body="        import base64\n        exec_globals = globals().copy()\n        exec_globals.update(local_context)\n        exec_locals = {}\n        exec(base64.b64decode('$b64_payload').decode('utf-8'), exec_globals, exec_locals)\n        result = exec_locals.get('result') or exec_globals.get('result')"
+
+    # 4. Передаем параметры в генератор шаблонов (обрабатывает корни "/" и "/get/<filename>")
+    local dynamic_template=$(generate_aio_template "$regex_pattern" "$aio_body" "/" "GET")
+
+    # 5. Собираем монолитную структуру для раздачи файлов (порт 5002)
+    local raw_python_code=$(cat << 'EOF'
+# === СБОРОЧНЫЙ МОДУЛЬ NEXUS SHARE CORE ===
+__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__
+
+@app.route('/get/<filename>', methods=['GET'])
+def outbound_file_delivery(filename):
+    return dynamic_nexus_processor()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5002, debug=False)
+EOF
+)
+
+    # 6. Бесшовная вклейка шаблона в маркер
+    raw_python_code="${raw_python_code//__NEXUS_DYNAMIC_COMPLIANCE_PLACEHOLDER__/$dynamic_template}"
+
+    echo -e "$raw_python_code"
+}
+
 
 generate_share_server_code_raw() {
     # 1. Собираем регулярку из массива прямо здесь
@@ -9659,7 +9805,8 @@ run_aio_server(){
     core_engine_loot "security" "NEXUS Core Analytical Gateway initiated on port 5000"
 
 }
-run_share_server() {
+
+run_sharev2_server() {
     # Слой 1: Визуализация через Голос [1]
     core_engine_ui "SHARE SECTOR: SECURE FILE DISTRIBUTION"
 
@@ -9677,6 +9824,30 @@ run_share_server() {
     # Слой 4: Динамический запуск через Live Node [22]
     # Используем тип "share" на порту 5002
     run_live_service "share" "5002"
+
+    
+    # Слой 5: Регистрация в Сборщике трофеев [11]
+    core_engine_loot "service" "Share Sector (Uplink) active on port 5002"
+}
+
+run_share_server() {
+    # Слой 1: Визуализация через Голос [1]
+    core_engine_ui "SHARE SECTOR: SECURE FILE DISTRIBUTION"
+
+    local share_dir="${HOME}/prime_share"
+    
+    # Слой 2: Подготовка инфраструктуры через Санитара [8]
+    if [[ ! -d "$share_dir" ]]; then
+        mkdir -p "$share_dir"
+        core_engine_ui "i" "Created transmission sector at $share_dir"
+    fi
+
+    # Слой 3: Валидация фундамента через Мозг [5]
+    core_engine_validator "pkg" "python3" "Python3 Engine" || { core_engine_wait; return; }
+
+    # Слой 4: Динамический запуск через Live Node [22]
+    # Используем тип "share" на порту 5002
+    run_live_service "sharev2" "5002"
 
     
     # Слой 5: Регистрация в Сборщике трофеев [11]
