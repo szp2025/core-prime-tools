@@ -9481,22 +9481,25 @@ update_all_dns_records() {
 run_live_service() {
     local service_type="$1"
     local port="${2:-8080}"
-    local log_file="$HOME/prime_node_${port}.log"  # Изолированный лог под каждый порт
+    local log_file="$HOME/prime_node_${port}.log"
     local protocol="http"
 
     core_engine_ui "h" "PRIME LIVE NODE: ${service_type^^}"
 
-    # --- 1. АДАПТИВНАЯ СЕТЬ (ПРЯМОЙ IP-РЕЖИМ) ---
+    # --- 1. ДИНАМИЧЕСКИЙ ПОИСК СЕТЕВОГО ИНТЕРФЕЙСА (inet) ---
     local lan_ip
-    lan_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    lan_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}')
     
     if [[ -z "$lan_ip" ]]; then
-        lan_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}')
+        lan_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     fi
     
     if [[ -z "$lan_ip" ]]; then
-        lan_ip="127.0.0.1"
-        core_engine_ui "w" "Network disconnected. Using loopback mode."
+        lan_ip=$(ifconfig 2>/dev/null | grep -Eo 'inet (addr:)?([0-3]*\.[0-3]*\.[0-3]*\.[0-3]*)' | grep -v '127.0.0.1' | awk '{print $2}' | head -n 1)
+    fi
+
+    if [[ -z "$lan_ip" ]]; then
+        lan_ip="[NO_ACTIVE_INET]"
     fi
 
     local service_name="$lan_ip"
@@ -9512,21 +9515,18 @@ run_live_service() {
         fi
     fi
 
-    # --- 3. БЕЗОПАСНАЯ ТОЧЕЧНАЯ САНИТАРИЯ ПОРТОВ ---
+    # --- 3. ТОЧЕЧНАЯ САНИТАРИЯ ВЫБРАННОГО ПОРТА ---
     core_engine_ui "i" "Sanitizing target port $port..."
     
-    # Находим конкретный PID процесса, который удерживает именно этот порт
     local target_pid
     target_pid=$(lsof -t -i :"$port" 2>/dev/null)
     if [[ -n "$target_pid" ]]; then
         kill -9 "$target_pid" >/dev/null 2>&1
     fi
-    
-    # Резервная очистка сокета для данного порта
     fuser -k -n tcp -9 "$port" >/dev/null 2>&1
     sleep 0.5
 
-    # --- 4. ЗАПУСК ДВИЖКА ---
+    # --- 4. ГЕНЕРАЦИЯ И ЗАПУСК ---
     local code_gen_func="generate_${service_type}_server_code_raw"
     if ! command -v "$code_gen_func" >/dev/null; then
         core_engine_ui "e" "Fatal: $code_gen_func not found."
@@ -9536,40 +9536,46 @@ run_live_service() {
     local temp_service_file="/tmp/${service_type}_server.py"
     export PRIME_CERT_PATH="$active_cert"
     
-    core_engine_ui "w" "Deploying $protocol engine on $service_name:$port..."
+    core_engine_ui "w" "Deploying $protocol engine on 0.0.0.0:$port..."
     export PRIME_LOOT PRIME_SHARE
     
-    # Генерация сырого Python кода во временный файл
+    # Генерация кода
     "$code_gen_func" > "$temp_service_file"
     
-    # Ограничения памяти (Защита NEXUS Core)
-    ulimit -m 524288 2>/dev/null
-    ulimit -v 1048576 2>/dev/null
-
-    # Стабильный фоновый запуск:
-    # </dev/null изолирует процесс от прерываний терминала меню
-    # disown полностью отвязывает PID от текущей сессии Bash
-    nohup nice -n 15 python3 "$temp_service_file" < /dev/null > "$log_file" 2>&1 &
+    # Сверхстабильный фоновый запуск (без ulimit во избежание Killed)
+    nohup python3 "$temp_service_file" < /dev/null > "$log_file" 2>&1 &
     PID=$!
     disown -h $PID
     
     core_engine_progress 2 "NODE_STABILIZATION"
 
-    # --- 5. ДИАГНОСТИКА И ВЫВОД ЗЕЛЕНОЙ МАТРИЦЫ АДРЕСОВ ---
-    sleep 1.5 # Пауза, необходимая Flask для успешного биндинга сокета в системе
+    # Ожидание инициализации сокета
+    sleep 2.5 
     
-    if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
-        echo -e "\n\033[1;32m[+]\033[0m \033[1;36mNEXUS CORE ENGINE ONLINE (PID: $PID)\033[0m"
+    # --- 5. ФУНКЦИЯ ПРИНУДИТЕЛЬНОГО ВЫВОДА МАТРИЦЫ АДРЕСОВ ---
+    print_network_matrix() {
+        local status_title="$1"
+        echo -e "\n$status_title"
         echo -e "--------------------------------------------------------"
-        echo -e "  \033[1;34m[>] LOCAL ACCESS :\033[0m  $protocol://127.0.0.1:${port}"
-        echo -e "  \033[1;35m[>] LAN ACCESS   :\033[0m  \033[1;32m$protocol://${lan_ip}:${port}\033[0m"
+        echo -e "  \033[1;35m[*] ALL INTERFACES :\033[0m  $protocol://0.0.0.0:${port}"
+        echo -e "  \033[1;34m[>] LOCAL LOOPBACK :\033[0m  $protocol://127.0.0.1:${port}"
+        echo -e "  \033[1;32m[>] INET INTERNET  :\033[0m  $protocol://${lan_ip}:${port}"
         echo -e "--------------------------------------------------------\n"
-        
-        core_engine_loot "node_startup" "Service ${service_type} deployed directly at $protocol://${lan_ip}:${port}"
-    else
-        core_engine_ui "e" "BOOT FAILURE. Analyzing crash logs..."
-        core_engine_ui "line"
+    }
 
+    # --- 6. АНАЛИЗ И ОТРИСОВКА ИНТЕРФЕЙСА ---
+    if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null; then
+        # Сценарий А: Полный автоматический успех
+        print_network_matrix "\033[1;32m[+]\033[0m \033[1;36mNEXUS CORE ENGINE ONLINE (PID: $PID)\033[0m"
+        core_engine_loot "node_startup" "Service ${service_type} deployed fully at 0.0.0.0:$port"
+    else
+        # Сценарий Б: Сбой детекции сокета (BOOT FAILURE), но адреса выводим ВСЁ РАВНО
+        core_engine_ui "e" "BOOT FAILURE. Socket verification timeout or crash encountered."
+        
+        # Принудительно показываем сетевые адреса, так как Flask мог успешно забиндиться в фоне
+        print_network_matrix "\033[1;33m[!]\033[0m \033[1;33mEXPECTED TARGET TARGET CONFIGURATION (VERIFY LOGS BELOW):\033[0m"
+        
+        core_engine_ui "line"
         if [[ -f "$log_file" ]]; then
             echo "[!] LAST 20 LINES OF LOG ($log_file):"
             tail -n 20 "$log_file"
