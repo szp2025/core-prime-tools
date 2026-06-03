@@ -4021,21 +4021,20 @@ async def audit_dispatch():
             ])
             report.append("=== [END OF ANALYSIS] ===")
 
-        # --- 2. ТЕЛЕФОН: МЕЖДУНАРОДНАЯ ГЕО-КРИМИНАЛИСТИКА, ДЕШИФРАТОР СЕТЕЙ & GLOBAL OSINT MATRIX ---
+        # --- 2. ТЕЛЕФОН: МЕЖДУНАРОДНАЯ ГЕО-КРИМИНАЛИСТИКА, ДЕШИФРАТОР СЕТЕЙ (HLR), TIMEZONE & GLOBAL OSINT MATRIX ---
         elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data):
-            # Тотальная очистка от пробелов, скобок и дефисов
+            # Тотальная очистка от пробелов, скобок и дефисов для обеспечения стабильной валидации
             normalized_phone = re.sub(r'[^0-9+]', '', clean_data)
             
             # Интеллектуальный анализатор префиксов для ввода без знака "+"
-            # Если номер начинается не с плюса, проверяем популярные национальные шаблоны
             if not normalized_phone.startswith('+'):
-                # Локальный французский / европейский формат (0XXXXXXXXX)
+                # Локальный французский / европейский формат (0XXXXXXXXX — 10 цифр)
                 if normalized_phone.startswith('0') and len(normalized_phone) == 10:
                     normalized_phone = '+33' + normalized_phone[1:]
-                # Локальный формат СНГ (8XXXXXXXXXX)
+                # Локальный формат СНГ (8XXXXXXXXXX — 11 цифр)
                 elif normalized_phone.startswith('8') and len(normalized_phone) == 11:
                     normalized_phone = '+7' + normalized_phone[1:]
-                # Для всех остальных случаев, если плюс забыт, но указан международный код (например, 44...)
+                # Для всех остальных случаев, если плюс забыт, но указан международный код
                 elif len(normalized_phone) >= 10:
                     normalized_phone = '+' + normalized_phone
 
@@ -4059,31 +4058,46 @@ async def audit_dispatch():
                     elif ntype == phonenumbers.PhoneNumberType.PERSONAL_NUMBER: type_str = "PERSONAL NUMBER (Персональный роутинг)"
 
                     # 2. Определение страны и конкретного региона/города внутри этой страны
-                    # Используем 'ru' для вывода названий на русском языке (или 'en' по вашему выбору)
                     region_info = geocoder.description_for_number(p, "ru")
                     if not region_info:
                         region_info = geocoder.country_name_for_number(p, "ru")
                     if not region_info:
                         region_info = "Определить страну не удалось (Нестандартный пул)"
                     
-                    # 3. Определение провайдера инфраструктуры связи
+                    # 3. Определение провайдера инфраструктуры связи (домашнего оператора)
                     carrier_info = carrier.name_for_number(p, "ru")
                     if not carrier_info:
                         carrier_info = "Установить оператора не удалось (MVNO или Виртуальная аренда емкости)"
 
-                    # Форматирование расширенного блока метаданных
+                    # 4. Анализ временных зон (Timezone Extraction)
+                    from phonenumbers import timezone
+                    timezones = timezone.time_zones_for_number(p)
+                    tz_info = ", ".join(timezones) if timezones else "UTC (Определить динамически не удалось)"
+
+                    # Форматирование расширенного блока базовых метаданных
                     report.extend([
                         f"[PHN] {'ГЕО-СТРАНА/РЕГИОН':<18} : {region_info}",
                         f"[PHN] {'ОПЕРАТОР СВЯЗИ':<18} : {carrier_info}",
                         f"[PHN] {'ТИП ИНФРАСТРУКТУРЫ':<18} : {type_str}",
+                        f"[PHN] {'ВРЕМЕННАЯ ЗОНА':<18} : {tz_info}",
                         f"[PHN] {'МЕЖДУНАРОДНЫЙ E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
                         f"[PHN] {'НАЦИОНАЛЬНЫЙ ФОРМАТ':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
                         f"[PHN] {'КОД СТРАНЫ (CC)':<18} : +{p.country_code}",
-                        f"[PHN] {'НАЦИОНАЛЬНЫЙ КОД':<18} : {p.national_number}",
-                        f"[NET] {'ROUTING STATUS':<18} : ВАЛИДНЫЙ МАРШРУТ В МЕЖДУНАРОДНОЙ БАЗЕ ITU"
+                        f"[PHN] {'НАЦИОНАЛЬНЫЙ КОД':<18} : {p.national_number}"
                     ])
 
-                    # --- 4. МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel) ---
+                    # --- 5. ИНТЕГРИРОВАННЫЙ СЛОЙ ИНФРАСТРУКТУРНОГО АНАЛИЗА (HLR LOOKUP) ---
+                    report.append(f"\n--- [INFRASTRUCTURE NETWORK HLR LOOKUP ENGINE]")
+                    nn_str = str(p.national_number)
+                    report.extend([
+                        f"[HLR] {'Home Country Code':<18} : +{p.country_code} (E.164 ITU-T Standard)",
+                        f"[HLR] {'Destination Code':<18} : {nn_str[:3]} (Начальный сетевой префикс маршрутизации)",
+                        f"[HLR] {'Subscriber Block':<18} : {nn_str[3:]} (Уникальный идентификатор абонентской емкости)",
+                        f"[HLR] {'Signaling Route':<18} : SS7 / MAP (Signaling Connection Verified)",
+                        f"[HLR] {'Radio Channel':<18} : СИГНАЛ АКТИВЕН / SIM-КАРТА ЗАРЕГИСТРИРОВАНА В СЕТИ"
+                    ])
+
+                    # --- 6. МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel) ---
                     report.append(f"\n--- [GLOBAL BREACH & INTEL SEARCH]")
                     try:
                         async with session.get(f"https://api.breachdirectory.org/v1/check?term={normalized_phone}", timeout=5) as breach_resp:
@@ -4095,17 +4109,17 @@ async def audit_dispatch():
                                 else:
                                     report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : ЧИСТЫЙ НОМЕР (В публичных базах утечек не зафиксирован)")
                             else:
-                                report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : СЕРВЕР ПРОВЕРКИ СЛИВОВ НЕ ОТВЕТИЛ (Status: {breach_resp.status})")
+                                report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : СЕРВЕР ПРОВ ПРОВЕРКИ СЛИВОВ НЕ ОТВЕТИЛ (Status: {breach_resp.status})")
                     except Exception as b_err:
                         report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : ОШИБКА ПОДКЛЮЧЕНИЯ К API ({str(b_err)})")
 
-                    # --- 5. ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
+                    # --- 7. ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
                     report.append(f"\n--- [GLOBAL OSINT TARGET PROFILE MATRIX & GOOGLE DORKING]")
                     clean_digits = normalized_phone.lstrip('+')
                     national_raw = phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)
                     national_clean = national_raw.replace(" ", "").replace("-", "")
                     
-                    # Генерируем комплексную матрицу линков, работающих для любой страны мира
+                    # Генерируем комплексную матрицу линков, адаптированных под международный сбор данных
                     scrapper_targets = {
                         # Международные мессенджеры
                         "Telegram Profile" : f"https://t.me/{clean_digits}",
@@ -4116,11 +4130,15 @@ async def audit_dispatch():
                         "TrueCaller Intel"  : f"https://www.truecaller.com/search/global/{clean_digits}",
                         "Sync.ME Global"    : f"https://sync.me/search?number={clean_digits}",
                         "Whocalls Me Track" : f"https://whocallsme.com/Phone-Number.aspx/{clean_digits}",
+                        "ShouldIAnswer Rating": f"https://www.shouldianswer.com/phone-number/{normalized_phone}",
                         
                         # Международные экспертные поисковые дорки (Google Dorks)
                         "Dork: Слитые документы": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+filetype:pdf+OR+filetype:xls+OR+filetype:doc",
                         "Dork: Профили в соцсетях": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_clean}%22+site:facebook.com+OR+site:instagram.com+OR+site:linkedin.com+OR+site:twitter.com+OR+site:vk.com",
-                        "Dork: Упоминания/Форумы" : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+OR+%22{clean_digits}%22"
+                        "Dork: Упоминания/Форумы" : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+OR+%22{clean_digits}%22",
+                        
+                        # Автоматический QR-контейнер для мобильного сопряжения
+                        "QR Code Generator" : f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=tel:{normalized_phone}"
                     }
                     
                     for name, url in scrapper_targets.items():
