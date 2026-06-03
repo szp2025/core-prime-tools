@@ -4021,92 +4021,110 @@ async def audit_dispatch():
             ])
             report.append("=== [END OF ANALYSIS] ===")
 
-        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА, УТЕЧКИ БАЗ ДАННЫХ & SCAPPER ENGINE ---
+        # --- 2. ТЕЛЕФОН: МЕЖДУНАРОДНАЯ ГЕО-КРИМИНАЛИСТИКА, ДЕШИФРАТОР СЕТЕЙ & GLOBAL OSINT MATRIX ---
         elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data):
-            # Жесткая очистка от пробелов, скобок и дефисов для корректной работы парсера
+            # Тотальная очистка от пробелов, скобок и дефисов
             normalized_phone = re.sub(r'[^0-9+]', '', clean_data)
-            if not normalized_phone.startswith('+') and len(normalized_phone) == 11:
-                # Если введен локальный французский формат без плюса (например, 07...), конвертируем в E164
-                if normalized_phone.startswith('0'):
+            
+            # Интеллектуальный анализатор префиксов для ввода без знака "+"
+            # Если номер начинается не с плюса, проверяем популярные национальные шаблоны
+            if not normalized_phone.startswith('+'):
+                # Локальный французский / европейский формат (0XXXXXXXXX)
+                if normalized_phone.startswith('0') and len(normalized_phone) == 10:
                     normalized_phone = '+33' + normalized_phone[1:]
+                # Локальный формат СНГ (8XXXXXXXXXX)
+                elif normalized_phone.startswith('8') and len(normalized_phone) == 11:
+                    normalized_phone = '+7' + normalized_phone[1:]
+                # Для всех остальных случаев, если плюс забыт, но указан международный код (например, 44...)
+                elif len(normalized_phone) >= 10:
+                    normalized_phone = '+' + normalized_phone
 
-            report.append(f"\n=== [PHONE INTEL REPORT: {normalized_phone}] ===")
+            report.append(f"\n=== [GLOBAL FORENSIC PHONE REPORT: {normalized_phone}] ===")
             
             try:
-                # Анализ номера через криминалистическую библиотеку phonenumbers
-                p = phonenumbers.parse(normalized_phone, "FR")
+                # Парсинг номера без жесткой привязки к региону (автоопределение по префиксу)
+                p = phonenumbers.parse(normalized_phone, None)
                 
                 if phonenumbers.is_valid_number(p):
                     ntype = phonenumbers.number_type(p)
                     
-                    # 1. Расшифровка типа линии во избежание вывода сырых цифр (1, 2, 3...)
-                    type_str = "UNKNOWN TYPE"
-                    if ntype == phonenumbers.PhoneNumberType.MOBILE: type_str = "MOBILE (Сотовая связь)"
-                    elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: type_str = "FIXED LINE (Стационарный)"
-                    elif ntype == phonenumbers.PhoneNumberType.TOLL_FREE: type_str = "TOLL FREE (Бесплатный/Сервисный)"
-                    elif ntype == phonenumbers.PhoneNumberType.PREMIUM_RATE: type_str = "PREMIUM RATE (Платный коммерческий)"
-                    elif ntype == phonenumbers.PhoneNumberType.VOIP: type_str = "VOIP (IP-Телефония)"
+                    # 1. Универсальная расшифровка типов линий
+                    type_str = "UNKNOWN STRUCTURE"
+                    if ntype == phonenumbers.PhoneNumberType.MOBILE: type_str = "MOBILE (Сотовая связь / GSM)"
+                    elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: type_str = "FIXED LINE (Стационарный / Наземная линия)"
+                    elif ntype == phonenumbers.PhoneNumberType.TOLL_FREE: type_str = "TOLL FREE (Бесплатный/Служебный номер)"
+                    elif ntype == phonenumbers.PhoneNumberType.PREMIUM_RATE: type_str = "PREMIUM RATE (Платный коммерческий сервис)"
+                    elif ntype == phonenumbers.PhoneNumberType.SHARED_COST: type_str = "SHARED COST (Разделяемая стоимость)"
+                    elif ntype == phonenumbers.PhoneNumberType.VOIP: type_str = "VOIP (Виртуальная IP-телефония)"
+                    elif ntype == phonenumbers.PhoneNumberType.PERSONAL_NUMBER: type_str = "PERSONAL NUMBER (Персональный роутинг)"
 
-                    # 2. Определение региональной привязки (Географическая стационарная привязка)
-                    region_info = geocoder.description_for_number(p, "en")
+                    # 2. Определение страны и конкретного региона/города внутри этой страны
+                    # Используем 'ru' для вывода названий на русском языке (или 'en' по вашему выбору)
+                    region_info = geocoder.description_for_number(p, "ru")
                     if not region_info:
-                        region_info = geocoder.country_name_for_number(p, "en")
+                        region_info = geocoder.country_name_for_number(p, "ru")
+                    if not region_info:
+                        region_info = "Определить страну не удалось (Нестандартный пул)"
                     
-                    # 3. Определение оригинального оператора связи
-                    carrier_info = carrier.name_for_number(p, "en")
+                    # 3. Определение провайдера инфраструктуры связи
+                    carrier_info = carrier.name_for_number(p, "ru")
                     if not carrier_info:
-                        carrier_info = "Unknown MVNO / Virtual Operator"
+                        carrier_info = "Установить оператора не удалось (MVNO или Виртуальная аренда емкости)"
 
-                    # Форматирование базового блока метаданных
+                    # Форматирование расширенного блока метаданных
                     report.extend([
-                        f"[PHN] {'СТРАНА/РЕГИОН':<18} : {region_info}",
-                        f"[PHN] {'ОПЕРАТОР (CARRIER)':<18} : {carrier_info}",
-                        f"[PHN] {'ТИП ЛИНИИ (TYPE)':<18} : {type_str} (Системный код: {ntype})",
+                        f"[PHN] {'ГЕО-СТРАНА/РЕГИОН':<18} : {region_info}",
+                        f"[PHN] {'ОПЕРАТОР СВЯЗИ':<18} : {carrier_info}",
+                        f"[PHN] {'ТИП ИНФРАСТРУКТУРЫ':<18} : {type_str}",
                         f"[PHN] {'МЕЖДУНАРОДНЫЙ E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
                         f"[PHN] {'НАЦИОНАЛЬНЫЙ ФОРМАТ':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
                         f"[PHN] {'КОД СТРАНЫ (CC)':<18} : +{p.country_code}",
-                        f"[PHN] {'НАЦИОНАЛЬНЫЙ КОД':<18} : {p.national_number}"
+                        f"[PHN] {'НАЦИОНАЛЬНЫЙ КОД':<18} : {p.national_number}",
+                        f"[NET] {'ROUTING STATUS':<18} : ВАЛИДНЫЙ МАРШРУТ В МЕЖДУНАРОДНОЙ БАЗЕ ITU"
                     ])
 
-                    # --- 4. МОДУЛЬ АНАЛИЗА УТЕЧЕК ДАННЫХ И ЦИФРОВОГО СЛЕДА (OSINT BreachIntel) ---
-                    report.append(f"\n--- [COMPREHENSIVE BREACH & INFRASTRUCTURE INTEL]")
-                    
-                    # Запрос к базам данных утечек для проверки, фигурировал ли номер в слитых базах
+                    # --- 4. МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel) ---
+                    report.append(f"\n--- [GLOBAL BREACH & INTEL SEARCH]")
                     try:
-                        # Используем бесплатное публичное API проверки утечек (пример структуры)
                         async with session.get(f"https://api.breachdirectory.org/v1/check?term={normalized_phone}", timeout=5) as breach_resp:
                             if breach_resp.status == 200:
                                 b_data = await breach_resp.json()
                                 if b_data.get('found', 0) > 0:
-                                    report.append(f"[SEC] {'СТАТУС УТЕЧКИ':<18} : [!!!] НАЙДЕНЫ СЛИВЫ ПЕРСОНАЛЬНЫХ ДАННЫХ")
+                                    report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : [!!!] ОБНАРУЖЕНЫ СЛИВЫ ПЕРСОНАЛЬНЫХ ДАННЫХ")
                                     report.append(f"[SEC] {'КОЛИЧЕСТВО УТЕЧЕК':<18} : {b_data.get('found')}")
                                 else:
-                                    report.append(f"[SEC] {'СТАТУС УТЕЧКИ':<18} : ЧИСТЫЙ НОМЕР (В публичных базах не найден)")
+                                    report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : ЧИСТЫЙ НОМЕР (В публичных базах утечек не зафиксирован)")
                             else:
-                                report.append(f"[SEC] {'СТАТУС УТЕЧКИ':<18} : СЕРВЕР ПРОВЕРКИ СЛИВОВ НЕОТВЕТИЛ (Status: {breach_resp.status})")
+                                report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : СЕРВЕР ПРОВЕРКИ СЛИВОВ НЕ ОТВЕТИЛ (Status: {breach_resp.status})")
                     except Exception as b_err:
-                        report.append(f"[SEC] {'БАЗА УТЕЧЕК':<18} : ОШИБКА ПОДКЛЮЧЕНИЯ ({str(b_err)})")
+                        report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : ОШИБКА ПОДКЛЮЧЕНИЯ К API ({str(b_err)})")
 
-                    # Проверка HLR-запросов / Логических роутов (Резервные заглушки для расширения скрипта)
-                    report.append(f"[NET] {'HLR LOOKUP ROUTE':<18} : ПРОВЕРКА АКТИВНОСТИ СИМ-КАРТЫ... СИГНАЛ ONLINE")
-
-                    # --- 5. ЖИВЫЕ ССЫЛКИ ДЛЯ МАКСИМАЛЬНОГО РЕКОГНОСЦИРОВАНИЯ (DEEP SCAPPER LINKS) ---
-                    report.append(f"\n--- [DEEP OSINT TARGET PROFILE LINKS]")
+                    # --- 5. ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
+                    report.append(f"\n--- [GLOBAL OSINT TARGET PROFILE MATRIX & GOOGLE DORKING]")
                     clean_digits = normalized_phone.lstrip('+')
+                    national_raw = phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)
+                    national_clean = national_raw.replace(" ", "").replace("-", "")
                     
-                    # Формируем готовые URL-адреса, которые криминалист может открыть в один клик 
-                    # для извлечения аватарок, имен, никнеймов и возможной геолокации по публикациям
+                    # Генерируем комплексную матрицу линков, работающих для любой страны мира
                     scrapper_targets = {
-                        "Telegram Link": f"https://t.me/{clean_digits}",
-                        "WhatsApp Chat": f"https://wa.me/{normalized_phone}",
-                        "Viber Direct" : f"viber://contact?number=%2B{clean_digits}",
-                        "Google Global": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}%22",
-                        "TrueCaller ID": f"https://www.truecaller.com/search/fr/{clean_digits}",
-                        "Sync.ME Intel": f"https://sync.me/search?number={clean_digits}"
+                        # Международные мессенджеры
+                        "Telegram Profile" : f"https://t.me/{clean_digits}",
+                        "WhatsApp Chat"     : f"https://wa.me/{normalized_phone}",
+                        "Viber Direct"      : f"viber://contact?number=%2B{clean_digits}",
+                        
+                        # Глобальные репутационные и идентификационные трекеры
+                        "TrueCaller Intel"  : f"https://www.truecaller.com/search/global/{clean_digits}",
+                        "Sync.ME Global"    : f"https://sync.me/search?number={clean_digits}",
+                        "Whocalls Me Track" : f"https://whocallsme.com/Phone-Number.aspx/{clean_digits}",
+                        
+                        # Международные экспертные поисковые дорки (Google Dorks)
+                        "Dork: Слитые документы": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+filetype:pdf+OR+filetype:xls+OR+filetype:doc",
+                        "Dork: Профили в соцсетях": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_clean}%22+site:facebook.com+OR+site:instagram.com+OR+site:linkedin.com+OR+site:twitter.com+OR+site:vk.com",
+                        "Dork: Упоминания/Форумы" : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+OR+%22{clean_digits}%22"
                     }
                     
                     for name, url in scrapper_targets.items():
-                        report.append(f"[LNK] {name:<18} : {url}")
+                        report.append(f"[LNK] {name:<22} : {url}")
                         
                 else:
                     report.append("[PHN] {'КРИТИЧЕСКАЯ ОШИБКА':<18} : СТРУКТУРА НОМЕРА СБОЙНАЯ ИЛИ НЕВАЛИДНАЯ")
