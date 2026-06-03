@@ -4021,25 +4021,72 @@ async def audit_dispatch():
             ])
             report.append("=== [END OF ANALYSIS] ===")
 
-        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE ---
-        elif re.match(r'^\+?[0-9]{7,15}$', clean_data):
-            report.append(f"\n=== [PHONE INTEL: {clean_data}] ===")
+        # --- 2. ТЕЛЕФОН: ГЕО-КРИМИНАЛИСТИКА & SCAPPER ENGINE (EXPERT LAYER) ---
+        elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data):
+            # Тотальная очистка от побочных символов для Regex-валидации
+            normalized_phone = re.sub(r'[^0-9+]', '', clean_data)
+            
+            report.append(f"\n=== [PHONE INTEL: {normalized_phone}] ===")
             try:
-                p = phonenumbers.parse(clean_data, "FR")
+                # Парсинг с базовым регионом по умолчанию (FR)
+                p = phonenumbers.parse(normalized_phone, "FR")
+                
                 if phonenumbers.is_valid_number(p):
                     ntype = phonenumbers.number_type(p)
+                    
+                    # Перевод типа номера в читаемый текстовый формат
+                    type_str = "UNKNOWN"
+                    if ntype == phonenumbers.PhoneNumberType.MOBILE: type_str = "MOBILE"
+                    elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: type_str = "FIXED LINE"
+                    elif ntype == phonenumbers.PhoneNumberType.TOLL_FREE: type_str = "TOLL FREE / SPECIAL"
+                    elif ntype == phonenumbers.PhoneNumberType.PREMIUM_RATE: type_str = "PREMIUM RATE"
+                    elif ntype == phonenumbers.PhoneNumberType.SHARED_COST: type_str = "SHARED COST"
+                    elif ntype == phonenumbers.PhoneNumberType.VOIP: type_str = "VOIP"
+                    elif ntype == phonenumbers.PhoneNumberType.PERSONAL_NUMBER: type_str = "PERSONAL NUMBER"
+                    
+                    # Извлечение локализации (с подстраховкой на случай сервисных номеров)
+                    region_info = geocoder.description_for_number(p, "en")
+                    if not region_info:
+                        # Если локальный город не найден, извлекаем страну по коду
+                        region_info = geocoder.country_name_for_number(p, "en")
+                    if not region_info:
+                        region_info = "France (National/Special Network)"
+
+                    # Извлечение провайдера связи
+                    carrier_info = carrier.name_for_number(p, "en")
+                    if not carrier_info:
+                        carrier_info = "Specialized Service Provider / Infrastructure Route"
+
+                    # Форматирование и добавление данных в финальный отчет
                     report.extend([
-                        f"[PHN] {'REGION':<14} : {geocoder.description_for_number(p, 'en')}",
-                        f"[PHN] {'CARRIER':<14} : {carrier.name_for_number(p, 'en')}",
-                        f"[PHN] {'TYPE':<14} : {ntype}",
-                        f"[PHN] {'E164':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
+                        f"[PHN] {'REGION/COUNTRY':<14} : {region_info}",
+                        f"[PHN] {'CARRIER/OPERATOR':<14} : {carrier_info}",
+                        f"[PHN] {'LINE TYPE':<14} : {type_str} (Raw: {ntype})",
+                        f"[PHN] {'E164 FORMAT':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
+                        f"[PHN] {'NATIONAL FORM':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
+                        f"[PHN] {'INTERNATIONAL':<14} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.INTERNATIONAL)}"
                     ])
-                    # DEEP SCAPPER
-                    report.append(f"\n--- [DEEP SCAPPER ENGINE: CROSS-DATA]")
-                    for name, url in {"Telegram": f"https://t.me/{clean_data.lstrip('+')}", "WhatsApp": f"https://wa.me/{clean_data.lstrip('+')}", "Google": f"https://www.google.com/search?q=%22{clean_data}%22"}.items():
-                        report.append(f"[PHN] {name:<14} : SCAN INITIALIZED")
-                else: report.append("[PHN] {'STATUS':<14} : INVALID FORMAT")
-            except Exception as e: report.append(f"[PHN] {'ERROR':<14} : {str(e)}")
+                    
+                    # --- DEEP SCAPPER ENGINE (Интеграция живых линков для анализа) ---
+                    report.append(f"\n--- [DEEP SCAPPER ENGINE: OSINT TARGET LINKS]")
+                    clean_digits = normalized_phone.lstrip('+')
+                    
+                    # Генерируем прямые рабочие URL для OSINT-анализа аккаунтов
+                    scrapper_targets = {
+                        "Telegram Profile": f"https://t.me/{clean_digits}",
+                        "WhatsApp Link"  : f"https://wa.me/{clean_digits}",
+                        "Viber Target"   : f"viber://contact?number=%2B{clean_digits}",
+                        "Google Search"  : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}%22"
+                    }
+                    
+                    for name, url in scrapper_targets.items():
+                        report.append(f"[PHN] {name:<16} : {url}")
+                        
+                else:
+                    report.append("[PHN] {'STATUS':<14} : INVALID PHONE NUMBER STRUCTURE")
+            except Exception as e:
+                report.append(f"[PHN] {'PARSING ERROR':<14} : {str(e)}")
+                
             report.append("=== [END OF ANALYSIS] ===")
 
         # --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
