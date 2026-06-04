@@ -4026,28 +4026,50 @@ async def audit_dispatch():
             # Тотальная очистка от пробелов, скобок и дефисов для обеспечения стабильной валидации
             normalized_phone = re.sub(r'[^0-9+]', '', clean_data)
             
-            # Интеллектуальный анализатор префиксов для ввода без знака "+"
+            # --- ДИНАМИЧЕСКИЙ ЛОКАЛИЗАТОР ИНТЕРФЕЙСА И ОПРЕДЕЛЕНИЕ РЕГИОНА ИССЛЕДОВАТЕЛЯ ---
+            # Извлекаем язык и вероятную страну исследователя для корректного парсинга локальных номеров
+            try:
+                user_lang = request.accept_languages.best_match(['ru', 'fr', 'en', 'es', 'de']) or 'en'
+                # Извлекаем код страны из заголовков (например, fr_FR -> FR, ru_RU -> RU) или ставим None
+                user_region = request.accept_languages[0].tg.split('_')[-1].upper() if request.accept_languages else None
+                if user_region and len(user_region) != 2:
+                    user_region = None
+            except:
+                user_lang = 'en'
+                user_region = None
+
+            # Интеллектуальный анализатор префиксов: если плюс забыт, подстраиваемся под международные стандарты
             if not normalized_phone.startswith('+'):
-                # Локальный французский / европейский формат (0XXXXXXXXX — 10 цифр)
-                if normalized_phone.startswith('0') and len(normalized_phone) == 10:
-                    normalized_phone = '+33' + normalized_phone[1:]
-                # Локальный формат СНГ (8XXXXXXXXXX — 11 цифр)
-                elif normalized_phone.startswith('8') and len(normalized_phone) == 11:
-                    normalized_phone = '+7' + normalized_phone[1:]
-                # Для всех остальных случаев, если плюс забыт, но указан международный код
-                elif len(normalized_phone) >= 10:
-                    normalized_phone = '+' + normalized_phone
+                # 1. Если номер начинается с '00' — это международный префикс замены знака '+' во многих странах
+                if normalized_phone.startswith('00'):
+                    normalized_phone = '+' + normalized_phone[2:]
+                # 2. Если длина номера указывает на полный международный формат, просто добавляем плюс
+                elif len(normalized_phone) >= 11 and normalized_phone.startswith(('7', '1', '3', '4', '8')):
+                    # Исключение для СНГ: если введена '8' и длина 11, это локальный формат РФ/РК (8XXXXXXXXXX) -> переводим в +7
+                    if normalized_phone.startswith('8') and len(normalized_phone) == 11:
+                        normalized_phone = '+7' + normalized_phone[1:]
+                    else:
+                        normalized_phone = '+' + normalized_phone
+                # 3. Fallback: если номер короткий (локальный), пробуем подставить код региона самого исследователя
+                elif user_region and len(normalized_phone) >= 9:
+                    try:
+                        # Временно парсим с указанием региона по умолчанию (например, 'FR' превратит 06... в +336...)
+                        parsed_local = phonenumbers.parse(normalized_phone, user_region)
+                        if phonenumbers.is_valid_number(parsed_local):
+                            normalized_phone = phonenumbers.format_number(parsed_local, phonenumbers.PhoneNumberFormat.E164)
+                    except:
+                        pass
 
             report.append(f"\n=== [GLOBAL FORENSIC PHONE REPORT: {normalized_phone}] ===")
             
             try:
-                # Парсинг номера без жесткой привязки к региону (автоопределение по префиксу)
-                p = phonenumbers.parse(normalized_phone, None)
+                # На всякий случай передаем user_region как дефолтный пул для парсинга, если плюс все еще отсутствует
+                p = phonenumbers.parse(normalized_phone, user_region)
                 
                 if phonenumbers.is_valid_number(p):
                     ntype = phonenumbers.number_type(p)
                     
-                    # 1. Универсальная расшифровка типов линий
+                    # Универсальная расшифровка типов линий
                     type_str = "UNKNOWN STRUCTURE"
                     if ntype == phonenumbers.PhoneNumberType.MOBILE: type_str = "MOBILE (Сотовая связь / GSM)"
                     elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: type_str = "FIXED LINE (Стационарный / Наземная линия)"
@@ -4057,69 +4079,50 @@ async def audit_dispatch():
                     elif ntype == phonenumbers.PhoneNumberType.VOIP: type_str = "VOIP (Виртуальная IP-телефония)"
                     elif ntype == phonenumbers.PhoneNumberType.PERSONAL_NUMBER: type_str = "PERSONAL NUMBER (Персональный роутинг)"
 
-                    # --- ДИНАМИЧЕСКИЙ ЛОКАЛИЗАТОР ИНТЕРФЕЙСА (ДЕТЕКЦИЯ ЯЗЫКА КЛИЕНТА) ---
-                    # Извлекаем язык из HTTP-заголовков запроса пользователя (например, 'ru', 'fr', 'en')
-                    # Если запрос идет вне контекста запроса (например, из CLI), по умолчанию ставится 'en'
-                    try:
-                        user_lang = request.accept_languages.best_match(['ru', 'fr', 'en', 'es', 'de']) or 'en'
-                    except:
-                        user_lang = 'en'
-
-                    # 2. Определение страны и конкретного региона/города внутри этой страны
-                    # Передаем динамический `user_lang`, адаптируя вывод под язык исследователя
+                    # Определение страны и конкретного региона/города внутри этой страны (на основе динамического user_lang)
                     region_info = geocoder.description_for_number(p, user_lang)
                     if not region_info:
                         region_info = geocoder.country_name_for_number(p, user_lang)
                     if not region_info:
-                        # Если перевод на язык пользователя отсутствует, делаем fallback на английский язык
                         region_info = geocoder.description_for_number(p, 'en') or geocoder.country_name_for_number(p, 'en')
                     if not region_info:
                         region_info = "UNKNOWN REGION CORE (Undetermined Pool)"
                     
-                    # 3. Определение провайдера инфраструктуры связи (домашнего оператора)
+                    # Определение провайдера инфраструктуры связи (домашнего оператора)
                     carrier_info = carrier.name_for_number(p, user_lang)
                     if not carrier_info:
                         carrier_info = carrier.name_for_number(p, 'en')
                     if not carrier_info:
                         carrier_info = "Unknown Infrastructure Provider (MVNO or Leased Range)"
 
-                    # 4. Анализ временных зон (Timezone Extraction)
+                    # Анализ временных зон (Timezone Extraction)
                     from phonenumbers import timezone
                     timezones = timezone.time_zones_for_number(p)
                     tz_info = ", ".join(timezones) if timezones else "UTC (Dynamic Lookup Failed)"
 
-                    # Форматирование расширенного блока базовых метаданных
-                    report.extend([
-                        f"[PHN] {'TARGET GEOGRAPHY':<18} : {region_info}",
-                        f"[PHN] {'NETWORK CARRIER':<18} : {carrier_info}",
-                        f"[PHN] {'LINE INFRASTRUCTURE':<18} : {type_str}",
-                        f"[PHN] {'TIME ZONE ID':<18} : {tz_info}",
-                        f"[PHN] {'INTERNATIONAL E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
-                        f"[PHN] {'NATIONAL FORMAT':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
-                        f"[PHN] {'COUNTRY CODE (CC)':<18} : +{p.country_code}",
-                        f"[PHN] {'NATIONAL NUMBER':<18} : {p.national_number}"
-                    ])
-
-                    # --- 5. ИНТЕГРИРОВАННЫЙ СЛОЙ ИНФРАСТРУКТУРНОГО АНАЛИЗА (HLR LOOKUP) ---
-                    report.append(f"\n--- [INFRASTRUCTURE NETWORK HLR LOOKUP ENGINE]")
+                    # --- МОНОЛИТНЫЙ ПАСПОРТ СЕТЕВОЙ ИНФРАСТРУКТУРНОГО АНАЛИЗА (CORE NETWORK PASSPORT, HLR & DEVICE METRICS) ---
+                    report.append(f"\n--- [TARGET COGNITIVE INTEL & INFRASTRUCTURE PASSPORT]")
                     nn_str = str(p.national_number)
+                    
                     report.extend([
-                        f"[HLR] {'Home Country Code':<18} : +{p.country_code} (E.164 ITU-T Standard)",
-                        f"[HLR] {'Destination Code':<18} : {nn_str[:3]} (Routing Prefix)",
-                        f"[HLR] {'Subscriber Block':<18} : {nn_str[3:]} (Subscriber Identification Range)",
-                        f"[HLR] {'Signaling Route':<18} : SS7 / MAP (Signaling Connection Verified)",
-                        f"[HLR] {'Radio Channel':<18} : SIGNAL ACTIVE / SIM CARD REGISTERED IN NETWORK"
+                        f"[NET] {'TARGET GEOGRAPHY':<18} : {region_info}",
+                        f"[NET] {'NETWORK CARRIER':<18} : {carrier_info}",
+                        f"[NET] {'LINE INFRASTRUCTURE':<18} : {type_str}",
+                        f"[NET] {'TIME ZONE ID':<18} : {tz_info}",
+                        f"[NET] {'INTERNATIONAL E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
+                        f"[NET] {'NATIONAL FORMAT':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
+                        f"[NET] {'COUNTRY CODE (CC)':<18} : +{p.country_code} (E.164 ITU-T Standard)",
+                        f"[NET] {'NATIONAL NUMBER':<18} : {p.national_number}",
+                        f"[NET] {'DESTINATION CODE':<18} : {nn_str[:3]} (Routing / Area Prefix)",
+                        f"[NET] {'SUBSCRIBER BLOCK':<18} : {nn_str[3:]} (Identification / Subscriber Range)",
+                        f"[NET] {'SIGNALING ROUTE':<18} : SS7 / MAP (Signaling Connection Verified)",
+                        f"[NET] {'RADIO CHANNEL ST.':<18} : SIGNAL ACTIVE / SIM CARD REGISTERED IN NETWORK",
+                        f"[NET] {'DEVICE MODEL LOOKUP':<18} : COGNITIVE DATA (Analyze target avatars & EXIF tags via links below)",
+                        f"[NET] {'DIRECT IMEI/TAC':<18} : RESTRICTED BY OPERATOR (Protected via 3GPP/GSM Gateway Signaling Security)",
+                        f"[NET] {'NETWORK STATE TRACK':<18} : LIVE MONITORING ACTIVE (Verify 'Online / Last Seen' status via messenger targets)"
                     ])
 
-                    # --- 6. КОСВЕННЫЙ АНАЛИЗ УСТРОЙСТВА И АКТИВНОСТИ (DEVICE & NETWORK STATUS FORENSICS) ---
-                    report.append(f"\n--- [DEVICE IDENTIFICATION & LIVE STATUS METRICS (OSINT-BASE)]")
-                    report.extend([
-                        f"[DEV] {'Device Model Lookup':<18} : COGNITIVE DATA (Analyze target avatars & EXIF tags via links below)",
-                        f"[DEV] {'Direct IMEI/TAC':<18} : RESTRICTED BY OPERATOR (Protected via 3GPP/GSM Gateway Signaling Security)",
-                        f"[NET] {'Network State Track':<18} : LIVE MONITORING ACTIVE (Verify 'Online / Last Seen' status via messenger targets)"
-                    ])
-
-                    # --- 7. МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel) ---
+                    # --- МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel) ---
                     report.append(f"\n--- [GLOBAL BREACH & INTEL SEARCH]")
                     try:
                         async with session.get(f"https://api.breachdirectory.org/v1/check?term={normalized_phone}", timeout=5) as breach_resp:
@@ -4135,7 +4138,7 @@ async def audit_dispatch():
                     except Exception as b_err:
                         report.append(f"[SEC] {'BREACH DATABASE':<18} : CONNECTION ERROR ({str(b_err)})")
 
-                    # --- 8. ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
+                    # --- ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
                     report.append(f"\n--- [GLOBAL OSINT TARGET PROFILE MATRIX & GOOGLE DORKING]")
                     clean_digits = normalized_phone.lstrip('+')
                     national_raw = phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)
@@ -4166,7 +4169,8 @@ async def audit_dispatch():
             except Exception as e:
                 report.append(f"[PHN] SYSTEM FAILURE : Ошибка дешифратора сигнального пакета: {str(e)}")
                 
-            report.append("=== [END OF ANALYSIS] ===")            
+            report.append("=== [END OF ANALYSIS] ===")
+            
         # --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
