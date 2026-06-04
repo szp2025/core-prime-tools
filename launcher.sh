@@ -4057,33 +4057,47 @@ async def audit_dispatch():
                     elif ntype == phonenumbers.PhoneNumberType.VOIP: type_str = "VOIP (Виртуальная IP-телефония)"
                     elif ntype == phonenumbers.PhoneNumberType.PERSONAL_NUMBER: type_str = "PERSONAL NUMBER (Персональный роутинг)"
 
+                    # --- ДИНАМИЧЕСКИЙ ЛОКАЛИЗАТОР ИНТЕРФЕЙСА (ДЕТЕКЦИЯ ЯЗЫКА КЛИЕНТА) ---
+                    # Извлекаем язык из HTTP-заголовков запроса пользователя (например, 'ru', 'fr', 'en')
+                    # Если запрос идет вне контекста запроса (например, из CLI), по умолчанию ставится 'en'
+                    try:
+                        user_lang = request.accept_languages.best_match(['ru', 'fr', 'en', 'es', 'de']) or 'en'
+                    except:
+                        user_lang = 'en'
+
                     # 2. Определение страны и конкретного региона/города внутри этой страны
-                    region_info = geocoder.description_for_number(p, "ru")
+                    # Передаем динамический `user_lang`, адаптируя вывод под язык исследователя
+                    region_info = geocoder.description_for_number(p, user_lang)
                     if not region_info:
-                        region_info = geocoder.country_name_for_number(p, "ru")
+                        region_info = geocoder.country_name_for_number(p, user_lang)
                     if not region_info:
-                        region_info = "Определить страну не удалось (Нестандартный пул)"
+                        # Если перевод на язык пользователя отсутствует, делаем fallback на английский язык
+                        region_info = geocoder.description_for_number(p, 'en') or geocoder.country_name_for_number(p, 'en')
+                    if not region_info:
+                        region_info = "UNKNOWN REGION CORE (Undetermined Pool)"
                     
                     # 3. Определение провайдера инфраструктуры связи (домашнего оператора)
-                    carrier_info = carrier.name_for_number(p, "ru")
+                    carrier_info = carrier.name_for_number(p, user_lang)
                     if not carrier_info:
-                        carrier_info = "Установить оператора не удалось (MVNO или Виртуальная аренда емкости)"
+                        carrier_info = carrier.name_for_number(p, 'en')
+                    if not carrier_info:
+                        carrier_info = "Unknown Infrastructure Provider (MVNO or Leased Range)"
 
                     # 4. Анализ временных зон (Timezone Extraction)
                     from phonenumbers import timezone
                     timezones = timezone.time_zones_for_number(p)
-                    tz_info = ", ".join(timezones) if timezones else "UTC (Определить динамически не удалось)"
+                    tz_info = ", ".join(timezones) if timezones else "UTC (Dynamic Lookup Failed)"
 
                     # Форматирование расширенного блока базовых метаданных
                     report.extend([
-                        f"[PHN] {'ГЕО-СТРАНА/РЕГИОН':<18} : {region_info}",
-                        f"[PHN] {'ОПЕРАТОР СВЯЗИ':<18} : {carrier_info}",
-                        f"[PHN] {'ТИП ИНФРАСТРУКТУРЫ':<18} : {type_str}",
-                        f"[PHN] {'ВРЕМЕННАЯ ЗОНА':<18} : {tz_info}",
-                        f"[PHN] {'МЕЖДУНАРОДНЫЙ E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
-                        f"[PHN] {'НАЦИОНАЛЬНЫЙ ФОРМАТ':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
-                        f"[PHN] {'КОД СТРАНЫ (CC)':<18} : +{p.country_code}",
-                        f"[PHN] {'НАЦИОНАЛЬНЫЙ КОД':<18} : {p.national_number}"
+                        f"[PHN] {'TARGET GEOGRAPHY':<18} : {region_info}",
+                        f"[PHN] {'NETWORK CARRIER':<18} : {carrier_info}",
+                        f"[PHN] {'LINE INFRASTRUCTURE':<18} : {type_str}",
+                        f"[PHN] {'TIME ZONE ID':<18} : {tz_info}",
+                        f"[PHN] {'INTERNATIONAL E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
+                        f"[PHN] {'NATIONAL FORMAT':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
+                        f"[PHN] {'COUNTRY CODE (CC)':<18} : +{p.country_code}",
+                        f"[PHN] {'NATIONAL NUMBER':<18} : {p.national_number}"
                     ])
 
                     # --- 5. ИНТЕГРИРОВАННЫЙ СЛОЙ ИНФРАСТРУКТУРНОГО АНАЛИЗА (HLR LOOKUP) ---
@@ -4091,18 +4105,18 @@ async def audit_dispatch():
                     nn_str = str(p.national_number)
                     report.extend([
                         f"[HLR] {'Home Country Code':<18} : +{p.country_code} (E.164 ITU-T Standard)",
-                        f"[HLR] {'Destination Code':<18} : {nn_str[:3]} (Начальный сетевой префикс маршрутизации)",
-                        f"[HLR] {'Subscriber Block':<18} : {nn_str[3:]} (Уникальный идентификатор абонентской емкости)",
+                        f"[HLR] {'Destination Code':<18} : {nn_str[:3]} (Routing Prefix)",
+                        f"[HLR] {'Subscriber Block':<18} : {nn_str[3:]} (Subscriber Identification Range)",
                         f"[HLR] {'Signaling Route':<18} : SS7 / MAP (Signaling Connection Verified)",
-                        f"[HLR] {'Radio Channel':<18} : СИГНАЛ АКТИВЕН / SIM-КАРТА ЗАРЕГИСТРИРОВАНА В СЕТИ"
+                        f"[HLR] {'Radio Channel':<18} : SIGNAL ACTIVE / SIM CARD REGISTERED IN NETWORK"
                     ])
 
                     # --- 6. КОСВЕННЫЙ АНАЛИЗ УСТРОЙСТВА И АКТИВНОСТИ (DEVICE & NETWORK STATUS FORENSICS) ---
                     report.append(f"\n--- [DEVICE IDENTIFICATION & LIVE STATUS METRICS (OSINT-BASE)]")
                     report.extend([
-                        f"[DEV] {'Определение модели':<18} : ДОСТУПНО КОСВЕННО (См. ссылки Telegram/WhatsApp на аватарки и EXIF)",
-                        f"[DEV] {'Прямой IMEI/TAC':<18} : ЗАБЛОКИРОВАНО ОПЕРАТОРОМ (Защищено протоколами 3GPP/GSM-коммутатора)",
-                        f"[NET] {'Текущий статус сети':<18} : LIVE ТРЕКИНГ АКТИВЕН (Проверьте статус 'В сети / Был недавно' по ссылкам мессенджеров)"
+                        f"[DEV] {'Device Model Lookup':<18} : COGNITIVE DATA (Analyze target avatars & EXIF tags via links below)",
+                        f"[DEV] {'Direct IMEI/TAC':<18} : RESTRICTED BY OPERATOR (Protected via 3GPP/GSM Gateway Signaling Security)",
+                        f"[NET] {'Network State Track':<18} : LIVE MONITORING ACTIVE (Verify 'Online / Last Seen' status via messenger targets)"
                     ])
 
                     # --- 7. МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel) ---
@@ -4112,14 +4126,14 @@ async def audit_dispatch():
                             if breach_resp.status == 200:
                                 b_data = await breach_resp.json()
                                 if b_data.get('found', 0) > 0:
-                                    report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : [!!!] ОБНАРУЖЕНЫ СЛИВЫ ПЕРСОНАЛЬНЫХ ДАННЫХ")
-                                    report.append(f"[SEC] {'КОЛИЧЕСТВО УТЕЧЕК':<18} : {b_data.get('found')}")
+                                    report.append(f"[SEC] {'BREACH DATABASE':<18} : [!!!] PERSONAL DATA EXPOSURE DETECTED")
+                                    report.append(f"[SEC] {'TOTAL BREACHES':<18} : {b_data.get('found')}")
                                 else:
-                                    report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : ЧИСТЫЙ НОМЕР (В публичных базах утечек не зафиксирован)")
+                                    report.append(f"[SEC] {'BREACH DATABASE':<18} : CLEAN RANGE (No public exposures found)")
                             else:
-                                report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : СЕРВЕР ПРОВЕРКИ СЛИВОВ НЕ ОТВЕТИЛ (Status: {breach_resp.status})")
+                                report.append(f"[SEC] {'BREACH DATABASE':<18} : TARGET NODE UNRESPONSIVE (Status: {breach_resp.status})")
                     except Exception as b_err:
-                        report.append(f"[SEC] {'БАЗЫ УТЕЧЕК':<18} : ОШИБКА ПОДКЛЮЧЕНИЯ К API ({str(b_err)})")
+                        report.append(f"[SEC] {'BREACH DATABASE':<18} : CONNECTION ERROR ({str(b_err)})")
 
                     # --- 8. ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
                     report.append(f"\n--- [GLOBAL OSINT TARGET PROFILE MATRIX & GOOGLE DORKING]")
@@ -4127,25 +4141,20 @@ async def audit_dispatch():
                     national_raw = phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)
                     national_clean = national_raw.replace(" ", "").replace("-", "")
                     
-                    # Генерируем комплексную матрицу линков, адаптированных под международный сбор данных
                     scrapper_targets = {
-                        # Международные мессенджеры
                         "Telegram Profile" : f"https://t.me/{clean_digits}",
                         "WhatsApp Chat"     : f"https://wa.me/{normalized_phone}",
                         "Viber Direct"      : f"viber://contact?number=%2B{clean_digits}",
                         
-                        # Глобальные репутационные и идентификационные трекеры
                         "TrueCaller Intel"  : f"https://www.truecaller.com/search/global/{clean_digits}",
                         "Sync.ME Global"    : f"https://sync.me/search?number={clean_digits}",
                         "Whocalls Me Track" : f"https://whocallsme.com/Phone-Number.aspx/{clean_digits}",
                         "ShouldIAnswer Rating": f"https://www.shouldianswer.com/phone-number/{normalized_phone}",
                         
-                        # Международные экспертные поисковые дорки (Google Dorks)
-                        "Dork: Слитые документы": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+filetype:pdf+OR+filetype:xls+OR+filetype:doc",
-                        "Dork: Профили в соцсетях": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_clean}%22+site:facebook.com+OR+site:instagram.com+OR+site:linkedin.com+OR+site:twitter.com+OR+site:vk.com",
-                        "Dork: Упоминания/Форумы" : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+OR+%22{clean_digits}%22",
+                        "Dork: Leak Documents": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+filetype:pdf+OR+filetype:xls+OR+filetype:doc",
+                        "Dork: Social Networks": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_clean}%22+site:facebook.com+OR+site:instagram.com+OR+site:linkedin.com+OR+site:twitter.com+OR+site:vk.com",
+                        "Dork: Mentions/Forums" : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+OR+%22{clean_digits}%22",
                         
-                        # Автоматический QR-контейнер для мобильного сопряжения
                         "QR Code Generator" : f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=tel:{normalized_phone}"
                     }
                     
@@ -4153,12 +4162,11 @@ async def audit_dispatch():
                         report.append(f"[LNK] {name:<22} : {url}")
                         
                 else:
-                    report.append("[PHN] {'КРИТИЧЕСКАЯ ОШИБКА':<18} : СТРУКТУРА НОМЕРА СБОЙНАЯ ИЛИ НЕВАЛИДНАЯ")
+                    report.append("[PHN] CRITICAL ERROR : Искаженная структура или невалидный префикс диапазона")
             except Exception as e:
-                report.append(f"[PHN] {'СИСТЕМНЫЙ СБОЙ':<18} : Ошибка синтаксического анализа: {str(e)}")
+                report.append(f"[PHN] SYSTEM FAILURE : Ошибка дешифратора сигнального пакета: {str(e)}")
                 
-            report.append("=== [END OF ANALYSIS] ===")
-            
+            report.append("=== [END OF ANALYSIS] ===")            
         # --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
         elif '@' in clean_data:
             domain = clean_data.split('@')[-1]
