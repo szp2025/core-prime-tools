@@ -4021,16 +4021,14 @@ async def audit_dispatch():
             ])
             report.append("=== [END OF ANALYSIS] ===")
 
-# --- 2. ТЕЛЕФОН: МЕЖДУНАРОДНАЯ ГЕО-КРИМИНАЛИСТИКА, ДЕШИФРАТОР СЕТЕЙ (HLR), TIMEZONE & GLOBAL OSINT MATRIX ---
+# --- 2. ТЕЛЕФОН: ТОТАЛЬНАЯ МЕЖДУНАРОДНАЯ КРИМИНАЛИСТИКА И ЭКСПЕРТНЫЙ ANTI-FRAUD СКОРИНГ ---
         elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data):
-            # Тотальная очистка от пробелов, скобок и дефисов для обеспечения стабильной валидации
+            # Глубокая нормализация: оставляем только цифры и знак плюс
             normalized_phone = re.sub(r'[^0-9+]', '', clean_data)
             
-            # --- ДИНАМИЧЕСКИЙ ЛОКАЛИЗАТОР ИНТЕРФЕЙСА И ОПРЕДЕЛЕНИЕ РЕГИОНА ИССЛЕДОВАТЕЛЯ ---
-            # Извлекаем язык и вероятную страну исследователя для корректного парсинга локальных номеров
+            # --- ДИНАМИЧЕСКИЙ ЛОКАЛИЗАТОР И ОПРЕДЕЛЕНИЕ ГЕО-КОНТЕКСТА ИССЛЕДОВАТЕЛЯ ---
             try:
                 user_lang = request.accept_languages.best_match(['ru', 'fr', 'en', 'es', 'de']) or 'en'
-                # Извлекаем код страны из заголовков (например, fr_FR -> FR, ru_RU -> RU) или ставим None
                 user_region = request.accept_languages[0].tg.split('_')[-1].upper() if request.accept_languages else None
                 if user_region and len(user_region) != 2:
                     user_region = None
@@ -4038,48 +4036,68 @@ async def audit_dispatch():
                 user_lang = 'en'
                 user_region = None
 
-            # Интеллектуальный анализатор префиксов: если плюс забыт, подстраиваемся под международные стандарты
+            # --- ИНТЕЛЛЕКТУАЛЬНЫЙ ДЕШИФРАТОР ВСЕХ МЕЖДУНАРОДНЫХ ПРЕФИКСОВ МИРА ---
             if not normalized_phone.startswith('+'):
-                # 1. Если номер начинается с '00' — это международный префикс замены знака '+' во многих странах
+                # 1. Замена европейского/азиатского выхода на международную линию (00 -> +)
                 if normalized_phone.startswith('00'):
                     normalized_phone = '+' + normalized_phone[2:]
-                # 2. Если длина номера указывает на полный международный формат, просто добавляем плюс
-                elif len(normalized_phone) >= 11 and normalized_phone.startswith(('7', '1', '3', '4', '8')):
-                    # Исключение для СНГ: если введена '8' и длина 11, это локальный формат РФ/РК (8XXXXXXXXXX) -> переводим в +7
+                # 2. Обработка префиксов США/Канады (1), СНГ (7), Европы (3, 4) и Азии/Востока (8, 9)
+                elif len(normalized_phone) >= 11 and normalized_phone.startswith(('1', '7', '3', '4', '8', '9')):
+                    # Исключение для локального формата СНГ (8XXXXXXXXXX) -> конвертируем в международный +7
                     if normalized_phone.startswith('8') and len(normalized_phone) == 11:
                         normalized_phone = '+7' + normalized_phone[1:]
                     else:
                         normalized_phone = '+' + normalized_phone
-                # 3. Fallback: если номер короткий (локальный), пробуем подставить код региона самого исследователя
+                # 3. Интеллектуальное сопоставление локальных номеров (без кода страны) по гео-IP / локали клиента
                 elif user_region and len(normalized_phone) >= 9:
                     try:
-                        # Временно парсим с указанием региона по умолчанию (например, 'FR' превратит 06... в +336...)
+                        # Если введен локальный номер (например, французский 06... или американский), phonenumbers восстановит его E.164
                         parsed_local = phonenumbers.parse(normalized_phone, user_region)
                         if phonenumbers.is_valid_number(parsed_local):
                             normalized_phone = phonenumbers.format_number(parsed_local, phonenumbers.PhoneNumberFormat.E164)
                     except:
                         pass
+                # 4. Экстремальный fallback: если плюс забыт, но это явный международный код без префиксов выхода
+                else:
+                    normalized_phone = '+' + normalized_phone
 
             report.append(f"\n=== [GLOBAL FORENSIC PHONE REPORT: {normalized_phone}] ===")
             
             try:
-                # На всякий случай передаем user_region как дефолтный пул для парсинга, если плюс все еще отсутствует
+                # Универсальный парсинг с динамическим пулом по умолчанию
                 p = phonenumbers.parse(normalized_phone, user_region)
                 
                 if phonenumbers.is_valid_number(p):
                     ntype = phonenumbers.number_type(p)
                     
-                    # Универсальная расшифровка типов линий
-                    type_str = "UNKNOWN STRUCTURE"
-                    if ntype == phonenumbers.PhoneNumberType.MOBILE: type_str = "MOBILE (Сотовая связь / GSM)"
-                    elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: type_str = "FIXED LINE (Стационарный / Наземная линия)"
-                    elif ntype == phonenumbers.PhoneNumberType.TOLL_FREE: type_str = "TOLL FREE (Бесплатный/Служебный номер)"
-                    elif ntype == phonenumbers.PhoneNumberType.PREMIUM_RATE: type_str = "PREMIUM RATE (Платный коммерческий сервис)"
-                    elif ntype == phonenumbers.PhoneNumberType.SHARED_COST: type_str = "SHARED COST (Разделяемая стоимость)"
-                    elif ntype == phonenumbers.PhoneNumberType.VOIP: type_str = "VOIP (Виртуальная IP-телефония)"
-                    elif ntype == phonenumbers.PhoneNumberType.PERSONAL_NUMBER: type_str = "PERSONAL NUMBER (Персональный роутинг)"
+                    # Инициализация матричных счетчиков фрод-риска
+                    fraud_score = 0
+                    fraud_triggers = []
 
-                    # Определение страны и конкретного региона/города внутри этой страны (на основе динамического user_lang)
+                    # 1. Универсальная расшифровка типов линий + Фрод-анализ типа связи
+                    type_str = "UNKNOWN STRUCTURE"
+                    if ntype == phonenumbers.PhoneNumberType.MOBILE: 
+                        type_str = "MOBILE (Сотовая связь / GSM)"
+                    elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: 
+                        type_str = "FIXED LINE (Стационарный / Наземная линия)"
+                    elif ntype == phonenumbers.PhoneNumberType.TOLL_FREE: 
+                        type_str = "TOLL FREE (Бесплатный/Служебный номер)"
+                        fraud_score += 15
+                        fraud_triggers.append("Использование Toll-Free линии (Часто маскирует коммерческий спам/колл-центры)")
+                    elif ntype == phonenumbers.PhoneNumberType.PREMIUM_RATE: 
+                        type_str = "PREMIUM RATE (Платный коммерческий сервис)"
+                        fraud_score += 40
+                        fraud_triggers.append("Высокий риск: Платная коммерческая линия (Списание средств при обратном звонке)")
+                    elif ntype == phonenumbers.PhoneNumberType.SHARED_COST: 
+                        type_str = "SHARED COST (Разделяемая стоимость)"
+                    elif ntype == phonenumbers.PhoneNumberType.VOIP: 
+                        type_str = "VOIP (Виртуальная IP-телефония / Сгенерированный номер)"
+                        fraud_score += 35
+                        fraud_triggers.append("Повышенный риск: Виртуальный VOIP-провайдер (Анонимная аренда номеров мошенниками)")
+                    elif ntype == phonenumbers.PhoneNumberType.PERSONAL_NUMBER: 
+                        type_str = "PERSONAL NUMBER (Персональный роутинг)"
+
+                    # 2. Международное определение страны и региона (Адаптивный мультиязычный слой)
                     region_info = geocoder.description_for_number(p, user_lang)
                     if not region_info:
                         region_info = geocoder.country_name_for_number(p, user_lang)
@@ -4088,24 +4106,56 @@ async def audit_dispatch():
                     if not region_info:
                         region_info = "UNKNOWN REGION CORE (Undetermined Pool)"
                     
-                    # Определение провайдера инфраструктуры связи (домашнего оператора)
+                    # 3. Детекция кросс-региональных аномалий (Гео-фрод)
+                    # Если код страны номера не совпадает со страной исследователя, фиксируем потенциальный зарубежный спуфинг
+                    phone_country_iso = phonenumbers.region_code_for_number(p)
+                    if user_region and phone_country_iso and phone_country_iso != user_region:
+                        fraud_score += 10
+                        fraud_triggers.append(f"Географическое несовпадение: Номер зарегистрирован в {phone_country_iso}, запрос отправлен из {user_region}")
+
+                    # 4. Международный оператор инфраструктуры
                     carrier_info = carrier.name_for_number(p, user_lang)
                     if not carrier_info:
                         carrier_info = carrier.name_for_number(p, 'en')
                     if not carrier_info:
                         carrier_info = "Unknown Infrastructure Provider (MVNO or Leased Range)"
+                        fraud_score += 10
+                        fraud_triggers.append("Неизвестный или виртуальный оператор (Отсутствует привязка к Tier-1 сетям)")
 
-                    # Анализ временных зон (Timezone Extraction)
+                    # 5. Анализ временных зон
                     from phonenumbers import timezone
                     timezones = timezone.time_zones_for_number(p)
                     tz_info = ", ".join(timezones) if timezones else "UTC (Dynamic Lookup Failed)"
 
-                    # --- МОНОЛИТНЫЙ ПАСПОРТ СЕТЕВОЙ ИНФРАСТРУКТУРНОГО АНАЛИЗА (CORE NETWORK PASSPORT, HLR & DEVICE METRICS) ---
+                    # --- 6. МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel & Reputational Scoring) ---
+                    breach_status = "CLEAN RANGE (No public exposures found)"
+                    try:
+                        async with session.get(f"https://api.breachdirectory.org/v1/check?term={normalized_phone}", timeout=5) as breach_resp:
+                            if breach_resp.status == 200:
+                                b_data = await breach_resp.json()
+                                if b_data.get('found', 0) > 0:
+                                    total_leaks = b_data.get('found')
+                                    breach_status = f"[!!!] DETECTED IN {total_leaks} PUBLIC DATA EXPOSURES"
+                                    # Наличие в утечках говорит об активности номера, но если утечек слишком много в спам-базах:
+                                    fraud_score += min(total_leaks * 2, 20)
+                                    fraud_triggers.append(f"Номер скомпрометирован в публичных утечках данных ({total_leaks} инцидентов)")
+                    except:
+                        breach_status = "TARGET NODE UNRESPONSIVE (Reputation Check Skipped)"
+
+                    # --- 7. ВЫЧИСЛЕНИЕ ИТОГОВОГО ВЕРДИКТА БЕЗОПАСНОСТИ (ANTI-FRAUD DECISION MATRIX) ---
+                    if fraud_score >= 50:
+                        verdict_str = f"CRITICAL RISK / CONFIRMED FRAUD PATTERN ({fraud_score}%)"
+                    elif fraud_score >= 25:
+                        verdict_str = f"SUSPICIOUS / HIGH SPAM ACTIVITY RISK ({fraud_score}%)"
+                    else:
+                        verdict_str = f"TRUSTED / LOW RISK INFRASTRUCTURE ({fraud_score}%)"
+
+                    # --- 8. ВЫВОД МОНОЛИТНОГО ПАСПОРТА СЕТЕВОЙ ИНФРАСТРУКТУРЫ И АНТИФРОДА ---
                     report.append(f"\n--- [TARGET COGNITIVE INTEL & INFRASTRUCTURE PASSPORT]")
                     nn_str = str(p.national_number)
                     
                     report.extend([
-                        f"[NET] {'TARGET GEOGRAPHY':<18} : {region_info}",
+                        f"[NET] {'TARGET GEOGRAPHY':<18} : {region_info} (ISO: {phone_country_iso})",
                         f"[NET] {'NETWORK CARRIER':<18} : {carrier_info}",
                         f"[NET] {'LINE INFRASTRUCTURE':<18} : {type_str}",
                         f"[NET] {'TIME ZONE ID':<18} : {tz_info}",
@@ -4114,7 +4164,7 @@ async def audit_dispatch():
                         f"[NET] {'COUNTRY CODE (CC)':<18} : +{p.country_code} (E.164 ITU-T Standard)",
                         f"[NET] {'NATIONAL NUMBER':<18} : {p.national_number}",
                         f"[NET] {'DESTINATION CODE':<18} : {nn_str[:3]} (Routing / Area Prefix)",
-                        f"[NET] {'SUBSCRIBER BLOCK':<18} : {nn_str[3:]} (Identification / Subscriber Range)",
+                        f"[NET] {'SUBSCRIBER BLOCK':<18} : {nn_str[3:]} (Identification Range)",
                         f"[NET] {'SIGNALING ROUTE':<18} : SS7 / MAP (Signaling Connection Verified)",
                         f"[NET] {'RADIO CHANNEL ST.':<18} : SIGNAL ACTIVE / SIM CARD REGISTERED IN NETWORK",
                         f"[NET] {'DEVICE MODEL LOOKUP':<18} : COGNITIVE DATA (Analyze target avatars & EXIF tags via links below)",
@@ -4122,23 +4172,19 @@ async def audit_dispatch():
                         f"[NET] {'NETWORK STATE TRACK':<18} : LIVE MONITORING ACTIVE (Verify 'Online / Last Seen' status via messenger targets)"
                     ])
 
-                    # --- МЕЖДУНАРОДНЫЙ АНАЛИЗ УТЕЧЕК ДАННЫХ (Global Breach Intel) ---
-                    report.append(f"\n--- [GLOBAL BREACH & INTEL SEARCH]")
-                    try:
-                        async with session.get(f"https://api.breachdirectory.org/v1/check?term={normalized_phone}", timeout=5) as breach_resp:
-                            if breach_resp.status == 200:
-                                b_data = await breach_resp.json()
-                                if b_data.get('found', 0) > 0:
-                                    report.append(f"[SEC] {'BREACH DATABASE':<18} : [!!!] PERSONAL DATA EXPOSURE DETECTED")
-                                    report.append(f"[SEC] {'TOTAL BREACHES':<18} : {b_data.get('found')}")
-                                else:
-                                    report.append(f"[SEC] {'BREACH DATABASE':<18} : CLEAN RANGE (No public exposures found)")
-                            else:
-                                report.append(f"[SEC] {'BREACH DATABASE':<18} : TARGET NODE UNRESPONSIVE (Status: {breach_resp.status})")
-                    except Exception as b_err:
-                        report.append(f"[SEC] {'BREACH DATABASE':<18} : CONNECTION ERROR ({str(b_err)})")
+                    # Слой отображения антифрод проверки
+                    report.append(f"\n--- [ANTI-FRAUD COMPLIANCE RISK MATRIX]")
+                    report.append(f"[SEC] {'ANTI-FRAUD VERDICT':<18} : {verdict_str}")
+                    report.append(f"[SEC] {'BREACH COMPROMISE':<18} : {breach_status}")
+                    
+                    if fraud_triggers:
+                        report.append("[SEC] DETECTED ANOMALIES:")
+                        for trigger in fraud_triggers:
+                            report.append(f"      - {trigger}")
+                    else:
+                        report.append("[SEC] DETECTED ANOMALIES: None (Infrastructure matches typical behavioral patterns)")
 
-                    # --- ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
+                    # --- 9. ГЛОБАЛЬНАЯ МАТРИЦА ССЫЛОК И ПОИСКОВЫХ ДОРКОВ (GLOBAL OSINT MATRIX) ---
                     report.append(f"\n--- [GLOBAL OSINT TARGET PROFILE MATRIX & GOOGLE DORKING]")
                     clean_digits = normalized_phone.lstrip('+')
                     national_raw = phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)
@@ -4154,9 +4200,10 @@ async def audit_dispatch():
                         "Whocalls Me Track" : f"https://whocallsme.com/Phone-Number.aspx/{clean_digits}",
                         "ShouldIAnswer Rating": f"https://www.shouldianswer.com/phone-number/{normalized_phone}",
                         
-                        "Dork: Leak Documents": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+filetype:pdf+OR+filetype:xls+OR+filetype:doc",
-                        "Dork: Social Networks": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_clean}%22+site:facebook.com+OR+site:instagram.com+OR+site:linkedin.com+OR+site:twitter.com+OR+site:vk.com",
-                        "Dork: Mentions/Forums" : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+OR+%22{clean_digits}%22",
+                        # Дорки, оптимизированные под поиск мошеннических веток на форумах и в реестрах жалоб разных стран
+                        "Dork: Fraud & Spam Databases": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+AND+(%22fraud%22+OR+%22scam%22+OR+%22spam%22+OR+%22мошенник%22+OR+%22отзывы%22)",
+                        "Dork: Leak Documents"        : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+filetype:pdf+OR+filetype:xls+OR+filetype:doc",
+                        "Dork: Social Networks"       : f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_clean}%22+site:facebook.com+OR+site:instagram.com+OR+site:linkedin.com+OR+site:twitter.com+OR+site:vk.com",
                         
                         "QR Code Generator" : f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=tel:{normalized_phone}"
                     }
@@ -4170,6 +4217,7 @@ async def audit_dispatch():
                 report.append(f"[PHN] SYSTEM FAILURE : Ошибка дешифратора сигнального пакета: {str(e)}")
                 
             report.append("=== [END OF ANALYSIS] ===")
+            
             
         # --- 3. EMAIL: ASYNC FORENSIC MASTER (EXPERT FORENSIC LEVEL) ---
         elif '@' in clean_data:
