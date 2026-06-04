@@ -3198,34 +3198,31 @@ get_tool_info() {
 # ==========================================
 
 # ==============================================================================
-# МОДУЛЬ NEXUS CORE: АВТОМАТИЧЕСКИЙ КРИМИНАЛИСТИЧЕСКИЙ ДИСПЕТЧЕР
+# МОДУЛЬ NEXUS CORE: УНИВЕРСАЛЬНЫЙ КРИМИНАЛИСТИЧЕСКИЙ ДИСПЕТЧЕР + АВТО-РЕЕСТР v4.5
 # ==============================================================================
 
 function run_nexus_forensic() {
     clear
     echo "======================================================================"
-    echo "         NEXUS AUTOMATIC COGNITIVE FORENSIC CORE v3.0                 "
+    echo "         NEXUS AUTOMATIC GLOBAL OSINT & FORENSIC CORE v4.5            "
     echo "======================================================================"
     echo ""
     
-    # Единственный автоматический запрос ввода без необходимости указывать тип данных
-    read -r -p "Введите объект для глубокого анализа (Телефон, Email, Домен, IBAN, Nick): " TARGET_DATA
+    # Полный спектр интеллектуального поиска в один клик
+    read -r -p "Введите любой объект (Телефон, Email, Адрес, SIRET, Гос Номер Машины, Nick): " TARGET_DATA
     
-    # Проверка на пустой ввод
     if [ -z "${TARGET_DATA}" ]; then
         echo -e "\n[ОТМЕНА] Объект не указан. Возврат в главное меню..."
         sleep 2
         return 0
     fi
 
-    echo -e "\n[ПОТОК] Инициализация вычислительного ядра и анализ структуры..."
+    echo -e "\n[ПОТОК] Сигнатурный анализ и запуск интеллектуального конвейера..."
 
-    # Активация виртуального окружения, если оно развернуто в проекте
     if [ -d ".venv" ]; then
         source .venv/bin/activate
     fi
 
-    # Передача сырых данных во встроенное Python-ядро через переменные окружения
     TARGET_DATA="${TARGET_DATA}" python3 << 'EOF'
 import os
 import sys
@@ -3235,8 +3232,8 @@ import aiodns
 import re
 import subprocess
 import socket
+import urllib.parse
 
-# Проверка обязательных криминалистических библиотек
 try:
     import phonenumbers
     from phonenumbers import geocoder, carrier, timezone
@@ -3245,264 +3242,271 @@ except ImportError:
     sys.exit(1)
 
 def verify_iban(iban: str) -> bool:
-    """ Валидация контрольной суммы IBAN по алгоритму MOD97 (ISO 13616) """
     if len(iban) < 4: return False
     rearranged = iban[4:] + iban[:4]
     integer_string = "".join(str(ord(char) - 55) if char.isalpha() else char for char in rearranged)
-    try:
-        return int(integer_string) % 97 == 1
-    except ValueError:
-        return False
+    try: return int(integer_string) % 97 == 1
+    except ValueError: return False
 
 class NexusForensicDispatcher:
     def __init__(self, lang="ru", region="RU"):
         self.lang = lang
         self.region = region
 
-    # --- МОДУЛЬ 1: АНАЛИЗ ФИНАНСОВЫХ ИНФРАСТРУКТУР (IBAN) ---
+    # --- МОДУЛЬ: ТРАНСПОРТНАЯ РАЗВЕДКА (PLATE / IMMATRICULATION) ---
+    async def process_license_plate(self, session, clean_data, country_hint, report):
+        report.append(f"\n=== [VEHICLE INTELLIGENCE & LICENSE PLATE AUDIT: {clean_data}] ===")
+        report.append(f"[CAR] REGISTRATION ZONE : {country_hint}")
+        
+        # Сценарий А: Французский формат SIV (AA-123-AA или старый 1234AB56)
+        if country_hint == "FRANCE (SIV / F-Plate)":
+            # Используем легальные публичные эндпоинты автозапчастей/страхования для выгрузки паспорта авто
+            url = f"https://www.oscaro.com/catalog/vehicles/v2/plates/{clean_data}"
+            try:
+                # Нам нужен кастомный заголовок, чтобы эмулировать браузер
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                async with session.get(url, headers=headers, timeout=6) as resp:
+                    if resp.status == 200:
+                        res_json = await resp.json()
+                        vehicle = res_json.get('vehicle', {}) or res_json.get('data', {})
+                        if vehicle:
+                            report.extend([
+                                f"[CAR] {'MANUFACTURER':<15} : {vehicle.get('brand', vehicle.get('make', 'N/A')).upper()}",
+                                f"[CAR] {'MODEL RANGE':<15} : {vehicle.get('model', 'N/A').upper()}",
+                                f"[CAR] {'ENGINE TYPE':<15} : {vehicle.get('engine', vehicle.get('energy', 'N/A'))}",
+                                f"[CAR] {'POWER OUTPUT':<15} : {vehicle.get('power', 'N/A')} HP / Din",
+                                f"[CAR] {'GEARBOX TYPE':<15} : {vehicle.get('gearbox', 'N/A')}",
+                                f"[CAR] {'PRODUCTION YEAR':<15} : {vehicle.get('year', 'N/A')}",
+                                f"[CAR] {'SHASSIS / VIN':<15} : {vehicle.get('vin', 'RESTRICTED / ENCRYPTED')}"
+                            ])
+                        else:
+                            report.append("[CAR] Номер распознан, но технические спецификации в открытом пуле отсутствуют.")
+                    else:
+                        report.append(f"[CAR] Французский технический шлюз вернул статус: {resp.status}")
+            except Exception as e:
+                report.append(f"[CAR] Ошибка связи с транспортным реестром SIV: {str(e)}")
+                
+        # Сценарий Б: Российский / СНГ Формат (А123АА77 и т.д.)
+        elif country_hint == "RUSSIA / CIS (RU-Plate)":
+            report.append("[CAR] Инициализация Dorking-сценариев проверки по базам штрафов, залогов и полисов ОСАГО...")
+            # Генерируем прямые криминалистические ссылки для ручной верификации по открытым реестрам
+            report.extend([
+                f"[LNK] {'Проверка РСА (ОСАГО)':<22} : https://autoins.ru/",
+                f"[LNK] {'Поиск в Нотариальной Палате':<22} : https://www.reestr-zalogov.ru/search/index",
+                f"[LNK] {'Dork: Упоминания в сети':<22} : https://www.google.com/search?q=%22{clean_data}%22",
+                f"[LNK] {'Dork: Проверка на парковках':<22} : https://www.google.com/search?q=%22{clean_data}%22+AND+(%22штраф%22+OR+%22эвакуация%22)"
+            ])
+            
+        # Универсальные международные OSINT-линки для автономеров
+        report.append(f"\n--- [GLOBAL COMPLIANCE VEHICLE MONITORS]")
+        report.extend([
+            f"[LNK] {'Euro Plates Database':<22} : https://www.europlates.eu/",
+            f"[LNK] {'PlatesMania Tracker':<22} : http://platesmania.com/search.php?car={clean_data}"
+        ])
+
+    # --- МОДУЛЬ: ФРАНЦУЗСКИЙ РЕЕСТР КОМПАНИЙ (SIRET / SIREN) ---
+    async def process_sirene(self, session, clean_data, report):
+        report.append(f"\n=== [REPERTOIRE SIRENE INFRASTRUCTURE AUDIT: {clean_data}] ===")
+        url = f"https://recherche-entreprises.api.gouv.fr/search?q={clean_data}"
+        try:
+            async with session.get(url, timeout=7) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    results = data.get('results', [])
+                    if not results:
+                        report.append("[SRN] Информация в государственном реестре не найдена."); return
+                    company = results[0]
+                    report.extend([
+                        f"[SRN] {'NOM COMMERCIAL':<16} : {company.get('nom_complet')}",
+                        f"[SRN] {'SIREN BASE':<16} : {company.get('siren')}",
+                        f"[SRN] {'STRUCTURE TYPE':<16} : {company.get('nature_juridique', 'N/A')}",
+                        f"[SRN] {'ACTIVITE MAIN':<16} : {company.get('activite_principale', 'N/A')} (Code APE)",
+                        f"[SRN] {'SIEGE ADDRESS':<16} : {company.get('adresse_complete', 'N/A')}"
+                    ])
+                    dirigeants = company.get('dirigeants', [])
+                    if dirigeants:
+                        report.append("--- [MANAGEMENT / DIRIGEANTS DETECTED]")
+                        for d in dirigeants:
+                            name = f"{d.get('prenoms', '')} {d.get('nom', '')}".strip() or d.get('denomination', 'N/A')
+                            report.append(f"      - [{d.get('qualite', 'Dirigeant')[:10]}] : {name}")
+                else: report.append(f"[SRN] Ошибка шлюза API Sirene: {resp.status}")
+        except Exception as e: report.append(f"[SRN] Критическая ошибка связи с реестром: {str(e)}")
+
+    # --- МОДУЛЬ: ГЛОБАЛЬНЫЙ МЕЖДУНАРОДНЫЙ РЕЕСТР (IMMATRICULATION / LEI) ---
+    async def process_global_immatriculation(self, session, clean_data, report):
+        report.append(f"\n=== [GLOBAL IMMATRICULATION & LEI AUDIT: {clean_data}] ===")
+        url = f"https://api.gleif.org/api/v1/lei-records/{clean_data}"
+        try:
+            async with session.get(url, timeout=7) as resp:
+                if resp.status == 200:
+                    res_json = await resp.json()
+                    attrs = res_json.get('data', {}).get('attributes', {})
+                    if not attrs: report.append("[LEI] Запись не верифицирована."); return
+                    legal_addr = attrs.get('entity', {}).get('legalAddress', {})
+                    lines = ", ".join(legal_addr.get('addressLines', []))
+                    report.extend([
+                        f"[LEI] {'LEGAL ENTITY NAME':<18} : {attrs.get('legalName', {}).get('name', 'N/A')}",
+                        f"[LEI] {'GLOBAL STATUS':<18} : {attrs.get('entity', {}).get('status', 'N/A')}",
+                        f"[LEI] {'JURISDICTION':<18} : {attrs.get('entity', {}).get('jurisdiction', 'N/A')}",
+                        f"[LEI] {'REGISTERED ADDR':<18} : {lines}, {legal_addr.get('city')}, {legal_addr.get('country')}"
+                    ])
+                else:
+                    search_url = f"https://api.gleif.org/api/v1/lei-records?filter[text]={urllib.parse.quote(clean_data)}"
+                    async with session.get(search_url, timeout=7) as s_resp:
+                        if s_resp.status == 200:
+                            s_json = await s_resp.json()
+                            s_data = s_json.get('data', [])
+                            if s_data:
+                                top_match = s_data[0].get('attributes', {})
+                                report.extend([
+                                    f"[LEI] {'BEST MATCH NAME':<18} : {top_match.get('legalName', {}).get('name')}",
+                                    f"[LEI] {'ASSIGNED LEI':<18} : {s_data[0].get('id')}"
+                                ])
+                            else: report.append("[LEI] Поиск по международным базам имматрикуляции не дал результатов.")
+        except Exception as e: report.append(f"[LEI] Сбой узла GLEIF: {str(e)}")
+
+    # --- МОДУЛЬ: ГЕОКОДИРОВАНИЕ ФИЗИЧЕСКОГО АДРЕСА ---
+    async def process_physical_address(self, session, clean_data, report):
+        report.append(f"\n=== [PHYSICAL ADDRESS GEOLOCATION MATRIX] ===")
+        url = f"https://api-adresse.data.gouv.fr/search/?q={urllib.parse.quote(clean_data)}&limit=1"
+        try:
+            async with session.get(url, timeout=6) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    features = data.get('features', [])
+                    if not features: report.append("[ADR] Совпадений адреса не обнаружено."); return
+                    prop = features[0].get('properties', {})
+                    coords = features[0].get('geometry', {}).get('coordinates', [0, 0])
+                    report.extend([
+                        f"[ADR] {'STANDARDIZED':<14} : {prop.get('label')}",
+                        f"[ADR] {'POSTAL CODE':<14} : {prop.get('postcode')}",
+                        f"[ADR] {'CITY / COMMUNE':<14} : {prop.get('city')}",
+                        f"[ADR] {'LONGITUDE':<14} : {coords[0]}",
+                        f"[ADR] {'LATITUDE':<14} : {coords[1]}"
+                    ])
+                    report.append(f"[LNK] {'OSM Live Map':<14} : https://www.openstreetmap.org/?mlat={coords[1]}&mlon={coords[0]}#map=17/{coords[1]}/{coords[0]}")
+        except Exception as e: report.append(f"[ADR] Сбой модуля BAN: {str(e)}")
+
+    # --- МОДУЛЬ: ФИНАНСОВЫЕ ИНФРАСТРУКТУРЫ (IBAN) ---
     async def process_iban(self, session, clean_data, report):
         is_valid = verify_iban(clean_data)
         report.append(f"\n=== [IBAN FORENSIC AUDIT: {clean_data}] ===")
-        report.append(f"[IBN] {'MOD97 CONTROL':<16} : {'PASSED (Valid Structure)' if is_valid else 'CRITICAL FAILURE (Checksum Mismatch)'}")
-        
+        report.append(f"[IBN] {'MOD97 CONTROL':<16} : {'PASSED' if is_valid else 'FAILURE'}")
         bic_prefix = clean_data[4:12]
-        routing_nodes = [
-            ("https://api.openiban.org/validate/{}", clean_data),
-            ("https://relais.epsoft.fr/api/iban/{}", clean_data),
-            ("https://bank-code.net/api/v1/bic/{}", bic_prefix)
-        ]
-        
-        nodes_reached = 0
-        for url_template, param in routing_nodes:
-            try:
-                async with session.get(url_template.format(param), timeout=6) as resp:
-                    if resp.status == 200:
-                        res_json = await resp.json()
-                        bd = res_json.get('bankData') or res_json.get('bank') or res_json
-                        report.append(f"--- [NODE: {url_template.split('/')[2]}] ---")
-                        report.extend([
-                            f"[IBN] {'BANK NAME':<16} : {bd.get('name') or bd.get('bankName') or 'N/A'}",
-                            f"[IBN] {'BIC/SWIFT CORE':<16} : {bd.get('bic') or bd.get('swift') or 'N/A'}",
-                            f"[IBN] {'CITY LOCATOR':<16} : {bd.get('city') or 'N/A'}",
-                            f"[IBN] {'COUNTRY METRIC':<16} : {bd.get('country') or 'N/A'}"
-                        ])
-                        nodes_reached += 1
-            except: continue
-                
-        report.append(f"\n--- [ANTI-FRAUD FINANCIAL VERDICT]")
-        report.extend([
-            f"[SEC] {'INTEGRITY STATE':<16} : {'VERIFIED INFRASTRUCTURE' if is_valid else 'COMPROMISED ARCHITECTURE'}",
-            f"[SEC] {'ROUTING TRUST':<16} : {'HIGH' if nodes_reached > 0 else 'SUSPICIOUS (No API Matches)'}"
-        ])
+        try:
+            async with session.get(f"https://api.openiban.org/validate/{clean_data}", timeout=5) as resp:
+                if resp.status == 200:
+                    bd = (await resp.json()).get('bankData', {})
+                    report.extend([
+                        f"[IBN] {'BANK NAME':<16} : {bd.get('name', 'N/A')}",
+                        f"[IBN] {'BIC/SWIFT CORE':<16} : {bd.get('bic', 'N/A')}"
+                    ])
+        except: pass
 
-    # --- МОДУЛЬ 2: МЕЖДУНАРОДНЫЙ АНТИ-ФРОД СКОРИНГ ТЕЛЕФОННЫХ СЕТЕЙ ---
+    # --- МОДУЛЬ: ТЕЛЕФОННЫЕ СЕТИ ---
     async def process_phone(self, session, clean_data, report):
         normalized = re.sub(r'[^0-9+]', '', clean_data)
         if not normalized.startswith('+'):
             if normalized.startswith('00'): normalized = '+' + normalized[2:]
             elif len(normalized) == 11 and normalized.startswith('8'): normalized = '+7' + normalized[1:]
             else: normalized = '+' + normalized
-
         report.append(f"\n=== [GLOBAL FORENSIC PHONE REPORT: {normalized}] ===")
         try:
             p = phonenumbers.parse(normalized, self.region)
             if phonenumbers.is_valid_number(p):
-                ntype = phonenumbers.number_type(p)
-                fraud_score = 0
-                fraud_triggers = []
-                
-                type_str = "UNKNOWN STRUCTURE"
-                if ntype == phonenumbers.PhoneNumberType.MOBILE: type_str = "MOBILE (Сотовая связь / GSM / LTE)"
-                elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: type_str = "FIXED LINE (Стационарная наземная линия)"
-                elif ntype == phonenumbers.PhoneNumberType.TOLL_FREE:
-                    type_str = "TOLL FREE (Бесплатный корпоративный номер)"
-                    fraud_score += 15; fraud_triggers.append("Toll-Free линия: частая маскировка под фальшивые колл-центры")
-                elif ntype == phonenumbers.PhoneNumberType.PREMIUM_RATE:
-                    type_str = "PREMIUM RATE (Платный коммерческий пул)"
-                    fraud_score += 40; fraud_triggers.append("Высокий риск: Платный номер (Риск списания средств при обратном звонке)")
-                elif ntype == phonenumbers.PhoneNumberType.VOIP:
-                    type_str = "VOIP (Виртуальная IP-телефония / Анонимная аренда)"
-                    fraud_score += 35; fraud_triggers.append("Повышенный риск: Анонимный виртуальный VOIP-номер")
-
-                region_info = geocoder.description_for_number(p, self.lang) or geocoder.country_name_for_number(p, self.lang)
-                phone_country = phonenumbers.region_code_for_number(p)
-                carrier_info = carrier.name_for_number(p, self.lang) or "Unknown MVNO / Virtual Provider"
-                if "Unknown" in carrier_info:
-                    fraud_score += 10; fraud_triggers.append("Отсутствует привязка к Tier-1 оператору")
-
-                timezones = timezone.time_zones_for_number(p)
-                tz_info = ", ".join(timezones) if timezones else "UTC Dynamic"
-
-                breach_status = "CLEAN RANGE (Записей в публичных утечках не найдено)"
-                try:
-                    async with session.get(f"https://api.breachdirectory.org/v1/check?term={normalized}", timeout=5) as b_resp:
-                        if b_resp.status == 200:
-                            b_data = await b_resp.json()
-                            if b_data.get('found', 0) > 0:
-                                total_leaks = b_data.get('found')
-                                breach_status = f"[!!!] ОБНАРУЖЕН В {total_leaks} ПУБЛИЧНЫХ УТЕЧКАХ"
-                                fraud_score += min(total_leaks * 2, 20)
-                                fraud_triggers.append(f"Номер скомпрометирован в базах данных ({total_leaks} раз)")
-                except: pass
-
-                report.append(f"\n--- [TARGET COGNITIVE INTEL & INFRASTRUCTURE PASSPORT]")
-                nn_str = str(p.national_number)
                 report.extend([
-                    f"[NET] {'GEOGRAPHY':<18} : {region_info} (ISO: {phone_country})",
-                    f"[NET] {'OPERATOR CORE':<18} : {carrier_info}",
-                    f"[NET] {'INFRASTRUCTURE':<18} : {type_str}",
-                    f"[NET] {'TIME ZONE ID':<18} : {tz_info}",
-                    f"[NET] {'FORMAT E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
-                    f"[NET] {'NATIONAL PREF':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
-                    f"[NET] {'ITU COUNTRY CC':<18} : +{p.country_code}",
-                    f"[NET] {'ROUTING PREFIX':<18} : {nn_str[:3]}",
-                    f"[NET] {'SIGNALING ROUTE':<18} : SS7 / MAP (Signaling Connection Verified)",
-                    f"[NET] {'RADIO CHANNEL ST.':<18} : SIGNAL ACTIVE / SIM CARD REGISTERED IN NETWORK",
-                    f"[NET] {'DIRECT IMEI/TAC':<18} : RESTRICTED BY 3GPP/GSM GATEWAY SECURE PROTOCOL"
+                    f"[NET] {'GEOGRAPHY':<18} : {geocoder.description_for_number(p, self.lang)}",
+                    f"[NET] {'OPERATOR CORE':<18} : {carrier.name_for_number(p, self.lang)}",
+                    f"[NET] {'FORMAT E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
                 ])
+        except Exception as e: report.append(f"[PHN] Сбой декодера: {str(e)}")
 
-                if fraud_score >= 50: verdict_str = f"CRITICAL RISK / FRAUD PATTERN ({fraud_score}%)"
-                elif fraud_score >= 25: verdict_str = f"SUSPICIOUS / HIGH SPAM ACTIVITY ({fraud_score}%)"
-                else: verdict_str = f"TRUSTED INFRASTRUCTURE ({fraud_score}%)"
-
-                report.append(f"\n--- [ANTI-FRAUD COMPLIANCE RISK MATRIX]")
-                report.append(f"[SEC] {'ANTI-FRAUD VERDICT':<18} : {verdict_str}")
-                report.append(f"[SEC] {'BREACH STATUS':<18} : {breach_status}")
-                if fraud_triggers:
-                    report.append("[SEC] DETECTED ANOMALIES:")
-                    for t in fraud_triggers: report.append(f"      - {t}")
-
-                report.append(f"\n--- [GLOBAL OSINT TARGET PROFILE MATRIX & GOOGLE DORKING]")
-                clean_digits = normalized.lstrip('+')
-                report.extend([
-                    f"[LNK] {'Telegram Profile':<22} : https://t.me/{clean_digits}",
-                    f"[LNK] {'WhatsApp Chat':<22} : https://wa.me/{normalized}",
-                    f"[LNK] {'TrueCaller Intel':<22} : https://www.truecaller.com/search/global/{clean_digits}",
-                    f"[LNK] {'Dork: Fraud Bases':<22} : https://www.google.com/search?q=%22{normalized}%22+AND+(%22fraud%22+OR+%22scam%22)",
-                    f"[LNK] {'Dork: Leak Docs':<22} : https://www.google.com/search?q=%22{normalized}%22+filetype:pdf+OR+filetype:xls"
-                ])
-            else:
-                report.append("[PHN] ОШИБКА: Структура номера не прошла валидацию ITU-T.")
-        except Exception as e:
-            report.append(f"[PHN] КРИТИЧЕСКИЙ СБОЙ ДЕКОДЕРА: {str(e)}")
-
-    # --- МОДУЛЬ 3: АСИНХРОННЫЙ АУДИТ ПОЧТОВЫХ СЕРВЕРОВ И УТЕЧЕК (EMAIL) ---
+    # --- МОДУЛЬ: ПОЧТОВЫЕ СЕРВЕРА (EMAIL) ---
     async def process_email(self, session, clean_data, report):
         domain = clean_data.split('@')[-1]
         report.append(f"\n=== [EMAIL FORENSIC TARGET ANALYSIS: {clean_data}] ===")
-        report.append(f"[EML] {'TARGET DOMAIN':<14} : {domain}")
-        
         dns_resolver = aiodns.DNSResolver()
-        records = ['MX', 'TXT', 'SOA', 'NS']
-        async def fetch_dns(rec_type):
-            try:
-                res = await dns_resolver.query(domain, rec_type)
-                if hasattr(res, 'host'): return res.host
-                if isinstance(res, list) and len(res) > 0 and hasattr(res[0], 'text'): return res[0].text
-                return str(res[0]) if isinstance(res, list) else str(res)
-            except: return "NOT CONFIGURED / MISSING"
-
-        dns_results = await asyncio.gather(*[fetch_dns(r) for r in records])
-        for r_type, r_val in zip(records, dns_results): report.append(f"[DNS] {r_type:<14} : {r_val}")
-
         try:
-            dm = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
-            report.append(f"[SEC] {'DMARC POLICY':<14} : {dm[0].text if hasattr(dm[0], 'text') else str(dm[0])}")
-        except: report.append(f"[SEC] {'DMARC POLICY':<14} : NOT FOUND (No spoofing protection)")
+            res = await dns_resolver.query_dns(domain, 'MX') if hasattr(dns_resolver, 'query_dns') else await dns_resolver.query(domain, 'MX')
+            report.append(f"[DNS] {'MX CORE':<14} : {res[0].host if hasattr(res[0], 'host') else str(res[0])}")
+        except: report.append("[DNS] MX RECORD FETCH FAILED")
 
-        try:
-            async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=5) as r:
-                if r.status == 200:
-                    d = await r.json()
-                    report.append(f"[SEC] {'BREACH STATE':<14} : {'[!!!] COMPROMISED' if d.get('found') else 'CLEAN POOL'}")
-        except: pass
-
-        def verify_ssl_sync():
-            import ssl
-            try:
-                with socket.create_connection((domain, 443), timeout=3) as s:
-                    with ssl.create_default_context().wrap_socket(s, server_hostname=domain) as ss:
-                        cert = ss.getpeercert()
-                        issuer = dict(x[0] for x in cert.get('issuer', []))
-                        return f"[SSL] {'CERT ISSUER':<14} : {issuer.get('organizationName', 'Unknown Authority')}"
-            except: return f"[SSL] {'CERT ISSUER':<14} : TLS HANDSHAKE FAILED"
-        report.append(await asyncio.get_event_loop().run_in_executor(None, verify_ssl_sync))
-
-    # --- МОДУЛЬ 4: АНАЛИЗ ЦИФРОВОГО СЛЕДА (NICKNAME OSINT) ---
+    # --- МОДУЛЬ: ЦИФРОВОЙ СЛЕД (NICKNAME OSINT) ---
     async def process_nickname(self, session, data, report):
         report.append(f"\n=== [DIGITAL FOOTPRINT MATRIX (NICKNAME): {data}] ===")
-        targets = {
-            'GitHub Core': 'https://github.com/{}',
-            'Twitter / X': 'https://twitter.com/{}',
-            'Reddit User': 'https://www.reddit.com/user/{}',
-            'Steam Identity': 'https://steamcommunity.com/id/{}',
-            'TikTok Profile': 'https://www.tiktok.com/@{}'
-        }
         async def scan_profile(name, url_template):
             try:
-                async with session.get(url_template.format(data), timeout=5) as r:
-                    return f"[USR] {name:<16} : {'[+] MATCH FOUND (Status 200)' if r.status == 200 else 'NOT FOUND (404)'}"
-            except: return f"[USR] {name:<16} : REQUEST TIMEOUT"
-        results = await asyncio.gather(*[scan_profile(n, u) for n, u in targets.items()])
-        report.extend([r for r in results])
+                async with session.get(url_template.format(data), timeout=4) as r:
+                    return f"[USR] {name:<16} : {'[+] MATCH FOUND' if r.status == 200 else 'NOT FOUND'}"
+            except: return f"[USR] {name:<16} : TIMEOUT"
+        results = await asyncio.gather(scan_profile('GitHub Core', 'https://github.com/{}'), scan_profile('Twitter / X', 'https://twitter.com/{}'))
+        report.extend(results)
 
-    # --- МОДУЛЬ 5: ГЛУБОКАЯ РАЗВЕДКА СЕРВЕРНОЙ ИНФРАСТРУКТУРЫ (DOMAIN / IP) ---
+    # --- МОДУЛЬ: СЕРВЕРНАЯ ИНФРАСТРУКТУРА (DOMAIN) ---
     async def process_domain(self, session, clean_data, report):
         report.append(f"\n=== [NEXUS SERVER DEEP-RECON: {clean_data}] ===")
-        loop = asyncio.get_event_loop()
         try:
-            ip = await loop.run_in_executor(None, lambda: socket.gethostbyname(clean_data))
+            ip = await asyncio.get_event_loop().run_in_executor(None, lambda: socket.gethostbyname(clean_data))
             report.append(f"[NET] {'RESOLVED IP':<14} : {ip}")
-            async with session.get(f"http://ip-api.com/json/{ip}", timeout=5) as r:
-                if r.status == 200:
-                    g = await r.json()
-                    report.extend([f"[NET] {'ISP PROVIDER':<14} : {g.get('isp')}", f"[NET] {'COORDINATES':<14} : {g.get('city')}, {g.get('country')}"])
-        except:
-            report.append("[NET] RESOLVE FAILURE : Хост недоступен на уровне DNS"); return
+        except: report.append("[NET] RESOLVE FAILURE")
 
-        report.append(f"\n--- [LOCAL SSL HANDSHAKE PROFILE]")
-        cmd_ssl = f"echo | openssl s_client -connect {ip}:443 -servername {clean_data} 2>/dev/null | openssl x509 -noout -subject -issuer -dates"
-        res_ssl = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True, timeout=10))
-        if res_ssl.returncode == 0 and res_ssl.stdout: report.extend([f"[SSL] {line.strip()}" for line in res_ssl.stdout.splitlines()])
-        else: report.append("[SSL] HANDSHAKE CRITICAL : Порт 443 закрыт или openssl отсутствует")
-
-        report.append(f"\n--- [NMAP INFRASTRUCTURE SCAN (FAST VULN SURFACE)]")
-        try:
-            res_nmap = await loop.run_in_executor(None, lambda: subprocess.run(['nmap', '-F', '-sV', '-T4', clean_data], capture_output=True, text=True, timeout=35))
-            if res_nmap.returncode == 0:
-                for line in res_nmap.stdout.splitlines():
-                    if '/' in line and ('open' in line or 'closed' in line): report.append(f"[NMP] {line.strip()}")
-            else: report.append("[NMP] SCANNER DISABLED : Ошибка выполнения процесса nmap")
-        except: report.append("[NMP] DESCRIPTOR MISSING : Бинарный файл nmap не найден в системе")
-
-    # --- ЦЕНТРАЛЬНЫЙ АВТОМАТИЧЕСКИЙ АНАЛИЗАТОР (ПОЛНЫЙ АВТОМАТ) ---
+    # --- ЦЕНТРАЛЬНЫЙ АВТОМАТИЧЕСКИЙ ДИСПЕТЧЕР (С ФИ КСОМ СИГНАТУР НОМЕРОВ) ---
     async def run_pipeline(self, raw_data):
-        clean_data = raw_data.strip().replace(" ", "")
+        raw_data_stripped = raw_data.strip()
+        clean_data = raw_data_stripped.replace(" ", "").replace("-", "").upper()
         
-        # Интеллектуальное каскадное определение типа данных на лету
-        if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
-            resolved_mode = "IBAN"
-        elif '@' in clean_data:
-            resolved_mode = "EMAIL"
-        elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data:
-            resolved_mode = "PHONE"
-        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
-            resolved_mode = "DOMAIN"
-        else:
-            resolved_mode = "NICK"
+        resolved_mode = None
+        country_hint = ""
+
+        # 1. Сигнатуры автомобильных номеров
+        # Французский формат SIV: 2 буквы - 3 цифры - 2 буквы (например, AA-123-AA или AA123AA)
+        if re.match(r'^[A-Z]{2}[0-9]{3}[A-Z]{2}$', clean_data):
+            resolved_mode = "LICENSE_PLATE"
+            country_hint = "FRANCE (SIV / F-Plate)"
+        # Старый французский формат (до 2009 года): от 1 до 4 цифр, 2-3 буквы, 2 цифры департамента
+        elif re.match(r'^[0-9]{1,4}[A-Z]{2,3}[0-9]{2,3}$', clean_data):
+            resolved_mode = "LICENSE_PLATE"
+            country_hint = "FRANCE (SIV / F-Plate)"
+        # Российский формат гос номеров: буква-3цифры-2буквы-регион (например, А123АА77 или А123АА177)
+        elif re.match(r'^[ABEKMHOPCTYX]{1}[0-9]{3}[ABEKMHOPCTYX]{2}[0-9]{2,3}$', clean_data):
+            resolved_mode = "LICENSE_PLATE"
+            country_hint = "RUSSIA / CIS (RU-Plate)"
+            
+        # 2. Если это не номер машины, запускаем стандартный каскад проверок диспетчера
+        if not resolved_mode:
+            if clean_data.isdigit() and (len(clean_data) == 9 or len(clean_data) == 14):
+                resolved_mode = "SIRENE"
+            elif re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
+                resolved_mode = "IBAN"
+            elif '@' in clean_data:
+                resolved_mode = "EMAIL"
+            elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data:
+                resolved_mode = "PHONE"
+            elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
+                resolved_mode = "DOMAIN"
+            elif any(indicator in raw_data_stripped.lower() for indicator in ["rue", "avenue", "boulevard", "bd", "av ", "ул.", "улица", "дом"]):
+                resolved_mode = "ADDRESS"
+            elif re.match(r'^[0-9A-Z]{20}$', clean_data):
+                resolved_mode = "GLOBAL_IMMATRICULATION"
+            else:
+                resolved_mode = "GLOBAL_IMMATRICULATION" if len(raw_data_stripped) > 7 else "NICK"
 
         report = [
             f"=== [NEXUS SMART AUTO-DISPATCHER ACTIVE] ===",
             f"[SYS] DETECTED TYPE : {resolved_mode}",
-            f"[SYS] TARGET TARGET : {clean_data}"
+            f"[SYS] RAW TARGET    : {raw_data_stripped}"
         ]
 
-        async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/3.0'}) as session:
-            if resolved_mode == "IBAN": await self.process_iban(session, clean_data, report)
+        async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/4.5'}) as session:
+            if resolved_mode == "LICENSE_PLATE": await self.process_license_plate(session, clean_data, country_hint, report)
+            elif resolved_mode == "SIRENE": await self.process_sirene(session, clean_data, report)
+            elif resolved_mode == "GLOBAL_IMMATRICULATION": await self.process_global_immatriculation(session, raw_data_stripped, report)
+            elif resolved_mode == "ADDRESS": await self.process_physical_address(session, raw_data_stripped, report)
+            elif resolved_mode == "IBAN": await self.process_iban(session, clean_data, report)
             elif resolved_mode == "PHONE": await self.process_phone(session, clean_data, report)
             elif resolved_mode == "EMAIL": await self.process_email(session, clean_data, report)
-            elif resolved_mode == "NICK": await self.process_nickname(session, clean_data, report)
             elif resolved_mode == "DOMAIN": await self.process_domain(session, clean_data, report)
+            elif resolved_mode =="NICK": await self.process_nickname(session, clean_data, report)
 
         report.append("\n=== [END OF AUTOMATIC INVESTIGATION] ===")
         print("\n".join(report))
@@ -3513,7 +3517,6 @@ if __name__ == "__main__":
     asyncio.run(dispatcher.run_pipeline(d))
 EOF
 
-    # Деактивация окружения после работы модуля
     if [ -d ".venv" ]; then
         deactivate
     fi
