@@ -4198,7 +4198,7 @@ async def audit_dispatch():
                         "TrueCaller Intel"  : f"https://www.truecaller.com/search/global/{clean_digits}",
                         "Sync.ME Global"    : f"https://sync.me/search?number={clean_digits}",
                         "Whocalls Me Track" : f"https://whocallsme.com/Phone-Number.aspx/{clean_digits}",
-                        "ShouldIAnswer Rating": f"https://www.shouldianswer.com/phone-number/{normalized_phone}",
+                        "ShouldIAnswer Rating": f"https://www.doisjerepondre.fr/numero-de-telephone/{normalized_phone}",
                         
                         # Дорки, оптимизированные под поиск мошеннических веток на форумах и в реестрах жалоб разных стран
                         "Dork: Fraud & Spam Databases": f"https://www.google.com/search?q=%22{normalized_phone}%22+OR+%22{national_raw}%22+AND+(%22fraud%22+OR+%22scam%22+OR+%22spam%22+OR+%22мошенник%22+OR+%22отзывы%22)",
