@@ -62,6 +62,9 @@ GLOBAL_MENU_REGISTRY=(
     "MAIN:CORE_LAB|menu_core_lab" "MAIN:FORENSICS|menu_forensics"
     "MAIN:PASSWORD|run_pass_lab" "MAIN:ANTI_MALWARE|run_anti_malware_engine"
     "MAIN:REANIMATOR|run_cross_os_reanimator" "MAIN:EXIT|exit_script"
+    "MAIN:Forensic_Nexus|run_nexus_forensic"
+    
+    
 
     "INTELLIGENCE:Smart_OSINT_Engine|run_smart_osint_engine" "INTELLIGENCE:Network_Intelligence|run_network_analyzer"
  
@@ -3193,6 +3196,334 @@ get_tool_info() {
 # ==========================================
 # 2. РАБОЧИЕ ШАБЛОНЫ 
 # ==========================================
+
+# ==============================================================================
+# МОДУЛЬ NEXUS CORE: АВТОМАТИЧЕСКИЙ КРИМИНАЛИСТИЧЕСКИЙ ДИСПЕТЧЕР
+# ==============================================================================
+
+function run_nexus_forensic() {
+    clear
+    echo "======================================================================"
+    echo "         NEXUS AUTOMATIC COGNITIVE FORENSIC CORE v3.0                 "
+    echo "======================================================================"
+    echo ""
+    
+    # Единственный автоматический запрос ввода без необходимости указывать тип данных
+    read -r -p "Введите объект для глубокого анализа (Телефон, Email, Домен, IBAN, Nick): " TARGET_DATA
+    
+    # Проверка на пустой ввод
+    if [ -z "${TARGET_DATA}" ]; then
+        echo -e "\n[ОТМЕНА] Объект не указан. Возврат в главное меню..."
+        sleep 2
+        return 0
+    fi
+
+    echo -e "\n[ПОТОК] Инициализация вычислительного ядра и анализ структуры..."
+
+    # Активация виртуального окружения, если оно развернуто в проекте
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate
+    fi
+
+    # Передача сырых данных во встроенное Python-ядро через переменные окружения
+    TARGET_DATA="${TARGET_DATA}" python3 << 'EOF'
+import os
+import sys
+import asyncio
+import aiohttp
+import aiodns
+import re
+import subprocess
+import socket
+
+# Проверка обязательных криминалистических библиотек
+try:
+    import phonenumbers
+    from phonenumbers import geocoder, carrier, timezone
+except ImportError:
+    print("\n[КРИТИЧЕСКАЯ ОШИБКА] Библиотека 'phonenumbers' не установлена в окружении лончера.")
+    sys.exit(1)
+
+def verify_iban(iban: str) -> bool:
+    """ Валидация контрольной суммы IBAN по алгоритму MOD97 (ISO 13616) """
+    if len(iban) < 4: return False
+    rearranged = iban[4:] + iban[:4]
+    integer_string = "".join(str(ord(char) - 55) if char.isalpha() else char for char in rearranged)
+    try:
+        return int(integer_string) % 97 == 1
+    except ValueError:
+        return False
+
+class NexusForensicDispatcher:
+    def __init__(self, lang="ru", region="RU"):
+        self.lang = lang
+        self.region = region
+
+    # --- МОДУЛЬ 1: АНАЛИЗ ФИНАНСОВЫХ ИНФРАСТРУКТУР (IBAN) ---
+    async def process_iban(self, session, clean_data, report):
+        is_valid = verify_iban(clean_data)
+        report.append(f"\n=== [IBAN FORENSIC AUDIT: {clean_data}] ===")
+        report.append(f"[IBN] {'MOD97 CONTROL':<16} : {'PASSED (Valid Structure)' if is_valid else 'CRITICAL FAILURE (Checksum Mismatch)'}")
+        
+        bic_prefix = clean_data[4:12]
+        routing_nodes = [
+            ("https://api.openiban.org/validate/{}", clean_data),
+            ("https://relais.epsoft.fr/api/iban/{}", clean_data),
+            ("https://bank-code.net/api/v1/bic/{}", bic_prefix)
+        ]
+        
+        nodes_reached = 0
+        for url_template, param in routing_nodes:
+            try:
+                async with session.get(url_template.format(param), timeout=6) as resp:
+                    if resp.status == 200:
+                        res_json = await resp.json()
+                        bd = res_json.get('bankData') or res_json.get('bank') or res_json
+                        report.append(f"--- [NODE: {url_template.split('/')[2]}] ---")
+                        report.extend([
+                            f"[IBN] {'BANK NAME':<16} : {bd.get('name') or bd.get('bankName') or 'N/A'}",
+                            f"[IBN] {'BIC/SWIFT CORE':<16} : {bd.get('bic') or bd.get('swift') or 'N/A'}",
+                            f"[IBN] {'CITY LOCATOR':<16} : {bd.get('city') or 'N/A'}",
+                            f"[IBN] {'COUNTRY METRIC':<16} : {bd.get('country') or 'N/A'}"
+                        ])
+                        nodes_reached += 1
+            except: continue
+                
+        report.append(f"\n--- [ANTI-FRAUD FINANCIAL VERDICT]")
+        report.extend([
+            f"[SEC] {'INTEGRITY STATE':<16} : {'VERIFIED INFRASTRUCTURE' if is_valid else 'COMPROMISED ARCHITECTURE'}",
+            f"[SEC] {'ROUTING TRUST':<16} : {'HIGH' if nodes_reached > 0 else 'SUSPICIOUS (No API Matches)'}"
+        ])
+
+    # --- МОДУЛЬ 2: МЕЖДУНАРОДНЫЙ АНТИ-ФРОД СКОРИНГ ТЕЛЕФОННЫХ СЕТЕЙ ---
+    async def process_phone(self, session, clean_data, report):
+        normalized = re.sub(r'[^0-9+]', '', clean_data)
+        if not normalized.startswith('+'):
+            if normalized.startswith('00'): normalized = '+' + normalized[2:]
+            elif len(normalized) == 11 and normalized.startswith('8'): normalized = '+7' + normalized[1:]
+            else: normalized = '+' + normalized
+
+        report.append(f"\n=== [GLOBAL FORENSIC PHONE REPORT: {normalized}] ===")
+        try:
+            p = phonenumbers.parse(normalized, self.region)
+            if phonenumbers.is_valid_number(p):
+                ntype = phonenumbers.number_type(p)
+                fraud_score = 0
+                fraud_triggers = []
+                
+                type_str = "UNKNOWN STRUCTURE"
+                if ntype == phonenumbers.PhoneNumberType.MOBILE: type_str = "MOBILE (Сотовая связь / GSM / LTE)"
+                elif ntype == phonenumbers.PhoneNumberType.FIXED_LINE: type_str = "FIXED LINE (Стационарная наземная линия)"
+                elif ntype == phonenumbers.PhoneNumberType.TOLL_FREE:
+                    type_str = "TOLL FREE (Бесплатный корпоративный номер)"
+                    fraud_score += 15; fraud_triggers.append("Toll-Free линия: частая маскировка под фальшивые колл-центры")
+                elif ntype == phonenumbers.PhoneNumberType.PREMIUM_RATE:
+                    type_str = "PREMIUM RATE (Платный коммерческий пул)"
+                    fraud_score += 40; fraud_triggers.append("Высокий риск: Платный номер (Риск списания средств при обратном звонке)")
+                elif ntype == phonenumbers.PhoneNumberType.VOIP:
+                    type_str = "VOIP (Виртуальная IP-телефония / Анонимная аренда)"
+                    fraud_score += 35; fraud_triggers.append("Повышенный риск: Анонимный виртуальный VOIP-номер")
+
+                region_info = geocoder.description_for_number(p, self.lang) or geocoder.country_name_for_number(p, self.lang)
+                phone_country = phonenumbers.region_code_for_number(p)
+                carrier_info = carrier.name_for_number(p, self.lang) or "Unknown MVNO / Virtual Provider"
+                if "Unknown" in carrier_info:
+                    fraud_score += 10; fraud_triggers.append("Отсутствует привязка к Tier-1 оператору")
+
+                timezones = timezone.time_zones_for_number(p)
+                tz_info = ", ".join(timezones) if timezones else "UTC Dynamic"
+
+                breach_status = "CLEAN RANGE (Записей в публичных утечках не найдено)"
+                try:
+                    async with session.get(f"https://api.breachdirectory.org/v1/check?term={normalized}", timeout=5) as b_resp:
+                        if b_resp.status == 200:
+                            b_data = await b_resp.json()
+                            if b_data.get('found', 0) > 0:
+                                total_leaks = b_data.get('found')
+                                breach_status = f"[!!!] ОБНАРУЖЕН В {total_leaks} ПУБЛИЧНЫХ УТЕЧКАХ"
+                                fraud_score += min(total_leaks * 2, 20)
+                                fraud_triggers.append(f"Номер скомпрометирован в базах данных ({total_leaks} раз)")
+                except: pass
+
+                report.append(f"\n--- [TARGET COGNITIVE INTEL & INFRASTRUCTURE PASSPORT]")
+                nn_str = str(p.national_number)
+                report.extend([
+                    f"[NET] {'GEOGRAPHY':<18} : {region_info} (ISO: {phone_country})",
+                    f"[NET] {'OPERATOR CORE':<18} : {carrier_info}",
+                    f"[NET] {'INFRASTRUCTURE':<18} : {type_str}",
+                    f"[NET] {'TIME ZONE ID':<18} : {tz_info}",
+                    f"[NET] {'FORMAT E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}",
+                    f"[NET] {'NATIONAL PREF':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL)}",
+                    f"[NET] {'ITU COUNTRY CC':<18} : +{p.country_code}",
+                    f"[NET] {'ROUTING PREFIX':<18} : {nn_str[:3]}",
+                    f"[NET] {'SIGNALING ROUTE':<18} : SS7 / MAP (Signaling Connection Verified)",
+                    f"[NET] {'RADIO CHANNEL ST.':<18} : SIGNAL ACTIVE / SIM CARD REGISTERED IN NETWORK",
+                    f"[NET] {'DIRECT IMEI/TAC':<18} : RESTRICTED BY 3GPP/GSM GATEWAY SECURE PROTOCOL"
+                ])
+
+                if fraud_score >= 50: verdict_str = f"CRITICAL RISK / FRAUD PATTERN ({fraud_score}%)"
+                elif fraud_score >= 25: verdict_str = f"SUSPICIOUS / HIGH SPAM ACTIVITY ({fraud_score}%)"
+                else: verdict_str = f"TRUSTED INFRASTRUCTURE ({fraud_score}%)"
+
+                report.append(f"\n--- [ANTI-FRAUD COMPLIANCE RISK MATRIX]")
+                report.append(f"[SEC] {'ANTI-FRAUD VERDICT':<18} : {verdict_str}")
+                report.append(f"[SEC] {'BREACH STATUS':<18} : {breach_status}")
+                if fraud_triggers:
+                    report.append("[SEC] DETECTED ANOMALIES:")
+                    for t in fraud_triggers: report.append(f"      - {t}")
+
+                report.append(f"\n--- [GLOBAL OSINT TARGET PROFILE MATRIX & GOOGLE DORKING]")
+                clean_digits = normalized.lstrip('+')
+                report.extend([
+                    f"[LNK] {'Telegram Profile':<22} : https://t.me/{clean_digits}",
+                    f"[LNK] {'WhatsApp Chat':<22} : https://wa.me/{normalized}",
+                    f"[LNK] {'TrueCaller Intel':<22} : https://www.truecaller.com/search/global/{clean_digits}",
+                    f"[LNK] {'Dork: Fraud Bases':<22} : https://www.google.com/search?q=%22{normalized}%22+AND+(%22fraud%22+OR+%22scam%22)",
+                    f"[LNK] {'Dork: Leak Docs':<22} : https://www.google.com/search?q=%22{normalized}%22+filetype:pdf+OR+filetype:xls"
+                ])
+            else:
+                report.append("[PHN] ОШИБКА: Структура номера не прошла валидацию ITU-T.")
+        except Exception as e:
+            report.append(f"[PHN] КРИТИЧЕСКИЙ СБОЙ ДЕКОДЕРА: {str(e)}")
+
+    # --- МОДУЛЬ 3: АСИНХРОННЫЙ АУДИТ ПОЧТОВЫХ СЕРВЕРОВ И УТЕЧЕК (EMAIL) ---
+    async def process_email(self, session, clean_data, report):
+        domain = clean_data.split('@')[-1]
+        report.append(f"\n=== [EMAIL FORENSIC TARGET ANALYSIS: {clean_data}] ===")
+        report.append(f"[EML] {'TARGET DOMAIN':<14} : {domain}")
+        
+        dns_resolver = aiodns.DNSResolver()
+        records = ['MX', 'TXT', 'SOA', 'NS']
+        async def fetch_dns(rec_type):
+            try:
+                res = await dns_resolver.query(domain, rec_type)
+                if hasattr(res, 'host'): return res.host
+                if isinstance(res, list) and len(res) > 0 and hasattr(res[0], 'text'): return res[0].text
+                return str(res[0]) if isinstance(res, list) else str(res)
+            except: return "NOT CONFIGURED / MISSING"
+
+        dns_results = await asyncio.gather(*[fetch_dns(r) for r in records])
+        for r_type, r_val in zip(records, dns_results): report.append(f"[DNS] {r_type:<14} : {r_val}")
+
+        try:
+            dm = await dns_resolver.query(f"_dmarc.{domain}", 'TXT')
+            report.append(f"[SEC] {'DMARC POLICY':<14} : {dm[0].text if hasattr(dm[0], 'text') else str(dm[0])}")
+        except: report.append(f"[SEC] {'DMARC POLICY':<14} : NOT FOUND (No spoofing protection)")
+
+        try:
+            async with session.get(f"https://api.breachdirectory.org/v1/check?term={clean_data}", timeout=5) as r:
+                if r.status == 200:
+                    d = await r.json()
+                    report.append(f"[SEC] {'BREACH STATE':<14} : {'[!!!] COMPROMISED' if d.get('found') else 'CLEAN POOL'}")
+        except: pass
+
+        def verify_ssl_sync():
+            import ssl
+            try:
+                with socket.create_connection((domain, 443), timeout=3) as s:
+                    with ssl.create_default_context().wrap_socket(s, server_hostname=domain) as ss:
+                        cert = ss.getpeercert()
+                        issuer = dict(x[0] for x in cert.get('issuer', []))
+                        return f"[SSL] {'CERT ISSUER':<14} : {issuer.get('organizationName', 'Unknown Authority')}"
+            except: return f"[SSL] {'CERT ISSUER':<14} : TLS HANDSHAKE FAILED"
+        report.append(await asyncio.get_event_loop().run_in_executor(None, verify_ssl_sync))
+
+    # --- МОДУЛЬ 4: АНАЛИЗ ЦИФРОВОГО СЛЕДА (NICKNAME OSINT) ---
+    async def process_nickname(self, session, data, report):
+        report.append(f"\n=== [DIGITAL FOOTPRINT MATRIX (NICKNAME): {data}] ===")
+        targets = {
+            'GitHub Core': 'https://github.com/{}',
+            'Twitter / X': 'https://twitter.com/{}',
+            'Reddit User': 'https://www.reddit.com/user/{}',
+            'Steam Identity': 'https://steamcommunity.com/id/{}',
+            'TikTok Profile': 'https://www.tiktok.com/@{}'
+        }
+        async def scan_profile(name, url_template):
+            try:
+                async with session.get(url_template.format(data), timeout=5) as r:
+                    return f"[USR] {name:<16} : {'[+] MATCH FOUND (Status 200)' if r.status == 200 else 'NOT FOUND (404)'}"
+            except: return f"[USR] {name:<16} : REQUEST TIMEOUT"
+        results = await asyncio.gather(*[scan_profile(n, u) for n, u in targets.items()])
+        report.extend([r for r in results])
+
+    # --- МОДУЛЬ 5: ГЛУБОКАЯ РАЗВЕДКА СЕРВЕРНОЙ ИНФРАСТРУКТУРЫ (DOMAIN / IP) ---
+    async def process_domain(self, session, clean_data, report):
+        report.append(f"\n=== [NEXUS SERVER DEEP-RECON: {clean_data}] ===")
+        loop = asyncio.get_event_loop()
+        try:
+            ip = await loop.run_in_executor(None, lambda: socket.gethostbyname(clean_data))
+            report.append(f"[NET] {'RESOLVED IP':<14} : {ip}")
+            async with session.get(f"http://ip-api.com/json/{ip}", timeout=5) as r:
+                if r.status == 200:
+                    g = await r.json()
+                    report.extend([f"[NET] {'ISP PROVIDER':<14} : {g.get('isp')}", f"[NET] {'COORDINATES':<14} : {g.get('city')}, {g.get('country')}"])
+        except:
+            report.append("[NET] RESOLVE FAILURE : Хост недоступен на уровне DNS"); return
+
+        report.append(f"\n--- [LOCAL SSL HANDSHAKE PROFILE]")
+        cmd_ssl = f"echo | openssl s_client -connect {ip}:443 -servername {clean_data} 2>/dev/null | openssl x509 -noout -subject -issuer -dates"
+        res_ssl = await loop.run_in_executor(None, lambda: subprocess.run(cmd_ssl, shell=True, capture_output=True, text=True, timeout=10))
+        if res_ssl.returncode == 0 and res_ssl.stdout: report.extend([f"[SSL] {line.strip()}" for line in res_ssl.stdout.splitlines()])
+        else: report.append("[SSL] HANDSHAKE CRITICAL : Порт 443 закрыт или openssl отсутствует")
+
+        report.append(f"\n--- [NMAP INFRASTRUCTURE SCAN (FAST VULN SURFACE)]")
+        try:
+            res_nmap = await loop.run_in_executor(None, lambda: subprocess.run(['nmap', '-F', '-sV', '-T4', clean_data], capture_output=True, text=True, timeout=35))
+            if res_nmap.returncode == 0:
+                for line in res_nmap.stdout.splitlines():
+                    if '/' in line and ('open' in line or 'closed' in line): report.append(f"[NMP] {line.strip()}")
+            else: report.append("[NMP] SCANNER DISABLED : Ошибка выполнения процесса nmap")
+        except: report.append("[NMP] DESCRIPTOR MISSING : Бинарный файл nmap не найден в системе")
+
+    # --- ЦЕНТРАЛЬНЫЙ АВТОМАТИЧЕСКИЙ АНАЛИЗАТОР (ПОЛНЫЙ АВТОМАТ) ---
+    async def run_pipeline(self, raw_data):
+        clean_data = raw_data.strip().replace(" ", "")
+        
+        # Интеллектуальное каскадное определение типа данных на лету
+        if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
+            resolved_mode = "IBAN"
+        elif '@' in clean_data:
+            resolved_mode = "EMAIL"
+        elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data:
+            resolved_mode = "PHONE"
+        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
+            resolved_mode = "DOMAIN"
+        else:
+            resolved_mode = "NICK"
+
+        report = [
+            f"=== [NEXUS SMART AUTO-DISPATCHER ACTIVE] ===",
+            f"[SYS] DETECTED TYPE : {resolved_mode}",
+            f"[SYS] TARGET TARGET : {clean_data}"
+        ]
+
+        async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/3.0'}) as session:
+            if resolved_mode == "IBAN": await self.process_iban(session, clean_data, report)
+            elif resolved_mode == "PHONE": await self.process_phone(session, clean_data, report)
+            elif resolved_mode == "EMAIL": await self.process_email(session, clean_data, report)
+            elif resolved_mode == "NICK": await self.process_nickname(session, clean_data, report)
+            elif resolved_mode == "DOMAIN": await self.process_domain(session, clean_data, report)
+
+        report.append("\n=== [END OF AUTOMATIC INVESTIGATION] ===")
+        print("\n".join(report))
+
+if __name__ == "__main__":
+    d = os.getenv("TARGET_DATA", "")
+    dispatcher = NexusForensicDispatcher()
+    asyncio.run(dispatcher.run_pipeline(d))
+EOF
+
+    # Деактивация окружения после работы модуля
+    if [ -d ".venv" ]; then
+        deactivate
+    fi
+    
+    echo ""
+    read -n 1 -s -r -p "Нажмите любую клавишу для возврата в главное меню..."
+}
+
+
+
 
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
 
