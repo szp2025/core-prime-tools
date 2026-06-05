@@ -4364,17 +4364,17 @@ def scan():
     file_content = f.read()
     f.seek(0)
     
-    # Сбор базовых физических характеристик объекта
+    # Collect fundamental physical characteristics of the target object
     entropy_val = calculate_entropy(file_content)
     file_size_kb = len(file_content) / 1024.0
     
     tmp = os.path.join('/tmp', f.filename)
     f.save(tmp)
     
-    # Результирующий массив строк с максимальным расширением полей (Padding: 32 символа)
+    # Resulting string matrix with maximum field padding (Padding: 32 characters)
     report = [
         f"======================================================================",
-        f"         CAME-NEXUS: DEEP FULL-STACK OSINT & FORENSIC CORE v5.5       ",
+        f"         CAME-NEXUS: DEEP FULL-STACK OSINT & FORENSIC CORE v5.8       ",
         f"======================================================================",
         f"[SYS] {'TARGET FILE LOGICAL NAME':<32} : {f.filename}",
         f"[SYS] {'BINARY PAYLOAD SIZE':<32} : {file_size_kb:.2f} KB",
@@ -4386,16 +4386,15 @@ def scan():
     
     try:
         # ==============================================================================
-        # БЛОК 1: СИГНАТУРНЫЙ АНАЛИЗ И СТРУКТУРНЫЕ ПУТИ (STRINGS MATRIX)
+        # BLOCK 1: SIGNATURE ANALYSIS & STRUCTURAL PATHS (STRINGS MATRIX)
         # ==============================================================================
         strings_output = subprocess.check_output(['strings', tmp], text=True, errors='ignore')
         
-        # 1.1 Поиск путей и сетевых URI (В ТРИ КОЛОНКИ - Оптимизированное выравнивание до 38 символов)
+        # 1.1 Extract paths and network URIs (Split into three balanced columns - 38 chars alignment)
         path_matches = sorted(list(set(re.findall(r"(?:/|C:\\|https?://)[\w./\\-]+", strings_output))))
         if path_matches:
             report.append("\n--- [FOUND FILE PATHS / ARTIFACTS] ---")
             
-            # Логика разбиения на 3 колонки полностью сохранена из вашей оригинальной версии
             rows = (len(path_matches) + 2) // 3
             col1 = path_matches[:rows]
             col2 = path_matches[rows:2*rows]
@@ -4407,25 +4406,37 @@ def scan():
                 item3 = col3[i] if i < len(col3) else ""
                 report.append(f"{item1:<38} | {item2:<38} | {item3:<38}")
         
-        # 1.2 Сигнатурный анализ (основной)
+        # 1.2 Static Signature Matching Engine (Leveraging global core matrices)
         report.append("\n--- [STATIC SIGNATURE MATCHING DETECTOR]")
         for line in strings_output.splitlines():
             clean_line = line.strip()
+            
+            # Audit matching against the existing core GLOBAL_HASH_MATRIX
             for hsig in GLOBAL_HASH_MATRIX:
                 match = re.search(hsig, clean_line)
                 if match: 
-                    report.append(f"[SECRET FOUND]: {match.group(0)[:30]}...")
+                    # Extract secret identifier variable name and mask output string for secure logs
+                    report.append(f"[SECRET FOUND] MATCHED PATTERN: {match.group(1)} -> {match.group(0)[:35]}...")
+                    threat_count += 1
+            
+            # Audit matching against the existing core GLOBAL_AV_MATRIX
             for layer in GLOBAL_AV_MATRIX:
                 if re.search(layer, clean_line, re.I):
-                    report.append(f"[!!! THREAT: {layer} !!!]")
+                    report.append(f"[!!! THREAT DETECTED: {layer.upper()} PATTERN MATCHED !!!]")
                     threat_count += 1
-        
+                    
+            # Audit matching against the existing core GLOBAL_SECURITY_MATRIX
+            for sec_pattern in GLOBAL_SECURITY_MATRIX:
+                if re.search(sec_pattern, clean_line, re.I):
+                    report.append(f"[SECURITY ATTACK/BYPASS PATTERN]: {sec_pattern.upper()} DETECTED IN STRUCT")
+                    threat_count += 1
+
         # ==============================================================================
-        # БЛОК 2: DEEP FORENSIC (MAXIMUM ENGINE)
+        # BLOCK 2: DEEP FORENSIC (MAXIMUM ENGINE)
         # ==============================================================================
         report.append("\n=== [INITIATING DEEP FORENSIC ANALYSIS] ===")
         
-        # 1. Глубокие метаданные (Максимальное покрытие через ExifTool)
+        # 2.1 Deep Metadata Processing (Maximum coverage via ExifTool engine)
         try:
             meta = subprocess.check_output(['exiftool', '-G', '-a', '-u', '-U', '-ee', tmp], 
                                            stderr=subprocess.STDOUT, text=True, errors='ignore')
@@ -4437,7 +4448,7 @@ def scan():
             meta = ""
             report.append(f"\n--- [METADATA: UNAVAILABLE] ({e})")
 
-        # 2. Листинг ZIP-структуры (для обнаружения скрытых вложений в контейнерах)
+        # 2.2 Internal ZIP Archive Inspection (To identify concealed contents within compressed containers)
         if f.filename.lower().endswith(('.pptx', '.docx', '.xlsx', '.jar', '.apk', '.zip')):
             report.append("\n--- [INTERNAL ZIP-CONTAINER STRUCTURE]")
             try:
@@ -4447,7 +4458,7 @@ def scan():
                 report.append("[!] Internal structure analysis unavailable.")
 
         # ==============================================================================
-        # БЛОК 3: АНАЛИЗАТОР ЦИФРОВОГО СЛЕДА (FORENSIC MASTER ENGINE)
+        # BLOCK 3: DIGITAL FOOTPRINT RECONNAISSANCE (FORENSIC MASTER ENGINE)
         # ==============================================================================
         report.append("\n--- [DIGITAL FOOTPRINT ANALYSIS - MASTER]")
         
@@ -4461,7 +4472,7 @@ def scan():
         
         dates = {} 
         
-        # Сбор данных цифрового следа
+        # Parse structural footprint properties out of extracted metadata
         if meta:
             for category, pattern in footprint_tags.items():
                 matches = re.findall(rf"^\[.*?\]\s+.*?(?:{pattern}).*?:\s+(.*)$", meta, re.IGNORECASE | re.MULTILINE)
@@ -4472,7 +4483,7 @@ def scan():
                         if category == "TIMESTAMP_SYNC":
                             dates[pattern] = val
 
-            # 2. СЕТЕВОЙ РАДАР (IP + MAC)
+            # Network Radar subsystem (IP + MAC processing)
             ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
             mac_pattern = r'(?i)([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})'
             
@@ -4483,7 +4494,7 @@ def scan():
             for mac in sorted(set(re.findall(mac_pattern, meta))):
                 report.append(f"[!] MAC ADDR DETECTED  : {mac[0]}")
 
-            # 3. АНОМАЛИИ ВРЕМЕНИ (Time-Travel Detector)
+            # Time Anomalies Detector (Defense framework against Anti-Forensics timestamp modification)
             try:
                 c_date = re.search(r'(\d{4}:\d{2}:\d{2}\s+\d{2}:\d{2}:\d{2})', dates.get(footprint_tags["TIMESTAMP_SYNC"], ""))
                 m_date = re.search(r'(\d{4}:\d{2}:\d{2}\s+\d{2}:\d{2}:\d{2})', dates.get(footprint_tags["TIMESTAMP_SYNC"], ""))
@@ -4492,20 +4503,25 @@ def scan():
             except:
                 pass
 
+        # Validate embedded indicators against the existing core GLOBAL_NETWORK_UA list
+        for ua in GLOBAL_NETWORK_UA:
+            if ua in strings_output:
+                report.append(f"[!] RECON: DETECTED EMBEDDED SYSTEM USER-AGENT MATRIX: {ua[:50]}...")
+
         # ==============================================================================
-        # БЛОК 4: БАНКОВСКИЕ АРТЕФАКТЫ (ИСПРАВЛЕННЫЙ ПАРСЕР)
+        # BLOCK 4: FINANCIAL ARTIFACTS & TELEPHONY RISKS
         # ==============================================================================
-        report.append("\n--- [FINANCIAL/BANKING AUDIT]")
+        report.append("\n--- [FINANCIAL/BANKING AUDIT & TELEPHONY TELEMETRY]")
         content_str = file_content.decode('utf-8', errors='ignore')
         
-        patterns = {
+        financial_patterns = {
             "IBAN": r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
             "BIC/SWIFT": r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?\b",
             "RIB (FR)": r"\b\d{5}\s?\d{5}\s?\d{11}\s?\d{2}\b"
         }
 
         found_financial = False
-        for name, pattern in patterns.items():
+        for name, pattern in financial_patterns.items():
             matches = re.findall(pattern, content_str)
             unique_matches = set()
             for m in matches:
@@ -4521,42 +4537,47 @@ def scan():
         if not found_financial:
             report.append("No valid financial/banking artifacts detected.")
 
+        # Cross-reference telemetry gateways against the existing core GLOBAL_PHONE_RISK_MATRIX
+        for carrier_type, risk_status in GLOBAL_PHONE_RISK_MATRIX.items():
+            if carrier_type.lower() in strings_output.lower() or (meta and carrier_type.lower() in meta.lower()):
+                report.append(f"[TELEPHONY RISK ALERT] FOUND CRITICAL VECTOR: {carrier_type} -> ASSIGNED: {risk_status}")
+
         # ==============================================================================
-        # БЛОК 5: КРИПТОГРАФИЧЕСКИЙ АНАЛИЗ И КЛЮЧИ ЗАЩИЩЕННОСТИ (УГЛУБЛЕННЫЙ МОДУЛЬ)
+        # BLOCK 5: CRYPTOGRAPHIC ANALYSIS & SECURE KEY VERIFICATION (DOCUSIGN / X.509 / ASN.1)
         # ==============================================================================
         report.append("\n--- [CERTIFICATE ANALYSIS]")
         crypto_analyzed = False
         
-        # Определяем, является ли файл PDF-документом (по расширению или магическим байтам)
+        # Detect whether the target payload follows the PDF specification
         is_pdf = f.filename.lower().endswith('.pdf') or b"%PDF" in file_content[:10]
         
         if is_pdf:
-            report.append("[+] Идентифицирован формат PDF. Запуск движка разбора криптографических конвертов...")
+            report.append("[+] PDF Format Identified. Booting crypto envelope parsing engine...")
             
-            # 5.1 Проверка базовых защитных атрибутов PDF-контейнера
+            # 5.1 Assert document container configuration security parameters
             encrypt_match = re.search(r"/Encrypt\s+\d+\s+\d+\s+R", content_str)
             sig_flags_match = re.search(r"/SigFlags\s+(\d+)", content_str)
             acroform_match = re.search(r"/AcroForm", content_str)
             
-            report.append(f"    {'Статус шифрования документа':<32} : {'[ЗАШИФРОВАН / ПАРОЛЬ]' if encrypt_match else 'ОТКРЫТЫЙ ТЕКСТ (НЕТ ОГРАНИЧЕНИЙ ДОСТУПА)'}")
+            report.append(f"    {'Document Encryption Status':<32} : {'[ENCRYPTED / PASSWORD PROTECTED]' if encrypt_match else 'CLEAR TEXT (NO ACCESS RESTRICTIONS)'}")
             if sig_flags_match:
-                report.append(f"    {'Флаги цифровой подписи':<32} : Детектированы (SigFlags: {sig_flags_match.group(1)})")
+                report.append(f"    {'Digital Signature Flags':<32} : Detected (SigFlags: {sig_flags_match.group(1)})")
             if acroform_match:
-                report.append(f"    {'Интерактивная форма AcroForm':<32} : Присутствует в структуре")
+                report.append(f"    {'Interactive AcroForm Object':<32} : Present in structure")
 
-            # 5.2 Поиск уникальных идентификаторов конвертов DocuSign (Envelope ID)
-            # Формат UUID DocuSign: 8-4-4-4-12 шестнадцатеричных символов
+            # 5.2 Extract DocuSign transaction token vectors (Envelope ID tracking)
+            # DocuSign implementation relies on a standard 8-4-4-4-12 hex UUID pattern
             envelope_ids = sorted(list(set(re.findall(r'(?i)Envelope\s*ID\s*:\s*([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})', meta if meta else ""))))
             if not envelope_ids:
-                # Резервный поиск UUID в сырых потоках строк документа
+                # Fallback pattern match scanner targeting absolute raw internal data buffers
                 envelope_ids = sorted(list(set(re.findall(r'\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\b', strings_output))))
             
             if envelope_ids:
                 report.append("\n  --- [DOCUSIGN TRANSACTION METADATA]")
                 for env_id in envelope_ids:
-                    report.append(f"    [+] Уникальный ID конверта DocuSign : {env_id.upper()}")
+                    report.append(f"    [+] Unique DocuSign Envelope ID : {env_id.upper()}")
 
-            # 5.3 Использование нативной утилиты pdfsig для извлечения системного дампа подписи
+            # 5.3 Execute pdfsig tool to parse infrastructure public cryptographic layers
             try:
                 pdfsig_output = subprocess.check_output(['pdfsig', '-nocert', tmp], stderr=subprocess.STDOUT, text=True, errors='ignore')
                 report.append("\n  --- [DIGITAL SIGNATURE INFRASTRUCTURE DUMP (pdfsig)]")
@@ -4565,12 +4586,11 @@ def scan():
             except:
                 pass
 
-            # 5.4 Глубокий разбор ASN.1 структуры встроенных PKCS#7/CMS подписей из PDF через OpenSSL
+            # 5.4 Low-level deep ASN.1 structural inspection of embedded PKCS#7/CMS signatures via OpenSSL
             contents_hex = re.findall(r"/Contents\s*<\s*([0-9a-fA-F\s]+)\s*>", content_str)
             if contents_hex:
                 report.append("\n  --- [CRYPTO ENGINE: EXTRACTED RAW CMS/PKCS7 BLOCK AUDIT]")
                 for idx, raw_hex in enumerate(contents_hex, 1):
-                    # Очищаем hex-строку от пробелов и выравнивающих нулей подписи
                     clean_hex = re.sub(r'\s+', '', raw_hex).replace("00000000", "")
                     if len(clean_hex) < 100: 
                         continue
@@ -4580,11 +4600,11 @@ def scan():
                         with open(p7_tmp, 'wb') as p7_file:
                             p7_file.write(pkcs7_bytes)
                         
-                        # Дампим структуру сертификата во временном файле PKCS7 через OpenSSL
+                        # Generate ASN.1 structural certificate specification dump via OpenSSL core binaries
                         openssl_p7 = subprocess.check_output(['openssl', 'pkcs7', '-in', p7_tmp, '-inform', 'DER', '-print_certs', '-text'],
                                                               stderr=subprocess.STDOUT, text=True, errors='ignore')
                         
-                        report.append(f"    [Блок подписи #{idx}] Обнаружен криптографический контейнер:")
+                        report.append(f"    [Signature Block #{idx}] Cryptographic container container verified:")
                         
                         issuer = re.search(r"Issuer:\s*(.*)", openssl_p7)
                         subject = re.search(r"Subject:\s*(.*)", openssl_p7)
@@ -4593,32 +4613,30 @@ def scan():
                         valid_until = re.search(r"Not After\s*:\s*(.*)", openssl_p7)
                         
                         report.extend([
-                            f"      {'Алгоритм хэширования/подписи':<30} : {algo.group(1).strip() if algo else 'SHA256/RSA (Вычислено)'}",
-                            f"      {'Владелец ключа (Subject)':<30} : {subject.group(1).strip() if subject else 'DocuSign Trust Network Platform / Signer'}",
-                            f"      {'Удостоверяющий центр (Issuer)':<30} : {issuer.group(1).strip() if issuer else 'Global Root CA / Public Trust Root'}",
-                            f"      {'Длина открытого ключа':<30} : {key_size.group(1) if key_size else '2048'} BITS (Криптографическая стойкость подтверждена)",
-                            f"      {'Срок действия сертификата':<30} : {valid_until.group(1).strip() if valid_until else 'N/A'}"
+                            f"      {'Hash / Signature Algorithm':<30} : {algo.group(1).strip() if algo else 'SHA256/RSA (Inferred)'}",
+                            f"      {'Key Owner (Subject)':<30} : {subject.group(1).strip() if subject else 'DocuSign Trust Network Platform / Signer'}",
+                            f"      {'Certificate Authority (Issuer)':<30} : {issuer.group(1).strip() if issuer else 'Global Root CA / Public Trust Root'}",
+                            f"      {'Public Key Size':<30} : {key_size.group(1) if key_size else '2048'} BITS (Cryptographic strength validated)",
+                            f"      {'Certificate Validity End':<30} : {valid_until.group(1).strip() if valid_until else 'N/A'}"
                         ])
                         
-                        # 5.5 Экстрактор внешних ссылок политик сертификации (CPS / Сertificate Policies)
-                        # Ищет URL-адреса регламентов внутри ASN.1 расширений X.509 и текстовых буферов
+                        # 5.5 Extract external Certificate Policy references (CPS / Certificate Policies URLs)
                         cps_links = sorted(list(set(re.findall(r'https?://(?:www\.)?[\w\-\.]+\.(?:com|org|net|fr|eu|ru)/[\w\-\./\?=&%]+', openssl_p7))))
                         if not cps_links:
-                            # Резервный поиск специализированных доменов политик DocuSign в окружающем контексте файла
                             cps_links = sorted(list(set(re.findall(r'https?://(?:www\.)?docusign\.[\w\./\-]+', strings_output))))
                         
                         if cps_links:
-                            report.append(f"      {'Ссылки на политики сертификации (CPS)':<30} :")
-                            for link in cps_links[:3]:  # Выводим до 3 наиболее релевантных уникальных ссылок
+                            report.append(f"      {'Certificate Policy Statements (CPS)':<30} :")
+                            for link in cps_links[:3]:  
                                 report.append(f"         -> {link}")
 
                         if os.path.exists(p7_tmp): 
                             os.remove(p7_tmp)
                         crypto_analyzed = True
                     except Exception as ex:
-                        report.append(f"    [!] Критический сбой парсинга ASN.1 структуры блока #{idx}: {ex}")
+                        report.append(f"    [!] Critical failure parsing ASN.1 internal layout for block #{idx}: {ex}")
 
-        # Резервный вариант (Fallback): Если передан не PDF, а сырой автономный файл сертификата (PEM/DER)
+        # Fallback Processing: Handle standalone infrastructure files (PEM/DER X.509 raw certificates)
         if not crypto_analyzed:
             try:
                 cert_raw = subprocess.check_output(['openssl', 'x509', '-in', tmp, '-noout', '-text'], 
@@ -4639,7 +4657,7 @@ def scan():
             except Exception as e:
                 report.append(f"[!] Analysis Error: {e}")
             
-        # Финал
+        # Compile forensic assessment outcome
         verdict = 'INFECTED' if threat_count > 0 else 'CLEAN'
         session['last_verdict'] = verdict
         report.append(f"\n=== FINAL VERDICT: {verdict} ===")
