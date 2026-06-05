@@ -3778,7 +3778,6 @@ EOF
 }
 
 
-
 function run_nexus_breach_intel() {
     clear
     echo "══════════════════════════════════════════════════"
