@@ -63,6 +63,8 @@ GLOBAL_MENU_REGISTRY=(
     "MAIN:PASSWORD|run_pass_lab" "MAIN:ANTI_MALWARE|run_anti_malware_engine"
     "MAIN:REANIMATOR|run_cross_os_reanimator" "MAIN:EXIT|exit_script"
     "MAIN:Forensic_Nexus|run_nexus_forensic"
+    "MAIN:Forensic_Breach_Leaks_Mails|run_nexus_breach_intel"
+    
     
     
 
@@ -3774,6 +3776,288 @@ EOF
     echo ""
     read -n 1 -s -r -p "Press any key to return to the main menu..."
 }
+
+
+
+function run_nexus_breach_intel() {
+    clear
+    echo "======================================================================"
+    echo "     NEXUS ULTRA MULTI-ENGINE THREAT INTELLIGENCE DISPATCHER v3.0     "
+    echo "======================================================================"
+    echo ""
+    
+    echo "----------------------------------------------------------------------"
+    echo " МУЛЬТИ-ПОИСКОВАЯ СИСТЕМА (DEHASHED, LEAKLOOKUP, SNUSBASE & AGGREGATORS)"
+    echo " ФОРМАТЫ ВВОДА:"
+    echo "  • Поиск по всему домену : @domain.com или domain.com"
+    echo "  • Точечная проверка ИБ  : operator@domain.com (Независимый аудит)"
+    echo "----------------------------------------------------------------------"
+    read -r -p "ВВЕДИТЕ ЦЕЛЬ (ДОМЕН ИЛИ КОНКРЕТНЫЙ EMAIL) > " TARGET_DATA
+    
+    if [ -z "${TARGET_DATA}" ]; then
+        echo -e "\n[ОТМЕНА] Входные данные пусты. Возврат в главное меню..."
+        sleep 2
+        return 0
+    fi
+
+    echo -e "\n[PIPELINE] Инициализация многопоточного шлюза и запуск параллельных запросов..."
+  
+    # Сериализация глобального массива User-Agent для Python сред
+    local UA_JOINED=""
+    if [ -n "${GLOBAL_NETWORK_UA[*]}" ]; then
+        for ua in "${GLOBAL_NETWORK_UA[@]}"; do
+            if [ -z "${UA_JOINED}" ]; then
+                UA_JOINED="${ua}"
+            else
+                UA_JOINED="${UA_JOINED}|||${ua}"
+            fi
+        done
+    fi
+
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate
+    fi
+
+    # Экспорт авторизационных ключей из окружения системы (укажите ваши ключи в профиле или раскомментируйте ниже)
+    # export DEHASHED_API_KEY="your_dehashed_key_here"
+    # export DEHASHED_USERNAME="your_dehashed_email_here"
+    # export LEAKLOOKUP_API_KEY="your_leaklookup_key_here"
+    # export SNUSBASE_API_KEY="your_snusbase_key_here"
+
+    export TARGET_DATA="${TARGET_DATA}"
+    export NEXUS_EXT_UA="${UA_JOINED}"
+    
+    python3 << 'EOF'
+import os
+import sys
+import asyncio
+import aiohttp
+import random
+
+ext_ua_raw = os.getenv("NEXUS_EXT_UA", "")
+if ext_ua_raw:
+    GLOBAL_NETWORK_UA = ext_ua_raw.split("|||")
+else:
+    GLOBAL_NETWORK_UA = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ]
+
+def get_rotated_headers(custom_headers=None):
+    """Генерация заголовков для обхода защитных экранов WAF."""
+    base = {
+        "User-Agent": random.choice(GLOBAL_NETWORK_UA),
+        "Accept": "application/json"
+    }
+    if custom_headers:
+        base.update(custom_headers)
+    return base
+
+
+class NexusMultiEngineBreachChecker:
+    """
+    Высокоскоростной асинхронный процессор для параллельного сбора компрометирующих данных
+    из распределенных источников коммерческой киберразведки.
+    """
+    def __init__(self, target_input: str):
+        """
+        Инициализация парсера целей и валидация входящего потока.
+        
+        @param string target_input Строка ввода (доменная зона или конкретная учетная запись).
+        """
+        self.raw_input = target_input.strip().lower()
+        self.is_email = "@" in self.raw_input and not self.raw_input.startswith("@")
+        
+        if self.is_email:
+            self.target_email = self.raw_input
+            self.target_domain = self.raw_input.split("@")[-1]
+            self.query_type = "email"
+        else:
+            self.target_email = None
+            self.target_domain = self.raw_input.lstrip("@")
+            self.query_type = "domain"
+
+        self.aggregated_results = {}
+
+    def _normalize_and_add(self, email: str, password: str):
+        """Внутренний метод нормализации и дедупликации записей утечек."""
+        if not email or not password:
+            return
+        email = email.strip().lower()
+        password = password.strip()
+        
+        # Если проверяем конкретный email, отсекаем посторонние совпадения из баз данных
+        if self.is_email and email != self.target_email:
+            return
+            
+        if email not in self.aggregated_results:
+            self.aggregated_results[email] = set()
+        self.aggregated_results[email].add(password)
+
+    async def fetch_dehashed(self, session: aiohttp.ClientSession):
+        """
+        Интеграционный коннектор к API DeHashed.
+        
+        @param ClientSession session Экземпляр сетевого клиента.
+        """
+        api_key = os.getenv("DEHASHED_API_KEY")
+        username = os.getenv("DEHASHED_USERNAME")
+        if not api_key or not username:
+            return # Пропускаем модуль при отсутствии токенов
+
+        search_query = self.target_email if self.is_email else self.target_domain
+        url = f"https://api.dehashed.com/v2/search?query={search_query}"
+        headers = get_rotated_headers()
+        auth = aiohttp.BasicAuth(username, api_key)
+        
+        try:
+            async with session.get(url, headers=headers, auth=auth, timeout=15) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("success") and "entries" in data and data["entries"]:
+                        for entry in data["entries"]:
+                            email_found = entry.get("email")
+                            # Ищем пароль, если пустой — берем хэш
+                            pass_found = entry.get("password") or entry.get("hash")
+                            self._normalize_and_add(email_found, pass_found)
+        except Exception:
+            pass # Изолируем ошибки сети отдельного API
+
+    async def fetch_leaklookup(self, session: aiohttp.ClientSession):
+        """
+        Интеграционный коннектор к API LeakLookup.
+        
+        @param ClientSession session Экземпляр сетевого клиента.
+        """
+        api_key = os.getenv("LEAKLOOKUP_API_KEY")
+        if not api_key:
+            return
+
+        url = "https://leak-lookup.com/api/search"
+        headers = get_rotated_headers()
+        search_query = self.target_email if self.is_email else self.target_domain
+        payload = {
+            "key": api_key,
+            "type": self.query_type,
+            "target": search_query
+        }
+        
+        try:
+            async with session.post(url, headers=headers, data=payload, timeout=15) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("error") == "false" and "message" in data:
+                        # Структура LeakLookup часто группирует результаты по базам данных
+                        for leak_source, entries in data["message"].items():
+                            for entry in entries:
+                                if isinstance(entry, dict):
+                                    email_found = entry.get("email") or entry.get("username")
+                                    pass_found = entry.get("password") or entry.get("hash")
+                                    self._normalize_and_add(email_found, pass_found)
+                                elif isinstance(entry, str):
+                                    # Обработка плоских комбо-листов формата user:pass
+                                    if ":" in entry:
+                                        parts = entry.split(":", 1)
+                                        self._normalize_and_add(parts[0], parts[1])
+        except Exception:
+            pass
+
+    async def fetch_snusbase(self, session: aiohttp.ClientSession):
+        """
+        Интеграционный коннектор к API SnusBase.
+        
+        @param ClientSession session Экземпляр сетевого клиента.
+        """
+        api_key = os.getenv("SNUSBASE_API_KEY")
+        if not api_key:
+            return
+
+        url = "https://api.snusbase.com/data/search"
+        headers = get_rotated_headers({
+            "Authorization": api_key,
+            "Content-Type": "application/json"
+        })
+        search_query = self.target_email if self.is_email else self.target_domain
+        
+        # Snusbase требует указания конкретных типов терминов
+        term_type = "email" if self.is_email else "domain"
+        payload = {
+            "terms": [search_query],
+            "types": [term_type]
+        }
+        
+        try:
+            async with session.post(url, headers=headers, json=payload, timeout=15) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if "results" in data:
+                        for table_name, entries in data["results"].items():
+                            for entry in entries:
+                                email_found = entry.get("email") or entry.get("username")
+                                pass_found = entry.get("password") or entry.get("hash")
+                                self._normalize_and_add(email_found, pass_found)
+        except Exception:
+            pass
+
+    async def execute_parallel_harvesting(self):
+        """Диспетчер параллельного запуска всех поисковых механизмов."""
+        print("\n======================================================================")
+        print("                  РЕЗУЛЬТАТЫ СИНХРОННОЙ ПРОВЕРКИ УТЕЧЕК                ")
+        print("======================================================================")
+        
+        async with aiohttp.ClientSession() as session:
+            # Запускаем все три тяжелых сетевых запроса ОДНОВРЕМЕННО в бэкграунде
+            tasks = [
+                self.fetch_dehashed(session),
+                self.fetch_leaklookup(session),
+                self.fetch_snusbase(session)
+            ]
+            await asyncio.gather(*tasks)
+
+        # Вывод результатов в строгом соответствии с условиями оператора
+        if self.is_email:
+            if self.aggregated_results and self.target_email in self.aggregated_results:
+                print(f"{'ПОЧТА':<35} | {'ПАРОЛЬ / ХЭШ':<35} | УТЕЧКА")
+                print(f"{'-'*35}-+-{'-'*35}-+-=======")
+                for password in sorted(self.aggregated_results[self.target_email]):
+                    print(f"{self.target_email:<35} | {password:<35} | ДА")
+            else:
+                print(f"Почта {self.target_email}: утечки нет.")
+        else:
+            if self.aggregated_results:
+                print(f"[!] ВНИМАНИЕ: Обнаружены компрометации в доменной зоне: {self.target_domain}\n")
+                print(f"{'ПОЧТА':<35} | {'ПАРОЛЬ / ХЭШ':<35} | УТЕЧКА")
+                print(f"{'-'*35}-+-{'-'*35}-+-=======")
+                for email, passwords in sorted(self.aggregated_results.items()):
+                    for password in sorted(passwords):
+                        print(f"{email:<35} | {password:<35} | ДА")
+            else:
+                print(f"Почта утечки нет (Для домена {self.target_domain} совпадений не найдено).")
+
+        print("======================================================================\n")
+
+
+async def main():
+    target_data = os.getenv("TARGET_DATA", "")
+    if not target_data:
+        print("[ERROR] Не передан целевой параметр для обработки.")
+        return
+
+    checker = NexusMultiEngineBreachChecker(target_data)
+    await checker.execute_parallel_harvesting()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+EOF
+
+    if [ -d ".venv" ]; then
+        deactivate
+    fi
+    
+    echo ""
+    read -n 1 -s -r -p "Нажмите любую клавишу для возврата в меню..."
+}
+
+
 
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
 
