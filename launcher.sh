@@ -3971,7 +3971,6 @@ EOF
 
 
 
-
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
 
 generate_core_form_template() {
@@ -4039,7 +4038,6 @@ def render_prime_form(action_url, fields=None, btn_text="INITIATE TRANSFER"):
     """
 EOF
 }
-
 
 
 generate_core_template() {
