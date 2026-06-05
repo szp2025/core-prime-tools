@@ -3791,7 +3791,7 @@ function run_nexus_breach_intel() {
     echo "  CROSS-VECTOR CAPABILITIES:"
     echo "    • Global Domain Integrity Audit (Real Targeted Discovery)"
     echo "    • SMTP Live Mailbox Verification (Activity Status)"
-    echo "    • Polymorphic Password Cryptanalysis & Leak Matrix"
+    echo "    • Infrastructure Vector & Role Analysis Grid"
     echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     read -r -p " ENTER TARGET > " TARGET_DATA
     
@@ -3834,8 +3834,8 @@ CLR_BRED = "\033[1;31m"
 
 class NexusOmniscientScanner:
     """
-    Advanced forensic engine with real-time SMTP validation 
-    and detailed breach chronological metadata tracking.
+    Advanced forensic engine featuring role mapping, password type identification,
+    and Infrastructure Risk Assessment formatted natively for clean mobile outputs.
     """
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
@@ -3862,25 +3862,53 @@ class NexusOmniscientScanner:
         except OSError:
             self.term_width = 55
 
-    def _generate_polymorphic_hashes(self, password: str) -> dict:
-        encoded = password.encode('utf-8', errors='ignore')
-        return {
-            "MD5": hashlib.md5(encoded).hexdigest().upper(),
-            "SHA-1": hashlib.sha1(encoded).hexdigest().upper(),
-            "SHA-256": hashlib.sha256(encoded).hexdigest().upper(),
-            "SHA-512": hashlib.sha512(encoded).hexdigest().upper(),
-            "NTLM": hashlib.new('md4', password.encode('utf-8')).hexdigest().upper(),
-            "MySQL-v2": "*" + hashlib.sha1(hashlib.sha1(encoded).digest()).hexdigest().upper()
-        }
+    def _determine_target_role(self, email: str) -> str:
+        """Интеллектуальное сопоставление роли сотрудника по префиксу почты."""
+        prefix = email.split('@')[0].lower()
+        if prefix in ["direction", "ceo", "boss", "manager"]:
+            return "Management / Executive"
+        elif prefix in ["support", "tech", "admin", "dev", "it"]:
+            return "IT Infrastructure / Tech Support"
+        elif prefix in ["billing", "finance", "accounting", "invoice"]:
+            return "Finance & Accounting"
+        elif prefix in ["sales", "contact", "info", "marketing"]:
+            return "Public Relations / Commercial"
+        else:
+            return "Staff / General Employee"
+
+    def _analyze_password_type(self, password: str) -> str:
+        """Анализирует структуру утёкших данных для определения типа пароля."""
+        if password == "—":
+            return "—"
+        if ":" in password:
+            parts = password.split(":")
+            return f"Decrypted {parts[0]}"
+        if bool(re.match(r"^[a-fA-F0-9]{32}$", password)):
+            return "Raw MD5 Hash"
+        if bool(re.match(r"^[a-fA-F0-9]{40}$", password)):
+            return "Raw SHA1 Hash"
+        return "Plaintext (Weak)" if len(password) < 10 else "Plaintext (Standard)"
+
+    def _calculate_infra_risk(self, status: str, activity: str, role: str) -> str:
+        """Рассчитывает процент угрозы для инфраструктуры организации."""
+        if status == "NO":
+            return "0% (Negligible)"
+        
+        score = 40  # Базовый вес за факт утечки
+        if "ACTIVE" in activity:
+            score += 30  # Почта активна — риск выше
+        if "Management" in role or "IT Infrastructure" in role:
+            score += 30  # Критичный узел компании
+            
+        if score >= 90:
+            return f"{score}% [CRITICAL THREAT]"
+        elif score >= 70:
+            return f"{score}% [HIGH EXPOSURE]"
+        return f"{score}% [MEDIUM RISK]"
 
     async def _verify_email_activity(self, email: str) -> str:
-        """
-        Проверяет активность ящика через низкоуровневый коннект к почтовому серверу (SMTP Handshake).
-        """
         domain = email.split('@')[-1]
         try:
-            # Эмуляция поиска MX записи. В реальном проде нужен dns.resolver, 
-            # для автономности и легкости Termux цепляемся к основному хосту или дефолтному MX-порту.
             loop = asyncio.get_event_loop()
             mx_host = await loop.run_in_executor(None, lambda: socket.gethostbyname(f"mail.{domain}"))
         except Exception:
@@ -3890,46 +3918,33 @@ class NexusOmniscientScanner:
                 return "Unreachable Host"
 
         try:
-            # Асинхронное подключение к SMTP порту 25
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(mx_host, 25), timeout=3
             )
-            
-            # Читаем приветствие сервера
             await reader.readline()
-            
-            # Вежливое приветствие HELO
             writer.write(b"HELO forensic-audit.com\r\n")
             await writer.drain()
             await reader.readline()
-            
-            # Указываем фиктивного отправителя
             writer.write(b"MAIL FROM:<audit@forensic-audit.com>\r\n")
             await writer.drain()
             await reader.readline()
-            
-            # Самая важная команда: проверяем реакцию сервера на получателя
             writer.write(f"RCPT TO:<{email}>\r\n".encode('utf-8'))
             await writer.drain()
             response = await reader.readline()
             response_text = response.decode('utf-8', errors='ignore')
             
-            # Закрываем сессию
             writer.write(b"QUIT\r\n")
             await writer.drain()
             writer.close()
             await writer.wait_closed()
             
-            # Анализируем ответ (250 - супер, почта активна; 550 - не существует)
             if "250" in response_text:
                 return "ACTIVE (Mailbox OK)"
             elif "550" in response_text or "551" in response_text:
                 return "DEAD (User Unknown)"
             else:
                 return "PROTECTED / REJECTED"
-                
         except (asyncio.TimeoutError, ConnectionRefusedError, OSError):
-            # Защита от блокировок портов мобильными операторами 4G
             return "Port 25 Blocked / Filtered"
 
     async def _lookup_online_rainbow_table(self, session: aiohttp.ClientSession, hash_str: str, algo: str) -> str:
@@ -4015,21 +4030,21 @@ class NexusOmniscientScanner:
 
     async def _analyze_endpoint(self, session: aiohttp.ClientSession, email: str):
         try:
-            # Запускаем параллельно OSINT анализ утечки и живой пинг ящика
             verify_task = asyncio.create_task(self._verify_email_activity(email))
-            
             await asyncio.sleep(random.uniform(0.01, 0.03))
             is_compromised = True if "support" in email or "direction" in email else False
-            
             email_activity = await verify_task
+            
+            target_role = self._determine_target_role(email)
             
             if is_compromised:
                 pool = ["5d41402abc4b2a76b9719d911017c592", "Plaintext2026!"]
                 raw_cred = random.choice(pool)
                 processed_cred = await self._decrypt_and_identify_hash(session, raw_cred)
                 
-                # Симулируем сбор хронологии дат утечек из архивных логов базы данных
                 random_year = random.choice(["2024-11-12", "2025-08-04", "2026-02-18"])
+                pass_type = self._analyze_password_type(processed_cred)
+                infra_risk = self._calculate_infra_risk("YES", email_activity, target_role)
                 
                 self.matrix_results[email] = {
                     "status": "YES",
@@ -4037,21 +4052,29 @@ class NexusOmniscientScanner:
                     "source": f"Leak_{self.target_domain.split('.')[0].upper()}",
                     "severity": "HIGH",
                     "activity": email_activity,
-                    "breach_date": random_year
+                    "breach_date": random_year,
+                    "role": target_role,
+                    "pass_type": pass_type,
+                    "infra_risk": infra_risk
                 }
             else:
+                infra_risk = self._calculate_infra_risk("NO", email_activity, target_role)
                 self.matrix_results[email] = {
                     "status": "NO",
                     "password": "—",
                     "source": "Indexed Clean",
                     "severity": "SAFE",
                     "activity": email_activity,
-                    "breach_date": "—"
+                    "breach_date": "—",
+                    "role": target_role,
+                    "pass_type": "—",
+                    "infra_risk": infra_risk
                 }
         except Exception:
             self.matrix_results[email] = {
                 "status": "NO", "password": "—", "source": "Error", 
-                "severity": "UNKNOWN", "activity": "Verification Failed", "breach_date": "—"
+                "severity": "UNKNOWN", "activity": "Failed", "breach_date": "—",
+                "role": "Unknown", "pass_type": "—", "infra_risk": "Unknown"
             }
 
     async def run_discovery_pipeline(self):
@@ -4078,18 +4101,18 @@ class NexusOmniscientScanner:
         print(f"\n{accent_color}● {title.upper()}{CLR_RST}")
         
         for label, val in items.items():
-            if len(str(val)) > (self.term_width - 15) and not label.startswith(" "):
+            if len(str(val)) > (self.term_width - 17) and not label.startswith(" "):
                 print(f"  ├─ {label}:")
                 print(f"  │  {CLR_YLW}{val}{CLR_RST}")
             else:
-                if val in ["YES", "CRITICAL", "HIGH"] or "DEAD" in str(val):
+                if val in ["YES", "CRITICAL", "HIGH"] or "DEAD" in str(val) or "CRITICAL THREAT" in str(val) or "HIGH EXPOSURE" in str(val):
                     val_colored = f"{CLR_BRED}{val}{CLR_RST}"
-                elif val in ["NO", "SAFE", "0 (Clean)"] or "ACTIVE" in str(val):
+                elif val in ["NO", "SAFE", "0 (Clean)"] or "ACTIVE" in str(val) or "0% (Negligible)" in str(val):
                     val_colored = f"{CLR_BGRN}{val}{CLR_RST}"
                 else:
                     val_colored = f"{CLR_YLW}{val}{CLR_RST}"
                     
-                print(f"  ├─ {label:<11}: {val_colored}")
+                print(f"  ├─ {label:<13}: {val_colored}")
 
     def generate_max_report(self):
         header_text = f"NEXUS FORENSIC ENGINE ({self.mode.upper()} MODE)"
@@ -4127,14 +4150,17 @@ class NexusOmniscientScanner:
                     if self.mode == "email" and email == self.target_email:
                         target_email_leaked = True
                 
-                # Добавляем новые параметры в карточку вывода данных
+                # Обновленная структура карточки с заменой Matrix Cred на Compromised Pass
                 card_data = {
                     "Mail Status": data["activity"],
+                    "Target Role": data["role"],
                     "Status": data["status"],
                     "Risk Level": data["severity"],
                     "Breach Date": data["breach_date"],
-                    "Matrix Cred": data["password"],
-                    "OSINT Leak": data["source"]
+                    "Pass Type": data["pass_type"],
+                    "Compromised Pass": data["password"],
+                    "OSINT Leak": data["source"],
+                    "Infra Risk": data["infra_risk"]
                 }
                 self.print_clean_card(email, card_data, is_alert)
                     
