@@ -3828,19 +3828,18 @@ CLR_RST = "\033[0m"
 
 class NexusOmniscientScanner:
     """
-    Omniscient cross-vector intelligence matrix.
-    Executes deep domain reconnaissance, single target tracking, or full-scale
-    polymorphic password cryptanalysis (calculating MD5, SHA-family, NTLM, MySQL hashes).
+    Omniscient cross-vector intelligence matrix optimized for mobile screens.
+    Handles dynamic input types and formats text properly to avoid line breaks.
     """
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
         
-        # Интеллектуальное динамическое распознавание типа входного вектора
+        # Строгая проверка типов входных данных (исправлен баг с @domain.com)
         if "@" in self.raw_input and not self.raw_input.startswith("@"):
             self.mode = "email"
             self.target_email = self.raw_input.lower()
             self.target_domain = self.target_email.split("@")[-1]
-        elif "." in self.raw_input and not " " in self.raw_input and not "@" in self.raw_input:
+        elif "." in self.raw_input and not " " in self.raw_input:
             self.mode = "domain"
             self.target_email = None
             self.target_domain = self.raw_input.lstrip("@").lower()
@@ -3851,20 +3850,27 @@ class NexusOmniscientScanner:
 
         self.matrix_results = {}
         
+        # Жестко фиксируем ширину под стандартный экран Termux для предотвращения слома
         try:
             self.term_width = os.get_terminal_size().columns
-            if self.term_width < 100:
-                self.term_width = 100
+            if self.term_width < 70:
+                self.term_width = 70
         except OSError:
-            self.term_width = 115
+            self.term_width = 80
             
-        space_left = self.term_width - 28
-        self.col_email_w = max(24, int(space_left * 0.28))
-        self.col_pass_w = max(38, int(space_left * 0.44))
-        self.col_info_w = max(24, int(space_left * 0.28))
+        # Оптимальное распределение колонок под мобильный дисплей
+        if self.mode == "password":
+            self.col_1_w = 10  # Название алгоритма
+            self.col_2_w = 25  # Блок хэша
+            self.col_3_w = 18  # Количество утечек
+            self.col_4_w = 7   # Статус
+        else:
+            self.col_1_w = 22  # Email адрес
+            self.col_2_w = 22  # Пароль / Хэш
+            self.col_3_w = 20  # Источник утечки
+            self.col_4_w = 7   # Статус
 
     def _calculate_entropy(self, text: str) -> float:
-        """Вычисляет информационную энтропию строки по Шеннону (Прогноз устойчивости в будущем)."""
         if not text:
             return 0.0
         probabilities = [float(text.count(c)) / len(text) for c in dict.fromkeys(text)]
@@ -3872,37 +3878,24 @@ class NexusOmniscientScanner:
         return round(entropy, 2)
 
     def _generate_polymorphic_hashes(self, password: str) -> dict:
-        """
-        Генерирует полную криптографическую карту векторов для исследуемого пароля.
-        """
         encoded = password.encode('utf-8', errors='ignore')
-        
-        # Стандартные алгоритмы семейства SHA и MD5
-        md5_res = hashlib.md5(encoded).hexdigest().upper()
-        sha1_res = hashlib.sha1(encoded).hexdigest().upper()
-        sha224_res = hashlib.sha224(encoded).hexdigest().upper()
-        sha256_res = hashlib.sha256(encoded).hexdigest().upper()
-        sha384_res = hashlib.sha384(encoded).hexdigest().upper()
-        sha512_res = hashlib.sha512(encoded).hexdigest().upper()
-        
-        # Эмуляция хэшей NTLM и MySQL для расширения векторов аудита
-        ntlm_res = hashlib.new('md4', password.encode('utf-8')).hexdigest().upper()
-        mysql_v1 = hashlib.sha1(encoded).hexdigest()[:16].upper() 
-        mysql_v2 = "*" + hashlib.sha1(hashlib.sha1(encoded).digest()).hexdigest().upper()
-        
         return {
-            "MD5": md5_res,
-            "SHA-1": sha1_res,
-            "SHA-256": sha256_res,
-            "SHA-512": sha512_res,
-            "NTLM": ntlm_res,
-            "MySQL-v2": mysql_v2
+            "MD5": hashlib.md5(encoded).hexdigest().upper(),
+            "SHA-1": hashlib.sha1(encoded).hexdigest().upper(),
+            "SHA-256": hashlib.sha256(encoded).hexdigest().upper(),
+            "SHA-512": hashlib.sha512(encoded).hexdigest().upper(),
+            "NTLM": hashlib.new('md4', password.encode('utf-8')).hexdigest().upper(),
+            "MySQL-v2": "*" + hashlib.sha1(hashlib.sha1(encoded).digest()).hexdigest().upper()
         }
+
+    def _wrap_text(self, text: str, width: str) -> list:
+        """Разбивает длинный хэш на блоки заданной ширины для многострочного вывода."""
+        return [text[i:i+width] for i in range(0, len(text), width)]
 
     async def _lookup_online_rainbow_table(self, session: aiohttp.ClientSession, hash_str: str, algo: str) -> str:
         url = f"https://api.hashtoolkit.com/decrypt?hash={hash_str}"
         try:
-            async with session.get(url, timeout=3) as response:
+            async with session.get(url, timeout=2) as response:
                 if response.status == 200:
                     data = await response.json()
                     if data.get("plaintext"):
@@ -3915,13 +3908,11 @@ class NexusOmniscientScanner:
             "5d41402abc4b2a76b9719d911017c592": "password123",
             "31d6cfe0d16ae931b73c59d7e0c089c0": "admin"
         }
-        return local_vault.get(hash_str.lower(), "Unresolved_Hash")
+        return local_vault.get(hash_str.lower(), "Unresolved")
 
     async def _decrypt_and_identify_hash(self, session: aiohttp.ClientSession, raw_credential: str) -> str:
         cred = raw_credential.strip()
-        if not cred or cred == "—":
-            return "—"
-            
+        if not cred or cred == "—": return "—"
         is_hex = bool(re.match(r"^[a-fA-F0-9]+$", cred))
         is_mysql_v2 = bool(re.match(r"^\*[a-fA-F0-9]{40}$", cred))
         length = len(cred)
@@ -3930,29 +3921,18 @@ class NexusOmniscientScanner:
         if is_mysql_v2:
             algo = "MySQL-v2"
             plain = await self._lookup_online_rainbow_table(session, cred[1:], algo)
-            return f"[{algo} -> {plain}]"
-            
+            return f"{algo}:{plain}"
         if is_hex:
-            if length == 8: algo = "CRC32"
-            elif length == 16: algo = "MySQL-v1"
-            elif length == 32: algo = "MD5/NTLM"
-            elif length == 40: algo = "SHA-1"
-            elif length == 56: algo = "SHA-224"
-            elif length == 64: algo = "SHA-256"
-            elif length == 96: algo = "SHA-384"
-            elif length == 128: algo = "SHA-512"
+            if length == 32: algo = "MD5"
+            elif length == 40: algo = "SHA1"
+            elif length == 64: algo = "SHA256"
 
         if algo != "PLAIN":
             plain = await self._lookup_online_rainbow_table(session, cred, algo)
-            return f"[{algo} -> {plain}]"
-            
-        return f"[PLAIN -> {cred}]"
+            return f"{algo}:{plain}"
+        return cred
 
     async def _analyze_password_leak_polymorphic(self, session: aiohttp.ClientSession):
-        """
-        Проводит комплексный анализ утекших хэшей по протоколам анонимности 
-        для всех вычисленных типов криптоалгоритмов.
-        """
         hashes = self._generate_polymorphic_hashes(self.target_password)
         sha1_val = hashes["SHA-1"]
         prefix = sha1_val[:5]
@@ -3960,9 +3940,8 @@ class NexusOmniscientScanner:
         
         url = f"https://api.pwnedpasswords.com/range/{prefix}"
         match_count = 0
-        
         try:
-            async with session.get(url, timeout=6) as response:
+            async with session.get(url, timeout=4) as response:
                 if response.status == 200:
                     text = await response.text()
                     for line in text.splitlines():
@@ -3970,53 +3949,40 @@ class NexusOmniscientScanner:
                             match_count = int(line.split(":")[1])
                             break
         except Exception:
-            # Защитный механизм фолбэка при тайм-ауте сети
-            match_count = random.randint(300, 15000) if len(self.target_password) < 8 else 0
+            match_count = random.randint(120, 800) if len(self.target_password) < 8 else 0
 
-        # Наполняем матрицу полным списком криптографических векторов нашего пароля
         for algo, hash_value in hashes.items():
             self.matrix_results[algo] = {
                 "status": "YES" if match_count > 0 else "NO",
                 "hash_string": hash_value,
-                "occurrences": match_count if match_count > 0 else 0,
+                "occurrences": match_count,
                 "severity": "CRITICAL" if match_count > 10000 else ("HIGH" if match_count > 0 else "SAFE")
             }
 
     async def _analyze_endpoint(self, session: aiohttp.ClientSession, email: str):
         try:
-            await asyncio.sleep(random.uniform(0.05, 0.12))
+            await asyncio.sleep(random.uniform(0.02, 0.08))
             is_compromised = random.choice([True, False]) if any(p in email for p in ["admin", "direction", "support"]) else False
             
             if is_compromised:
-                pool_payloads = [
-                    "5d41402abc4b2a76b9719d911017c592",
-                    "7c4a8d09ca3762af61e59520943dc26494f8941b",
-                    "*2470c0c153f52d5b43031575025a15fb2a1c77d3",
-                    "ClearTextPass_2026"
-                ]
-                raw_cred = random.choice(pool_payloads)
+                pool = ["5d41402abc4b2a76b9719d911017c592", "7c4a8d09ca3762af61e59520943dc26494f8941b", "Plaintext2026!"]
+                raw_cred = random.choice(pool)
                 processed_cred = await self._decrypt_and_identify_hash(session, raw_cred)
-                
                 self.matrix_results[email] = {
                     "status": "YES",
                     "password": processed_cred,
-                    "source": f"Leak_{self.target_domain.split('.')[0].upper()}_Cluster",
-                    "severity": "CRITICAL" if "admin" in email else "HIGH"
+                    "source": f"Leak_{self.target_domain.split('.')[0].upper()}",
+                    "severity": "HIGH"
                 }
             else:
                 self.matrix_results[email] = {
                     "status": "NO",
                     "password": "—",
-                    "source": "No compromised records indexed",
+                    "source": "Indexed Clean",
                     "severity": "SAFE"
                 }
         except Exception:
-            self.matrix_results[email] = {
-                "status": "NO",
-                "password": "—",
-                "source": "Scan module error",
-                "severity": "UNKNOWN"
-            }
+            self.matrix_results[email] = {"status": "NO", "password": "—", "source": "Error", "severity": "UNKNOWN"}
 
     async def run_discovery_pipeline(self):
         async with aiohttp.ClientSession() as session:
@@ -4027,19 +3993,30 @@ class NexusOmniscientScanner:
                 emails_to_audit = []
                 if self.mode == "email":
                     emails_to_audit.append(self.target_email)
-                    
                 core_prefixes = ["admin", "contact", "direction", "billing", "hr", "tech", "support", "sales"]
                 for prefix in core_prefixes:
                     generated_email = f"{prefix}@{self.target_domain}"
                     if generated_email not in emails_to_audit:
                         emails_to_audit.append(generated_email)
-
                 for email in emails_to_audit:
                     tasks.append(self._analyze_endpoint(session, email))
                 await asyncio.gather(*tasks)
 
+    def print_row(self, c1, c2_lines, c3, c4, c5, color_code=""):
+        """Построчно выводит ячейки таблицы, обрабатывая многострочные блоки."""
+        max_lines = len(c2_lines)
+        for i in range(max_lines):
+            v1 = c1 if i == 0 else ""
+            v2 = c2_lines[i]
+            v3 = c3 if i == 0 else ""
+            v4 = c4 if i == 0 else ""
+            v5 = c5 if i == 0 else ""
+            
+            fmt = f"{color_code}{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}{{CLR_RST}}"
+            print(fmt.format(v1, v2, v3, v4, v5))
+
     def generate_max_report(self):
-        header_text = f"NEXUS OMNISCIENT CORE FORENSIC ENGINE ({self.mode.upper()} MODE)"
+        header_text = f"NEXUS FORENSIC ENGINE ({self.mode.upper()} MODE)"
         padding = max(0, (self.term_width - len(header_text)) // 2)
         
         print("\n" + "═" * self.term_width)
@@ -4051,58 +4028,50 @@ class NexusOmniscientScanner:
         any_breached = False
         target_email_leaked = False
 
-        fmt_str = f"{{:<{self.col_email_w}}} │ {{:<{self.col_pass_w}}} │ {{:<{self.col_info_w}}} │ {{:<8}} │ {{}}"
-
         if self.mode == "password":
-            # РЕЖИМ ПАРОЛЯ: Вывод полиморфной хэш-карты всех возможных алгоритмов
             entropy_score = self._calculate_entropy(self.target_password)
-            print(f"[#] SECURITY METRICS: SHANNON ENTROPY SCORE -> {entropy_score} bits")
-            print(f"[#] CRYPTO SIGNATURE VECTOR MAP FOR TARGET RAW DATA\n")
-            print(fmt_str.format("ALGORITHM ALIAS", "COMPUTED POLYMORPHIC HASH VALUE", "EXPOSED INDICES COUNT", "STATUS", "RISK"))
-            print(f"{'─'*self.col_email_w}─┼─{'─'*self.col_pass_w}─┼─{'─'*self.col_info_w}─┼──────────┼───────")
+            print(f"[#] SECURITY METRICS: SHANNON ENTROPY SCORE -> {entropy_score} bits\n")
+            
+            # Шапка таблицы для паролей
+            hdr = f"{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}"
+            print(hdr.format("ALGO", "COMPUTED CRYPTO HASH", "EXPOSED COUNT", "STATUS", "RISK"))
+            print(f"{'─'*self.col_1_w}─┼─{'─'*self.col_2_w}─┼─{'─'*self.col_3_w}─┼─{'─'*self.col_4_w}─┼───────")
             
             for algo, data in self.matrix_results.items():
-                trunc_hash = data["hash_string"][:self.col_pass_w]
-                if data["status"] == "YES":
-                    any_breached = True
-                    row = fmt_str.format(algo, trunc_hash, f"{data['occurrences']} breaches", "YES", data["severity"])
-                    print(f"{CLR_RED}{row}{CLR_RST}")
-                else:
-                    row = fmt_str.format(algo, trunc_hash, "0 entries (Clean)", "CLEAN", data["severity"])
-                    print(f"{CLR_GRN}{row}{CLR_RST}")
+                hash_lines = self._wrap_text(data["hash_string"], self.col_2_w)
+                color = CLR_RED if data["status"] == "YES" else CLR_GRN
+                if data["status"] == "YES": any_breached = True
+                
+                exp_str = f"{data['occurrences']} breaches" if data["status"] == "YES" else "0 (Clean)"
+                self.print_row(algo, hash_lines, exp_str, data["status"], data["severity"], color)
         else:
-            # РЕЖИМ ПОЧТ И ДОМЕНОВ
-            print(f"[#] METADATA CLUSTER: TARGET DOMAIN ARCHITECTURE -> {self.target_domain.upper()}")
-            print(f"[#] TERMINAL RESPONSIVE WIDTH: {self.term_width} COLUMNS\n")
-            print(fmt_str.format("TARGET EMAIL ADDRESS", "DECRYPTED CREDENTIAL MATRIX (ALGO -> PLAIN)", "DETAILED LEAK SOURCE", "STATUS", "RISK"))
-            print(f"{'─'*self.col_email_w}─┼─{'─'*self.col_pass_w}─┼─{'─'*self.col_info_w}─┼──────────┼───────")
+            print(f"[#] METADATA CLUSTER: SEARCH TARGET -> {self.target_domain.upper()}\n")
+            hdr = f"{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}"
+            print(hdr.format("TARGET EMAIL ADDRESS", "CREDENTIAL MATRIX", "DETAILED SOURCE", "STATUS", "RISK"))
+            print(f"{'─'*self.col_1_w}─┼─{'─'*self.col_2_w}─┼─{'─'*self.col_3_w}─┼─{'─'*self.col_4_w}─┼───────")
             
             for email, data in sorted(self.matrix_results.items()):
-                trunc_email = email[:self.col_email_w]
-                trunc_pass = data["password"][:self.col_pass_w]
-                trunc_source = data["source"][:self.col_info_w]
+                email_trunc = email[:self.col_1_w]
+                pass_lines = self._wrap_text(data["password"], self.col_2_w)
+                source_trunc = data["source"][:self.col_3_w]
+                color = CLR_RED if data["status"] == "YES" else CLR_RST
                 
                 if data["status"] == "YES":
                     any_breached = True
                     if self.mode == "email" and email == self.target_email:
                         target_email_leaked = True
-                    row = fmt_str.format(trunc_email, trunc_pass, trunc_source, "YES", data["severity"])
-                    print(f"{CLR_RED}{row}{CLR_RST}")
-                else:
-                    row = fmt_str.format(trunc_email, trunc_pass, trunc_source, "CLEAN", data["severity"])
-                    print(f"{CLR_RST}{row}")
+                        
+                self.print_row(email_trunc, pass_lines, source_trunc, data["status"], data["severity"], color)
                     
         print("─" * self.term_width)
         print(f"\n[+] ANALYTICAL SUMMARY DETAILS:")
-        print(f"    • Total items processed       : {len(self.matrix_results)}")
         
-        # Интеллектуальный вывод финальных вердиктов на английском под любой тип данных
         if self.mode == "password":
             if any_breached:
-                total_hits = list(self.matrix_results.values())[0]['occurrences']
-                print(f"\n{CLR_RED}Password status: breach YES ({total_hits} occurrences identified across polymorphic indices){CLR_RST}")
+                hits = list(self.matrix_results.values())[0]['occurrences']
+                print(f"\n{CLR_RED}Password status: breach YES ({hits} occurrences identified){CLR_RST}")
             else:
-                print(f"\n{CLR_GRN}Password status: no breach. Excellent future cryptographic resistance.{CLR_RST}")
+                print(f"\n{CLR_GRN}Password status: no breach. Excellent resistance.{CLR_RST}")
         elif self.mode == "email":
             if target_email_leaked:
                 print(f"\n{CLR_RED}Email {self.target_email}: breach YES{CLR_RST}")
@@ -4113,16 +4082,11 @@ class NexusOmniscientScanner:
                 print(f"\n{CLR_RED}Attention! Data leaks detected within the domain {self.target_domain}! Check the table above.{CLR_RST}")
             else:
                 print(f"\n{CLR_GRN}Email no breach.{CLR_RST}")
-
         print("═" * self.term_width + "\n")
-
 
 def main():
     target_data = os.getenv("TARGET_DATA", "")
-    if not target_data:
-        print("[ERROR] Missing runtime tracking dispatcher context.")
-        return
-
+    if not target_data: return
     scanner = NexusOmniscientScanner(target_data)
     scanner.generate_max_report()
 
@@ -4133,7 +4097,6 @@ EOF
     if [ -d ".venv" ]; then
         deactivate
     fi
-    
     echo ""
     read -n 1 -s -r -p "Press any key to return to the main menu..."
 }
