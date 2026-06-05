@@ -3201,56 +3201,66 @@ get_tool_info() {
 # МОДУЛЬ NEXUS CORE: УНИВЕРСАЛЬНЫЙ КРИМИНАЛИСТИЧЕСКИЙ ДИСПЕТЧЕР + АВТО-РЕЕСТР v4.5
 # ==============================================================================
 
+# ==============================================================================
+# MODULE NEXUS CORE: UNIVERSAL FORENSIC DISPATCHER + AUTO-REGISTRY v4.5
+# ==============================================================================
+
 function run_nexus_forensic() {
     clear
     echo "======================================================================"
     echo "         NEXUS AUTOMATIC GLOBAL OSINT & FORENSIC CORE v4.5            "
     echo "======================================================================"
     echo ""
-    
-    # Полный детализированный спектр объектов для автоматического криминалистического конвейера
     echo "----------------------------------------------------------------------"
-    echo " ПОДДЕРЖИВАЕМЫЕ ОБЪЕКТЫ ДЛЯ СИГНАТУРНОГО АНАЛИЗА И АВТО-ДИСПЕТЧЕРИЗАЦИИ:"
-    echo "  • [Транспорт]  Гос. Номер Машины Франции (SIV), Номера РФ/СНГ, Euro-Plates"
-    echo "  • [Бизнес FR]  Французские Реестры: Номера SIRET (14 цифр), SIREN (9 цифр)"
-    echo "  • [Бизнес Мир] Международная Имматрикуляция, Коды Юр. Лиц LEI (20 знаков), Названия Компаний"
-    echo "  • [Геолокация] Физические Почтовые Адреса (Улицы, Города, Департаменты через BAN/OSM)"
-    echo "  • [Финансы]    Международные Номера Банковских Счетов IBAN, SWIFT/BIC Коды"
-    echo "  • [Связь]      Телефоны (E.164, Мобильные, Стационарные, VOIP), Электронная Почта (Email)"
-    echo "  • [Сеть]       Доменные Имена, IP-Адреса, Цифровые Псевдонимы (Nicknames/OSINT)"
+    echo " SUPPORTED SIGNATURE OBJECTS FOR AUTOMATIC DISPATCHING:"
+    echo "  • [Vehicles]   France SIV (AA-123-AA), RU/CIS Plates, Euro-Plates"
+    echo "  • [Business FR] Business Registers: SIRET (14 digits), SIREN (9 digits)"
+    echo "  • [Business Global] LEI Codes (20 chars), Company Names/Registries"
+    echo "  • [Geolocation] Physical Addresses (Streets, Cities, Depts via BAN/OSM)"
+    echo "  • [Finances]    International Bank Account Numbers (IBAN), SWIFT/BIC Codes"
+    echo "  • [Telecom]     Phones (E.164, Mobile, Landline, VOIP), Emails"
+    echo "  • [Network]     Domain Names, IP Addresses, Digital Aliases (Nicknames)"
     echo "----------------------------------------------------------------------"
-    read -r -p "ВВЕДИТЕ ОБЪЕКТ РАЗВЕДКИ > " TARGET_DATA
+    read -r -p "ENTER TARGET DATA > " TARGET_DATA
     
     if [ -z "${TARGET_DATA}" ]; then
-        echo -e "\n[ОТМЕНА] Объект не указан. Возврат в главное меню..."
+        echo -e "\n[CANCEL] Target not specified. Returning to main menu..."
         sleep 2
         return 0
     fi
 
-    echo -e "\n[ПОТОК] Сигнатурный анализ и запуск интеллектуального конвейера..."
-  
-
-    if [ -d ".venv" ]; then
-        source .venv/bin/activate
+    echo -e "\n[PIPELINE] Running signature analysis and core engine..."
+    local UA_JOINED=""
+    if [ -n "${GLOBAL_NETWORK_UA[*]}" ]; then
+        for ua in "${GLOBAL_NETWORK_UA[@]}"; do
+            [ -z "${UA_JOINED}" ] && UA_JOINED="${ua}" || UA_JOINED="${UA_JOINED}|||${ua}"
+        done
     fi
 
-    TARGET_DATA="${TARGET_DATA}" python3 << 'EOF'
-import os
-import sys
-import asyncio
-import aiohttp
-import aiodns
-import re
-import subprocess
-import socket
-import urllib.parse
+    [ -d ".venv" ] && source .venv/bin/activate
+    export TARGET_DATA="${TARGET_DATA}"
+    export NEXUS_EXT_UA="${UA_JOINED}"
+    
+    python3 << 'EOF'
+import os, sys, asyncio, aiohttp, aiodns, re, random, socket, urllib.parse
 
 try:
     import phonenumbers
     from phonenumbers import geocoder, carrier, timezone
 except ImportError:
-    print("\n[КРИТИЧЕСКАЯ ОШИБКА] Библиотека 'phonenumbers' не установлена в окружении лончера.")
+    print("\n[CRITICAL ERROR] 'phonenumbers' library is not installed.")
     sys.exit(1)
+
+ext_ua_raw = os.getenv("NEXUS_EXT_UA", "")
+GLOBAL_NETWORK_UA = ext_ua_raw.split("|||") if ext_ua_raw else ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"]
+
+def get_rotated_headers():
+    return {
+        "User-Agent": random.choice(GLOBAL_NETWORK_UA),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Connection": "keep-alive"
+    }
 
 def verify_iban(iban: str) -> bool:
     if len(iban) < 4: return False
@@ -3260,132 +3270,94 @@ def verify_iban(iban: str) -> bool:
     except ValueError: return False
 
 class NexusForensicDispatcher:
-    def __init__(self, lang="ru", region="RU"):
-        self.lang = lang
-        self.region = region
+    def __init__(self): pass
 
-    # --- МОДУЛЬ: ТРАНСПОРТНАЯ РАЗВЕДКА (PLATE / IMMATRICULATION) ---
     async def process_license_plate(self, session, clean_data, country_hint, report):
-        report.append(f"\n=== [VEHICLE INTELLIGENCE & LICENSE PLATE AUDIT: {clean_data}] ===")
-        report.append(f"[CAR] REGISTRATION ZONE : {country_hint}")
-        
-        # Сценарий А: Французский формат SIV (AA-123-AA или старый 1234AB56)
+        report.extend([f"\n=== [VEHICLE INTELLIGENCE & LICENSE PLATE AUDIT: {clean_data}] ===", f"[CAR] REGISTRATION ZONE : {country_hint}"])
         if country_hint == "FRANCE (SIV / F-Plate)":
-            # Используем легальные публичные эндпоинты автозапчастей/страхования для выгрузки паспорта авто
             url = f"https://www.oscaro.com/catalog/vehicles/v2/plates/{clean_data}"
             try:
-                # Нам нужен кастомный заголовок, чтобы эмулировать браузер
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-                async with session.get(url, headers=headers, timeout=6) as resp:
+                async with session.get(url, headers=get_rotated_headers(), timeout=6) as resp:
                     if resp.status == 200:
-                        res_json = await resp.json()
-                        vehicle = res_json.get('vehicle', {}) or res_json.get('data', {})
-                        if vehicle:
+                        v = (await resp.json()).get('vehicle', {}) or (await resp.json()).get('data', {})
+                        if v:
                             report.extend([
-                                f"[CAR] {'MANUFACTURER':<15} : {vehicle.get('brand', vehicle.get('make', 'N/A')).upper()}",
-                                f"[CAR] {'MODEL RANGE':<15} : {vehicle.get('model', 'N/A').upper()}",
-                                f"[CAR] {'ENGINE TYPE':<15} : {vehicle.get('engine', vehicle.get('energy', 'N/A'))}",
-                                f"[CAR] {'POWER OUTPUT':<15} : {vehicle.get('power', 'N/A')} HP / Din",
-                                f"[CAR] {'GEARBOX TYPE':<15} : {vehicle.get('gearbox', 'N/A')}",
-                                f"[CAR] {'PRODUCTION YEAR':<15} : {vehicle.get('year', 'N/A')}",
-                                f"[CAR] {'SHASSIS / VIN':<15} : {vehicle.get('vin', 'RESTRICTED / ENCRYPTED')}"
+                                f"[CAR] {'MANUFACTURER':<15} : {str(v.get('brand', v.get('make', 'N/A'))).upper()}",
+                                f"[CAR] {'MODEL RANGE':<15} : {str(v.get('model', 'N/A')).upper()}",
+                                f"[CAR] {'ENGINE TYPE':<15} : {v.get('engine', v.get('energy', 'N/A'))}",
+                                f"[CAR] {'POWER OUTPUT':<15} : {v.get('power', 'N/A')} HP / Din",
+                                f"[CAR] {'GEARBOX TYPE':<15} : {v.get('gearbox', 'N/A')}",
+                                f"[CAR] {'PRODUCTION YEAR':<15} : {v.get('year', 'N/A')}",
+                                f"[CAR] {'SHASSIS / VIN':<15} : {v.get('vin', 'RESTRICTED / ENCRYPTED')}"
                             ])
-                        else:
-                            report.append("[CAR] Номер распознан, но технические спецификации в открытом пуле отсутствуют.")
-                    else:
-                        report.append(f"[CAR] Французский технический шлюз вернул статус: {resp.status}")
-            except Exception as e:
-                report.append(f"[CAR] Ошибка связи с транспортным реестром SIV: {str(e)}")
-                
-        # Сценарий Б: Российский / СНГ Формат (А123АА77 и т.д.)
+                        else: report.append("[CAR] Plate recognized, but technical specs are not available in public pool.")
+                    else: report.append(f"[CAR] French gateway returned status: {resp.status}")
+            except Exception as e: report.append(f"[CAR] Connection error to SIV registry: {str(e)}")
         elif country_hint == "RUSSIA / CIS (RU-Plate)":
-            report.append("[CAR] Инициализация Dorking-сценариев проверки по базам штрафов, залогов и полисов ОСАГО...")
-            # Генерируем прямые криминалистические ссылки для ручной верификации по открытым реестрам
             report.extend([
-                f"[LNK] {'Проверка РСА (ОСАГО)':<22} : https://autoins.ru/",
-                f"[LNK] {'Поиск в Нотариальной Палате':<22} : https://www.reestr-zalogov.ru/search/index",
-                f"[LNK] {'Dork: Упоминания в сети':<22} : https://www.google.com/search?q=%22{clean_data}%22",
-                f"[LNK] {'Dork: Проверка на парковках':<22} : https://www.google.com/search?q=%22{clean_data}%22+AND+(%22штраф%22+OR+%22эвакуация%22)"
+                "[CAR] Initiating dorking scenarios for fines, pledges, and insurance registries...",
+                f"[LNK] {'RSA Insurance Audit':<22} : https://autoins.ru/",
+                f"[LNK] {'Notary Pledge Registry':<22} : https://www.reestr-zalogov.ru/search/index",
+                f"[LNK] {'Web Mentions Dork':<22} : https://www.google.com/search?q=%22{clean_data}%22",
+                f"[LNK] {'Parking Evacuation Dork':<22} : https://www.google.com/search?q=%22{clean_data}%22+AND+(%22штраф%22+OR+%22эвакуация%22)"
             ])
-            
-        # Универсальные международные OSINT-линки для автономеров
-        report.append(f"\n--- [GLOBAL COMPLIANCE VEHICLE MONITORS]")
-        report.extend([
-            f"[LNK] {'Euro Plates Database':<22} : https://www.europlates.eu/",
-            f"[LNK] {'PlatesMania Tracker':<22} : http://platesmania.com/search.php?car={clean_data}"
-        ])
+        report.extend([f"\n--- [GLOBAL COMPLIANCE VEHICLE MONITORS]", f"[LNK] {'Euro Plates Database':<22} : https://www.europlates.eu/", f"[LNK] {'PlatesMania Tracker':<22} : http://platesmania.com/search.php?car={clean_data}"])
 
-    # --- МОДУЛЬ: ФРАНЦУЗСКИЙ РЕЕСТР КОМПАНИЙ (SIRET / SIREN) ---
     async def process_sirene(self, session, clean_data, report):
         report.append(f"\n=== [REPERTOIRE SIRENE INFRASTRUCTURE AUDIT: {clean_data}] ===")
-        url = f"https://recherche-entreprises.api.gouv.fr/search?q={clean_data}"
         try:
-            async with session.get(url, timeout=7) as resp:
+            async with session.get(f"https://recherche-entreprises.api.gouv.fr/search?q={clean_data}", headers=get_rotated_headers(), timeout=7) as resp:
                 if resp.status == 200:
-                    data = await resp.json()
-                    results = data.get('results', [])
-                    if not results:
-                        report.append("[SRN] Информация в государственном реестре не найдена."); return
-                    company = results[0]
+                    results = (await resp.json()).get('results', [])
+                    if not results: report.append("[SRN] No matches found in the state registry."); return
+                    c = results[0]
                     report.extend([
-                        f"[SRN] {'NOM COMMERCIAL':<16} : {company.get('nom_complet')}",
-                        f"[SRN] {'SIREN BASE':<16} : {company.get('siren')}",
-                        f"[SRN] {'STRUCTURE TYPE':<16} : {company.get('nature_juridique', 'N/A')}",
-                        f"[SRN] {'ACTIVITE MAIN':<16} : {company.get('activite_principale', 'N/A')} (Code APE)",
-                        f"[SRN] {'SIEGE ADDRESS':<16} : {company.get('adresse_complete', 'N/A')}"
+                        f"[SRN] {'LEGAL NAME':<16} : {c.get('nom_complet')}",
+                        f"[SRN] {'SIREN BASE':<16} : {c.get('siren')}",
+                        f"[SRN] {'STRUCTURE TYPE':<16} : {c.get('nature_juridique', 'N/A')}",
+                        f"[SRN] {'MAIN ACTIVITY':<16} : {c.get('activite_principale', 'N/A')} (Code APE)",
+                        f"[SRN] {'HQ ADDRESS':<16} : {c.get('adresse_complete', 'N/A')}"
                     ])
-                    dirigeants = company.get('dirigeants', [])
+                    dirigeants = c.get('dirigeants', [])
                     if dirigeants:
                         report.append("--- [MANAGEMENT / DIRIGEANTS DETECTED]")
                         for d in dirigeants:
                             name = f"{d.get('prenoms', '')} {d.get('nom', '')}".strip() or d.get('denomination', 'N/A')
-                            report.append(f"      - [{d.get('qualite', 'Dirigeant')[:10]}] : {name}")
-                else: report.append(f"[SRN] Ошибка шлюза API Sirene: {resp.status}")
-        except Exception as e: report.append(f"[SRN] Критическая ошибка связи с реестром: {str(e)}")
+                            report.append(f"      - [{d.get('qualite', 'Manager')[:10]}] : {name}")
+                else: report.append(f"[SRN] Sirene API Gateway error: {resp.status}")
+        except Exception as e: report.append(f"[SRN] Critical registry connection error: {str(e)}")
 
-    # --- МОДУЛЬ: ГЛОБАЛЬНЫЙ МЕЖДУНАРОДНЫЙ РЕЕСТР (IMMATRICULATION / LEI) ---
     async def process_global_immatriculation(self, session, clean_data, report):
         report.append(f"\n=== [GLOBAL IMMATRICULATION & LEI AUDIT: {clean_data}] ===")
-        url = f"https://api.gleif.org/api/v1/lei-records/{clean_data}"
         try:
-            async with session.get(url, timeout=7) as resp:
+            async with session.get(f"https://api.gleif.org/api/v1/lei-records/{clean_data}", headers=get_rotated_headers(), timeout=7) as resp:
                 if resp.status == 200:
-                    res_json = await resp.json()
-                    attrs = res_json.get('data', {}).get('attributes', {})
-                    if not attrs: report.append("[LEI] Запись не верифицирована."); return
-                    legal_addr = attrs.get('entity', {}).get('legalAddress', {})
-                    lines = ", ".join(legal_addr.get('addressLines', []))
+                    attrs = (await resp.json()).get('data', {}).get('attributes', {})
+                    if not attrs: report.append("[LEI] Entry not verified."); return
+                    addr = attrs.get('entity', {}).get('legalAddress', {})
                     report.extend([
                         f"[LEI] {'LEGAL ENTITY NAME':<18} : {attrs.get('legalName', {}).get('name', 'N/A')}",
                         f"[LEI] {'GLOBAL STATUS':<18} : {attrs.get('entity', {}).get('status', 'N/A')}",
                         f"[LEI] {'JURISDICTION':<18} : {attrs.get('entity', {}).get('jurisdiction', 'N/A')}",
-                        f"[LEI] {'REGISTERED ADDR':<18} : {lines}, {legal_addr.get('city')}, {legal_addr.get('country')}"
+                        f"[LEI] {'REGISTERED ADDR':<18} : {', '.join(addr.get('addressLines', []))}, {addr.get('city')}, {addr.get('country')}"
                     ])
                 else:
-                    search_url = f"https://api.gleif.org/api/v1/lei-records?filter[text]={urllib.parse.quote(clean_data)}"
-                    async with session.get(search_url, timeout=7) as s_resp:
+                    async with session.get(f"https://api.gleif.org/api/v1/lei-records?filter[text]={urllib.parse.quote(clean_data)}", headers=get_rotated_headers(), timeout=7) as s_resp:
                         if s_resp.status == 200:
-                            s_json = await s_resp.json()
-                            s_data = s_json.get('data', [])
+                            s_data = (await s_resp.json()).get('data', [])
                             if s_data:
-                                top_match = s_data[0].get('attributes', {})
-                                report.extend([
-                                    f"[LEI] {'BEST MATCH NAME':<18} : {top_match.get('legalName', {}).get('name')}",
-                                    f"[LEI] {'ASSIGNED LEI':<18} : {s_data[0].get('id')}"
-                                ])
-                            else: report.append("[LEI] Поиск по международным базам имматрикуляции не дал результатов.")
-        except Exception as e: report.append(f"[LEI] Сбой узла GLEIF: {str(e)}")
+                                match = s_data[0].get('attributes', {})
+                                report.extend([f"[LEI] {'BEST MATCH NAME':<18} : {match.get('legalName', {}).get('name')}", f"[LEI] {'ASSIGNED LEI':<18} : {s_data[0].get('id')}"])
+                            else: report.append("[LEI] Text search across global immatriculation databases yielded no results.")
+        except Exception as e: report.append(f"[LEI] GLEIF node lookup failure: {str(e)}")
 
-    # --- МОДУЛЬ: ГЕОКОДИРОВАНИЕ ФИЗИЧЕСКОГО АДРЕСА ---
     async def process_physical_address(self, session, clean_data, report):
         report.append(f"\n=== [PHYSICAL ADDRESS GEOLOCATION MATRIX] ===")
-        url = f"https://api-adresse.data.gouv.fr/search/?q={urllib.parse.quote(clean_data)}&limit=1"
         try:
-            async with session.get(url, timeout=6) as resp:
+            async with session.get(f"https://api-adresse.data.gouv.fr/search/?q={urllib.parse.quote(clean_data)}&limit=1", headers=get_rotated_headers(), timeout=6) as resp:
                 if resp.status == 200:
-                    data = await resp.json()
-                    features = data.get('features', [])
-                    if not features: report.append("[ADR] Совпадений адреса не обнаружено."); return
+                    features = (await resp.json()).get('features', [])
+                    if not features: report.append("[ADR] No address matches detected."); return
                     prop = features[0].get('properties', {})
                     coords = features[0].get('geometry', {}).get('coordinates', [0, 0])
                     report.extend([
@@ -3393,28 +3365,21 @@ class NexusForensicDispatcher:
                         f"[ADR] {'POSTAL CODE':<14} : {prop.get('postcode')}",
                         f"[ADR] {'CITY / COMMUNE':<14} : {prop.get('city')}",
                         f"[ADR] {'LONGITUDE':<14} : {coords[0]}",
-                        f"[ADR] {'LATITUDE':<14} : {coords[1]}"
+                        f"[ADR] {'LATITUDE':<14} : {coords[1]}",
+                        f"[LNK] {'OSM Live Map':<14} : https://www.openstreetmap.org/?mlat={coords[1]}&mlon={coords[0]}#map=17/{coords[1]}/{coords[0]}"
                     ])
-                    report.append(f"[LNK] {'OSM Live Map':<14} : https://www.openstreetmap.org/?mlat={coords[1]}&mlon={coords[0]}#map=17/{coords[1]}/{coords[0]}")
-        except Exception as e: report.append(f"[ADR] Сбой модуля BAN: {str(e)}")
+        except Exception as e: report.append(f"[ADR] BAN engine lookup failure: {str(e)}")
 
-    # --- МОДУЛЬ: ФИНАНСОВЫЕ ИНФРАСТРУКТУРЫ (IBAN) ---
     async def process_iban(self, session, clean_data, report):
         is_valid = verify_iban(clean_data)
-        report.append(f"\n=== [IBAN FORENSIC AUDIT: {clean_data}] ===")
-        report.append(f"[IBN] {'MOD97 CONTROL':<16} : {'PASSED' if is_valid else 'FAILURE'}")
-        bic_prefix = clean_data[4:12]
+        report.extend([f"\n=== [IBAN FORENSIC AUDIT: {clean_data}] ===", f"[IBN] {'MOD97 CONTROL':<16} : {'PASSED' if is_valid else 'FAILURE'}"])
         try:
-            async with session.get(f"https://api.openiban.org/validate/{clean_data}", timeout=5) as resp:
+            async with session.get(f"https://api.openiban.org/validate/{clean_data}", headers=get_rotated_headers(), timeout=5) as resp:
                 if resp.status == 200:
                     bd = (await resp.json()).get('bankData', {})
-                    report.extend([
-                        f"[IBN] {'BANK NAME':<16} : {bd.get('name', 'N/A')}",
-                        f"[IBN] {'BIC/SWIFT CORE':<16} : {bd.get('bic', 'N/A')}"
-                    ])
+                    report.extend([f"[IBN] {'BANK NAME':<16} : {bd.get('name', 'N/A')}", f"[IBN] {'BIC/SWIFT CORE':<16} : {bd.get('bic', 'N/A')}"])
         except: pass
 
-    # --- МОДУЛЬ: ТЕЛЕФОННЫЕ СЕТИ ---
     async def process_phone(self, session, clean_data, report):
         normalized = re.sub(r'[^0-9+]', '', clean_data)
         if not normalized.startswith('+'):
@@ -3423,37 +3388,38 @@ class NexusForensicDispatcher:
             else: normalized = '+' + normalized
         report.append(f"\n=== [GLOBAL FORENSIC PHONE REPORT: {normalized}] ===")
         try:
-            p = phonenumbers.parse(normalized, self.region)
+            p = phonenumbers.parse(normalized, None)
             if phonenumbers.is_valid_number(p):
+                rc = phonenumbers.region_code_for_number(p)
+                lang = "fr" if rc == "FR" else ("ru" if rc in ["RU", "BY", "KZ", "UA"] else "en")
                 report.extend([
-                    f"[NET] {'GEOGRAPHY':<18} : {geocoder.description_for_number(p, self.lang)}",
-                    f"[NET] {'OPERATOR CORE':<18} : {carrier.name_for_number(p, self.lang)}",
+                    f"[NET] {'GEOGRAPHY':<18} : {geocoder.description_for_number(p, lang)}",
+                    f"[NET] {'OPERATOR CORE':<18} : {carrier.name_for_number(p, lang)}",
                     f"[NET] {'FORMAT E164':<18} : {phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.E164)}"
                 ])
-        except Exception as e: report.append(f"[PHN] Сбой декодера: {str(e)}")
+                tzs = timezone.time_zones_for_number(p)
+                if tzs: report.append(f"[NET] {'TIMEZONE MATCH':<18} : {', '.join(tzs)}")
+            else: report.append("[PHN] Number structure failed strict E.164 validation.")
+        except Exception as e: report.append(f"[PHN] Signature parsing failure: {str(e)}")
 
-    # --- МОДУЛЬ: ПОЧТОВЫЕ СЕРВЕРА (EMAIL) ---
     async def process_email(self, session, clean_data, report):
         domain = clean_data.split('@')[-1]
         report.append(f"\n=== [EMAIL FORENSIC TARGET ANALYSIS: {clean_data}] ===")
-        dns_resolver = aiodns.DNSResolver()
         try:
-            res = await dns_resolver.query_dns(domain, 'MX') if hasattr(dns_resolver, 'query_dns') else await dns_resolver.query(domain, 'MX')
+            resolver = aiodns.DNSResolver()
+            res = await resolver.query_dns(domain, 'MX') if hasattr(resolver, 'query_dns') else await resolver.query(domain, 'MX')
             report.append(f"[DNS] {'MX CORE':<14} : {res[0].host if hasattr(res[0], 'host') else str(res[0])}")
         except: report.append("[DNS] MX RECORD FETCH FAILED")
 
-    # --- МОДУЛЬ: ЦИФРОВОЙ СЛЕД (NICKNAME OSINT) ---
     async def process_nickname(self, session, data, report):
         report.append(f"\n=== [DIGITAL FOOTPRINT MATRIX (NICKNAME): {data}] ===")
         async def scan_profile(name, url_template):
             try:
-                async with session.get(url_template.format(data), timeout=4) as r:
+                async with session.get(url_template.format(data), headers=get_rotated_headers(), timeout=4) as r:
                     return f"[USR] {name:<16} : {'[+] MATCH FOUND' if r.status == 200 else 'NOT FOUND'}"
             except: return f"[USR] {name:<16} : TIMEOUT"
-        results = await asyncio.gather(scan_profile('GitHub Core', 'https://github.com/{}'), scan_profile('Twitter / X', 'https://twitter.com/{}'))
-        report.extend(results)
+        report.extend(await asyncio.gather(scan_profile('GitHub Core', 'https://github.com/{}'), scan_profile('Twitter / X', 'https://twitter.com/{}')))
 
-    # --- МОДУЛЬ: СЕРВЕРНАЯ ИНФРАСТРУКТУРА (DOMAIN) ---
     async def process_domain(self, session, clean_data, report):
         report.append(f"\n=== [NEXUS SERVER DEEP-RECON: {clean_data}] ===")
         try:
@@ -3461,83 +3427,51 @@ class NexusForensicDispatcher:
             report.append(f"[NET] {'RESOLVED IP':<14} : {ip}")
         except: report.append("[NET] RESOLVE FAILURE")
 
-    # --- ЦЕНТРАЛЬНЫЙ АВТОМАТИЧЕСКИЙ ДИСПЕТЧЕР (С ФИ КСОМ СИГНАТУР НОМЕРОВ) ---
     async def run_pipeline(self, raw_data):
-        raw_data_stripped = raw_data.strip()
-        clean_data = raw_data_stripped.replace(" ", "").replace("-", "").upper()
-        
-        resolved_mode = None
-        country_hint = ""
+        raw_stripped = raw_data.strip()
+        clean_data = raw_stripped.replace(" ", "").replace("-", "").upper()
+        resolved_mode, country_hint = None, ""
 
-        # 1. Сигнатуры автомобильных номеров
-        # Французский формат SIV: 2 буквы - 3 цифры - 2 буквы (например, AA-123-AA или AA123AA)
-        if re.match(r'^[A-Z]{2}[0-9]{3}[A-Z]{2}$', clean_data):
-            resolved_mode = "LICENSE_PLATE"
-            country_hint = "FRANCE (SIV / F-Plate)"
-        # Старый французский формат (до 2009 года): от 1 до 4 цифр, 2-3 буквы, 2 цифры департамента
-        elif re.match(r'^[0-9]{1,4}[A-Z]{2,3}[0-9]{2,3}$', clean_data):
-            resolved_mode = "LICENSE_PLATE"
-            country_hint = "FRANCE (SIV / F-Plate)"
-        # Российский формат гос номеров: буква-3цифры-2буквы-регион (например, А123АА77 или А123АА177)
+        if re.match(r'^[A-Z]{2}[0-9]{3}[A-Z]{2}$', clean_data) or re.match(r'^[0-9]{1,4}[A-Z]{2,3}[0-9]{2,3}$', clean_data):
+            resolved_mode, country_hint = "LICENSE_PLATE", "FRANCE (SIV / F-Plate)"
         elif re.match(r'^[ABEKMHOPCTYX]{1}[0-9]{3}[ABEKMHOPCTYX]{2}[0-9]{2,3}$', clean_data):
-            resolved_mode = "LICENSE_PLATE"
-            country_hint = "RUSSIA / CIS (RU-Plate)"
+            resolved_mode, country_hint = "LICENSE_PLATE", "RUSSIA / CIS (RU-Plate)"
             
-        # 2. Если это не номер машины, запускаем стандартный каскад проверок диспетчера
         if not resolved_mode:
-            if clean_data.isdigit() and (len(clean_data) == 9 or len(clean_data) == 14):
-                resolved_mode = "SIRENE"
-            elif re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data):
-                resolved_mode = "IBAN"
-            elif '@' in clean_data:
-                resolved_mode = "EMAIL"
-            elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data:
-                resolved_mode = "PHONE"
-            elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data):
-                resolved_mode = "DOMAIN"
-            elif any(indicator in raw_data_stripped.lower() for indicator in ["rue", "avenue", "boulevard", "bd", "av ", "ул.", "улица", "дом"]):
-                resolved_mode = "ADDRESS"
-            elif re.match(r'^[0-9A-Z]{20}$', clean_data):
-                resolved_mode = "GLOBAL_IMMATRICULATION"
-            else:
-                resolved_mode = "GLOBAL_IMMATRICULATION" if len(raw_data_stripped) > 7 else "NICK"
+            if clean_data.isdigit() and len(clean_data) in [9, 14]: resolved_mode = "SIRENE"
+            elif re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data): resolved_mode = "IBAN"
+            elif '@' in clean_data: resolved_mode = "EMAIL"
+            elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data: resolved_mode = "PHONE"
+            elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[0-9]{1,3}(\.[0-9]{1,3}){3})$', clean_data): resolved_mode = "DOMAIN"
+            elif any(ind in raw_stripped.lower() for ind in ["rue", "avenue", "boulevard", "bd", "av ", "ул.", "улица", "дом"]): resolved_mode = "ADDRESS"
+            elif re.match(r'^[0-9A-Z]{20}$', clean_data): resolved_mode = "GLOBAL_IMMATRICULATION"
+            else: resolved_mode = "GLOBAL_IMMATRICULATION" if len(raw_stripped) > 7 else "NICK"
 
-        report = [
-            f"=== [NEXUS SMART AUTO-DISPATCHER ACTIVE] ===",
-            f"[SYS] DETECTED TYPE : {resolved_mode}",
-            f"[SYS] RAW TARGET    : {raw_data_stripped}"
-        ]
+        report = ["=== [NEXUS SMART AUTO-DISPATCHER ACTIVE] ===", f"[SYS] DETECTED TYPE : {resolved_mode}", f"[SYS] RAW TARGET    : {raw_stripped}"]
 
-        async with aiohttp.ClientSession(headers={'User-Agent': 'Nexus-Forensic/4.5'}) as session:
+        async with aiohttp.ClientSession(headers=get_rotated_headers()) as session:
             if resolved_mode == "LICENSE_PLATE": await self.process_license_plate(session, clean_data, country_hint, report)
             elif resolved_mode == "SIRENE": await self.process_sirene(session, clean_data, report)
-            elif resolved_mode == "GLOBAL_IMMATRICULATION": await self.process_global_immatriculation(session, raw_data_stripped, report)
-            elif resolved_mode == "ADDRESS": await self.process_physical_address(session, raw_data_stripped, report)
+            elif resolved_mode == "GLOBAL_IMMATRICULATION": await self.process_global_immatriculation(session, raw_stripped, report)
+            elif resolved_mode == "ADDRESS": await self.process_physical_address(session, raw_stripped, report)
             elif resolved_mode == "IBAN": await self.process_iban(session, clean_data, report)
             elif resolved_mode == "PHONE": await self.process_phone(session, clean_data, report)
             elif resolved_mode == "EMAIL": await self.process_email(session, clean_data, report)
             elif resolved_mode == "DOMAIN": await self.process_domain(session, clean_data, report)
-            elif resolved_mode =="NICK": await self.process_nickname(session, clean_data, report)
+            elif resolved_mode == "NICK": await self.process_nickname(session, clean_data, report)
 
         report.append("\n=== [END OF AUTOMATIC INVESTIGATION] ===")
         print("\n".join(report))
 
 if __name__ == "__main__":
-    d = os.getenv("TARGET_DATA", "")
     dispatcher = NexusForensicDispatcher()
-    asyncio.run(dispatcher.run_pipeline(d))
+    asyncio.run(dispatcher.run_pipeline(os.getenv("TARGET_DATA", "")))
 EOF
 
-    if [ -d ".venv" ]; then
-        deactivate
-    fi
-    
+    [ -d ".venv" ] && deactivate
     echo ""
-    read -n 1 -s -r -p "Нажмите любую клавишу для возврата в главное меню..."
+    read -n 1 -s -r -p "Press any key to return to the main menu..."
 }
-
-
-
 
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
 
