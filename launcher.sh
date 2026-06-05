@@ -3780,15 +3780,20 @@ EOF
 
 function run_nexus_breach_intel() {
     clear
-    echo "══════════════════════════════════════════════════"
+    # Динамически определяем ширину экрана для верхнего баннера
+    try_width=$(tput cols 2>/dev/null || echo 50)
+    [ "$try_width" -lt 40 ] && try_width=40
+    [ "$try_width" -gt 80 ] && try_width=60
+
+    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo "       NEXUS OMNISCIENT HYBRID INTELLIGENCE CORE  "
-    echo "══════════════════════════════════════════════════"
+    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo ""
     echo "  CROSS-VECTOR CAPABILITIES:"
     echo "    • Global Domain Integrity Audit (Real Targeted Discovery)"
     echo "    • Specific Targeted Email Forensic Tracking"
     echo "    • Polymorphic Password Cryptanalysis & Leak Matrix"
-    echo "──────────────────────────────────────────────────"
+    echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     read -r -p " ENTER TARGET > " TARGET_DATA
     
     if [ -z "${TARGET_DATA}" ]; then
@@ -3815,20 +3820,22 @@ import aiohttp
 import random
 import re
 import hashlib
-import math
 
-# ANSI цветовые коды для терминала
+# ANSI цветовая палитра для глубокого контраста
 CLR_RED = "\033[91m"
 CLR_GRN = "\033[92m"
 CLR_YLW = "\033[93m"
 CLR_BLU = "\033[94m"
 CLR_CYN = "\033[96m"
+CLR_MAG = "\033[95m"
 CLR_RST = "\033[0m"
+CLR_BGRN = "\033[1;32m"
+CLR_BRED = "\033[1;31m"
 
 class NexusOmniscientScanner:
     """
-    Omniscient cross-vector intelligence matrix with fully adaptive UI layout.
-    Dynamically recalculates column grid spaces based on active terminal size.
+    High-end card-based layout engine designed specifically for mobile 
+    terminal viewports to maintain ultra-clean aesthetics and readability.
     """
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
@@ -3848,34 +3855,13 @@ class NexusOmniscientScanner:
 
         self.matrix_results = {}
         
-        # Динамический рассчет геометрии экрана Termux
+        # Замеряем физический размер экрана
         try:
             self.term_width = os.get_terminal_size().columns
-            if self.term_width < 60:
-                self.term_width = 60
+            if self.term_width < 40:
+                self.term_width = 40
         except OSError:
-            self.term_width = 75
-
-        # Адаптивное вычисление долей колонок от общей ширины экрана (минус разделители ' │ ')
-        usable_w = self.term_width - 14 
-        
-        if self.mode == "password":
-            self.col_1_w = max(9, int(usable_w * 0.15))   # Алгоритм
-            self.col_2_w = max(20, int(usable_w * 0.45))  # Хэш-строка
-            self.col_3_w = max(12, int(usable_w * 0.22))  # Кол-во утечек
-            self.col_4_w = max(6, int(usable_w * 0.18))   # Статус / Риск
-        else:
-            self.col_1_w = max(18, int(usable_w * 0.32))  # Email адрес
-            self.col_2_w = max(15, int(usable_w * 0.28))  # Крипто-матрица
-            self.col_3_w = max(15, int(usable_w * 0.25))  # Источник
-            self.col_4_w = max(6, int(usable_w * 0.15))   # Статус / Риск
-
-    def _calculate_entropy(self, text: str) -> float:
-        if not text:
-            return 0.0
-        probabilities = [float(text.count(c)) / len(text) for c in dict.fromkeys(text)]
-        entropy = - sum([p * math.log(p, 2) for p in probabilities])
-        return round(entropy, 2)
+            self.term_width = 55
 
     def _generate_polymorphic_hashes(self, password: str) -> dict:
         encoded = password.encode('utf-8', errors='ignore')
@@ -3887,12 +3873,6 @@ class NexusOmniscientScanner:
             "NTLM": hashlib.new('md4', password.encode('utf-8')).hexdigest().upper(),
             "MySQL-v2": "*" + hashlib.sha1(hashlib.sha1(encoded).digest()).hexdigest().upper()
         }
-
-    def _wrap_text(self, text: str, width: int) -> list:
-        """Интеллектуальный многострочный перенос строк без разрушения структуры."""
-        if not text:
-            return ["—"]
-        return [text[i:i+width] for i in range(0, len(text), width)]
 
     async def _lookup_online_rainbow_table(self, session: aiohttp.ClientSession, hash_str: str, algo: str) -> str:
         url = f"https://api.hashtoolkit.com/decrypt?hash={hash_str}"
@@ -3942,7 +3922,6 @@ class NexusOmniscientScanner:
             pass
 
         if not discovered:
-            # Возвращаем только реально используемые в бизнес-процессах узлы инфраструктуры
             simulated_real = ["direction", "support", "billing"]
             for prefix in simulated_real:
                 discovered.add(f"{prefix}@{domain}")
@@ -3978,7 +3957,7 @@ class NexusOmniscientScanner:
 
     async def _analyze_endpoint(self, session: aiohttp.ClientSession, email: str):
         try:
-            await asyncio.sleep(random.uniform(0.01, 0.05))
+            await asyncio.sleep(random.uniform(0.01, 0.04))
             is_compromised = True if "support" in email or "direction" in email else False
             
             if is_compromised:
@@ -4012,36 +3991,34 @@ class NexusOmniscientScanner:
                 if self.mode == "email":
                     emails_to_audit.append(self.target_email)
                 else:
-                    print("[OSINT] Querying public databases for real target emails...")
+                    print("[OSINT] Querying public databases for real targets...")
                     emails_to_audit = await self._discover_real_domain_emails(session, self.target_domain)
-                    print(f"[OSINT] Identified {len(emails_to_audit)} active email targets for audit.")
+                    print(f"[OSINT] Identified {len(emails_to_audit)} targets for forensic audit.")
 
                 for email in emails_to_audit:
                     tasks.append(self._analyze_endpoint(session, email))
                 await asyncio.gather(*tasks)
 
-    def print_adaptive_row(self, c1_raw, c2_raw, c3_raw, c4_raw, c5_raw, color_code=""):
-        """
-        Ультимативный рендеринг: бьет абсолютно все ячейки строки на подстроки 
-        и аккуратно выстраивает их в адаптивный вертикальный стек.
-        """
-        lines_c1 = self._wrap_text(c1_raw, self.col_1_w)
-        lines_c2 = self._wrap_text(c2_raw, self.col_2_w)
-        lines_c3 = self._wrap_text(c3_raw, self.col_3_w)
-        lines_c4 = self._wrap_text(c4_raw, self.col_4_w)
-        lines_c5 = [c5_raw]
+    def print_clean_card(self, title, items, is_alert=False):
+        """Выводит сущность в виде чистой, легко читаемой карточки."""
+        accent_color = CLR_RED if is_alert else CLR_CYN
+        print(f"\n{accent_color}● {title.upper()}{CLR_RST}")
         
-        max_lines = max(len(lines_c1), len(lines_c2), len(lines_c3), len(lines_c4))
-        
-        for i in range(max_lines):
-            v1 = lines_c1[i] if i < len(lines_c1) else ""
-            v2 = lines_c2[i] if i < len(lines_c2) else ""
-            v3 = lines_c3[i] if i < len(lines_c3) else ""
-            v4 = lines_c4[i] if i < len(lines_c4) else ""
-            v5 = lines_c5[i] if i < len(lines_c5) else ""
-            
-            fmt = f"{color_code}{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}{CLR_RST}"
-            print(fmt.format(v1, v2, v3, v4, v5))
+        for label, val in items.items():
+            # Если значение длинное (например, хэш), выводим его со следующей строки со сдвигом
+            if len(str(val)) > (self.term_width - 15) and not label.startswith(" "):
+                print(f"  ├─ {label}:")
+                print(f"  │  {CLR_YLW}{val}{CLR_RST}")
+            else:
+                # Статусы подсвечиваем триггерными цветами
+                if val in ["YES", "CRITICAL", "HIGH"]:
+                    val_colored = f"{CLR_BRED}{val}{CLR_RST}"
+                elif val in ["NO", "SAFE", "0 (Clean)"]:
+                    val_colored = f"{CLR_BGRN}{val}{CLR_RST}"
+                else:
+                    val_colored = f"{CLR_YLW}{val}{CLR_RST}"
+                    
+                print(f"  ├─ {label:<11}: {val_colored}")
 
     def generate_max_report(self):
         header_text = f"NEXUS FORENSIC ENGINE ({self.mode.upper()} MODE)"
@@ -4056,38 +4033,39 @@ class NexusOmniscientScanner:
         any_breached = False
         target_email_leaked = False
 
-        # Форматирование заголовка таблицы
-        hdr_fmt = f"{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}"
-
         if self.mode == "password":
-            entropy_score = self._calculate_entropy(self.target_password)
-            print(f"[#] SECURITY METRICS: SHANNON ENTROPY SCORE -> {entropy_score} bits\n")
-            
-            print(hdr_fmt.format("ALGO", "COMPUTED CRYPTO HASH", "EXPOSED COUNT", "STATUS", "RISK"))
-            print(f"{'─'*self.col_1_w}─┼─{'─'*self.col_2_w}─┼─{'─'*self.col_3_w}─┼─{'─'*self.col_4_w}─┼───────")
-            
             for algo, data in self.matrix_results.items():
-                color = CLR_RED if data["status"] == "YES" else CLR_GRN
-                if data["status"] == "YES": any_breached = True
-                exp_str = f"{data['occurrences']} hits" if data["status"] == "YES" else "0 (Clean)"
+                is_alert = (data["status"] == "YES")
+                if is_alert: any_breached = True
                 
-                self.print_adaptive_row(algo, data["hash_string"], exp_str, data["status"], data["severity"], color)
+                card_data = {
+                    "Status": data["status"],
+                    "Risk Level": data["severity"],
+                    "Breaches": f"{data['occurrences']} hits" if is_alert else "0 (Clean)",
+                    "Crypto Hash": data["hash_string"]
+                }
+                self.print_clean_card(algo, card_data, is_alert)
         else:
-            print(f"\n[#] METADATA CLUSTER: REAL TARGET DOMAIN -> {self.target_domain.upper()}\n")
-            print(hdr_fmt.format("TARGET EMAIL ADDRESS", "CREDENTIAL MATRIX", "DETAILED SOURCE", "STATUS", "RISK"))
-            print(f"{'─'*self.col_1_w}─┼─{'─'*self.col_2_w}─┼─{'─'*self.col_3_w}─┼─{'─'*self.col_4_w}─┼───────")
+            print(f"\n[#] CLUSTER TARGET -> {self.target_domain.upper()}")
+            print("─" * self.term_width)
             
             for email, data in sorted(self.matrix_results.items()):
-                color = CLR_RED if data["status"] == "YES" else CLR_RST
-                if data["status"] == "YES":
+                is_alert = (data["status"] == "YES")
+                if is_alert:
                     any_breached = True
                     if self.mode == "email" and email == self.target_email:
                         target_email_leaked = True
-                        
-                self.print_adaptive_row(email, data["password"], data["source"], data["status"], data["severity"], color)
+                
+                card_data = {
+                    "Status": data["status"],
+                    "Risk Level": data["severity"],
+                    "Matrix Cred": data["password"],
+                    "OSINT Leak": data["source"]
+                }
+                self.print_clean_card(email, card_data, is_alert)
                     
-        print("─" * self.term_width)
-        print(f"\n[+] ANALYTICAL SUMMARY DETAILS:")
+        print("\n" + "─" * self.term_width)
+        print(f"[+] ANALYTICAL SUMMARY DETAILS:")
         
         if self.mode == "password":
             if any_breached:
@@ -4102,9 +4080,9 @@ class NexusOmniscientScanner:
                 print(f"\n{CLR_GRN}Email {self.target_email}: no breach.{CLR_RST}")
         else:
             if any_breached:
-                print(f"\n{CLR_RED}Attention! Data leaks detected within the domain {self.target_domain}! Check the table above.{CLR_RST}")
+                print(f"\n{CLR_RED}Attention! Data leaks detected within the domain {self.target_domain}! Check the report above.{CLR_RST}")
             else:
-                print(f"\n{CLR_GRN}Email no breach.{CLR_RST}")
+                print(f"\n{CLR_GRN}Domain status: clean. No active public leaks found.{CLR_RST}")
         print("═" * self.term_width + "\n")
 
 def main():
