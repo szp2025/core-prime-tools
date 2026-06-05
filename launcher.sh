@@ -3779,7 +3779,7 @@ EOF
 
 
 
-fufunction run_nexus_breach_intel() {
+function run_nexus_breach_intel() {
     clear
     echo "══════════════════════════════════════════════════"
     echo "       NEXUS OMNISCIENT HYBRID INTELLIGENCE CORE  "
