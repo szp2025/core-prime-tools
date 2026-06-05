@@ -3804,6 +3804,7 @@ function run_nexus_breach_intel() {
         source .venv/bin/activate
     fi
     
+    # Полный обход PEP 668 ограничений окружения с форсированием флага
     pip install aiohttp --quiet --disable-pip-version-check --break-system-packages 2>/dev/null || pip install aiohttp --quiet --disable-pip-version-check
 
     export TARGET_DATA="${TARGET_DATA}"
@@ -3888,8 +3889,10 @@ class NexusOmniscientScanner:
             "MySQL-v2": "*" + hashlib.sha1(hashlib.sha1(encoded).digest()).hexdigest().upper()
         }
 
-    def _wrap_text(self, text: str, width: str) -> list:
+    def _wrap_text(self, text: str, width: int) -> list:
         """Разбивает длинный хэш на блоки заданной ширины для многострочного вывода."""
+        if not text:
+            return ["—"]
         return [text[i:i+width] for i in range(0, len(text), width)]
 
     async def _lookup_online_rainbow_table(self, session: aiohttp.ClientSession, hash_str: str, algo: str) -> str:
@@ -4012,7 +4015,8 @@ class NexusOmniscientScanner:
             v4 = c4 if i == 0 else ""
             v5 = c5 if i == 0 else ""
             
-            fmt = f"{color_code}{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}{{CLR_RST}}"
+            # Ошибка исправлена: CLR_RST подставляется как переменная через f-строку снаружи шаблона
+            fmt = f"{color_code}{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}{CLR_RST}"
             print(fmt.format(v1, v2, v3, v4, v5))
 
     def generate_max_report(self):
@@ -4032,7 +4036,6 @@ class NexusOmniscientScanner:
             entropy_score = self._calculate_entropy(self.target_password)
             print(f"[#] SECURITY METRICS: SHANNON ENTROPY SCORE -> {entropy_score} bits\n")
             
-            # Шапка таблицы для паролей
             hdr = f"{{:<{self.col_1_w}}} │ {{:<{self.col_2_w}}} │ {{:<{self.col_3_w}}} │ {{:<{self.col_4_w}}} │ {{}}"
             print(hdr.format("ALGO", "COMPUTED CRYPTO HASH", "EXPOSED COUNT", "STATUS", "RISK"))
             print(f"{'─'*self.col_1_w}─┼─{'─'*self.col_2_w}─┼─{'─'*self.col_3_w}─┼─{'─'*self.col_4_w}─┼───────")
@@ -4100,6 +4103,7 @@ EOF
     echo ""
     read -n 1 -s -r -p "Press any key to return to the main menu..."
 }
+
 
 
 
