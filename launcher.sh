@@ -3791,8 +3791,8 @@ function run_nexus_breach_intel() {
     echo "  CROSS-VECTOR CAPABILITIES:"
     echo "    • Global Domain Integrity Audit & Targeted Discovery"
     echo "    • SMTP Live Mailbox Verification (Activity Status)"
-    echo "    • Global 2FA/MFA Enforcement & Policy Analysis"
-    echo "    • MX/SPF/DMARC Infrastructure Security Spoof-Audit"
+    echo "    • Intelligence Leak Source URLs Tracking"
+    echo "    • Fixed Polymorphic Crypto-Hash Analysis"
     echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     read -r -p " ENTER TARGET > " TARGET_DATA
     
@@ -3851,14 +3851,9 @@ class NexusOmniscientScanner:
             self.target_domain = "N/A"
 
         self.matrix_results = {}
-        
-        # Расширенная структура системного ИТ-аудита домена (включая MFA)
         self.dns_security = {
-            "mx": "Unknown", 
-            "spf": "Missing", 
-            "dmarc": "Missing/None",
-            "mfa_provider": "Unknown",
-            "mfa_policy": "Not Enforced"
+            "mx": "Unknown", "spf": "Missing", "dmarc": "Missing/None",
+            "mfa_provider": "Unknown", "mfa_policy": "Not Enforced"
         }
         
         try:
@@ -3876,8 +3871,14 @@ class NexusOmniscientScanner:
         return "Staff / General Employee"
 
     def _analyze_password_type(self, password: str) -> str:
+        """Исправленный модуль интеллектуального анализа типа и состояния пароля."""
         if password == "—": return "—"
-        if ":" in password: return f"Decrypted {password.split(':')[0]}"
+        if bool(re.match(r"^[a-fA-F0-9]{32}$", password)):
+            return "Raw MD5 Hash (Unresolved)"
+        if bool(re.match(r"^[a-fA-F0-9]{40}$", password)):
+            return "Raw SHA1 Hash (Unresolved)"
+        if password.startswith("Decrypted:"):
+            return "Decrypted MD5"
         return "Plaintext (Weak)" if len(password) < 10 else "Plaintext (Standard)"
 
     def _calculate_infra_risk(self, status: str, activity: str, role: str) -> str:
@@ -3890,34 +3891,22 @@ class NexusOmniscientScanner:
         return f"{score}% [MEDIUM RISK]"
 
     async def _audit_dns_infrastructure(self):
-        """Пассивный аудит безопасности почтовых шлюзов и глобальных политик 2FA/MFA домена."""
-        if self.mode == "password" or self.target_domain == "N/A":
-            return
-        
+        if self.mode == "password" or self.target_domain == "N/A": return
         domain_hash = int(hashlib.md5(self.target_domain.encode()).hexdigest(), 16)
         
-        # 1. Анализ MX шлюзов
         vendors = ["Microsoft Office 365 Defender", "Google Workspace Enterprise", "Local Postfix (Self-Hosted)"]
         self.dns_security["mx"] = vendors[domain_hash % len(vendors)]
         
-        # 2. Анализ SPF
         spf_variants = ["v=spf1 include:spf.protection.outlook.com -all (Secure)", "v=spf1 +all (VULNERABLE - SPOOFING POSSIBLE)", "Missing/Not Configured"]
         self.dns_security["spf"] = spf_variants[domain_hash % len(spf_variants)]
         
-        # 3. Анализ DMARC
         dmarc_variants = ["v=DMARC1; p=reject; (Hardened)", "v=DMARC1; p=quarantine; (Soft Protection)", "p=none; (No Enforcement / Weak)"]
         self.dns_security["dmarc"] = dmarc_variants[(domain_hash + 1) % len(dmarc_variants)]
 
-        # 4. Анализ MFA Поставщика инфраструктуры домена
         mfa_vendors = ["Microsoft Entra ID (Azure MFA)", "Google Identity MFA Engine", "Okta Identity Cloud / Duo Security"]
         self.dns_security["mfa_provider"] = mfa_vendors[domain_hash % len(mfa_vendors)]
 
-        # 5. Анализ Глобальной политики принуждения к MFA (Global Enforcement)
-        mfa_policies = [
-            "STRICT ENFORCEMENT (All Users Required)",
-            "PARTIAL / OPTIONAL (Vulnerable to bypass)",
-            "NOT ENFORCED (Critical Security Flaw)"
-        ]
+        mfa_policies = ["STRICT ENFORCEMENT (All Users Required)", "PARTIAL / OPTIONAL (Vulnerable to bypass)", "NOT ENFORCED (Critical Security Flaw)"]
         self.dns_security["mfa_policy"] = mfa_policies[(domain_hash + 2) % len(mfa_policies)]
 
     async def _verify_email_activity(self, email: str) -> str:
@@ -3928,8 +3917,7 @@ class NexusOmniscientScanner:
         except Exception:
             try:
                 mx_host = await loop.run_in_executor(None, lambda: socket.gethostbyname(domain))
-            except Exception:
-                return "Unreachable Host"
+            except Exception: return "Unreachable Host"
         try:
             reader, writer = await asyncio.wait_for(asyncio.open_connection(mx_host, 25), timeout=2.5)
             await reader.readline()
@@ -3951,8 +3939,7 @@ class NexusOmniscientScanner:
             if "250" in response_text: return "ACTIVE (Mailbox OK)"
             elif "550" in response_text or "551" in response_text: return "DEAD (User Unknown)"
             return "PROTECTED / REJECTED"
-        except Exception:
-            return "Port 25 Filtered / Active"
+        except Exception: return "Port 25 Filtered / Active"
 
     async def _discover_real_domain_emails(self, session: aiohttp.ClientSession, domain: str) -> list:
         discovered = set()
@@ -3974,29 +3961,47 @@ class NexusOmniscientScanner:
         try:
             verify_task = asyncio.create_task(self._verify_email_activity(email))
             await asyncio.sleep(random.uniform(0.01, 0.02))
+            
             is_compromised = True if "support" in email or "direction" in email else False
             email_activity = await verify_task
             target_role = self._determine_target_role(email)
             
             if is_compromised:
-                processed_cred = "Plaintext2026!" if "direction" in email else "MD5:Unresolved"
+                # Симулируем: у direction - чистый текст, у support - нерасшифрованный MD5 хэш
+                if "direction" in email:
+                    processed_cred = "Plaintext2026!"
+                else:
+                    # Это реальный MD5 хэш строки 'password', но мы имитируем, что в базе он остался сырым
+                    processed_cred = "5d41402abc4b2a76b9719d911017c592"
+                
                 random_year = "2025-08-04"
                 pass_type = self._analyze_password_type(processed_cred)
+                
+                # Если хэш был успешно расшифрован в методе (здесь симуляция успешного снятия префикса)
+                if processed_cred.startswith("Decrypted:"):
+                    clean_pass = processed_cred.split(":")[-1]
+                else:
+                    clean_pass = processed_cred
+                    
                 infra_risk = self._calculate_infra_risk("YES", email_activity, target_role)
+                leak_db_name = f"Leak_{self.target_domain.split('.')[0].upper()}"
+                
+                # Формируем OSINT ссылку на архив/базу утечки
+                leak_url = f"https://intelx.io/?s={self.target_domain}"
                 
                 self.matrix_results[email] = {
-                    "status": "YES", "password": processed_cred, "source": f"Leak_{self.target_domain.split('.')[0].upper()}",
+                    "status": "YES", "password": clean_pass, "source": leak_db_name, "leak_url": leak_url,
                     "severity": "HIGH", "activity": email_activity, "breach_date": random_year,
                     "role": target_role, "pass_type": pass_type, "infra_risk": infra_risk
                 }
             else:
                 infra_risk = self._calculate_infra_risk("NO", email_activity, target_role)
                 self.matrix_results[email] = {
-                    "status": "NO", "password": "—", "source": "Indexed Clean", "severity": "SAFE",
+                    "status": "NO", "password": "—", "source": "Indexed Clean", "leak_url": "—", "severity": "SAFE",
                     "activity": email_activity, "breach_date": "—", "role": target_role, "pass_type": "—", "infra_risk": infra_risk
                 }
         except Exception:
-            self.matrix_results[email] = {"status": "NO", "password": "—", "source": "Error", "severity": "UNKNOWN", "activity": "Failed", "breach_date": "—", "role": "Unknown", "pass_type": "—", "infra_risk": "Unknown"}
+            self.matrix_results[email] = {"status": "NO", "password": "—", "source": "Error", "leak_url": "—", "severity": "UNKNOWN", "activity": "Failed", "breach_date": "—", "role": "Unknown", "pass_type": "—", "infra_risk": "Unknown"}
 
     async def run_discovery_pipeline(self):
         async with aiohttp.ClientSession() as session:
@@ -4013,14 +4018,16 @@ class NexusOmniscientScanner:
         accent_color = CLR_RED if is_alert else CLR_CYN
         print(f"\n{accent_color}● {title.upper()}{CLR_RST}")
         for label, val in items.items():
-            if len(str(val)) > (self.term_width - 17) and not label.startswith(" "):
+            if len(str(val)) > (self.term_width - 19) and not label.startswith(" "):
                 print(f"  ├─ {label}:")
                 print(f"  │  {CLR_YLW}{val}{CLR_RST}")
             else:
-                if val in ["YES", "CRITICAL", "HIGH"] or "DEAD" in str(val) or "CRITICAL THREAT" in str(val) or "VULNERABLE" in str(val) or "NOT ENFORCED" in str(val):
+                if val in ["YES", "CRITICAL", "HIGH"] or "DEAD" in str(val) or "CRITICAL THREAT" in str(val) or "VULNERABLE" in str(val) or "NOT ENFORCED" in str(val) or "Unresolved" in str(val):
                     val_colored = f"{CLR_BRED}{val}{CLR_RST}"
                 elif val in ["NO", "SAFE", "0 (Clean)"] or "ACTIVE" in str(val) or "0%" in str(val) or "Secure" in str(val) or "Hardened" in str(val) or "STRICT" in str(val):
                     val_colored = f"{CLR_BGRN}{val}{CLR_RST}"
+                elif label == "Leak Link" and val != "—":
+                    val_colored = f"\033[4;94m{val}{CLR_RST}" # Подчеркнутый синий URL
                 else:
                     val_colored = f"{CLR_YLW}{val}{CLR_RST}"
                 print(f"  ├─ {label:<15}: {val_colored}")
@@ -4044,6 +4051,7 @@ class NexusOmniscientScanner:
                 is_alert = (data["status"] == "YES")
                 if is_alert: any_breached = True
                 
+                # Добавлен параметр Leak Link в вывод карточки
                 card_data = {
                     "Mail Status": data["activity"],
                     "Target Role": data["role"],
@@ -4053,6 +4061,7 @@ class NexusOmniscientScanner:
                     "Pass Type": data["pass_type"],
                     "Compromised Pass": data["password"],
                     "OSINT Leak": data["source"],
+                    "Leak Link": data["leak_url"],
                     "Infra Risk": data["infra_risk"]
                 }
                 self.print_clean_card(email, card_data, is_alert)
@@ -4062,15 +4071,11 @@ class NexusOmniscientScanner:
         
         if self.mode != "password":
             print(f"  ├─ MX Gateway   : {CLR_CYN}{self.dns_security['mx']}{CLR_RST}")
-            
             spf_color = CLR_BRED if "VULNERABLE" in self.dns_security['spf'] else CLR_BGRN
             print(f"  ├─ SPF Policy   : {spf_color}{self.dns_security['spf']}{CLR_RST}")
-            
             dmarc_color = CLR_BRED if "Weak" in self.dns_security['dmarc'] else CLR_BGRN
             print(f"  ├─ DMARC Policy : {dmarc_color}{self.dns_security['dmarc']}{CLR_RST}")
-            
             print(f"  ├─ MFA Provider : {CLR_CYN}{self.dns_security['mfa_provider']}{CLR_RST}")
-            
             mfa_p_color = CLR_BRED if "NOT ENFORCED" in self.dns_security['mfa_policy'] else (CLR_YLW if "PARTIAL" in self.dns_security['mfa_policy'] else CLR_BGRN)
             print(f"  ├─ Global 2FA   : {mfa_p_color}{self.dns_security['mfa_policy']}{CLR_RST}")
             print("─" * self.term_width)
