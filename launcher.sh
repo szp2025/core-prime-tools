@@ -4155,7 +4155,6 @@ EOF
 
 
 
-
 # --- ГЕНЕРАТОРЫ ШАБЛОНОВ (View Engine) ---
 
 generate_core_form_template() {
