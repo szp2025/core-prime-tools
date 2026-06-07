@@ -3785,17 +3785,16 @@ function run_nexus_breach_intel() {
 
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo "       NEXUS OMNISCIENT FORENSIC COMPLIANCE CORE "
-    echo "            [COMPACT MONOLITH ENGINE v8.0] "
+    echo "            [STEALTH MONOLITH ENGINE v9.5] "
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo ""
-    echo "LEGITIMATE CAPABILITIES (COMPACT MATRIX):"
-    echo "  • Multi-Provider Core [Anti-Overlap]   • Secure RDAP Domain Lifecycle"
-    echo "  • Adaptive Word-Wrap Layout Engine     • Multi-Resolver DNS Mining"
-    echo "  • MX-Heuristic Profile (Proton/Zoho)   • Exposure Subdomain Mapping"
-    echo "  • Domain 2FA/MFA Requirement Matrix    • Leak Repository Timeline Match"
+    echo "PASSIVE STEALTH CAPABILITIES (NO-PROBE MATRIX):"
+    echo "  • Zero-Trace Architecture      • Passive Leak Harvester"
+    echo "  • Wiko Lenny 3 Compact Layout  • Cloud Realm Identity Map"
+    echo "  • EntraID/Workspace MFA Matrix • Third-Party DNS Resolving"
     echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     
-    read -r -p " ENTER TARGETS (separated by comma) > " RAW_TARGET_INPUT
+    read -r -p " ENTER TARGET (Email or Domain) > " RAW_TARGET_INPUT
     
     if [ -z "${RAW_TARGET_INPUT}" ]; then
         echo -e "\n[CANCEL] Input is empty. Returning to menu..."
@@ -3815,7 +3814,7 @@ function run_nexus_breach_intel() {
             continue
         fi
 
-        echo -e "\n\033[1;95m[QUERY $CURRENT_IDX/$TOTAL_TARGETS] Target: ${CLEAN_TARGET^^}\033[0m"
+        echo -e "\n\033[1;95m[PASSIVE RUN $CURRENT_IDX/$TOTAL_TARGETS] Target: ${CLEAN_TARGET^^}\033[0m"
         export TARGET_DATA_LIST="${CLEAN_TARGET}"
     
         python3 << 'EOF'
@@ -3824,10 +3823,8 @@ import sys
 import asyncio
 import socket
 import re
-import urllib.parse
 import dns.resolver
 import aiohttp
-import smtplib
 import xml.etree.ElementTree as ET
 
 CLR_RED = "\033[91m"
@@ -3840,7 +3837,7 @@ CLR_RST = "\033[0m"
 CLR_BGRN = "\033[1;32m"
 CLR_BRED = "\033[1;31m"
 
-class NexusCompactValidator:
+class NexusStealthValidator:
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
         self.target_email = None
@@ -3858,7 +3855,7 @@ class NexusCompactValidator:
             self.target_domain = self.raw_input.lower()
 
         self.dns_security = {
-            "domain_ips": "No active public A records",
+            "domain_ips": "No public A records",
             "mx": "No public MX endpoints",
             "ns": "No active nameservers",
             "spf": "None",
@@ -3868,11 +3865,11 @@ class NexusCompactValidator:
             "subdomains_found": "None"
         }
         self.whois_data = {"created": "Restricted", "expiry": "Restricted", "registrar": "Unknown"}
-        self.mailbox_status = "N/A (Domain-Mode)" if self.mode == "domain" else "Checking..."
-        self.platform_detected = "Generic/Custom Infrastructure"
+        self.mailbox_status = "PASSIVE / UNTRACKED" if self.mode == "domain" else "PASSIVE / UNTRACKED"
+        self.platform_detected = "Generic / Custom Node"
         
-        self.mfa_engine = "Standard Auth Layer"
-        self.mfa_policy = "Optional / User Profile Defined"
+        self.mfa_engine = "Standard Auth Gate"
+        self.mfa_policy = "Optional / Profile Dependent"
         self.breach_results = []
         
         try:
@@ -3880,76 +3877,24 @@ class NexusCompactValidator:
             if self.term_width < 60: self.term_width = 60
             if self.term_width > 105: self.term_width = 95
         except OSError:
-            self.term_width = 80
+            self.term_width = 60
 
-    async def _fetch_failsafe_whois(self, session: aiohttp.ClientSession):
+    async def _fetch_passive_whois(self, session: aiohttp.ClientSession):
         if not self.target_domain: return
         try:
-            loop = asyncio.get_event_loop()
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(2.5)
-            await loop.run_in_executor(None, s.connect, ("whois.iana.org", 43))
-            await loop.run_in_executor(None, s.send, (self.target_domain + "\r\n").encode())
-            iana_bytes = await loop.run_in_executor(None, s.recv, 8192)
-            s.close()
-            iana_text = iana_bytes.decode('utf-8', errors='ignore')
-            
-            refer_server = None
-            for line in iana_text.splitlines():
-                if line.lower().startswith("refer:"):
-                    refer_server = line.split(":", 1)[1].strip()
-                    break
-            
-            if refer_server:
-                s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s2.settimeout(2.5)
-                await loop.run_in_executor(None, s2.connect, (refer_server, 43))
-                await loop.run_in_executor(None, s2.send, (self.target_domain + "\r\n").encode())
-                whois_bytes = await loop.run_in_executor(None, s2.recv, 8192)
-                s2.close()
-                whois_text = whois_bytes.decode('utf-8', errors='ignore')
-                
-                for line in whois_text.splitlines():
-                    l = line.strip()
-                    if re.match(r'(?i)(Creation Date|Created On|created|Registration Time):', l):
-                        self.whois_data['created'] = l.split(":", 1)[1].strip()[:19]
-                    if re.match(r'(?i)(Registry Expiry Date|Expiration Date|Expires On|expiry):', l):
-                        self.whois_data['expiry'] = l.split(":", 1)[1].strip()[:19]
-                    if re.match(r'(?i)(Registrar:|registrar|Sponsoring Registrar):', l):
-                        self.whois_data['registrar'] = l.split(":", 1)[1].strip()[:30]
-                if self.whois_data['created'] != "Restricted": return 
-        except Exception: pass
-
-        try:
-            async with session.get(f"https://rdap.org/domain/{self.target_domain}", timeout=4.0) as resp:
+            async with session.get(f"https://rdap.org/domain/{self.target_domain}", timeout=3.0) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     for event in data.get("events", []):
                         action = event.get("eventAction", "").lower()
-                        if action == "registration": self.whois_data['created'] = event.get("eventDate", "")[:19]
-                        elif action == "expiration": self.whois_data['expiry'] = event.get("eventDate", "")[:19]
+                        if action == "registration": self.whois_data['created'] = event.get("eventDate", "")[:10]
+                        elif action == "expiration": self.whois_data['expiry'] = event.get("eventDate", "")[:10]
                     for entity in data.get("entities", []):
                         if "registrar" in entity.get("roles", []):
                             vcard = entity.get("vcardArray", [None, []])[1]
                             for prop in vcard:
-                                if prop[0] == "fn": self.whois_data['registrar'] = prop[3][:30]; break
+                                if prop[0] == "fn": self.whois_data['registrar'] = prop[3][:20]; break
         except Exception: pass
-
-    def _verify_mailbox_via_smtp(self, mx_host):
-        if not self.target_email: return
-        try:
-            server = smtplib.SMTP(timeout=4.0)
-            server.connect(mx_host, 25)
-            server.helo(socket.gethostname())
-            server.mail('forensic-probe@perimeter-defense-core.net')
-            code, message = server.rcpt(str(self.target_email))
-            server.quit()
-            
-            if code == 250: self.mailbox_status = "VERIFIED / ACTIVE"
-            elif code in [550, 551, 552, 554]: self.mailbox_status = f"INVALID (Code: {code})"
-            else: self.mailbox_status = f"PROTECTED (Code: {code})"
-        except Exception:
-            self.mailbox_status = "UNKNOWN / PROBE BLOCKED"
 
     async def _detect_cloud_identity(self, session: aiohttp.ClientSession):
         if not self.target_domain: return
@@ -3958,17 +3903,16 @@ class NexusCompactValidator:
         if is_public:
             if "gmail.com" in self.target_domain:
                 self.platform_detected = "Google Consumer Mail"
-                self.mfa_engine = "Google Security Core"
-                self.mfa_policy = "ENFORCED / STAGE-2 (Global Mandate)"
-                if self.mode == "email": self.mailbox_status = "VERIFIED / ACTIVE"
+                self.mfa_engine = "Google Identity Core"
+                self.mfa_policy = "ENFORCED / STAGE-2"
             elif "free.fr" in self.target_domain:
-                self.platform_detected = "Free ISP Webmail Network (France)"
-                self.mfa_engine = "Free Central Auth Matrix"
-                self.mfa_policy = "OPTIONAL / User Profile Managed"
+                self.platform_detected = "Free ISP Network (FR)"
+                self.mfa_engine = "Free Central Radius"
+                self.mfa_policy = "OPTIONAL"
             return
 
         try:
-            async with session.get(f"https://login.microsoftonline.com/getuserrealm.srf?login=probe@{self.target_domain}&xml=1", timeout=3.5) as resp:
+            async with session.get(f"https://login.microsoftonline.com/getuserrealm.srf?login=probe@{self.target_domain}&xml=1", timeout=3.0) as resp:
                 if resp.status == 200:
                     root = ET.fromstring(await resp.text())
                     ns = root.find("NameSpaceType")
@@ -3976,21 +3920,12 @@ class NexusCompactValidator:
                         self.platform_detected = f"Microsoft 365 ({ns.text})"
                         sts = root.find("STSAuthURL")
                         if sts is not None and sts.text:
-                            self.mfa_engine = f"Federated Gateway ({sts.text.split('/')[2]})"
-                            self.mfa_policy = "STRICT / EXTERNAL IDP ENFORCED"
+                            self.mfa_engine = f"Federated ({sts.text.split('/')[2]})"
+                            self.mfa_policy = "STRICT / IDP"
                         else:
-                            self.mfa_engine = "Entra ID / Azure Cloud Core"
-                            self.mfa_policy = "ENFORCED (Security Defaults / Conditional)"
+                            self.mfa_engine = "Entra ID / Azure Core"
+                            self.mfa_policy = "ENFORCED (Security Defaults)"
                         return
-        except Exception: pass
-
-        try:
-            async with session.get(f"https://www.google.com/a/{self.target_domain}/ServiceLogin", timeout=3.0, allow_redirects=False) as resp:
-                if resp.status == 302 and "google.com/a/" in resp.headers.get("Location", ""):
-                    self.platform_detected = "Google Workspace Edge"
-                    self.mfa_engine = "Google Identity IdP Engine"
-                    self.mfa_policy = "ENFORCED / Enterprise Corporate Rule"
-                    return
         except Exception: pass
 
     def _apply_mx_heuristic_overrides(self):
@@ -3998,123 +3933,97 @@ class NexusCompactValidator:
         if not mx_str or "no public" in mx_str: return
 
         if "protection.outlook.com" in mx_str:
-            if "Microsoft" not in self.platform_detected:
-                self.platform_detected = "Microsoft 365 Gateway"
-                self.mfa_engine = "Microsoft Entra Identity Core"
-                self.mfa_policy = "STRICT / Corporate Tenant Mandate"
+            self.platform_detected = "Microsoft 365"
+            self.mfa_engine = "Microsoft Entra ID"
+            self.mfa_policy = "STRICT / Corporate Tenant"
         elif "googlemail.com" in mx_str or "aspmx.l.google.com" in mx_str:
-            if "Google" not in self.platform_detected:
-                self.platform_detected = "Google Workspace Cloud"
-                self.mfa_engine = "Google Identity Core"
-                self.mfa_policy = "ENFORCED / Enterprise Rule"
+            self.platform_detected = "Google Workspace"
+            self.mfa_engine = "Google Identity System"
+            self.mfa_policy = "ENFORCED / Domain Wide"
         elif "protonmail" in mx_str:
-            self.platform_detected = "ProtonMail Swiss Infrastructure"
-            self.mfa_engine = "Proton Cryptographic Vault"
-            self.mfa_policy = "HIGH-STRICTNESS / Hardware-TOTP Configured"
+            self.platform_detected = "ProtonMail (Swiss Secure)"
+            self.mfa_engine = "Proton Auth Vault"
+            self.mfa_policy = "HIGH / Hardware-TOTP"
         elif "zoho" in mx_str:
-            self.platform_detected = "Zoho Corporation Mail Network"
-            self.mfa_engine = "Zoho Accounts Identity Core"
-            self.mfa_policy = "STRICT (Enforced via OneAuth Module)"
-        elif "icloud.com" in mx_str:
-            self.platform_detected = "Apple iCloud Business Node"
-            self.mfa_engine = "Apple ID Managed Core"
-            self.mfa_policy = "MFA MANDATORY (Identity Trust Suite)"
-        elif "free.fr" in mx_str:
-            self.platform_detected = "Free Telecom (Proxad France)"
-            self.mfa_engine = "Free.fr Central Auth Suite"
-            self.mfa_policy = "OPTIONAL / Console Managed"
-        
+            self.platform_detected = "Zoho Corporation"
+            self.mfa_engine = "Zoho OneAuth Engine"
+            self.mfa_policy = "STRICT / Enforced"
+        elif "icloud" in mx_str:
+            self.platform_detected = "Apple iCloud Business"
+            self.mfa_engine = "Apple ID Trust Core"
+            self.mfa_policy = "MFA MANDATORY"
+
         dmarc_raw = self.dns_security.get("dmarc", "").lower()
         if "p=reject" in dmarc_raw or "p=quarantine" in dmarc_raw:
-            if "Optional" in self.mfa_policy: self.mfa_policy += " [DMARC Hardened]"
+            if "Optional" in self.mfa_policy:
+                self.mfa_policy += " [DMARC Hardened]"
 
-    async def _audit_dns_infrastructure(self):
+    async def _audit_dns_passive(self):
         if not self.target_domain: return
-        resolvers = []
-        for IP in ['1.1.1.1', '8.8.8.8']:
-            r = dns.resolver.Resolver(configure=False)
-            r.nameservers = [IP]
-            r.timeout = 2.0; r.lifetime = 2.0
-            resolvers.append(r)
+        r = dns.resolver.Resolver(configure=False)
+        r.nameservers = ['1.1.1.1', '8.8.8.8']
+        r.timeout = 1.5; r.lifetime = 1.5
 
-        main_ip = None
-        for res in resolvers:
-            try:
-                a_ans = res.resolve(self.target_domain, 'A')
-                self.dns_security['domain_ips'] = ", ".join([str(ip) for ip in a_ans])
-                main_ip = str(a_ans[0])
-                break
-            except Exception: pass
+        try:
+            ans = r.resolve(self.target_domain, 'A')
+            self.dns_security['domain_ips'] = ", ".join([str(ip) for ip in ans])
+        except Exception: pass
 
-        for res in resolvers:
-            try:
-                ns_ans = res.resolve(self.target_domain, 'NS')
-                self.dns_security['ns'] = ", ".join([str(ns.target).rstrip('.') for ns in ns_ans])
-                break
-            except Exception: pass
+        try:
+            ans = r.resolve(self.target_domain, 'NS')
+            self.dns_security['ns'] = ", ".join([str(ns.target).rstrip('.') for ns in ans])
+        except Exception: pass
 
-        mx_hosts = []
-        for res in resolvers:
-            try:
-                mx_answers = res.resolve(self.target_domain, 'MX')
-                for rdata in sorted(mx_answers, key=lambda r: r.preference):
-                    mx_hosts.append(str(rdata.exchange).rstrip('.'))
-                self.dns_security['mx'] = ", ".join(mx_hosts)
-                break
-            except Exception: pass
+        try:
+            ans = r.resolve(self.target_domain, 'MX')
+            mx_hosts = [str(rdata.exchange).rstrip('.') for rdata in sorted(ans, key=lambda rx: rx.preference)]
+            self.dns_security['mx'] = ", ".join(mx_hosts)
+        except Exception: pass
 
         self._apply_mx_heuristic_overrides()
-        best_mx = mx_hosts[0] if mx_hosts else main_ip
-        
-        if self.mode == "email" and best_mx and "Checking" in self.mailbox_status:
-            await asyncio.get_event_loop().run_in_executor(None, self._verify_mailbox_via_smtp, best_mx)
 
-        discovered_subs = []
-        for prefix in ['mail', 'webmail', 'smtp', 'autodiscover']:
+        # Пассивный маппинг общедоступных хостов без прямой отправки пакетов
+        subs = []
+        for pfx in ['mail', 'webmail', 'smtp', 'autodiscover', 'vpn', 'cloud']:
             try:
-                addr = socket.gethostbyname(f"{prefix}.{self.target_domain}")
-                discovered_subs.append(f"{prefix}->{addr}")
+                addr = socket.gethostbyname(f"{pfx}.{self.target_domain}")
+                subs.append(f"{pfx}->{addr}")
             except Exception: pass
-        if discovered_subs: self.dns_security['subdomains_found'] = " | ".join(discovered_subs)
+        if subs: self.dns_security['subdomains_found'] = " | ".join(subs)
 
-        for res in resolvers:
-            try:
-                txt_answers = res.resolve(self.target_domain, 'TXT')
-                for rdata in txt_answers:
-                    t = rdata.to_text()
-                    if "v=spf1" in t:
-                        self.dns_security['spf'] = t.strip('"')
-                        self.dns_security['spf_status'] = "HardFail (-all)" if "-all" in t else ("SoftFail (~all)" if "~all" in t else "Custom")
-                        break
-                if self.dns_security['spf'] != "None": break
-            except Exception: pass
-
-        for res in resolvers:
-            try:
-                dmarc_answers = res.resolve(f"_dmarc.{self.target_domain}", 'TXT')
-                for rdata in dmarc_answers:
-                    t = rdata.to_text()
-                    if "v=DMARC1" in t:
-                        self.dns_security['dmarc'] = t.strip('"')
-                        self.dns_security['dmarc_status'] = "Reject" if "p=reject" in t else ("Quarantine" if "p=quarantine" in t else "Monitor (none)")
-                        break
-                if self.dns_security['dmarc'] != "None": break
-            except Exception: pass
-
-    async def _check_pwned_emails(self, session: aiohttp.ClientSession):
-        if not self.target_email: return
-        url = f"https://acuris.com/wp-json/api/v1/check-email?email={self.target_email}"
-        headers = {"User-Agent": "Mozilla/5.0"}
         try:
-            async with session.get(url, headers=headers, timeout=4) as response:
-                if response.status == 200:
-                    data = await response.json()
+            ans = r.resolve(self.target_domain, 'TXT')
+            for rd in ans:
+                t = rd.to_text()
+                if "v=spf1" in t:
+                    self.dns_security['spf'] = t.strip('"')
+                    self.dns_security['spf_status'] = "HardFail (-all)" if "-all" in t else ("SoftFail (~all)" if "~all" in t else "Custom")
+                    break
+        except Exception: pass
+
+        try:
+            ans = r.resolve(f"_dmarc.{self.target_domain}", 'TXT')
+            for rd in ans:
+                t = rd.to_text()
+                if "v=DMARC1" in t:
+                    self.dns_security['dmarc'] = t.strip('"')
+                    self.dns_security['dmarc_status'] = "Reject" if "p=reject" in t else ("Quarantine" if "p=quarantine" in t else "Monitor")
+                    break
+        except Exception: pass
+
+    async def _query_leak_repository(self, session: aiohttp.ClientSession, query_term: str):
+        url = f"https://acuris.com/wp-json/api/v1/check-email?email={query_term}"
+        try:
+            async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4.0) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
                     if data.get("breaches"):
-                        for breach in data["breaches"]:
+                        for b in data["breaches"]:
                             self.breach_results.append({
-                                "src": breach.get("name", "Leak"),
-                                "date": breach.get("date", "N/A"),
-                                "class": ", ".join(breach.get('data_classes', []))[:45]
+                                "target": query_term,
+                                "src": b.get("name", "Leak"),
+                                "date": b.get("date", "N/A"),
+                                "class": ", ".join(b.get('data_classes', []))[:35]
                             })
         except Exception: pass
 
@@ -4122,37 +4031,44 @@ class NexusCompactValidator:
         async with aiohttp.ClientSession() as session:
             await self._detect_cloud_identity(session)
             await asyncio.gather(
-                self._fetch_failsafe_whois(session),
-                self._audit_dns_infrastructure(),
-                self._check_pwned_emails(session)
+                self._audit_dns_passive(),
+                self._fetch_passive_whois(session)
             )
+            
+            # Пассивная разведка утечек
+            if self.mode == "email":
+                await self._query_leak_repository(session, self.target_email)
+            else:
+                # В режиме домена ищем утечки по самому корню домена (захватывает системные привязки)
+                await self._query_leak_repository(session, self.target_domain)
 
-    def _compact_print(self, prefix: str, text: str, color_code: str = "", split_by_token: str = None):
-        clean_prefix = re.sub(r'\033\[[0-9;]*m', '', prefix)
-        p_len = len(clean_prefix)
-        max_chunk = self.term_width - p_len - 4
-        
+    def _compact_print(self, prefix: str, text: str, color_code: str = "", token: str = None):
+        p_clean = re.sub(r'\033\[[0-9;]*m', '', prefix)
+        p_len = len(p_clean)
+        max_chunk = self.term_width - p_len - 3
+        if max_chunk < 15: max_chunk = 35
+
         chunks = []
-        if split_by_token and split_by_token in text:
-            raw_tokens = text.split(split_by_token)
-            for i, tok in enumerate(raw_tokens):
-                t_str = tok.strip()
-                if not t_str: continue
-                suffix = split_by_token if (i < len(raw_tokens)-1 and split_by_token in [';', ',']) else ""
-                chunks.append(f"{t_str}{suffix}")
+        if token and token in text:
+            tokens = text.split(token)
+            for i, tk in enumerate(tokens):
+                s = tk.strip()
+                if not s: continue
+                sfx = token if (i < len(tokens)-1 and token in [';', ',']) else ""
+                chunks.append(f"{s}{sfx}")
         else:
             words = str(text).split(' ')
             curr = []
-            c_len = 0
+            curr_l = 0
             for w in words:
-                w_len = len(re.sub(r'\033\[[0-9;]*m', '', w))
-                if c_len + w_len + (1 if curr else 0) <= max_chunk:
+                wl = len(re.sub(r'\033\[[0-9;]*m', '', w))
+                if curr_l + wl + (1 if curr else 0) <= max_chunk:
                     curr.append(w)
-                    c_len += w_len + (1 if curr else 0)
+                    curr_l += wl + (1 if curr else 0)
                 else:
                     if curr: chunks.append(" ".join(curr))
                     curr = [w]
-                    c_len = w_len
+                    curr_l = wl
             if curr: chunks.append(" ".join(curr))
 
         if not chunks:
@@ -4160,53 +4076,47 @@ class NexusCompactValidator:
             return
 
         print(f"{prefix}{color_code}{chunks[0]}{CLR_RST}")
-        
-        is_last = "└─" in prefix
-        conn = "   " if is_last else "│  "
+        conn = "   " if "└─" in prefix else "│  "
         indent = " " * (p_len - 3) + conn
-        
         for extra in chunks[1:]:
             print(f"{indent}{color_code}{extra}{CLR_RST}")
 
     def render_report(self):
         print("\n" + "═" * self.term_width)
-        print(f" NEXUS STAGE-8 CORE COMPLIANCE REPORT [COMPACT RUN]")
+        print(f" NEXUS v9.5 STEALTH OSINT COMPLIANCE REPORT")
         print("═" * self.term_width)
         print(f"[#] TARGET: {self.raw_input.upper()}")
         print("─" * self.term_width)
         
-        print(f"{CLR_CYN}● INFRASTRUCTURE & IDENTITIES:{CLR_RST}")
-        self._compact_print("  ├─ Platform: ", self.platform_detected, CLR_YLW)
-        m_clr = CLR_BGRN if "VERIFIED" in self.mailbox_status else CLR_YLW
-        self._compact_print("  └─ Mailbox : ", self.mailbox_status, m_clr)
-        
-        print(f"\n{CLR_CYN}● IDENTITY SECURITY & MULTI-FACTOR POLICIES:{CLR_RST}")
+        print(f"{CLR_CYN}● IDENTITY SECURITY & MFA MATRIX (STEALTH):{CLR_RST}")
+        self._compact_print("  ├─ Platform: ", self.platform_detected, CLY_YLW if "Generic" in self.platform_detected else CLR_YLW)
         self._compact_print("  ├─ Gateway : ", self.mfa_engine, CLR_YLW)
-        p_clr = CLR_BGRN if "ENFORCED" in self.mfa_policy or "STRICT" in self.mfa_policy else CLR_YLW
-        self._compact_print("  └─ 2FA Rule: ", self.mfa_policy, p_clr)
+        p_clr = CLR_BGRN if any(x in self.mfa_policy for x in ["ENFORCED", "STRICT", "MANDATORY"]) else CLR_YLW
+        self._compact_print("  ├─ MFA Rule: ", self.mfa_policy, p_clr)
+        self._compact_print("  └─ Status  : ", self.mailbox_status, CLR_GRN)
         
-        print(f"\n{CLR_RED}● INCIDENT REPOSITORY MATCHES (LEAKS):{CLR_RST}")
+        print(f"\n{CLR_RED}● INCIDENT REPOSITORY MATCHES (PASSIVE LEAKS):{CLR_RST}")
         if not self.breach_results:
-            print(f"  └─ Logs: {CLR_GRN}No data leak incidents found in open historical indexes.{CLR_RST}")
+            print(f"  └─ Logs: {CLR_GRN}No data leaks detected via index matching.{CLR_RST}")
         else:
             for idx, data in enumerate(self.breach_results, 1):
-                print(f"  ├─ Leak [{idx}]: {CLR_BRED}{data['src']}{CLR_RST} ({data['date']})")
-                self._compact_print("  │  └─ Exposed: ", data['class'], CLR_MAG)
+                print(f"  ├─ Breach [{idx}]: {CLR_BRED}{data['target']}{CLR_RST} -> {data['src']}")
+                self._compact_print("  │  └─ Exposed: ", f"({data['date']}) {data['class']}", CLR_MAG)
 
         if self.target_domain:
             print("\n" + "─" * self.term_width)
-            print(f"{CLR_MAG}● CORE NETWORK PERIMETER RECORDS (HIGH-DENSITY):{CLR_RST}")
+            print(f"{CLR_MAG}● PASSIVE NETWORK PERIMETER RECORDS:{CLR_RST}")
             print(f"  ├─ Registrar : {self.whois_data.get('registrar')}")
             print(f"  ├─ Born Date : {CLR_GRN}{self.whois_data.get('created')}{CLR_RST}")
             print(f"  ├─ Expire    : {CLR_YLW}{self.whois_data.get('expiry')}{CLR_RST}")
             
-            self._compact_print("  ├─ Root IPs  : ", self.dns_security.get('domain_ips'), CLR_CYN, split_by_token=",")
-            self._compact_print("  ├─ Nameserver: ", self.dns_security.get('ns'), split_by_token=",")
-            self._compact_print("  ├─ MX Gates  : ", self.dns_security.get('mx'), CLR_CYN, split_by_token=",")
-            self._compact_print("  ├─ Subdomains: ", self.dns_security.get('subdomains_found'), CLR_BLU, split_by_token="|")
-            self._compact_print("  ├─ SPF Record: ", self.dns_security.get('spf'), CLR_BLU, split_by_token=" ")
+            self._compact_print("  ├─ Root IPs  : ", self.dns_security.get('domain_ips'), CLR_CYN, token=",")
+            self._compact_print("  ├─ Nameserver: ", self.dns_security.get('ns'), token=",")
+            self._compact_print("  ├─ MX Gates  : ", self.dns_security.get('mx'), CLR_CYN, token=",")
+            self._compact_print("  ├─ Subdomains: ", self.dns_security.get('subdomains_found'), CLR_BLU, token="|")
+            self._compact_print("  ├─ SPF Record: ", self.dns_security.get('spf'), CLR_BLU, token=" ")
             print(f"  ├─ SPF State : {self.dns_security.get('spf_status')}")
-            self._compact_print("  ├─ DMARC Rec : ", self.dns_security.get('dmarc'), CLR_BLU, split_by_token=";")
+            self._compact_print("  ├─ DMARC Rec : ", self.dns_security.get('dmarc'), CLR_BLU, token=";")
             
             d_stat = self.dns_security.get('dmarc_status', '')
             d_clr = CLR_BRED if "VULNERABLE" in d_stat else CLR_BGRN
@@ -4216,7 +4126,7 @@ class NexusCompactValidator:
 def main():
     raw_input = os.getenv("TARGET_DATA_LIST", "")
     if not raw_input: return
-    scanner = NexusCompactValidator(raw_input)
+    scanner = NexusStealthValidator(raw_input)
     asyncio.run(scanner.run_pipeline())
     scanner.render_report()
 
@@ -4232,338 +4142,6 @@ EOF
 
 
 
-function run_nexus_breach_intelold() {
-    clear
-    try_width=$(tput cols 2>/dev/null || echo 45)
-    [ "$try_width" -lt 35 ] && try_width=35
-    [ "$try_width" -gt 65 ] && try_width=50
-
-    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
-    echo "       NEXUS OMNISCIENT HYBRID INTELLIGENCE CORE  "
-    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
-    echo ""
-    echo "CROSS-VECTOR CAPABILITIES:"
-    echo "    • Mass Multi-Target Processing (Separated by , or ;)"
-    echo "    • Multi-Node API Breach Router (ProxyNova, LeakCheck, HIBP)"
-    echo "    • Incident & Attack Vector Counter (Breach Count)"
-    echo "    • Active Device Session Mapping (IP, MAC, Client OS)"
-    echo "    • Deep Infrastructure Forensic & Anti-Spoofing Audit"
-    echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
-    read -r -p " ENTER TARGETS (e.g. domain.com, +336123456, mail@test.com) > " RAW_TARGET_INPUT
-    
-    if [ -z "${RAW_TARGET_INPUT}" ]; then
-        echo -e "\n[CANCEL] Input is empty. Returning to menu..."
-        sleep 2
-        return 0
-    fi
-
-    NORMALIZED_INPUT=$(echo "$RAW_TARGET_INPUT" | tr ';' ',')
-
-    if [ -d ".venv" ]; then
-        source .venv/bin/activate
-    fi
-    
-    pip install aiohttp --quiet --disable-pip-version-check --break-system-packages 2>/dev/null || pip install aiohttp --quiet --disable-pip-version-check
-
-    export TARGET_DATA_LIST="${NORMALIZED_INPUT}"
-    
-    python3 << 'EOF'
-import os
-import sys
-import asyncio
-import aiohttp
-import hashlib
-import socket
-import re
-
-CLR_RED = "\033[91m"
-CLR_GRN = "\033[92m"
-CLR_YLW = "\033[93m"
-CLR_BLU = "\033[94m"
-CLR_CYN = "\033[96m"
-CLR_MAG = "\033[95m"
-CLR_RST = "\033[0m"
-CLR_BGRN = "\033[1;32m"
-CLR_BRED = "\033[1;31m"
-
-class NexusOmniscientScanner:
-    def __init__(self, target_input: str):
-        self.raw_input = target_input.strip()
-        
-        if "@" in self.raw_input and not self.raw_input.startswith("@"):
-            self.mode = "email"
-            self.target_type = "EMAIL"
-            self.target_email = self.raw_input.lower()
-            self.target_domain = self.target_email.split("@")[-1]
-        elif any(c.isdigit() for c in self.raw_input) and ("+" in self.raw_input or len(self.raw_input) >= 9) and not "." in self.raw_input:
-            self.mode = "phone"
-            self.target_type = "PHONE"
-            self.target_phone = re.sub(r'[^0-9+]', '', self.raw_input)
-            self.target_domain = "N/A"
-        elif "." in self.raw_input and not " " in self.raw_input:
-            self.mode = "domain"
-            self.target_type = "ALL"
-            self.target_email = None
-            self.target_domain = self.raw_input.lstrip("@").lower()
-        else:
-            self.mode = "password"
-            self.target_type = "ALL"
-            self.target_password = self.raw_input
-            self.target_domain = "N/A"
-
-        self.matrix_results = {}
-        self.device_sessions_map = {}
-        
-        # Динамическая инфраструктурная карта (генерируется на лету на основе хэша домена)
-        self.dns_security = {}
-        
-        try:
-            self.term_width = os.get_terminal_size().columns
-            if self.term_width < 35: self.term_width = 35
-            if self.term_width > 65: self.term_width = 50
-        except OSError:
-            self.term_width = 45
-
-    def _determine_target_role(self, target_str: str) -> str:
-        if self.mode == "phone": return "Standalone Node"
-        if "@" not in target_str: return "Perimeter Gateway"
-        prefix = target_str.split('@')[0].lower()
-        if prefix in ["direction", "ceo", "boss", "manager"]: return "Executive"
-        elif prefix in ["support", "tech", "admin", "dev", "it"]: return "IT & Tech Support"
-        elif prefix in ["billing", "finance", "accounting", "invoice"]: return "Finance"
-        return "General Staff"
-
-    def _generate_dynamic_payload(self, target_str: str) -> dict:
-        """Полностью динамическая генерация метрик на основе криптографического хэша строки"""
-        t_lower = target_str.lower()
-        t_hash = int(hashlib.md5(t_lower.encode()).hexdigest(), 16)
-        
-        # Определение роли и соответствующих ей каноничных параметров уязвимостей
-        if "billing" in t_lower:
-            role = "Finance"
-            breach_count = "18 Incidents Detected"
-            pass_type = "Raw MD5 (Unresolved)"
-            password = "5d41402abc4b2a76b9719d911017c592"
-            infra_risk = "70% [HIGH]"
-            devices = [
-                {"os": "macOS Sequoia (Safari)", "ip": "176.59.32.41", "mac": "AC:DE:48:56:10:38", "state": "ONLINE (Active)"},
-                {"os": "iOS 18.2 (Apple Mail)", "ip": "2a01:e0a:2:78b0::1", "mac": "00:25:96:57:11:39", "state": "IDLE (6h ago)"}
-            ]
-        elif "direction" in t_lower:
-            role = "Executive"
-            breach_count = "5 Incidents Detected"
-            pass_type = "Plaintext (Standard)"
-            password = "DirectionPass_4666!"
-            infra_risk = "100% [CRITICAL]"
-            devices = [
-                {"os": "iOS 18.2 (Apple Mail)", "ip": "176.59.32.41", "mac": "AC:DE:48:56:10:38", "state": "ONLINE (Active)"}
-            ]
-        elif "support" in t_lower:
-            role = "IT & Tech Support"
-            breach_count = "14 Incidents Detected"
-            pass_type = "Raw MD5 (Unresolved)"
-            password = "5d41402abc4b2a76b9719d911017c592"
-            infra_risk = "70% [HIGH]"
-            devices = [
-                {"os": "Android 14 (Gmail Mobile)", "ip": "176.59.32.41", "mac": "AC:DE:48:56:10:38", "state": "ONLINE (Active)"},
-                {"os": "Windows 11 (Outlook 365)", "ip": "2a01:e0a:2:78b0::1", "mac": "00:25:96:57:11:39", "state": "IDLE (6h ago)"}
-            ]
-        else:
-            # Масштабируемый автогенератор для любых произвольных юзеров / телефонов
-            role = self._determine_target_role(target_str)
-            calc_incidents = (t_hash % 15) + 1
-            breach_count = f"{calc_incidents} Incidents Detected"
-            
-            if t_hash % 2 == 0:
-                pass_type = "Raw MD5 (Unresolved)"
-                password = hashlib.md5(target_str.encode()).hexdigest()
-            else:
-                pass_type = "SHA-256 (Leaked)"
-                password = hashlib.sha256(target_str.encode()).hexdigest()[:32]
-                
-            infra_risk = "100% [CRITICAL]" if role == "Executive" else "70% [HIGH]"
-            devices = [
-                {"os": "Windows 11 (Outlook 365)", "ip": "176.59.32.41", "mac": "AC:DE:48:56:10:38", "state": "ONLINE (Active)"},
-                {"os": "macOS Sequoia (Safari)", "ip": "2a01:e0a:2:78b0::1", "mac": "00:25:96:57:11:39", "state": "IDLE (6h ago)"}
-            ]
-
-        return {
-            "role": role, "breach_count": breach_count, "pass_type": pass_type,
-            "password": password, "infra_risk": infra_risk, "devices": devices
-        }
-
-    async def _audit_dns_infrastructure(self):
-        if self.mode in ["password", "phone"] or self.target_domain == "N/A": return
-        
-        d_hash = int(hashlib.md5(self.target_domain.encode()).hexdigest(), 16)
-        
-        # Динамическое разрешение IP адреса периметра
-        try:
-            loop = asyncio.get_event_loop()
-            mx_ip = await loop.run_in_executor(None, lambda: socket.gethostbyname(self.target_domain))
-        except:
-            mx_ip = f"189.234.{165 + (d_hash % 10)}.{86 + (d_hash % 5)}"
-
-        # Динамическое переключение провайдеров на основе хэша домена (больше никакой привязки!)
-        if d_hash % 2 == 0:
-            self.dns_security = {
-                "mx": "Google SMTP Container", "mx_ip": mx_ip, "asn_provider": f"AS{28800 + (d_hash%50)} (Google Cloud Platform)",
-                "spf": "Missing/Not Configured", "dmarc": "v=DMARC1; p=reject; (Hardened)", "dkim_status": "Missing Signature Records",
-                "mta_sts": "Testing / Operational", "dnssec": "Active (Verified)", "smtp_tls": "TLS 1.3 Strong Forward Secrecy",
-                "cert_ca": "DigiCert Global Root G2", "cert_exp": "Active (95 Days Left)", "ip_threat": "84% [MALICIOUS HOSTER]",
-                "open_ports": "25/tcp, 587/tcp (Secure SMTP)", "spoof_index": "HIGHLY VULNERABLE (Brand Spoofing Allowed)",
-                "mfa_provider": "Google Identity Engine", "mfa_policy": "STRICT (Required)"
-            }
-        else:
-            self.dns_security = {
-                "mx": "Microsoft O365 Gateway", "mx_ip": mx_ip, "asn_provider": f"AS{42200 + (d_hash%50)} (OVH SAS Cloud Hoster)",
-                "spf": "v=spf1 +all (VULNERABLE)", "dmarc": "p=none; (Weak Policy)", "dkim_status": "Active (1024-bit Legacy Key)",
-                "mta_sts": "Enforced (mta-sts.txt Active)", "dnssec": "Unsigned / Disabled", "smtp_tls": "TLS 1.3 Strong Forward Secrecy",
-                "cert_ca": "GlobalSign Organization CA", "cert_exp": "Active (210 Days Left)", "ip_threat": "15% (Low Risk Profile)",
-                "open_ports": "25/tcp, 443/tcp, 110/tcp (Exposed Core)",
-                "spoof_index": "HIGHLY VULNERABLE (Brand Spoofing Allowed)",
-                "mfa_provider": "Microsoft Entra ID", "mfa_policy": "PARTIAL (Optional)"
-            }
-
-    async def _analyze_endpoint(self, current_target: str):
-        payload = self._generate_dynamic_payload(current_target)
-        await asyncio.sleep(0.15) # Сетевой пинг ядра
-        
-        self.matrix_results[current_target] = {
-            "status": "YES",
-            "activity": "ACTIVE (Mailbox OK)",
-            "role": payload["role"],
-            "breach_count": payload["breach_count"],
-            "pass_type": payload["pass_type"],
-            "password": payload["password"],
-            "source": "ProxyNova COMB Registry",
-            "leak_url": f"https://intelx.io/?s={current_target}",
-            "infra_risk": payload["infra_risk"],
-            "breach_date": "2025-08-04"
-        }
-        self.device_sessions_map[current_target] = payload["devices"]
-
-    async def run_discovery_pipeline(self):
-        if self.mode == "password":
-            self.matrix_results["Polymorphic Cryptanalysis"] = {"status": "NO", "severity": "SAFE"}
-        elif self.mode in ["email", "phone"]:
-            await asyncio.gather(self._analyze_endpoint(self.raw_input), self._audit_dns_infrastructure())
-        else:
-            # Для режима домена генерируем базовый кластер адресов на лету
-            targets_to_audit = [f"billing@{self.target_domain}", f"direction@{self.target_domain}", f"support@{self.target_domain}"]
-            await asyncio.gather(*[self._analyze_endpoint(t) for t in targets_to_audit], self._audit_dns_infrastructure())
-
-    def print_clean_card(self, title, items, is_alert=False):
-        print(f"\n{(CLR_RED if is_alert else CLR_CYN)}● {title.upper()}{CLR_RST}")
-        max_val_len = self.term_width - 19 
-        if max_val_len < 15: max_val_len = 15
-
-        for label, val in items.items():
-            val_str = str(val)
-            if val in ["YES", "100% [CRITICAL]", "HIGH", "HIGHLY VULNERABLE", "HIGHLY VULNERABLE (Brand Spoofing Allowed)"] or "[CRITICAL]" in val_str or "VULNERABLE" in val_str or "Incidents" in val_str:
-                val_colored = f"{CLR_BRED}{val_str}{CLR_RST}"
-            elif val in ["NO", "SAFE"] or "ACTIVE" in val_str or "STRICT" in val_str or "Verified" in val_str:
-                val_colored = f"{CLR_BGRN}{val_str}{CLR_RST}"
-            elif "https://" in val_str:
-                val_colored = f"\033[4;94m{val_str}{CLR_RST}"
-            else:
-                val_colored = f"{CLR_YLW}{val_str}{CLR_RST}"
-
-            if len(val_str) > max_val_len and not "https://" in val_str:
-                print(f"  ├─ {label:<13}:")
-                chunks = [val_str[i:i+max_val_len] for i in range(0, len(val_str), max_val_len)]
-                for chunk in chunks:
-                    print(f"  │  {CLR_BRED if is_alert else CLR_YLW}{chunk}{CLR_RST}")
-            else:
-                print(f"  ├─ {label:<13}: {val_colored}")
-
-    def generate_max_report(self):
-        header_text = f"NEXUS FORENSIC ({self.mode.upper()} MODE)"
-        padding = max(0, (self.term_width - len(header_text)) // 2)
-        
-        print("\n" + "═" * self.term_width)
-        print(" " * padding + header_text)
-        print("═" * self.term_width)
-        
-        asyncio.run(self.run_discovery_pipeline())
-        
-        print(f"\n[#] TARGET VECTOR -> {self.raw_input.upper()}")
-        print("─" * self.term_width)
-        
-        for entity, data in sorted(self.matrix_results.items()):
-            if self.mode == "password":
-                print(f"\n{CLR_BGRN}● PASSWORD METRICS: SAFE{CLR_RST}")
-                continue
-                
-            card_data = {
-                "Activity": data["activity"],
-                "Target Role": data["role"],
-                "Breach Count": data["breach_count"],
-                "Breach Found": data["status"],
-                "Risk Level": "HIGH" if "HIGH" in data["infra_risk"] or "CRITICAL" in data["infra_risk"] else "LOW",
-                "Timeline": data["breach_date"],
-                "Crypto Class": data["pass_type"],
-                "Decrypted": data["password"],
-                "API Source": data["source"],
-                "Leak Link": data["leak_url"],
-                "Infra Threat": data["infra_risk"]
-            }
-            self.print_clean_card(entity, card_data, True)
-            
-            if entity in self.device_sessions_map:
-                print(f"  │  ")
-                print(f"  ├─ {CLR_MAG}CONNECTED DEVICES TELEMETRY:{CLR_RST}")
-                for d_idx, dev in enumerate(self.device_sessions_map[entity], 1):
-                    status_clr = CLR_BGRN if "ONLINE" in dev["state"] else CLR_YLW
-                    print(f"  │  ├─ Device [{d_idx}]: {CLR_CYN}{dev['os']}{CLR_RST}")
-                    print(f"  │  │  ├─ IPv4 Addr : {CLR_YLW}{dev['ip']}{CLR_RST}")
-                    print(f"  │  │  ├─ HW MAC    : {CLR_MAG}{dev['mac']}{CLR_RST}")
-                    print(f"  │  │  └─ Session   : {status_clr}{dev['state']}{CLR_RST}")
-                    
-        if self.mode in ["domain", "email"]:
-            print("\n" + "─" * self.term_width)
-            print(f"[+] NETWORK PERIMETER AUDIT:")
-            print(f"  ├─ MX Gateway  : {CLR_CYN}{self.dns_security['mx']}{CLR_RST}")
-            print(f"  ├─ IPv4 Endpt  : {CLR_YLW}{self.dns_security['mx_ip']}{CLR_RST}")
-            print(f"  ├─ ASN Carrier : {CLR_CYN}{self.dns_security['asn_provider']}{CLR_RST}")
-            print(f"  ├─ SPF Routing : {CLR_BRED}{self.dns_security['spf']}{CLR_RST}")
-            print(f"  ├─ DMARC Policy: {CLR_BGRN}{self.dns_security['dmarc']}{CLR_RST}")
-            print(f"  ├─ DKIM Sign   : {CLR_BRED}{self.dns_security['dkim_status']}{CLR_RST}")
-            print(f"  ├─ MTA-STS     : {CLR_BGRN}{self.dns_security['mta_sts']}{CLR_RST}")
-            print(f"  ├─ DNSSEC State: {CLR_BGRN}{self.dns_security['dnssec']}{CLR_RST}")
-            print(f"  ├─ SMTP TLS Ver: {CLR_BGRN}{self.dns_security['smtp_tls']}{CLR_RST}")
-            print(f"  ├─ TLS Cert CA : {CLR_CYN}{self.dns_security['cert_ca']}{CLR_RST}")
-            print(f"  ├─ Cert Valid  : {CLR_YLW}{self.dns_security['cert_exp']}{CLR_RST}")
-            print(f"  ├─ IP Threat   : {CLR_BRED}{self.dns_security['ip_threat']}{CLR_RST}")
-            print(f"  ├─ Open Ports  : {CLR_CYN}{self.dns_security['open_ports']}{CLR_RST}")
-            print(f"  ├─ Spoof Def   : {CLR_BRED}{self.dns_security['spoof_index']}{CLR_RST}")
-            print(f"  ├─ MFA Engine  : {CLR_CYN}{self.dns_security['mfa_provider']}{CLR_RST}")
-            print(f"  ├─ Policy 2FA  : {CLR_BGRN}{self.dns_security['mfa_policy']}{CLR_RST}")
-            print("═" * self.term_width)
-
-        print(f"\n{CLR_RED}Attention! Critical vulnerabilities or network leaks detected within active API nodes!{CLR_RST}")
-        print("═" * self.term_width + "\n")
-
-def main():
-    raw_list = os.getenv("TARGET_DATA_LIST", "")
-    if not raw_list: return
-    
-    targets = [t.strip() for t in raw_list.split(",") if t.strip()]
-    for idx, target in enumerate(targets, 1):
-        print(f"\n\033[1;95m[BATCH PROGRESS {idx}/{len(targets)}] Activating Breach Vector for: {target.upper()}\033[0m")
-        scanner = NexusOmniscientScanner(target)
-        scanner.generate_max_report()
-
-if __name__ == "__main__":
-    main()
-EOF
-
-    if [ -d ".venv" ]; then
-        deactivate
-    fi
-    echo ""
-    read -n 1 -s -r -p "Press any key to return to the main menu..."
-}
 
 
 
