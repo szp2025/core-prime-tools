@@ -3780,23 +3780,19 @@ EOF
 function run_nexus_breach_intel() {
     clear
     try_width=$(tput cols 2>/dev/null || echo 80)
-    [ "$try_width" -lt 65 ] && try_width=65
+    [ "$try_width" -lt 60 ] && try_width=60
     [ "$try_width" -gt 105 ] && try_width=95
 
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo "       NEXUS OMNISCIENT FORENSIC COMPLIANCE CORE "
-    echo "           [MONOLITH INTERFACE ENGINE v7.5] "
+    echo "            [COMPACT MONOLITH ENGINE v8.0] "
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo ""
-    echo "CROSS-PLATFORM LEGITIMATE CAPABILITIES:"
-    echo "    • Strict Multi-Provider Separation (Fixes Microsoft/Google Overlap Bug)"
-    echo "    • Smart Word-Wrap Layout Engine (Fixes Broken Pseudo-Graphic Borders)"
-    echo "    • Enhanced MX-Based Heuristic Profiler (Proton, Zoho, iCloud, Local Postfix/Exchange)"
-    echo "    • Domain-Wide 2FA/MFA Requirement Matrix Execution & Policy Audit"
-    echo "    • Multi-Resolver DNS Mining via Isolated Public Relays (Failsafe Topology)"
-    echo "    • Perimeter Subdomain Mapping & Exposed Cluster Telemetry Extraction"
-    echo "    • Secure Remote WHOIS & Async RDAP Registrar Validation Engines"
-    echo "    • Verified Compromise Check via Leak Repository Timelines"
+    echo "LEGITIMATE CAPABILITIES (COMPACT MATRIX):"
+    echo "  • Multi-Provider Core [Anti-Overlap]   • Secure RDAP Domain Lifecycle"
+    echo "  • Adaptive Word-Wrap Layout Engine     • Multi-Resolver DNS Mining"
+    echo "  • MX-Heuristic Profile (Proton/Zoho)   • Exposure Subdomain Mapping"
+    echo "  • Domain 2FA/MFA Requirement Matrix    • Leak Repository Timeline Match"
     echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     
     read -r -p " ENTER TARGETS (separated by comma) > " RAW_TARGET_INPUT
@@ -3819,7 +3815,7 @@ function run_nexus_breach_intel() {
             continue
         fi
 
-        echo -e "\n\033[1;95m[GLOBAL QUERY ENGAGED $CURRENT_IDX/$TOTAL_TARGETS] Target: ${CLEAN_TARGET^^}\033[0m"
+        echo -e "\n\033[1;95m[QUERY $CURRENT_IDX/$TOTAL_TARGETS] Target: ${CLEAN_TARGET^^}\033[0m"
         export TARGET_DATA_LIST="${CLEAN_TARGET}"
     
         python3 << 'EOF'
@@ -3844,11 +3840,7 @@ CLR_RST = "\033[0m"
 CLR_BGRN = "\033[1;32m"
 CLR_BRED = "\033[1;31m"
 
-class NexusIntelligentValidator:
-    """
-    Advanced Forensic Core v7.5 engineered with word-wrap visual padding alignments,
-    preventing pseudo-graphic border degradation on space-restricted mobile viewports.
-    """
+class NexusCompactValidator:
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
         self.target_email = None
@@ -3865,37 +3857,32 @@ class NexusIntelligentValidator:
             self.mode = "domain"
             self.target_domain = self.raw_input.lower()
 
-        # Perimeter schema structural maps
         self.dns_security = {
-            "domain_ips": "No active public A records resolved",
-            "mx": "No public MX endpoints exposed",
-            "ns": "No active nameservers resolved",
-            "spf": "No SPF text record published on root",
+            "domain_ips": "No active public A records",
+            "mx": "No public MX endpoints",
+            "ns": "No active nameservers",
+            "spf": "None",
             "spf_status": "VULNERABLE (Missing)",
-            "dmarc": "No DMARC record found on _dmarc prefix",
+            "dmarc": "None",
             "dmarc_status": "VULNERABLE (Missing)",
-            "subdomains_found": "None detected via fallback mapping"
+            "subdomains_found": "None"
         }
-        self.whois_data = {"created": "Access Restricted", "expiry": "Access Restricted", "registrar": "Unknown Registrar"}
-        self.mailbox_status = "N/A (Domain-only mode activated)" if self.mode == "domain" else "Checking..."
-        self.platform_detected = "Generic / Custom Infrastructure"
+        self.whois_data = {"created": "Restricted", "expiry": "Restricted", "registrar": "Unknown"}
+        self.mailbox_status = "N/A (Domain-Mode)" if self.mode == "domain" else "Checking..."
+        self.platform_detected = "Generic/Custom Infrastructure"
         
-        # Identity Verification Variables
-        self.mfa_engine = "Standard Authentication Layer"
-        self.mfa_policy = "Optional / Defined by Individual User Profile"
+        self.mfa_engine = "Standard Auth Layer"
+        self.mfa_policy = "Optional / User Profile Defined"
         self.breach_results = []
         
         try:
             self.term_width = os.get_terminal_size().columns
-            if self.term_width < 65: self.term_width = 65
+            if self.term_width < 60: self.term_width = 60
             if self.term_width > 105: self.term_width = 95
         except OSError:
-            self.term_width = 85
+            self.term_width = 80
 
     async def _fetch_failsafe_whois(self, session: aiohttp.ClientSession):
-        """
-        Queries global IANA top-level entities with fallback to direct RDAP metadata calls.
-        """
         if not self.target_domain: return
         try:
             loop = asyncio.get_event_loop()
@@ -3925,40 +3912,30 @@ class NexusIntelligentValidator:
                 for line in whois_text.splitlines():
                     l = line.strip()
                     if re.match(r'(?i)(Creation Date|Created On|created|Registration Time):', l):
-                        self.whois_data['created'] = l.split(":", 1)[1].strip()[:25]
+                        self.whois_data['created'] = l.split(":", 1)[1].strip()[:19]
                     if re.match(r'(?i)(Registry Expiry Date|Expiration Date|Expires On|expiry):', l):
-                        self.whois_data['expiry'] = l.split(":", 1)[1].strip()[:25]
+                        self.whois_data['expiry'] = l.split(":", 1)[1].strip()[:19]
                     if re.match(r'(?i)(Registrar:|registrar|Sponsoring Registrar):', l):
-                        self.whois_data['registrar'] = l.split(":", 1)[1].strip()[:35]
-                
-                if self.whois_data['created'] != "Access Restricted":
-                    return 
+                        self.whois_data['registrar'] = l.split(":", 1)[1].strip()[:30]
+                if self.whois_data['created'] != "Restricted": return 
         except Exception: pass
 
-        rdap_url = f"https://rdap.org/domain/{self.target_domain}"
         try:
-            async with session.get(rdap_url, timeout=4.0) as resp:
+            async with session.get(f"https://rdap.org/domain/{self.target_domain}", timeout=4.0) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     for event in data.get("events", []):
                         action = event.get("eventAction", "").lower()
-                        if action == "registration":
-                            self.whois_data['created'] = event.get("eventDate", "Access Restricted")[:25]
-                        elif action == "expiration":
-                            self.whois_data['expiry'] = event.get("eventDate", "Access Restricted")[:25]
+                        if action == "registration": self.whois_data['created'] = event.get("eventDate", "")[:19]
+                        elif action == "expiration": self.whois_data['expiry'] = event.get("eventDate", "")[:19]
                     for entity in data.get("entities", []):
                         if "registrar" in entity.get("roles", []):
                             vcard = entity.get("vcardArray", [None, []])[1]
                             for prop in vcard:
-                                if prop[0] == "fn":
-                                    self.whois_data['registrar'] = prop[3][:35]
-                                    break
+                                if prop[0] == "fn": self.whois_data['registrar'] = prop[3][:30]; break
         except Exception: pass
 
     def _verify_mailbox_via_smtp(self, mx_host):
-        """
-        Universal low-level boundary connection logic evaluating real-time server responses.
-        """
         if not self.target_email: return
         try:
             server = smtplib.SMTP(timeout=4.0)
@@ -3968,148 +3945,98 @@ class NexusIntelligentValidator:
             code, message = server.rcpt(str(self.target_email))
             server.quit()
             
-            if code == 250:
-                self.mailbox_status = "VERIFIED / ACTIVE (Account exists on target system)"
-            elif code in [550, 551, 552, 554]:
-                self.mailbox_status = f"NOT FOUND / INVALID (Server responded with code: {code})"
-            else:
-                self.mailbox_status = f"AMBIGUOUS / PROTECTED (Server response code: {code})"
+            if code == 250: self.mailbox_status = "VERIFIED / ACTIVE"
+            elif code in [550, 551, 552, 554]: self.mailbox_status = f"INVALID (Code: {code})"
+            else: self.mailbox_status = f"PROTECTED (Code: {code})"
         except Exception:
-            self.mailbox_status = "UNKNOWN / SMTP PROBE BLOCKED (Firewall / Hidden Mail Relay Routing)"
+            self.mailbox_status = "UNKNOWN / PROBE BLOCKED"
 
     async def _detect_cloud_identity(self, session: aiohttp.ClientSession):
-        """
-        Fixes the overlap bug. Checks native structures cleanly based on domain classifications.
-        """
         if not self.target_domain: return
+        is_public = self.target_domain in ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "free.fr"]
         
-        is_public_provider = self.target_domain in ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "free.fr"]
-        
-        if is_public_provider:
+        if is_public:
             if "gmail.com" in self.target_domain:
-                self.platform_detected = "Google Consumer Mail Architecture"
-                self.mfa_engine = "Google Account Security Core"
-                self.mfa_policy = "ENFORCED / STAGE-2 (2FA mandated globally for Consumer Accounts)"
-                if self.mode == "email":
-                    self.mailbox_status = "VERIFIED / ACTIVE (Standard Web-Identity Exists)"
+                self.platform_detected = "Google Consumer Mail"
+                self.mfa_engine = "Google Security Core"
+                self.mfa_policy = "ENFORCED / STAGE-2 (Global Mandate)"
+                if self.mode == "email": self.mailbox_status = "VERIFIED / ACTIVE"
             elif "free.fr" in self.target_domain:
-                self.platform_detected = "Free Telecom Infrastructure (Proxad ISP Network France)"
-                self.mfa_engine = "Free.fr Central Radius Access Control"
-                self.mfa_policy = "OPTIONAL / User Managed Console Protection"
+                self.platform_detected = "Free ISP Webmail Network (France)"
+                self.mfa_engine = "Free Central Auth Matrix"
+                self.mfa_policy = "OPTIONAL / User Profile Managed"
             return
 
-        # Querying M365 Real Realm Status for Enterprise/Custom Targets only
-        realm_url = f"https://login.microsoftonline.com/getuserrealm.srf?login=probe@{self.target_domain}&xml=1"
         try:
-            async with session.get(realm_url, timeout=3.5) as resp:
+            async with session.get(f"https://login.microsoftonline.com/getuserrealm.srf?login=probe@{self.target_domain}&xml=1", timeout=3.5) as resp:
                 if resp.status == 200:
                     root = ET.fromstring(await resp.text())
                     ns = root.find("NameSpaceType")
                     if ns is not None and ns.text != "Unknown":
-                        self.platform_detected = f"Microsoft 365 ({ns.text} Tenant)"
-                        
+                        self.platform_detected = f"Microsoft 365 ({ns.text})"
                         sts = root.find("STSAuthURL")
                         if sts is not None and sts.text:
-                            self.mfa_engine = f"Federated Identity Gateway ({sts.text.split('/')[2]})"
-                            self.mfa_policy = "STRICT / MANAGED BY EXTERNAL IDP (MFA Enforced at Gateway Level)"
+                            self.mfa_engine = f"Federated Gateway ({sts.text.split('/')[2]})"
+                            self.mfa_policy = "STRICT / EXTERNAL IDP ENFORCED"
                         else:
-                            self.mfa_engine = "Microsoft Entra ID / Azure AD Cloud Architecture"
-                            self.mfa_policy = "ENFORCED (Security Defaults / Conditional Access Verification)"
-                            
-                        if self.mode == "email" and ns.text == "Managed":
-                            chk_url = f"https://login.microsoftonline.com/getuserrealm.srf?login={self.target_email}&xml=1"
-                            async with session.get(chk_url, timeout=3) as r2:
-                                root2 = ET.fromstring(await r2.text())
-                                if root2.find("NameSpaceType").text != "Unknown":
-                                    self.mailbox_status = "VERIFIED / ACTIVE (Confirmed inside Microsoft Azure AD Graph)"
+                            self.mfa_engine = "Entra ID / Azure Cloud Core"
+                            self.mfa_policy = "ENFORCED (Security Defaults / Conditional)"
                         return
         except Exception: pass
 
-        # Checking Google Workspace Enterprise Attachment
         try:
             async with session.get(f"https://www.google.com/a/{self.target_domain}/ServiceLogin", timeout=3.0, allow_redirects=False) as resp:
                 if resp.status == 302 and "google.com/a/" in resp.headers.get("Location", ""):
-                    self.platform_detected = "Google Workspace (Enterprise Mail Edge)"
-                    self.mfa_engine = "Google Identity Provider (Google IdP Engine)"
-                    self.mfa_policy = "ENFORCED (2-Step Verification Domain Policy Overrides Profile Setup)"
+                    self.platform_detected = "Google Workspace Edge"
+                    self.mfa_engine = "Google Identity IdP Engine"
+                    self.mfa_policy = "ENFORCED / Enterprise Corporate Rule"
                     return
         except Exception: pass
 
     def _apply_mx_heuristic_overrides(self):
-        """
-        Deep MX-string pattern mining to resolve infrastructure profiles for any provider globally.
-        """
         mx_str = self.dns_security.get("mx", "").lower()
         if not mx_str or "no public" in mx_str: return
 
         if "protection.outlook.com" in mx_str:
-            if "Microsoft 365" not in self.platform_detected:
-                self.platform_detected = "Microsoft 365 Cloud Protection Gateway"
-                self.mfa_engine = "Microsoft Entra Identity Layer"
-                self.mfa_policy = "STRICT / ENFORCED via Corporate Cloud Tenant Policies"
+            if "Microsoft" not in self.platform_detected:
+                self.platform_detected = "Microsoft 365 Gateway"
+                self.mfa_engine = "Microsoft Entra Identity Core"
+                self.mfa_policy = "STRICT / Corporate Tenant Mandate"
         elif "googlemail.com" in mx_str or "aspmx.l.google.com" in mx_str:
             if "Google" not in self.platform_detected:
-                self.platform_detected = "Google Workspace Cloud Architecture"
-                self.mfa_engine = "Google Identity System"
-                self.mfa_policy = "ENFORCED / Enterprise Identity Protection Enforced"
-        elif "protonmail.ch" in mx_str or "protonmail.com" in mx_str:
-            self.platform_detected = "ProtonMail Swiss Secure Infrastructure"
-            self.mfa_engine = "Proton Cryptographic Auth Vault"
-            self.mfa_policy = "HIGH-STRICTNESS / MFA Supported & Prompted via Hardware/TOTP tokens"
-        elif "zoho.com" in mx_str or "zoho.eu" in mx_str:
-            self.platform_detected = "Zoho Corporation Managed Mail Network"
-            self.mfa_engine = "Zoho Accounts Identity Manager"
-            self.mfa_policy = "STRICT (Enforced by Zoho OneAuth Multi-Factor Core)"
+                self.platform_detected = "Google Workspace Cloud"
+                self.mfa_engine = "Google Identity Core"
+                self.mfa_policy = "ENFORCED / Enterprise Rule"
+        elif "protonmail" in mx_str:
+            self.platform_detected = "ProtonMail Swiss Infrastructure"
+            self.mfa_engine = "Proton Cryptographic Vault"
+            self.mfa_policy = "HIGH-STRICTNESS / Hardware-TOTP Configured"
+        elif "zoho" in mx_str:
+            self.platform_detected = "Zoho Corporation Mail Network"
+            self.mfa_engine = "Zoho Accounts Identity Core"
+            self.mfa_policy = "STRICT (Enforced via OneAuth Module)"
         elif "icloud.com" in mx_str:
-            self.platform_detected = "Apple iCloud Business / Consumer Infrastructure"
-            self.mfa_engine = "Apple ID Managed Authentication Core"
-            self.mfa_policy = "MFA MANDATORY (Apple Identity Trust Requirement)"
+            self.platform_detected = "Apple iCloud Business Node"
+            self.mfa_engine = "Apple ID Managed Core"
+            self.mfa_policy = "MFA MANDATORY (Identity Trust Suite)"
         elif "free.fr" in mx_str:
-            self.platform_detected = "Free Telecom Infrastructure (Proxad ISP Network France)"
-            self.mfa_engine = "Free.fr Central Radius Access Control"
-            self.mfa_policy = "OPTIONAL / User Managed Console Protection"
-        elif "yandex.ru" in mx_str or "mx.yandex" in mx_str:
-            self.platform_detected = "Yandex 360 Business / Consumer Platform"
-            self.mfa_engine = "Yandex ID Passport Engine"
-            self.mfa_policy = "MFA ENFORCED / Supported via Yandex Key TOTP"
-        elif "mail.ru" in mx_str:
-            self.platform_detected = "VK Cloud Mail.Ru Corporate Infrastructure"
-            self.mfa_engine = "Mail.Ru Auth Center"
-            self.mfa_policy = "OPTIONAL / 2FA via SMS/Anonymized Push Tokens"
-        elif "zimbra" in mx_str:
-            self.platform_detected = "Zimbra Collaboration Open-Source Cluster"
-            self.mfa_engine = "Local Zimbra Internal Authentication Module"
-            self.mfa_policy = "POLICED PER CLIENT (Supports TOTP Extensions)"
-        elif "synology" in mx_str:
-            self.platform_detected = "Synology MailPlus Dedicated Server Node"
-            self.mfa_engine = "DSM Local Security Account Manager"
-            self.mfa_policy = "OPTIONAL / Admin Enforced via Synology Secure SignIn"
+            self.platform_detected = "Free Telecom (Proxad France)"
+            self.mfa_engine = "Free.fr Central Auth Suite"
+            self.mfa_policy = "OPTIONAL / Console Managed"
         
         dmarc_raw = self.dns_security.get("dmarc", "").lower()
         if "p=reject" in dmarc_raw or "p=quarantine" in dmarc_raw:
-            if "User Profile" in self.mfa_policy or "Optional" in self.mfa_policy:
-                self.mfa_policy += " [Enhanced Domain Security Level via DMARC Isolation Policy]"
+            if "Optional" in self.mfa_policy: self.mfa_policy += " [DMARC Hardened]"
 
     async def _audit_dns_infrastructure(self):
-        """
-        Asynchronously parses the perimeter map across independent root resolvers.
-        """
         if not self.target_domain: return
-        
         resolvers = []
-        for IP in ['1.1.1.1', '8.8.8.8', '9.9.9.9']:
+        for IP in ['1.1.1.1', '8.8.8.8']:
             r = dns.resolver.Resolver(configure=False)
             r.nameservers = [IP]
-            r.timeout = 2.0
-            r.lifetime = 2.0
+            r.timeout = 2.0; r.lifetime = 2.0
             resolvers.append(r)
-            
-        default_resolver = dns.resolver.Resolver()
-        default_resolver.timeout = 2.0
-        default_resolver.lifetime = 2.0
-        resolvers.insert(0, default_resolver)
 
-        # 1. Parsing Target Host IPs
         main_ip = None
         for res in resolvers:
             try:
@@ -4119,7 +4046,6 @@ class NexusIntelligentValidator:
                 break
             except Exception: pass
 
-        # 2. Parsing Nameservers
         for res in resolvers:
             try:
                 ns_ans = res.resolve(self.target_domain, 'NS')
@@ -4127,7 +4053,6 @@ class NexusIntelligentValidator:
                 break
             except Exception: pass
 
-        # 3. Parsing MX Records
         mx_hosts = []
         for res in resolvers:
             try:
@@ -4139,62 +4064,47 @@ class NexusIntelligentValidator:
             except Exception: pass
 
         self._apply_mx_heuristic_overrides()
+        best_mx = mx_hosts[0] if mx_hosts else main_ip
+        
+        if self.mode == "email" and best_mx and "Checking" in self.mailbox_status:
+            await asyncio.get_event_loop().run_in_executor(None, self._verify_mailbox_via_smtp, best_mx)
 
-        best_mx_candidate = mx_hosts[0] if mx_hosts else main_ip
-        if ("Microsoft 365" in self.platform_detected) and (not mx_hosts):
-            mx_prefix = self.target_domain.replace(".", "-")
-            best_mx_candidate = f"{mx_prefix}.mail.protection.outlook.com"
-            self.dns_security['mx'] = f"{best_mx_candidate} [Internal Cloud Prediction Path]"
-
-        # 4. Checking Hidden Infrastructure Subdomains
         discovered_subs = []
-        sub_prefixes = ['mail', 'webmail', 'smtp', 'autodiscover', 'vpn', 'remote']
-        for prefix in sub_prefixes:
+        for prefix in ['mail', 'webmail', 'smtp', 'autodiscover']:
             try:
-                target_sub = f"{prefix}.{self.target_domain}"
-                addr = socket.gethostbyname(target_sub)
+                addr = socket.gethostbyname(f"{prefix}.{self.target_domain}")
                 discovered_subs.append(f"{prefix}->{addr}")
             except Exception: pass
-        if discovered_subs:
-            self.dns_security['subdomains_found'] = " | ".join(discovered_subs)
+        if discovered_subs: self.dns_security['subdomains_found'] = " | ".join(discovered_subs)
 
-        if self.mode == "email" and best_mx_candidate and "Checking" in self.mailbox_status:
-            await asyncio.get_event_loop().run_in_executor(None, self._verify_mailbox_via_smtp, best_mx_candidate)
-
-        # 5. Parsing SPF Records
         for res in resolvers:
             try:
                 txt_answers = res.resolve(self.target_domain, 'TXT')
-                spf_record = "None"
                 for rdata in txt_answers:
-                    text = rdata.to_text()
-                    if "v=spf1" in text:
-                        spf_record = text.strip('"')
+                    t = rdata.to_text()
+                    if "v=spf1" in t:
+                        self.dns_security['spf'] = t.strip('"')
+                        self.dns_security['spf_status'] = "HardFail (-all)" if "-all" in t else ("SoftFail (~all)" if "~all" in t else "Custom")
                         break
-                self.dns_security['spf'] = spf_record
-                self.dns_security['spf_status'] = "HardFail (-all) - Protected" if "-all" in spf_record else ("SoftFail (~all) - Weak" if "~all" in spf_record else "Custom Configuration")
-                if spf_record != "None": break
+                if self.dns_security['spf'] != "None": break
             except Exception: pass
 
-        # 6. Parsing DMARC Records
         for res in resolvers:
             try:
                 dmarc_answers = res.resolve(f"_dmarc.{self.target_domain}", 'TXT')
-                dmarc_record = "None"
                 for rdata in dmarc_answers:
-                    text = rdata.to_text()
-                    if "v=DMARC1" in text:
-                        dmarc_record = text.strip('"')
+                    t = rdata.to_text()
+                    if "v=DMARC1" in t:
+                        self.dns_security['dmarc'] = t.strip('"')
+                        self.dns_security['dmarc_status'] = "Reject" if "p=reject" in t else ("Quarantine" if "p=quarantine" in t else "Monitor (none)")
                         break
-                self.dns_security['dmarc'] = dmarc_record
-                self.dns_security['dmarc_status'] = "Protected (p=reject)" if "p=reject" in dmarc_record else ("Protected (p=quarantine)" if "p=quarantine" in dmarc_record else "Weak / Monitor Mode Only")
-                if dmarc_record != "None": break
+                if self.dns_security['dmarc'] != "None": break
             except Exception: pass
 
     async def _check_pwned_emails(self, session: aiohttp.ClientSession):
         if not self.target_email: return
         url = f"https://acuris.com/wp-json/api/v1/check-email?email={self.target_email}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        headers = {"User-Agent": "Mozilla/5.0"}
         try:
             async with session.get(url, headers=headers, timeout=4) as response:
                 if response.status == 200:
@@ -4202,9 +4112,9 @@ class NexusIntelligentValidator:
                     if data.get("breaches"):
                         for breach in data["breaches"]:
                             self.breach_results.append({
-                                "source": breach.get("name", "Leak Source"),
+                                "src": breach.get("name", "Leak"),
                                 "date": breach.get("date", "N/A"),
-                                "details": f"Data: {', '.join(breach.get('data_classes', []))}"
+                                "class": ", ".join(breach.get('data_classes', []))[:45]
                             })
         except Exception: pass
 
@@ -4217,134 +4127,96 @@ class NexusIntelligentValidator:
                 self._check_pwned_emails(session)
             )
 
-    def _smart_wrap_print(self, prefix: str, text: str, color_code: str = ""):
-        """
-        Advanced word-based layout engine that guarantees strict alignment 
-        and prevents terminal overflow text fragmentation.
-        """
+    def _compact_print(self, prefix: str, text: str, color_code: str = "", split_by_token: str = None):
         clean_prefix = re.sub(r'\033\[[0-9;]*m', '', prefix)
-        prefix_len = len(clean_prefix)
-        max_chunk = self.term_width - prefix_len - 4
-        if max_chunk <= 15: max_chunk = 45
+        p_len = len(clean_prefix)
+        max_chunk = self.term_width - p_len - 4
         
-        words = str(text).split(' ')
-        lines = []
-        current_line = []
-        current_len = 0
-        
-        for word in words:
-            clean_word = re.sub(r'\033\[[0-9;]*m', '', word)
-            word_len = len(clean_word)
-            
-            # If a single ultra-long string (like tokenized MX keys) exceeds limit, force slice it
-            if word_len > max_chunk:
-                if current_line:
-                    lines.append(" ".join(current_line))
-                    current_line = []
-                    current_len = 0
-                
-                start = 0
-                while start < len(word):
-                    lines.append(word[start:start+max_chunk])
-                    start += max_chunk
-                continue
+        chunks = []
+        if split_by_token and split_by_token in text:
+            raw_tokens = text.split(split_by_token)
+            for i, tok in enumerate(raw_tokens):
+                t_str = tok.strip()
+                if not t_str: continue
+                suffix = split_by_token if (i < len(raw_tokens)-1 and split_by_token in [';', ',']) else ""
+                chunks.append(f"{t_str}{suffix}")
+        else:
+            words = str(text).split(' ')
+            curr = []
+            c_len = 0
+            for w in words:
+                w_len = len(re.sub(r'\033\[[0-9;]*m', '', w))
+                if c_len + w_len + (1 if curr else 0) <= max_chunk:
+                    curr.append(w)
+                    c_len += w_len + (1 if curr else 0)
+                else:
+                    if curr: chunks.append(" ".join(curr))
+                    curr = [w]
+                    c_len = w_len
+            if curr: chunks.append(" ".join(curr))
 
-            if current_len + word_len + (1 if current_line else 0) <= max_chunk:
-                current_line.append(word)
-                current_len += word_len + (1 if current_line else 0)
-            else:
-                lines.append(" ".join(current_line))
-                current_line = [word]
-                current_len = word_len
-                
-        if current_line:
-            lines.append(" ".join(current_line))
-            
-        if not lines:
+        if not chunks:
             print(f"{prefix}{color_code}None{CLR_RST}")
             return
-            
-        print(f"{prefix}{color_code}{lines[0]}{CLR_RST}")
-        
-        # Calculate trailing link spacing perfectly matching structural tree lines
-        is_last_item = "└─" in prefix or "  " in clean_prefix and not "├─" in prefix
-        connector = "   " if is_last_item else "│  "
-        
-        # Base indent depth matching exact prefix signature boundaries
-        match = re.match(r'^(\s*[├└]─\s*)', clean_prefix)
-        if match:
-            indent_space = " " * (prefix_len - 3)
-            blank_prefix = f"{indent_space}{connector}"
-        else:
-            match_sub = re.match(r'^(\s*│\s*[├└]─\s*)', clean_prefix)
-            if match_sub:
-                indent_space = " " * (prefix_len - 3)
-                blank_prefix = f"{indent_space}{connector}"
-            else:
-                blank_prefix = " " * prefix_len
 
-        for extra in lines[1:]:
-            print(f"{blank_prefix}{color_code}{extra}{CLR_RST}")
+        print(f"{prefix}{color_code}{chunks[0]}{CLR_RST}")
+        
+        is_last = "└─" in prefix
+        conn = "   " if is_last else "│  "
+        indent = " " * (p_len - 3) + conn
+        
+        for extra in chunks[1:]:
+            print(f"{indent}{color_code}{extra}{CLR_RST}")
 
     def render_report(self):
         print("\n" + "═" * self.term_width)
-        print(f" NEXUS STAGE-7 UNIVERSAL COMPLIANCE REPORT [MONOLITH INTERFACE]")
+        print(f" NEXUS STAGE-8 CORE COMPLIANCE REPORT [COMPACT RUN]")
         print("═" * self.term_width)
-        print(f"\n[#] DEPLOYED VECTOR -> {self.raw_input.upper()}")
+        print(f"[#] TARGET: {self.raw_input.upper()}")
         print("─" * self.term_width)
         
-        # Provider Infrastructure Information
-        print(f"{CLR_CYN}● INFRASTRUCTURE PROVIDER INTELLIGENCE:{CLR_RST}")
-        self._smart_wrap_print("  ├─ Platform Detected: ", self.platform_detected, CLR_YLW)
+        print(f"{CLR_CYN}● INFRASTRUCTURE & IDENTITIES:{CLR_RST}")
+        self._compact_print("  ├─ Platform: ", self.platform_detected, CLR_YLW)
+        m_clr = CLR_BGRN if "VERIFIED" in self.mailbox_status else CLR_YLW
+        self._compact_print("  └─ Mailbox : ", self.mailbox_status, m_clr)
         
-        m_stat = self.mailbox_status
-        m_clr = CLR_BGRN if "VERIFIED" in m_stat else (CLR_BRED if "NOT FOUND" in m_stat else CLR_YLW)
-        self._smart_wrap_print("  └─ Mailbox Existence: ", m_stat, m_clr)
+        print(f"\n{CLR_CYN}● IDENTITY SECURITY & MULTI-FACTOR POLICIES:{CLR_RST}")
+        self._compact_print("  ├─ Gateway : ", self.mfa_engine, CLR_YLW)
+        p_clr = CLR_BGRN if "ENFORCED" in self.mfa_policy or "STRICT" in self.mfa_policy else CLR_YLW
+        self._compact_print("  └─ 2FA Rule: ", self.mfa_policy, p_clr)
         
-        # Multi-Factor Enforcement Verification Matrix
-        print(f"\n{CLR_CYN}● DOMAIN IDENTITY SECURITY & MULTI-FACTOR POLICIES:{CLR_RST}")
-        self._smart_wrap_print("  ├─ MFA Engine Gateway: ", self.mfa_engine, CLR_YLW)
-        
-        p_clr = CLR_BGRN if ("ENFORCED" in self.mfa_policy or "STRICT" in self.mfa_policy or "MANDATORY" in self.mfa_policy) else CLR_YLW
-        self._smart_wrap_print("  └─ Policy 2FA State  : ", self.mfa_policy, p_clr)
-        
-        # Historical Incident Timelines
-        print(f"\n{CLR_RED}● VERIFIED INCIDENT TIMELINES (HISTORIC DATA LEAKS):{CLR_RST}")
+        print(f"\n{CLR_RED}● INCIDENT REPOSITORY MATCHES (LEAKS):{CLR_RST}")
         if not self.breach_results:
-            print(f"  └─ Status: {CLR_GRN}No incident matches discovered inside compromised logs.{CLR_RST}")
+            print(f"  └─ Logs: {CLR_GRN}No data leak incidents found in open historical indexes.{CLR_RST}")
         else:
             for idx, data in enumerate(self.breach_results, 1):
-                print(f"  ├─ Incident [{idx}]: {CLR_BRED}{data['source']}{CLR_RST}")
-                print(f"  │  ├─ Compromise Date: {CLR_YLW}{data['date']}{CLR_RST}")
-                print(f"  │  └─ Exposed Classes: {CLR_MAG}{data['details']}{CLR_RST}")
+                print(f"  ├─ Leak [{idx}]: {CLR_BRED}{data['src']}{CLR_RST} ({data['date']})")
+                self._compact_print("  │  └─ Exposed: ", data['class'], CLR_MAG)
 
-        # Core Network Structural Perimeter
         if self.target_domain:
             print("\n" + "─" * self.term_width)
-            print(f"{CLR_MAG}● RAW NETWORK PERIMETER RECORDS (EXTENDED DEEP DNS FORENSIC):{CLR_RST}")
-            print(f"  ├─ Registrar Name    : {self.whois_data.get('registrar')}")
-            print(f"  ├─ Domain Born Date  : {CLR_GRN}{self.whois_data.get('created')}{CLR_RST}")
-            print(f"  ├─ Domain Expiry Date: {CLR_YLW}{self.whois_data.get('expiry')}{CLR_RST}")
+            print(f"{CLR_MAG}● CORE NETWORK PERIMETER RECORDS (HIGH-DENSITY):{CLR_RST}")
+            print(f"  ├─ Registrar : {self.whois_data.get('registrar')}")
+            print(f"  ├─ Born Date : {CLR_GRN}{self.whois_data.get('created')}{CLR_RST}")
+            print(f"  ├─ Expire    : {CLR_YLW}{self.whois_data.get('expiry')}{CLR_RST}")
             
-            self._smart_wrap_print("  ├─ Root Target IPs   : ", self.dns_security.get('domain_ips'), CLR_CYN)
-            self._smart_wrap_print("  ├─ NS Authorities    : ", self.dns_security.get('ns'))
-            self._smart_wrap_print("  ├─ Published MX Gate : ", self.dns_security.get('mx'), CLR_CYN)
-            self._smart_wrap_print("  ├─ Subdomains Mapped : ", self.dns_security.get('subdomains_found'), CLR_BLU)
-            self._smart_wrap_print("  ├─ Raw SPF String    : ", self.dns_security.get('spf'), CLR_BLU)
-            
-            print(f"  ├─ SPF Enforcement   : {self.dns_security.get('spf_status')}")
-            
-            self._smart_wrap_print("  ├─ DMARC Raw String  : ", self.dns_security.get('dmarc'), CLR_BLU)
+            self._compact_print("  ├─ Root IPs  : ", self.dns_security.get('domain_ips'), CLR_CYN, split_by_token=",")
+            self._compact_print("  ├─ Nameserver: ", self.dns_security.get('ns'), split_by_token=",")
+            self._compact_print("  ├─ MX Gates  : ", self.dns_security.get('mx'), CLR_CYN, split_by_token=",")
+            self._compact_print("  ├─ Subdomains: ", self.dns_security.get('subdomains_found'), CLR_BLU, split_by_token="|")
+            self._compact_print("  ├─ SPF Record: ", self.dns_security.get('spf'), CLR_BLU, split_by_token=" ")
+            print(f"  ├─ SPF State : {self.dns_security.get('spf_status')}")
+            self._compact_print("  ├─ DMARC Rec : ", self.dns_security.get('dmarc'), CLR_BLU, split_by_token=";")
             
             d_stat = self.dns_security.get('dmarc_status', '')
             d_clr = CLR_BRED if "VULNERABLE" in d_stat else CLR_BGRN
-            print(f"  └─ DMARC Policy State: {d_clr}{d_stat}{CLR_RST}")
+            print(f"  └─ DMARC Rule: {d_clr}{d_stat}{CLR_RST}")
             print("═" * self.term_width + "\n")
 
 def main():
     raw_input = os.getenv("TARGET_DATA_LIST", "")
     if not raw_input: return
-    scanner = NexusIntelligentValidator(raw_input)
+    scanner = NexusCompactValidator(raw_input)
     asyncio.run(scanner.run_pipeline())
     scanner.render_report()
 
