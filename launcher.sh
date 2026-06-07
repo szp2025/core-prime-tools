@@ -3779,22 +3779,21 @@ EOF
 
 function run_nexus_breach_intel() {
     clear
-    try_width=$(tput cols 2>/dev/null || echo 65)
-    [ "$try_width" -lt 55 ] && try_width=55
-    [ "$try_width" -gt 85 ] && try_width=75
+    try_width=$(tput cols 2>/dev/null || echo 70)
+    [ "$try_width" -lt 60 ] && try_width=60
+    [ "$try_width" -gt 90 ] && try_width=80
 
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo "       NEXUS OMNISCIENT HYBRID INTELLIGENCE CORE  "
-    echo "          [MAXIMAL forensic COMPLIANCE ENGINE v3.0]       "
+    echo "          [MAXIMAL REAL-DATA FORENSIC ENGINE v4.0] "
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo ""
-    echo "CROSS-VECTOR EXTENDED REAL-TIME CAPABILITIES:"
-    echo "    • Multi-Node Real DNS Infrastructure Deep Forensic"
-    echo "    • Advanced Cryptanalysis & Match Line Extraction"
-    echo "    • Autonomous System Number (ASN) Lookup & Carrier Map"
-    echo "    • SSL/TLS Certificate Expiry & Authority Fingerprint"
-    echo "    • Automated Public Dorking Engine (Leaks & Pastes Tracking)"
-    echo "    • Comprehensive Perimeter Gateway & Brand Spoofing Index"
+    echo "EXTRACTING LEGITIMATE INTEL PERIMETER:"
+    echo "    • True WHOIS Infrastructure Registry Data (Creation & Expiry)"
+    echo "    • Verified Public Breach Timelines & Data Classes"
+    echo "    • Unaltered Live DNS Core Mapping (A, NS, MX Records)"
+    echo "    • Raw SPF / DMARC String Parsing & Security Enforcement"
+    echo "    • Real OSINT Web Dorking via Indexed Metadata Search"
     echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     
     read -r -p " ENTER TARGETS (separated by comma) > " RAW_TARGET_INPUT
@@ -3817,14 +3816,13 @@ function run_nexus_breach_intel() {
             continue
         fi
 
-        echo -e "\n\033[1;95m[BATCH PROGRESS $CURRENT_IDX/$TOTAL_TARGETS] Activating Deep Vector: ${CLEAN_TARGET^^}\033[0m"
+        echo -e "\n\033[1;95m[QUERY ENGAGED $CURRENT_IDX/$TOTAL_TARGETS] Target Vector: ${CLEAN_TARGET^^}\033[0m"
         export TARGET_DATA_LIST="${CLEAN_TARGET}"
     
         python3 << 'EOF'
 import os
 import sys
 import asyncio
-import hashlib
 import socket
 import re
 import urllib.parse
@@ -3842,11 +3840,11 @@ CLR_RST = "\033[0m"
 CLR_BGRN = "\033[1;32m"
 CLR_BRED = "\033[1;31m"
 
-class NexusMaximalScanner:
+class NexusMaximalStrictScanner:
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
         self.target_email = None
-        self.target_domain = "N/A"
+        self.target_domain = None
         
         if self.raw_input.startswith("@"):
             self.mode = "domain"
@@ -3860,51 +3858,115 @@ class NexusMaximalScanner:
             self.target_domain = self.raw_input.lower()
 
         self.dns_security = {}
+        self.whois_data = {}
         self.breach_results = []
         self.dork_leaks = []
         
         try:
             self.term_width = os.get_terminal_size().columns
-            if self.term_width < 55: self.term_width = 55
-            if self.term_width > 85: self.term_width = 75
+            if self.term_width < 60: self.term_width = 60
+            if self.term_width > 90: self.term_width = 80
         except OSError:
-            self.term_width = 65
+            self.term_width = 70
+
+    def _fetch_real_whois(self):
+        """Прямой низкоуровневый опрос серверов WHOIS без сторонних библиотек"""
+        if not self.target_domain:
+            return
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(4.0)
+            s.connect(("whois.iana.org", 43))
+            s.send((self.target_domain + "\r\n").encode())
+            response = b""
+            while True:
+                data = s.recv(4096)
+                if not data: break
+                response += data
+            s.close()
+            
+            iana_text = response.decode('utf-8', errors='ignore')
+            refer_server = None
+            for line in iana_text.splitlines():
+                if line.lower().startswith("refer:"):
+                    refer_server = line.split(":", 1)[1].strip()
+                    break
+            
+            if not refer_server:
+                refer_server = "whois.verisign-grs.com" if self.target_domain.endswith(".com") else "whois.iana.org"
+
+            s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s2.settimeout(4.0)
+            s2.connect((refer_server, 43))
+            s2.send((self.target_domain + "\r\n").encode())
+            response2 = b""
+            while True:
+                data = s2.recv(4096)
+                if not data: break
+                response2 += data
+            s2.close()
+            
+            whois_text = response2.decode('utf-8', errors='ignore')
+            
+            created = "Not Found"
+            expiry = "Not Found"
+            registrar = "Not Found"
+            
+            for line in whois_text.splitlines():
+                line_clean = line.strip()
+                if idx_match := re.match(r'(?i)(Creation Date|Created On|Registry Domain ID|created):', line_clean):
+                    if "date" in line_clean.lower() or "created" in line_clean.lower():
+                        created = line_clean.split(":", 1)[1].strip()
+                if idx_match := re.match(r'(?i)(Registry Expiry Date|Expiration Date|Expires On|expiry):', line_clean):
+                    expiry = line_clean.split(":", 1)[1].strip()
+                if idx_match := re.match(r'(?i)(Registrar:|registrar|Sponsoring Registrar):', line_clean):
+                    registrar = line_clean.split(":", 1)[1].strip()
+            
+            self.whois_data['created'] = created[:35] if created else "N/A"
+            self.whois_data['expiry'] = expiry[:35] if expiry else "N/A"
+            self.whois_data['registrar'] = registrar[:45] if registrar else "N/A"
+        except Exception:
+            self.whois_data['created'] = "Timeout / Restricted Access"
+            self.whois_data['expiry'] = "Timeout / Restricted Access"
+            self.whois_data['registrar'] = "N/A"
 
     async def _audit_dns_infrastructure(self):
-        if self.target_domain == "N/A" or not self.target_domain: 
-            return
-            
+        if not self.target_domain: return
         resolver = dns.resolver.Resolver()
-        resolver.timeout = 2.5
-        resolver.lifetime = 2.5
+        resolver.timeout = 3.0
+        resolver.lifetime = 3.0
         
-        d_hash = int(hashlib.sha256(self.target_domain.encode()).hexdigest(), 16)
-        
-        # --- МАССИВНЫЙ СБОР ДАННЫХ ПЕРИМЕТРА ---
-        
-        # 1. Почтовый шлюз (MX)
+        # 1. IP адреса сайта (A records)
+        try:
+            a_answers = resolver.resolve(self.target_domain, 'A')
+            self.dns_security['domain_ips'] = ", ".join([str(ip) for ip in a_answers])
+        except Exception:
+            self.dns_security['domain_ips'] = "No A Records published"
+
+        # 2. NS серверы (у кого хостится DNS-зона)
+        try:
+            ns_answers = resolver.resolve(self.target_domain, 'NS')
+            self.dns_security['ns_servers'] = ", ".join([str(ns).rstrip('.') for ns in ns_answers])
+        except Exception:
+            self.dns_security['ns_servers'] = "No Nameservers detected"
+
+        # 3. MX серверы
         mx_servers = []
         try:
             mx_answers = resolver.resolve(self.target_domain, 'MX')
             for rdata in sorted(mx_answers, key=lambda r: r.preference):
                 mx_servers.append(str(rdata.exchange).rstrip('.'))
-            self.dns_security['mx'] = mx_servers[0] if mx_servers else "Not Found"
+            self.dns_security['mx'] = ", ".join(mx_servers) if mx_servers else "None"
         except Exception:
-            self.dns_security['mx'] = "No MX Records Detected / Internal Relay Only"
+            self.dns_security['mx'] = "No MX Records Found"
 
-        # 2. Определение IP-адреса и сетевой инфраструктуры шлюза
-        if "Detected" not in self.dns_security['mx'] and mx_servers:
-            try: 
-                self.dns_security['mx_ip'] = socket.gethostbyname(mx_servers[0])
-                self.dns_security['asn_provider'] = f"AS{42225 + (d_hash % 50)} (Routed via Edge Telecom)"
-            except Exception: 
-                self.dns_security['mx_ip'] = "159.95.9.241"
-                self.dns_security['asn_provider'] = "AS42225 (OVH SAS Cloud Hoster Proxy)"
+        if mx_servers:
+            try: self.dns_security['mx_ip'] = socket.gethostbyname(mx_servers[0])
+            except Exception: self.dns_security['mx_ip'] = "Resolution Error"
         else:
-            self.dns_security['mx_ip'] = "159.95.9.241"
-            self.dns_security['asn_provider'] = "AS42225 (OVH SAS Cloud Hoster Proxy)"
+            self.dns_security['mx_ip'] = "N/A"
 
-        # 3. Маршрутизация и анализ SPF
+        # 4. Строгий SPF
         try:
             txt_answers = resolver.resolve(self.target_domain, 'TXT')
             spf_record = "None"
@@ -3914,18 +3976,15 @@ class NexusMaximalScanner:
                     spf_record = text.strip('"')
                     break
             self.dns_security['spf'] = spf_record
-            if spf_record == "None":
-                self.dns_security['spf'] = "v=spf1 include:_spf.hosting-relay.net ~all (SoftFail)"
-                self.dns_security['spf_status'] = "VULNERABLE (Brand Spoofing Allowed)"
-            elif "~all" in spf_record or "?all" in spf_record:
-                self.dns_security['spf_status'] = "SoftFail / Neutral (Weak Security Perimeter)"
-            else:
-                self.dns_security['spf_status'] = "Harded Rules Active"
+            if spf_record == "None": self.dns_security['spf_status'] = "VULNERABLE (Запись отсутствует)"
+            elif "~all" in spf_record or "?all" in spf_record: self.dns_security['spf_status'] = "SoftFail (Слабая политика защиты)"
+            elif "-all" in spf_record: self.dns_security['spf_status'] = "HardFail (Строгая легитимная защита)"
+            else: self.dns_security['spf_status'] = "Custom Rules"
         except Exception:
-            self.dns_security['spf'] = "v=spf1 +all (VULNERABLE - BROAD OVERRIDE)"
-            self.dns_security['spf_status'] = "HIGHLY VULNERABLE"
+            self.dns_security['spf'] = "No TXT Records published"
+            self.dns_security['spf_status'] = "VULNERABLE"
 
-        # 4. Аудит политик DMARC
+        # 5. Строгий DMARC
         try:
             dmarc_answers = resolver.resolve(f"_dmarc.{self.target_domain}", 'TXT')
             dmarc_record = "None"
@@ -3935,88 +3994,36 @@ class NexusMaximalScanner:
                     dmarc_record = text.strip('"')
                     break
             self.dns_security['dmarc'] = dmarc_record
-            if dmarc_record == "None":
-                self.dns_security['dmarc'] = "p=none; pct=100; (Weak Non-Enforcement Policy)"
-                self.dns_security['dmarc_status'] = "HIGHLY VULNERABLE (No Anti-Spoof Protection)"
-            elif "p=reject" in dmarc_record: 
-                self.dns_security['dmarc_status'] = "PROTECTED (Strict Reject Execution)"
-            else: 
-                self.dns_security['dmarc_status'] = "WEAK POLICY (Monitoring Only)"
+            if "p=reject" in dmarc_record: self.dns_security['dmarc_status'] = "PROTECTED (Reject Execution)"
+            elif "p=quarantine" in dmarc_record: self.dns_security['dmarc_status'] = "MODERATE (Quarantine Active)"
+            else: self.dns_security['dmarc_status'] = "WEAK MONITORING (p=none - Не защищает)"
         except Exception:
-            self.dns_security['dmarc'] = "p=none; (No DMARC record published)"
+            self.dns_security['dmarc'] = "No DMARC published"
             self.dns_security['dmarc_status'] = "HIGHLY VULNERABLE"
 
-        # 5. Верификация ключей DKIM и дополнительных параметров безопасности
-        self.dns_security['dkim_status'] = "Active (1024-bit Legacy Key)" if d_hash % 2 == 0 else "Active (2048-bit Valid Key)"
-        self.dns_security['mta_sts'] = "Testing / Operational" if d_hash % 2 == 0 else "Enforced (mta-sts.txt Active)"
-        
-        # 6. Статус DNSSEC
+        # 6. DNSSEC
         try:
             resolver.resolve(self.target_domain, 'DNSKEY')
-            self.dns_security['dnssec'] = "Active (Zone Signed & Verified)"
+            self.dns_security['dnssec'] = "Active (Signed Zone)"
         except Exception:
-            self.dns_security['dnssec'] = "Unsigned / Disabled Perimeter"
-
-        # 7. Шифрование транспортного уровня и сертификаты
-        self.dns_security['smtp_tls'] = "TLS 1.3 Strong Forward Secrecy (AES-256)"
-        self.dns_security['cert_ca'] = "GlobalSign Organization CA" if d_hash % 2 == 0 else "DigiCert Global Root G2"
-        self.dns_security['cert_exp'] = f"Active ({(d_hash % 280) + 20} Days Left)"
-        self.dns_security['ip_threat'] = "68% [SUSPICIOUS TRAFFIC DETECTED]" if d_hash % 2 == 0 else "15% (Low Risk Profile)"
-        self.dns_security['open_ports'] = "25/tcp, 443/tcp, 110/tcp (Exposed Core Service Network)"
-        self.dns_security['mfa_provider'] = "Microsoft Entra ID" if d_hash % 2 == 0 else "Okta Identity Cloud Gateway"
-        self.dns_security['mfa_policy'] = "PARTIAL (Optional Compliance)" if d_hash % 2 == 0 else "STRICT (Required)"
+            self.dns_security['dnssec'] = "Unsigned / Disabled"
 
     async def _check_pwned_emails(self, session: aiohttp.ClientSession):
-        if not self.target_email: 
-            return
-            
+        if not self.target_email: return
         url = f"https://acuris.com/wp-json/api/v1/check-email?email={self.target_email}"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        
         try:
-            async with session.get(url, headers=headers, timeout=4) as response:
+            async with session.get(url, headers=headers, timeout=5) as response:
                 if response.status == 200:
                     data = await response.json()
                     if data.get("breaches"):
                         for breach in data["breaches"]:
                             self.breach_results.append({
-                                "source": breach.get("name", "Unknown Incident Leak"),
-                                "date": breach.get("date", "2025-08-04"),
-                                "details": f"Compromised Dataset: {', '.join(breach.get('data_classes', []))}",
-                                "crypto": "Raw MD5 (Unresolved Hash Archive)",
-                                "decrypted": hashlib.md5(self.target_email.encode()).hexdigest()
+                                "source": breach.get("name", "Unknown Database"),
+                                "date": breach.get("date", "Unknown Date"),
+                                "details": f"Compromised Dataset: {', '.join(breach.get('data_classes', []))}"
                             })
-        except Exception: 
-            pass
-
-        # Использование резервных открытых COMB реестров
-        fallback_url = f"https://api.proxynova.com/comb?query={self.target_email}"
-        try:
-            async with session.get(fallback_url, headers=headers, timeout=4) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get("results"):
-                        for res in data["results"]:
-                            self.breach_results.append({
-                                "source": "ProxyNova COMB Registry",
-                                "date": "2025-08-04",
-                                "details": f"Raw Database Match Line: {res}",
-                                "crypto": "Plaintext / Decrypted Row Struct",
-                                "decrypted": res.split(":")[-1] if ":" in res else "Unresolved"
-                            })
-        except Exception: 
-            pass
-
-        # Если публичные API перегружены или молчат — разворачиваем детальную запись инцидента на основе локального анализа
-        if not self.breach_results:
-            t_hash = hashlib.sha256(self.target_email.encode()).hexdigest()
-            self.breach_results.append({
-                "source": "ProxyNova COMB Registry (Deep Archive)",
-                "date": "2025-08-04",
-                "details": "Exposed credentials data classes: Passwords, Mailbox Metadata Account",
-                "crypto": "Raw MD5 (Unresolved)",
-                "decrypted": t_hash[:32]
-            })
+        except Exception: pass
 
     async def _execute_dork_engine(self, session: aiohttp.ClientSession):
         query_str = self.target_email if self.mode == "email" else self.target_domain
@@ -4041,13 +4048,13 @@ class NexusMaximalScanner:
                                 link = urllib.parse.unquote(link.split("uddg=")[1].split("&")[0])
                             if link and link not in self.dork_leaks:
                                 self.dork_leaks.append(link)
-            except Exception: 
-                pass
-                
-        if not self.dork_leaks:
-            self.dork_leaks.append(f"https://intelx.io/?s={urllib.parse.quote(query_str)}")
+                await asyncio.sleep(1.0)
+            except Exception: pass
 
     async def run_pipeline(self):
+        # Запуск WHOIS в отдельном потоке, так как сокеты синхронные
+        await asyncio.get_event_loop().run_in_executor(None, self._fetch_real_whois)
+        
         async with aiohttp.ClientSession() as session:
             await asyncio.gather(
                 self._audit_dns_infrastructure(),
@@ -4055,103 +4062,66 @@ class NexusMaximalScanner:
                 self._execute_dork_engine(session)
             )
 
-    def print_massive_card(self, title, items, is_alert=False):
-        print(f"\n{(CLR_RED if is_alert else CLR_CYN)}● {title.upper()}{CLR_RST}")
-        max_val_len = self.term_width - 19
-        if max_val_len < 20: max_val_len = 20
-
-        for label, val in items.items():
-            val_str = str(val)
-            if val in ["YES", "HIGH", "HIGHLY VULNERABLE", "VULNERABLE", "VULNERABLE (Brand Spoofing Allowed)", "68% [SUSPICIOUS TRAFFIC DETECTED]"] or "VULNERABLE" in val_str or "Threat" in label:
-                val_colored = f"{CLR_BRED}{val_str}{CLR_RST}"
-            elif val in ["NO", "SAFE", "PROTECTED"] or "Active" in val_str or "Strict" in val_str or "PROTECTED" in val_str:
-                val_colored = f"{CLR_BGRN}{val_str}{CLR_RST}"
-            elif "https://" in val_str:
-                val_colored = f"\033[4;94m{val_str}{CLR_RST}"
-            else:
-                val_colored = f"{CLR_YLW}{val_str}{CLR_RST}"
-
-            if len(val_str) > max_val_len and not "https://" in val_str:
-                print(f"  ├─ {label:<13}:")
-                chunks = [val_str[i:i+max_val_len] for i in range(0, len(val_str), max_val_len)]
-                for chunk in chunks:
-                    print(f"  │  {CLR_YLW}{chunk}{CLR_RST}")
-            else:
-                print(f"  ├─ {label:<13}: {val_colored}")
-
     def render_report(self):
-        header_text = f"NEXUS FORENSIC ({self.mode.upper()} MAX ENGINE)"
-        padding = max(0, (self.term_width - len(header_text)) // 2)
         print("\n" + "═" * self.term_width)
-        print(" " * padding + header_text)
+        print(f" NEXUS FORENSIC ENGINE REPORT [STRICT REAL DATA MODE]")
         print("═" * self.term_width)
-        print(f"\n[#] TARGET VECTOR -> {self.raw_input.upper()}")
+        print(f"\n[#] TARGET PERIMETER -> {self.raw_input.upper()}")
         print("─" * self.term_width)
         
-        # Вывод данных об утечках (Блок 1 в стиле симулятора)
-        for idx, data in enumerate(self.breach_results, 1):
-            card_data = {
-                "Activity": "ACTIVE (Mailbox Status Checked)",
-                "Target Role": "General Corporate Node" if self.mode == "email" else "Infrastructure Domain Gateway",
-                "Breach Count": f"{idx + 2} Incidents Detected",
-                "Breach Found": "YES",
-                "Risk Level": "HIGH",
-                "Timeline": data["date"],
-                "Crypto Class": data["crypto"],
-                "Decrypted": data["decrypted"],
-                "API Source": data["source"],
-                "Leak Link": f"https://intelx.io/?s={self.raw_input.lower()}",
-                "Infra Threat": "70% [HIGH RISK PROFILE]"
-            }
-            self.print_massive_card(f"Infiltration Entity Vector [{idx}]", card_data, True)
-            
-        # Блок телеметрии устройств из симулятора (Интегрирован для полноты данных)
-        d_hash = int(hashlib.sha256(self.raw_input.encode()).hexdigest(), 16)
-        print(f"  │  ")
-        print(f"  ├─ {CLR_MAG}CONNECTED DEVICES TELEMETRY METRICS:{CLR_RST}")
-        print(f"  │  ├─ Device [1]: Windows 11 (Outlook 365 Core Client)")
-        print(f"  │  │  ├─ IPv4 Addr : 159.95.9.241")
-        print(f"  │  │  ├─ HW MAC    : BF:4E:A3:E8:5F:EE")
-        print(f"  │  │  └─ Session   : {CLR_BGRN}ONLINE (Active Session){CLR_RST}")
-        print(f"  │  ├─ Device [2]: macOS Sequoia (Safari WebAgent)")
-        print(f"  │  │  ├─ IPv4 Addr : 112.12.50.216")
-        print(f"  │  │  ├─ HW MAC    : 95:17:80:28:1D:E2")
-        print(f"  │  │  └─ Session   : {CLR_YLW}IDLE ({(d_hash % 10) + 2}h ago){CLR_RST}")
+        # Вывод реальных утечек с настоящими ДАТАМИ
+        print(f"{CLR_RED}● REAL DATA BREACH TIMELINES (ОБНАРУЖЕННЫЕ УТЕЧКИ И ИХ ДАТЫ):{CLR_RST}")
+        if not self.breach_results:
+            print(f"  └─ Status: {CLR_GRN}В публичных базах инцидентов этот почтовый адрес не числится.{CLR_RST}")
+        else:
+            for idx, data in enumerate(self.breach_results, 1):
+                print(f"  ├─ Leak Source [{idx}]: {CLR_BRED}{data['source']}{CLR_RST}")
+                print(f"  │  ├─ Истинная дата фиксации: {CLR_YLW}{data['date']}{CLR_RST}")
+                print(f"  │  └─ Что утекло в сеть      : {CLR_MAG}{data['details']}{CLR_RST}")
                 
-        print(f"  │  ")
-        print(f"  ├─ {CLR_MAG}AUTOMATED SEARCH DORK REPOSITORY LINKS:{CLR_RST}")
-        for idx, link in enumerate(self.dork_leaks, 1):
-            print(f"  │  ├─ Exposure [{idx}]: {CLR_CYN}{link}{CLR_RST}")
+        # Вывод реальных дорков
+        print(f"\n{CLR_MAG}● REAL OPEN OSINT TARGET MATCHES (ПРЯМЫЕ ССЫЛКИ ИЗ ПАСТ И РЕПОЗИТОРИЕВ):{CLR_RST}")
+        if not self.dork_leaks:
+            print(f"  └─ Прямых совпадений в открытых индексах не зафиксировано.")
+        else:
+            for idx, link in enumerate(self.dork_leaks, 1):
+                print(f"  ├─ Link [{idx}]: \033[4;94m{link}\033[0m")
         
-        # Детальный масштабный аудит сетевого периметры (Блок 2 - Полный детальный аудит)
-        print("\n" + "─" * self.term_width)
-        print(f"[+] REAL NETWORK PERIMETER FORENSIC AUDIT:")
-        print(f"  ├─ MX Gateway  : {CLR_CYN}{self.dns_security.get('mx', 'N/A')}{CLR_RST}")
-        print(f"  ├─ IPv4 Endpt  : {CLR_YLW}{self.dns_security.get('mx_ip', 'N/A')}{CLR_RST}")
-        print(f"  ├─ ASN Carrier : {CLR_CYN}{self.dns_security.get('asn_provider', 'N/A')}{CLR_RST}")
-        print(f"  ├─ SPF Record  : {CLR_CYN}{self.dns_security.get('spf', 'None')}{CLR_RST}")
-        print(f"  ├─ SPF Routing : {CLR_BRED}{self.dns_security.get('spf_status', 'N/A')}{CLR_RST}")
-        print(f"  ├─ DMARC Record: {CLR_CYN}{self.dns_security.get('dmarc', 'None')}{CLR_RST}")
-        print(f"  ├─ DMARC Policy: {CLR_BRED}{self.dns_security.get('dmarc_status', 'N/A')}{CLR_RST}")
-        print(f"  ├─ DKIM Sign   : {CLR_YLW}{self.dns_security.get('dkim_status', 'N/A')}{CLR_RST}")
-        print(f"  ├─ MTA-STS     : {CLR_BGRN}{self.dns_security.get('mta_sts', 'N/A')}{CLR_RST}")
-        print(f"  ├─ DNSSEC State: {CLR_BRED if 'Disabled' in self.dns_security.get('dnssec','') else CLR_BGRN}{self.dns_security.get('dnssec', 'N/A')}{CLR_RST}")
-        print(f"  ├─ SMTP TLS Ver: {CLR_BGRN}{self.dns_security.get('smtp_tls', 'N/A')}{CLR_RST}")
-        print(f"  ├─ TLS Cert CA : {CLR_CYN}{self.dns_security.get('cert_ca', 'N/A')}{CLR_RST}")
-        print(f"  ├─ Cert Valid  : {CLR_YLW}{self.dns_security.get('cert_exp', 'N/A')}{CLR_RST}")
-        print(f"  ├─ IP Threat   : {CLR_BRED}{self.dns_security.get('ip_threat', 'N/A')}{CLR_RST}")
-        print(f"  ├─ Open Ports  : {CLR_CYN}{self.dns_security.get('open_ports', 'N/A')}{CLR_RST}")
-        print(f"  ├─ Spoof Def   : {CLR_BRED}HIGHLY VULNERABLE (Brand Spoofing Allowed){CLR_RST}")
-        print(f"  ├─ MFA Engine  : {CLR_CYN}{self.dns_security.get('mfa_provider', 'N/A')}{CLR_RST}")
-        print(f"  ├─ Policy 2FA  : {CLR_YLW}{self.dns_security.get('mfa_policy', 'N/A')}{CLR_RST}")
-        print("═" * self.term_width)
-        print(f"\n{CLR_BRED}Attention! Structural perimeter vulnerabilities or corporate leaks detected within active nodes!{CLR_RST}")
-        print("═" * self.term_width + "\n")
+        # Инфраструктурный блок (Только реальные данные)
+        if self.target_domain:
+            print("\n" + "─" * self.term_width)
+            print(f"{CLR_CYN}● TRUE INFRASTRUCTURE WHOIS & DNS RECORDS (ОТВЕТЫ СЕРВЕРОВ ИМЕН):{CLR_RST}")
+            
+            # Данные WHOIS
+            print(f"  ├─ Registrar   : {self.whois_data.get('registrar', 'N/A')}")
+            print(f"  ├─ Domain Born : {CLR_GRN}{self.whois_data.get('created', 'N/A')}{CLR_RST}")
+            print(f"  ├─ Domain Exp  : {CLR_YLW}{self.whois_data.get('expiry', 'N/A')}{CLR_RST}")
+            
+            # Данные DNS
+            print(f"  ├─ Target IPs  : {self.dns_security.get('domain_ips')}")
+            print(f"  ├─ NS Authority: {self.dns_security.get('ns_servers')}")
+            print(f"  ├─ MX Hosts    : {self.dns_security.get('mx')}")
+            print(f"  ├─ MX IPv4 Gate: {self.dns_security.get('mx_ip')}")
+            
+            # SPF / DMARC
+            spf_s = self.dns_security.get('spf_status', '')
+            spf_c = CLR_BRED if "VULNERABLE" in spf_s else (CLR_YLW if "SoftFail" in spf_s else CLR_BGRN)
+            print(f"  ├─ SPF Record  : {CLR_BLU}{self.dns_security.get('spf')}{CLR_RST}")
+            print(f"  ├─ SPF Status  : {spf_c}{spf_s}{CLR_RST}")
+            
+            dm_s = self.dns_security.get('dmarc_status', '')
+            dm_c = CLR_BRED if "VULNERABLE" in dm_s or "WEAK" in dm_s else CLR_BGRN
+            print(f"  ├─ DMARC Record: {CLR_BLU}{self.dns_security.get('dmarc')}{CLR_RST}")
+            print(f"  ├─ DMARC Status: {dm_c}{dm_s}{CLR_RST}")
+            
+            sec_s = self.dns_security.get('dnssec', '')
+            print(f"  └─ DNSSEC State: {CLR_BGRN if 'Active' in sec_s else CLR_YLW}{sec_s}{CLR_RST}")
+            print("═" * self.term_width + "\n")
 
 def main():
     raw_input = os.getenv("TARGET_DATA_LIST", "")
     if not raw_input: return
-    scanner = NexusMaximalScanner(raw_input)
+    scanner = NexusMaximalStrictScanner(raw_input)
     asyncio.run(scanner.run_pipeline())
     scanner.render_report()
 
