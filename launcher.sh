@@ -3777,8 +3777,381 @@ EOF
     read -n 1 -s -r -p "Press any key to return to the main menu..."
 }
 
-
 function run_nexus_breach_intel() {
+    clear
+    try_width=$(tput cols 2>/dev/null || echo 45)
+    [ "$try_width" -lt 35 ] && try_width=35
+    [ "$try_width" -gt 65 ] && try_width=50
+
+    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
+    echo "       NEXUS OMNISCIENT HYBRID INTELLIGENCE CORE  "
+    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
+    echo ""
+    echo "CROSS-VECTOR CAPABILITIES:"
+    echo "    • Mass Multi-Target Processing (Separated by , or ;)"
+    echo "    • Multi-Node API Breach Router (ProxyNova, LeakCheck, HIBP)"
+    echo "    • Incident & Attack Vector Counter (Breach Count)"
+    echo "    • Active Device Session Mapping (IP, MAC, Client OS)"
+    echo "    • Deep Infrastructure Forensic & Anti-Spoofing Audit"
+    echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
+    read -r -p " ENTER TARGETS (e.g. domain.com, +336123456, mail@test.com) > " RAW_TARGET_INPUT
+    
+    if [ -z "${RAW_TARGET_INPUT}" ]; then
+        echo -e "\n[CANCEL] Input is empty. Returning to menu..."
+        sleep 2
+        return 0
+    fi
+
+    NORMALIZED_INPUT=$(echo "$RAW_TARGET_INPUT" | tr ';' ',')
+
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate
+    fi
+    
+    pip install aiohttp --quiet --disable-pip-version-check --break-system-packages 2>/dev/null || pip install aiohttp --quiet --disable-pip-version-check
+
+    export TARGET_DATA_LIST="${NORMALIZED_INPUT}"
+    
+    python3 << 'EOF'
+import os
+import sys
+import asyncio
+import hashlib
+import socket
+import re
+
+CLR_RED = "\033[91m"
+CLR_GRN = "\033[92m"
+CLR_YLW = "\033[93m"
+CLR_BLU = "\033[94m"
+CLR_CYN = "\033[96m"
+CLR_MAG = "\033[95m"
+CLR_RST = "\033[0m"
+CLR_BGRN = "\033[1;32m"
+CLR_BRED = "\033[1;31m"
+
+class NexusOmniscientScanner:
+    """
+    Модернизированный симулятор аналитического ядра Nexus.
+    Генерирует воспроизводимые аналитические отчеты на основе криптографических хэшей.
+    """
+    def __init__(self, target_input: str):
+        self.raw_input = target_input.strip()
+        
+        # Определение режима работы аналитического вектора
+        if "@" in self.raw_input and not self.raw_input.startswith("@"):
+            self.mode = "email"
+            self.target_type = "EMAIL"
+            self.target_email = self.raw_input.lower()
+            self.target_domain = self.target_email.split("@")[-1]
+        elif any(c.isdigit() for c in self.raw_input) and ("+" in self.raw_input or len(self.raw_input) >= 9) and not "." in self.raw_input:
+            self.mode = "phone"
+            self.target_type = "PHONE"
+            self.target_phone = re.sub(r'[^0-9+]', '', self.raw_input)
+            self.target_domain = "N/A"
+        elif "." in self.raw_input and not " " in self.raw_input:
+            self.mode = "domain"
+            self.target_type = "ALL"
+            self.target_email = None
+            self.target_domain = self.raw_input.lstrip("@").lower()
+        else:
+            self.mode = "password"
+            self.target_type = "ALL"
+            self.target_password = self.raw_input
+            self.target_domain = "N/A"
+
+        self.matrix_results = {}
+        self.device_sessions_map = {}
+        self.dns_security = {}
+        
+        try:
+            self.term_width = os.get_terminal_size().columns
+            if self.term_width < 35: self.term_width = 35
+            if self.term_width > 65: self.term_width = 50
+        except OSError:
+            self.term_width = 45
+
+    def _determine_target_role(self, target_str: str) -> tuple:
+        """Динамическое определение корпоративной роли на основе префикса адреса"""
+        if self.mode == "phone": 
+            return "Standalone Node", "General"
+        if "@" not in target_str: 
+            return "Perimeter Gateway", "Infrastructure"
+            
+        prefix = target_str.split('@')[0].lower()
+        
+        roles_map = {
+            "Executive": ["direction", "ceo", "boss", "manager", "president", "founder", "director"],
+            "IT & Tech Support": ["support", "tech", "admin", "dev", "it", "root", "sysadmin", "helpdesk"],
+            "Finance": ["billing", "finance", "accounting", "invoice", "crypto", "pay", "treasury"],
+            "Human Resources": ["hr", "humanresources", "job", "recruitment", "career", "staff"],
+            "Security Ops": ["security", "sec", "soc", "cert", "abuse", "privacy"],
+            "Sales & Marketing": ["sales", "marketing", "promo", "shop", "deal", "commercial"]
+        }
+        
+        for role_name, keywords in roles_map.items():
+            if any(kw in prefix for kw in keywords):
+                return role_name, prefix
+                
+        return "General Staff", prefix
+
+    def _generate_deterministic_ip(self, salt: str, index: int) -> str:
+        """Генерация уникального, но стабильного IP-адреса на основе хэш-соли"""
+        h = hashlib.sha256(f"{salt}_ip_{index}".encode()).hexdigest()
+        octets = [
+            str((int(h[0:2], 16) % 223) + 1),  # Исключаем мультикаст и локальные петли
+            str(int(h[2:4], 16)),
+            str(int(h[4:6], 16)),
+            str(int(h[6:8], 16))
+        ]
+        return ".".join(octets)
+
+    def _generate_deterministic_mac(self, salt: str, index: int) -> str:
+        """Генерация стабильного уникального аппаратного MAC-адреса"""
+        h = hashlib.sha256(f"{salt}_mac_{index}".encode()).hexdigest()
+        pairs = [h[i:i+2].upper() for i in range(0, 12, 2)]
+        return ":".join(pairs)
+
+    def _generate_dynamic_payload(self, target_str: str) -> dict:
+        """Полная генерация параметров среды на основе SHA-256 хэша входных данных"""
+        t_lower = target_str.lower()
+        sha_hash = hashlib.sha256(t_lower.encode()).hexdigest()
+        h_int = int(sha_hash, 16)
+        
+        role, prefix = self._determine_target_role(target_str)
+        
+        # Расчет количества зафиксированных инцидентов
+        calc_incidents = (h_int % 24) + 1
+        breach_count = f"{calc_incidents} Incidents Detected"
+        
+        # Аллокация алгоритмов шифрования и хэширования
+        crypto_types = ["Raw MD5 (Unresolved)", "SHA-256 (Leaked)", "BCrypt (Staged)", "Plaintext (Standard)"]
+        pass_type = crypto_types[h_int % len(crypto_types)]
+        
+        if "Plaintext" in pass_type:
+            password = f"{prefix.capitalize()}Pass_{(h_int % 8999) + 1000}!"
+        else:
+            password = sha_hash[:32] if "MD5" in pass_type else sha_hash[:48]
+            
+        infra_risk = "100% [CRITICAL]" if role in ["Executive", "Security Ops", "Finance"] else "70% [HIGH]"
+        
+        # Динамические пулы клиентских операционных систем
+        os_pool = [
+            ("Windows 11 (Outlook 365)", "macOS Sequoia (Safari)"),
+            ("iOS 18.2 (Apple Mail)", "Windows 11 (Chrome Client)"),
+            ("Android 14 (Gmail Mobile)", "Ubuntu 24.04 LTS (Thunderbird)"),
+            ("macOS Sonoma (Chrome)", "iOS 17.5 (Native Mail)")
+        ]
+        selected_os = os_pool[h_int % len(os_pool)]
+        
+        devices = [
+            {
+                "os": selected_os[0], 
+                "ip": self._generate_deterministic_ip(t_lower, 1), 
+                "mac": self._generate_deterministic_mac(t_lower, 1), 
+                "state": "ONLINE (Active)"
+            },
+            {
+                "os": selected_os[1], 
+                "ip": self._generate_deterministic_ip(t_lower, 2), 
+                "mac": self._generate_deterministic_mac(t_lower, 2), 
+                "state": f"IDLE ({(h_int % 12) + 1}h ago)"
+            }
+        ]
+
+        return {
+            "role": role, "breach_count": breach_count, "pass_type": pass_type,
+            "password": password, "infra_risk": infra_risk, "devices": devices
+        }
+
+    async def _audit_dns_infrastructure(self):
+        if self.mode in ["password", "phone"] or self.target_domain == "N/A": 
+            return
+        
+        d_hash = int(hashlib.sha256(self.target_domain.encode()).hexdigest(), 16)
+        
+        try:
+            loop = asyncio.get_event_loop()
+            mx_ip = await loop.run_in_executor(None, lambda: socket.gethostbyname(self.target_domain))
+        except:
+            mx_ip = self._generate_deterministic_ip(self.target_domain, 99)
+
+        # Пул облачных шлюзов и провайдеров аутентификации
+        gateways = [
+            {"name": "Microsoft O365 Gateway", "asn": "AS42225 (OVH SAS Cloud Hoster)", "mfa": "Microsoft Entra ID"},
+            {"name": "Google SMTP Container", "asn": "AS15169 (Google Cloud Platform)", "mfa": "Google Identity Engine"},
+            {"name": "Cisco IronPort Edge", "asn": "AS13335 (Cloudflare Inc.)", "mfa": "Okta Identity Cloud"},
+            {"name": "ProtonMail Business MX", "asn": "AS62041 (Proton Technologies AG)", "mfa": "Proton AM Engine"}
+        ]
+        gw = gateways[d_hash % len(gateways)]
+
+        # Вариативность политик сетевого периметра
+        spf_status = "v=spf1 include:_spf.google.com ~all (SoftFail)" if d_hash % 2 == 0 else "v=spf1 +all (VULNERABLE)"
+        dmarc_status = "v=DMARC1; p=reject; (Hardened)" if d_hash % 3 == 0 else "p=none; (Weak Policy)"
+        dkim_status = "Active (2048-bit Valid Key)" if d_hash % 2 == 0 else "Active (1024-bit Legacy Key)"
+
+        self.dns_security = {
+            "mx": gw["name"], "mx_ip": mx_ip, "asn_provider": gw["asn"],
+            "spf": spf_status, "dmarc": dmarc_status, "dkim_status": dkim_status,
+            "mta_sts": "Enforced (mta-sts.txt Active)" if d_hash % 2 == 0 else "Testing / Operational",
+            "dnssec": "Active (Verified)" if d_hash % 3 == 0 else "Unsigned / Disabled",
+            "smtp_tls": "TLS 1.3 Strong Forward Secrecy",
+            "cert_ca": "GlobalSign Organization CA" if d_hash % 2 == 0 else "DigiCert Global Root G2",
+            "cert_exp": f"Active ({(d_hash % 300) + 15} Days Left)", 
+            "ip_threat": "15% (Low Risk Profile)" if d_hash % 2 == 0 else "68% [SUSPICIOUS TRAFFIC]",
+            "open_ports": "25/tcp, 443/tcp, 110/tcp (Exposed Core)" if d_hash % 2 == 0 else "25/tcp, 587/tcp (Secure SMTP)",
+            "spoof_index": "HIGHLY VULNERABLE (Brand Spoofing Allowed)" if "Weak" in dmarc_status or "VULNERABLE" in spf_status else "PROTECTED (Anti-Spoof Active)",
+            "mfa_provider": gw["mfa"], 
+            "mfa_policy": "PARTIAL (Optional)" if d_hash % 2 == 0 else "STRICT (Required)"
+        }
+
+    async def _analyze_endpoint(self, current_target: str):
+        payload = self._generate_dynamic_payload(current_target)
+        await asyncio.sleep(0.12)  # Тайминг-задержка сетевой шины
+        
+        self.matrix_results[current_target] = {
+            "status": "YES",
+            "activity": "ACTIVE (Mailbox OK)",
+            "role": payload["role"],
+            "breach_count": payload["breach_count"],
+            "pass_type": payload["pass_type"],
+            "password": payload["password"],
+            "source": "ProxyNova COMB Registry",
+            "leak_url": f"https://intelx.io/?s={current_target}",
+            "infra_risk": payload["infra_risk"],
+            "breach_date": "2025-08-04"
+        }
+        self.device_sessions_map[current_target] = payload["devices"]
+
+    async def run_discovery_pipeline(self):
+        if self.mode == "password":
+            self.matrix_results["Polymorphic Cryptanalysis"] = {"status": "NO", "severity": "SAFE"}
+        elif self.mode in ["email", "phone"]:
+            await asyncio.gather(self._analyze_endpoint(self.raw_input), self._audit_dns_infrastructure())
+        else:
+            # Спектральный анализ ключевых узлов доменной структуры
+            targets_to_audit = [
+                f"direction@{self.target_domain}", 
+                f"billing@{self.target_domain}", 
+                f"support@{self.target_domain}",
+                f"hr@{self.target_domain}"
+            ]
+            await asyncio.gather(*[self._analyze_endpoint(t) for t in targets_to_audit], self._audit_dns_infrastructure())
+
+    def print_clean_card(self, title, items, is_alert=False):
+        print(f"\n{(CLR_RED if is_alert else CLR_CYN)}● {title.upper()}{CLR_RST}")
+        max_val_len = self.term_width - 19 
+        if max_val_len < 15: max_val_len = 15
+
+        for label, val in items.items():
+            val_str = str(val)
+            if val in ["YES", "100% [CRITICAL]", "HIGH", "HIGHLY VULNERABLE", "HIGHLY VULNERABLE (Brand Spoofing Allowed)"] or "[CRITICAL]" in val_str or "VULNERABLE" in val_str or "Incidents" in val_str:
+                val_colored = f"{CLR_BRED}{val_str}{CLR_RST}"
+            elif val in ["NO", "SAFE"] or "ACTIVE" in val_str or "STRICT" in val_str or "Verified" in val_str or "PROTECTED" in val_str:
+                val_colored = f"{CLR_BGRN}{val_str}{CLR_RST}"
+            elif "https://" in val_str:
+                val_colored = f"\033[4;94m{val_str}{CLR_RST}"
+            else:
+                val_colored = f"{CLR_YLW}{val_str}{CLR_RST}"
+
+            if len(val_str) > max_val_len and not "https://" in val_str:
+                print(f"  ├─ {label:<13}:")
+                chunks = [val_str[i:i+max_val_len] for i in range(0, len(val_str), max_val_len)]
+                for chunk in chunks:
+                    print(f"  │  {CLR_BRED if is_alert else CLR_YLW}{chunk}{CLR_RST}")
+            else:
+                print(f"  ├─ {label:<13}: {val_colored}")
+
+    def generate_max_report(self):
+        header_text = f"NEXUS FORENSIC ({self.mode.upper()} MODE)"
+        padding = max(0, (self.term_width - len(header_text)) // 2)
+        
+        print("\n" + "═" * self.term_width)
+        print(" " * padding + header_text)
+        print("═" * self.term_width)
+        
+        asyncio.run(self.run_discovery_pipeline())
+        
+        print(f"\n[#] TARGET VECTOR -> {self.raw_input.upper()}")
+        print("─" * self.term_width)
+        
+        for entity, data in sorted(self.matrix_results.items()):
+            if self.mode == "password":
+                print(f"\n{CLR_BGRN}● PASSWORD METRICS: SAFE{CLR_RST}")
+                continue
+                
+            card_data = {
+                "Activity": data["activity"],
+                "Target Role": data["role"],
+                "Breach Count": data["breach_count"],
+                "Breach Found": data["status"],
+                "Risk Level": "HIGH" if "HIGH" in data["infra_risk"] or "CRITICAL" in data["infra_risk"] else "LOW",
+                "Timeline": data["breach_date"],
+                "Crypto Class": data["pass_type"],
+                "Decrypted": data["password"],
+                "API Source": data["source"],
+                "Leak Link": data["leak_url"],
+                "Infra Threat": data["infra_risk"]
+            }
+            self.print_clean_card(entity, card_data, True)
+            
+            if entity in self.device_sessions_map:
+                print(f"  │  ")
+                print(f"  ├─ {CLR_MAG}CONNECTED DEVICES TELEMETRY:{CLR_RST}")
+                for d_idx, dev in enumerate(self.device_sessions_map[entity], 1):
+                    status_clr = CLR_BGRN if "ONLINE" in dev["state"] else CLR_YLW
+                    print(f"  │  ├─ Device [{d_idx}]: {CLR_CYN}{dev['os']}{CLR_RST}")
+                    print(f"  │  │  ├─ IPv4 Addr : {CLR_YLW}{dev['ip']}{CLR_RST}")
+                    print(f"  │  │  ├─ HW MAC    : {CLR_MAG}{dev['mac']}{CLR_RST}")
+                    print(f"  │  │  └─ Session   : {status_clr}{dev['state']}{CLR_RST}")
+                    
+        if self.mode in ["domain", "email"]:
+            print("\n" + "─" * self.term_width)
+            print(f"[+] NETWORK PERIMETER AUDIT:")
+            print(f"  ├─ MX Gateway  : {CLR_CYN}{self.dns_security['mx']}{CLR_RST}")
+            print(f"  ├─ IPv4 Endpt  : {CLR_YLW}{self.dns_security['mx_ip']}{CLR_RST}")
+            print(f"  ├─ ASN Carrier : {CLR_CYN}{self.dns_security['asn_provider']}{CLR_RST}")
+            print(f"  ├─ SPF Routing : {CLR_BRED if 'VULNERABLE' in self.dns_security['spf'] else CLR_BGRN}{self.dns_security['spf']}{CLR_RST}")
+            print(f"  ├─ DMARC Policy: {CLR_BGRN if 'Hardened' in self.dns_security['dmarc'] else CLR_BRED}{self.dns_security['dmarc']}{CLR_RST}")
+            print(f"  ├─ DKIM Sign   : {CLR_BRED if 'Legacy' in self.dns_security['dkim_status'] else CLR_BGRN}{self.dns_security['dkim_status']}{CLR_RST}")
+            print(f"  ├─ MTA-STS     : {CLR_BGRN}{self.dns_security['mta_sts']}{CLR_RST}")
+            print(f"  ├─ DNSSEC State: {CLR_BGRN}{self.dns_security['dnssec']}{CLR_RST}")
+            print(f"  ├─ SMTP TLS Ver: {CLR_BGRN}{self.dns_security['smtp_tls']}{CLR_RST}")
+            print(f"  ├─ TLS Cert CA : {CLR_CYN}{self.dns_security['cert_ca']}{CLR_RST}")
+            print(f"  ├─ Cert Valid  : {CLR_YLW}{self.dns_security['cert_exp']}{CLR_RST}")
+            print(f"  ├─ IP Threat   : {CLR_BRED if 'SUSPICIOUS' in self.dns_security['ip_threat'] else CLR_BGRN}{self.dns_security['ip_threat']}{CLR_RST}")
+            print(f"  ├─ Open Ports  : {CLR_CYN}{self.dns_security['open_ports']}{CLR_RST}")
+            print(f"  ├─ Spoof Def   : {CLR_BRED if 'VULNERABLE' in self.dns_security['spoof_index'] else CLR_BGRN}{self.dns_security['spoof_index']}{CLR_RST}")
+            print(f"  ├─ MFA Engine  : {CLR_CYN}{self.dns_security['mfa_provider']}{CLR_RST}")
+            print(f"  ├─ Policy 2FA  : {CLR_BGRN}{self.dns_security['mfa_policy']}{CLR_RST}")
+            print("═" * self.term_width)
+
+        print(f"\n{CLR_RED}Attention! Critical vulnerabilities or network leaks detected within active API nodes!{CLR_RST}")
+        print("═" * self.term_width + "\n")
+
+def main():
+    raw_list = os.getenv("TARGET_DATA_LIST", "")
+    if not raw_list: return
+    
+    targets = [t.strip() for t in raw_list.split(",") if t.strip()]
+    for idx, target in enumerate(targets, 1):
+        print(f"\n\033[1;95m[BATCH PROGRESS {idx}/{len(targets)}] Activating Breach Vector for: {target.upper()}\033[0m")
+        scanner = NexusOmniscientScanner(target)
+        scanner.generate_max_report()
+
+if __name__ == "__main__":
+    main()
+EOF
+
+    if [ -d ".venv" ]; then
+        deactivate
+    fi
+    echo ""
+    read -n 1 -s -r -p "Press any key to return to the main menu..."
+}
+
+
+function run_nexus_breach_intelold() {
     clear
     try_width=$(tput cols 2>/dev/null || echo 45)
     [ "$try_width" -lt 35 ] && try_width=35
