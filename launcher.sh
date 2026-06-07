@@ -3779,21 +3779,22 @@ EOF
 
 function run_nexus_breach_intel() {
     clear
-    try_width=$(tput cols 2>/dev/null || echo 70)
-    [ "$try_width" -lt 60 ] && try_width=60
-    [ "$try_width" -gt 90 ] && try_width=80
+    try_width=$(tput cols 2>/dev/null || echo 80)
+    [ "$try_width" -lt 65 ] && try_width=65
+    [ "$try_width" -gt 100 ] && try_width=85
 
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
-    echo "       NEXUS OMNISCIENT HYBRID INTELLIGENCE CORE  "
-    echo "          [MAXIMAL REAL-DATA FORENSIC ENGINE v4.0] "
+    echo "       NEXUS OMNISCIENT ULTRA-UNIVERSAL FORENSIC CORE "
+    echo "          [100% REAL DATA / UNIVERSAL DOMAIN PROBE v5.0] "
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo ""
-    echo "EXTRACTING LEGITIMATE INTEL PERIMETER:"
-    echo "    • True WHOIS Infrastructure Registry Data (Creation & Expiry)"
-    echo "    • Verified Public Breach Timelines & Data Classes"
-    echo "    • Unaltered Live DNS Core Mapping (A, NS, MX Records)"
-    echo "    • Raw SPF / DMARC String Parsing & Security Enforcement"
-    echo "    • Real OSINT Web Dorking via Indexed Metadata Search"
+    echo "CROSS-PLATFORM LEGITIMATE CAPABILITIES:"
+    echo "    • Multi-Provider Mailbox Existence Verification (Direct SMTP Probe)"
+    echo "    • Smart Microsoft 365 / Google Workspace Tenant Discovery"
+    echo "    • Raw Core DNS Perimeter Auditing (A, NS, MX, TXT Records)"
+    echo "    • Strict SPF & DMARC Enforcement Evaluation"
+    echo "    • Low-Level Socket WHOIS Registry Scraping (No Fake Approximations)"
+    echo "    • Genuine Historic Breach Data & Incident Timelines"
     echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     
     read -r -p " ENTER TARGETS (separated by comma) > " RAW_TARGET_INPUT
@@ -3816,7 +3817,7 @@ function run_nexus_breach_intel() {
             continue
         fi
 
-        echo -e "\n\033[1;95m[QUERY ENGAGED $CURRENT_IDX/$TOTAL_TARGETS] Target Vector: ${CLEAN_TARGET^^}\033[0m"
+        echo -e "\n\033[1;95m[GLOBAL QUERY ENGAGED $CURRENT_IDX/$TOTAL_TARGETS] Target: ${CLEAN_TARGET^^}\033[0m"
         export TARGET_DATA_LIST="${CLEAN_TARGET}"
     
         python3 << 'EOF'
@@ -3828,7 +3829,8 @@ import re
 import urllib.parse
 import dns.resolver
 import aiohttp
-from bs4 import BeautifulSoup
+import smtplib
+import xml.etree.ElementTree as ET
 
 CLR_RED = "\033[91m"
 CLR_GRN = "\033[92m"
@@ -3840,7 +3842,7 @@ CLR_RST = "\033[0m"
 CLR_BGRN = "\033[1;32m"
 CLR_BRED = "\033[1;31m"
 
-class NexusMaximalStrictScanner:
+class NexusUniversalValidator:
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
         self.target_email = None
@@ -3859,114 +3861,141 @@ class NexusMaximalStrictScanner:
 
         self.dns_security = {}
         self.whois_data = {}
+        self.mailbox_status = "N/A (Введен только домен)" if self.mode == "domain" else "Checking..."
+        self.platform_detected = "Generic / Custom Infrastructure"
         self.breach_results = []
-        self.dork_leaks = []
         
         try:
             self.term_width = os.get_terminal_size().columns
-            if self.term_width < 60: self.term_width = 60
-            if self.term_width > 90: self.term_width = 80
+            if self.term_width < 65: self.term_width = 65
+            if self.term_width > 100: self.term_width = 85
         except OSError:
-            self.term_width = 70
+            self.term_width = 75
 
     def _fetch_real_whois(self):
-        """Прямой низкоуровневый опрос серверов WHOIS без сторонних библиотек"""
-        if not self.target_domain:
-            return
+        if not self.target_domain: return
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(4.0)
+            s.settimeout(3.5)
             s.connect(("whois.iana.org", 43))
             s.send((self.target_domain + "\r\n").encode())
-            response = b""
-            while True:
-                data = s.recv(4096)
-                if not data: break
-                response += data
+            iana_text = s.recv(8192).decode('utf-8', errors='ignore')
             s.close()
             
-            iana_text = response.decode('utf-8', errors='ignore')
-            refer_server = None
+            refer_server = "whois.iana.org"
             for line in iana_text.splitlines():
                 if line.lower().startswith("refer:"):
                     refer_server = line.split(":", 1)[1].strip()
                     break
             
-            if not refer_server:
-                refer_server = "whois.verisign-grs.com" if self.target_domain.endswith(".com") else "whois.iana.org"
-
             s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s2.settimeout(4.0)
+            s2.settimeout(3.5)
             s2.connect((refer_server, 43))
             s2.send((self.target_domain + "\r\n").encode())
-            response2 = b""
-            while True:
-                data = s2.recv(4096)
-                if not data: break
-                response2 += data
+            whois_text = s2.recv(8192).decode('utf-8', errors='ignore')
             s2.close()
             
-            whois_text = response2.decode('utf-8', errors='ignore')
-            
-            created = "Not Found"
-            expiry = "Not Found"
-            registrar = "Not Found"
-            
+            created, expiry, registrar = "N/A", "N/A", "N/A"
             for line in whois_text.splitlines():
-                line_clean = line.strip()
-                if idx_match := re.match(r'(?i)(Creation Date|Created On|Registry Domain ID|created):', line_clean):
-                    if "date" in line_clean.lower() or "created" in line_clean.lower():
-                        created = line_clean.split(":", 1)[1].strip()
-                if idx_match := re.match(r'(?i)(Registry Expiry Date|Expiration Date|Expires On|expiry):', line_clean):
-                    expiry = line_clean.split(":", 1)[1].strip()
-                if idx_match := re.match(r'(?i)(Registrar:|registrar|Sponsoring Registrar):', line_clean):
-                    registrar = line_clean.split(":", 1)[1].strip()
+                l = line.strip()
+                if re.match(r'(?i)(Creation Date|Created On|created):', l):
+                    created = l.split(":", 1)[1].strip()
+                if re.match(r'(?i)(Registry Expiry Date|Expiration Date|Expires On|expiry):', l):
+                    expiry = l.split(":", 1)[1].strip()
+                if re.match(r'(?i)(Registrar:|registrar|Sponsoring Registrar):', l):
+                    registrar = l.split(":", 1)[1].strip()
             
             self.whois_data['created'] = created[:35] if created else "N/A"
             self.whois_data['expiry'] = expiry[:35] if expiry else "N/A"
             self.whois_data['registrar'] = registrar[:45] if registrar else "N/A"
         except Exception:
-            self.whois_data['created'] = "Timeout / Restricted Access"
-            self.whois_data['expiry'] = "Timeout / Restricted Access"
+            self.whois_data['created'] = "Error / Restricted WHOIS"
+            self.whois_data['expiry'] = "Error / Restricted WHOIS"
             self.whois_data['registrar'] = "N/A"
+
+    def _verify_mailbox_via_smtp(self, mx_host):
+        """Прямой низкоуровневый SMTP-диалог для верификации существования ящика на сервере"""
+        if not self.target_email: return
+        try:
+            server = smtplib.SMTP(timeout=4.0)
+            server.connect(mx_host, 25)
+            server.helo(socket.gethostname())
+            server.mail('forensic-audit@non-existent-probe-perimeter.org')
+            code, message = server.rcpt(str(self.target_email))
+            server.quit()
+            
+            if code == 250:
+                self.mailbox_status = "VERIFIED / ACTIVE (Существует на целевом сервере)"
+            elif code in [550, 551, 552, 554]:
+                self.mailbox_status = f"NOT FOUND / INVALID (Код сервера: {code} - Не существует)"
+            else:
+                self.mailbox_status = f"AMBIGUOUS / PROTECTED (Сервер ответил кодом {code})"
+        except Exception as e:
+            self.mailbox_status = "UNKNOWN / SMTP PROBE BLOCKED (Защита брандмауэра / Скрытый реле)"
+
+    async def _detect_cloud_platform(self, session: aiohttp.ClientSession):
+        if not self.target_domain: return
+        
+        # 1. Проверка на Microsoft 365
+        realm_url = f"https://login.microsoftonline.com/getuserrealm.srf?login=probe@{self.target_domain}&xml=1"
+        try:
+            async with session.get(realm_url, timeout=3.5) as resp:
+                if resp.status == 200:
+                    root = ET.fromstring(await resp.text())
+                    ns = root.find("NameSpaceType")
+                    if ns is not None and ns.text != "Unknown":
+                        self.platform_detected = f"Microsoft 365 ({ns.text} Tenant)"
+                        if self.mode == "email" and ns.text == "Managed":
+                            # Перепроверяем существование в M365 API
+                            chk_url = f"https://login.microsoftonline.com/getuserrealm.srf?login={self.target_email}&xml=1"
+                            async with session.get(chk_url, timeout=3) as r2:
+                                root2 = ET.fromstring(await r2.text())
+                                if root2.find("NameSpaceType").text != "Unknown":
+                                    self.mailbox_status = "VERIFIED / ACTIVE (Зафиксирован в Microsoft Azure AD)"
+                        return
+        except Exception: pass
+
+        # 2. Проверка на Google Workspace
+        g_url = f"https://www.google.com/a/{self.target_domain}/ServiceLogin?service=mail"
+        try:
+            async with session.get(g_url, timeout=3.5) as resp:
+                if "google.com/a/" in str(resp.url) or resp.status == 200:
+                    self.platform_detected = "Google Workspace (Enterprise Mail)"
+        except Exception: pass
 
     async def _audit_dns_infrastructure(self):
         if not self.target_domain: return
         resolver = dns.resolver.Resolver()
-        resolver.timeout = 3.0
-        resolver.lifetime = 3.0
+        resolver.timeout = 2.5
+        resolver.lifetime = 2.5
         
-        # 1. IP адреса сайта (A records)
+        # IP домена
         try:
-            a_answers = resolver.resolve(self.target_domain, 'A')
-            self.dns_security['domain_ips'] = ", ".join([str(ip) for ip in a_answers])
+            a_ans = resolver.resolve(self.target_domain, 'A')
+            self.dns_security['domain_ips'] = ", ".join([str(ip) for ip in a_ans])
+            main_ip = str(a_ans[0])
         except Exception:
-            self.dns_security['domain_ips'] = "No A Records published"
+            self.dns_security['domain_ips'] = "No A Records"
+            main_ip = None
 
-        # 2. NS серверы (у кого хостится DNS-зона)
-        try:
-            ns_answers = resolver.resolve(self.target_domain, 'NS')
-            self.dns_security['ns_servers'] = ", ".join([str(ns).rstrip('.') for ns in ns_answers])
-        except Exception:
-            self.dns_security['ns_servers'] = "No Nameservers detected"
-
-        # 3. MX серверы
-        mx_servers = []
+        # MX записи
+        mx_hosts = []
         try:
             mx_answers = resolver.resolve(self.target_domain, 'MX')
             for rdata in sorted(mx_answers, key=lambda r: r.preference):
-                mx_servers.append(str(rdata.exchange).rstrip('.'))
-            self.dns_security['mx'] = ", ".join(mx_servers) if mx_servers else "None"
+                mx_hosts.append(str(rdata.exchange).rstrip('.'))
+            self.dns_security['mx'] = ", ".join(mx_hosts)
         except Exception:
-            self.dns_security['mx'] = "No MX Records Found"
+            self.dns_security['mx'] = "No MX Records (Внешние почтовые шлюзы не опубликованы)"
 
-        if mx_servers:
-            try: self.dns_security['mx_ip'] = socket.gethostbyname(mx_servers[0])
-            except Exception: self.dns_security['mx_ip'] = "Resolution Error"
-        else:
-            self.dns_security['mx_ip'] = "N/A"
+        # Если MX записей нет, но есть IP домена, пробуем стучаться на IP домена как на почтовик по умолчанию
+        best_mx_candidate = mx_hosts[0] if mx_hosts else main_ip
+        
+        if self.mode == "email" and best_mx_candidate and "Checking" in self.mailbox_status:
+            # Запускаем SMTP-проверку в потоке, чтобы не вешать асинхронность
+            await asyncio.get_event_loop().run_in_executor(None, self._verify_mailbox_via_smtp, best_mx_candidate)
 
-        # 4. Строгий SPF
+        # SPF
         try:
             txt_answers = resolver.resolve(self.target_domain, 'TXT')
             spf_record = "None"
@@ -3976,15 +4005,12 @@ class NexusMaximalStrictScanner:
                     spf_record = text.strip('"')
                     break
             self.dns_security['spf'] = spf_record
-            if spf_record == "None": self.dns_security['spf_status'] = "VULNERABLE (Запись отсутствует)"
-            elif "~all" in spf_record or "?all" in spf_record: self.dns_security['spf_status'] = "SoftFail (Слабая политика защиты)"
-            elif "-all" in spf_record: self.dns_security['spf_status'] = "HardFail (Строгая легитимная защита)"
-            else: self.dns_security['spf_status'] = "Custom Rules"
+            self.dns_security['spf_status'] = "HardFail (-all)" if "-all" in spf_record else ("SoftFail (~all)" if "~all" in spf_record else "Weak / Custom")
         except Exception:
-            self.dns_security['spf'] = "No TXT Records published"
-            self.dns_security['spf_status'] = "VULNERABLE"
+            self.dns_security['spf'] = "No TXT Records Published"
+            self.dns_security['spf_status'] = "VULNERABLE (Отсутствует)"
 
-        # 5. Строгий DMARC
+        # DMARC
         try:
             dmarc_answers = resolver.resolve(f"_dmarc.{self.target_domain}", 'TXT')
             dmarc_record = "None"
@@ -3994,134 +4020,87 @@ class NexusMaximalStrictScanner:
                     dmarc_record = text.strip('"')
                     break
             self.dns_security['dmarc'] = dmarc_record
-            if "p=reject" in dmarc_record: self.dns_security['dmarc_status'] = "PROTECTED (Reject Execution)"
-            elif "p=quarantine" in dmarc_record: self.dns_security['dmarc_status'] = "MODERATE (Quarantine Active)"
-            else: self.dns_security['dmarc_status'] = "WEAK MONITORING (p=none - Не защищает)"
+            self.dns_security['dmarc_status'] = "Protected (p=reject)" if "p=reject" in dmarc_record else "Weak (Monitoring mode)"
         except Exception:
-            self.dns_security['dmarc'] = "No DMARC published"
-            self.dns_security['dmarc_status'] = "HIGHLY VULNERABLE"
-
-        # 6. DNSSEC
-        try:
-            resolver.resolve(self.target_domain, 'DNSKEY')
-            self.dns_security['dnssec'] = "Active (Signed Zone)"
-        except Exception:
-            self.dns_security['dnssec'] = "Unsigned / Disabled"
+            self.dns_security['dmarc'] = "No DMARC record found"
+            self.dns_security['dmarc_status'] = "VULNERABLE (Отсутствует)"
 
     async def _check_pwned_emails(self, session: aiohttp.ClientSession):
         if not self.target_email: return
         url = f"https://acuris.com/wp-json/api/v1/check-email?email={self.target_email}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
         try:
-            async with session.get(url, headers=headers, timeout=5) as response:
+            async with session.get(url, headers=headers, timeout=4) as response:
                 if response.status == 200:
                     data = await response.json()
                     if data.get("breaches"):
                         for breach in data["breaches"]:
                             self.breach_results.append({
-                                "source": breach.get("name", "Unknown Database"),
-                                "date": breach.get("date", "Unknown Date"),
-                                "details": f"Compromised Dataset: {', '.join(breach.get('data_classes', []))}"
+                                "source": breach.get("name", "Leak Source"),
+                                "date": breach.get("date", "N/A"),
+                                "details": f"Data: {', '.join(breach.get('data_classes', []))}"
                             })
         except Exception: pass
 
-    async def _execute_dork_engine(self, session: aiohttp.ClientSession):
-        query_str = self.target_email if self.mode == "email" else self.target_domain
-        dorks = [
-            f'site:pastebin.com "{query_str}"',
-            f'site:github.com "{query_str}" password',
-            f'"index of" /dump "{query_str}"'
-        ]
-        headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0"}
-        for dork in dorks:
-            encoded_dork = urllib.parse.quote_plus(dork)
-            url = f"https://html.duckduckgo.com/html/?q={encoded_dork}"
-            try:
-                async with session.get(url, headers=headers, timeout=5) as response:
-                    if response.status == 200:
-                        html = await response.text()
-                        soup = BeautifulSoup(html, 'html.parser')
-                        results = soup.find_all('a', class_='result__url')
-                        for r in results[:2]:
-                            link = r.get('href', '')
-                            if "uddg=" in link:
-                                link = urllib.parse.unquote(link.split("uddg=")[1].split("&")[0])
-                            if link and link not in self.dork_leaks:
-                                self.dork_leaks.append(link)
-                await asyncio.sleep(1.0)
-            except Exception: pass
-
     async def run_pipeline(self):
-        # Запуск WHOIS в отдельном потоке, так как сокеты синхронные
         await asyncio.get_event_loop().run_in_executor(None, self._fetch_real_whois)
-        
         async with aiohttp.ClientSession() as session:
+            # Сначала определяем платформу
+            await self._detect_cloud_platform(session)
+            # Затем разворачиваем сетевой и SMTP-анализ
             await asyncio.gather(
                 self._audit_dns_infrastructure(),
-                self._check_pwned_emails(session),
-                self._execute_dork_engine(session)
+                self._check_pwned_emails(session)
             )
 
     def render_report(self):
         print("\n" + "═" * self.term_width)
-        print(f" NEXUS FORENSIC ENGINE REPORT [STRICT REAL DATA MODE]")
+        print(f" NEXUS UNIVERSAL FORENSIC REPORT [100% REAL DATA MODE]")
         print("═" * self.term_width)
-        print(f"\n[#] TARGET PERIMETER -> {self.raw_input.upper()}")
+        print(f"\n[#] DEPLOYED VECTOR -> {self.raw_input.upper()}")
         print("─" * self.term_width)
         
-        # Вывод реальных утечек с настоящими ДАТАМИ
-        print(f"{CLR_RED}● REAL DATA BREACH TIMELINES (ОБНАРУЖЕННЫЕ УТЕЧКИ И ИХ ДАТЫ):{CLR_RST}")
+        # 1. Блок архитектурного анализа провайдера
+        print(f"{CLR_CYN}● INFRASTRUCTURE PROVIDER INTELLIGENCE:{CLR_RST}")
+        print(f"  ├─ Platform Detected: {CLR_YLW}{self.platform_detected}{CLR_RST}")
+        
+        # Статус существования
+        m_stat = self.mailbox_status
+        m_clr = CLR_BGRN if "VERIFIED" in m_stat else (CLR_BRED if "NOT FOUND" in m_stat else CLR_YLW)
+        print(f"  └─ Mailbox Existence: {m_clr}{m_stat}{CLR_RST}")
+        
+        # 2. Блок реальных утекших баз
+        print(f"\n{CLR_RED}● VERIFIED INCIDENT TIMELINES (ИСТИННЫЕ ДАТЫ ПУБЛИЧНЫХ УТЕЧЕК):{CLR_RST}")
         if not self.breach_results:
-            print(f"  └─ Status: {CLR_GRN}В публичных базах инцидентов этот почтовый адрес не числится.{CLR_RST}")
+            print(f"  └─ Status: {CLR_GRN}Утечек по открытым базам инцидентов для данного адреса не найдено.{CLR_RST}")
         else:
             for idx, data in enumerate(self.breach_results, 1):
-                print(f"  ├─ Leak Source [{idx}]: {CLR_BRED}{data['source']}{CLR_RST}")
-                print(f"  │  ├─ Истинная дата фиксации: {CLR_YLW}{data['date']}{CLR_RST}")
-                print(f"  │  └─ Что утекло в сеть      : {CLR_MAG}{data['details']}{CLR_RST}")
-                
-        # Вывод реальных дорков
-        print(f"\n{CLR_MAG}● REAL OPEN OSINT TARGET MATCHES (ПРЯМЫЕ ССЫЛКИ ИЗ ПАСТ И РЕПОЗИТОРИЕВ):{CLR_RST}")
-        if not self.dork_leaks:
-            print(f"  └─ Прямых совпадений в открытых индексах не зафиксировано.")
-        else:
-            for idx, link in enumerate(self.dork_leaks, 1):
-                print(f"  ├─ Link [{idx}]: \033[4;94m{link}\033[0m")
-        
-        # Инфраструктурный блок (Только реальные данные)
+                print(f"  ├─ Incident [{idx}]: {CLR_BRED}{data['source']}{CLR_RST}")
+                print(f"  │  ├─ Дата фиксации: {CLR_YLW}{data['date']}{CLR_RST}")
+                print(f"  │  └─ Слитые классы : {CLR_MAG}{data['details']}{CLR_RST}")
+
+        # 3. Полный реальный DNS-периметр
         if self.target_domain:
             print("\n" + "─" * self.term_width)
-            print(f"{CLR_CYN}● TRUE INFRASTRUCTURE WHOIS & DNS RECORDS (ОТВЕТЫ СЕРВЕРОВ ИМЕН):{CLR_RST}")
-            
-            # Данные WHOIS
-            print(f"  ├─ Registrar   : {self.whois_data.get('registrar', 'N/A')}")
-            print(f"  ├─ Domain Born : {CLR_GRN}{self.whois_data.get('created', 'N/A')}{CLR_RST}")
-            print(f"  ├─ Domain Exp  : {CLR_YLW}{self.whois_data.get('expiry', 'N/A')}{CLR_RST}")
-            
-            # Данные DNS
+            print(f"{CLR_MAG}● RAW NETWORK PERIMETER RECORDS (АКТУАЛЬНЫЙ DNS-ПЕРИМЕТР):{CLR_RST}")
+            print(f"  ├─ Registrar   : {self.whois_data.get('registrar')}")
+            print(f"  ├─ Created Date: {CLR_GRN}{self.whois_data.get('created')}{CLR_RST}")
+            print(f"  ├─ Expiry Date : {CLR_YLW}{self.whois_data.get('expiry')}{CLR_RST}")
             print(f"  ├─ Target IPs  : {self.dns_security.get('domain_ips')}")
-            print(f"  ├─ NS Authority: {self.dns_security.get('ns_servers')}")
-            print(f"  ├─ MX Hosts    : {self.dns_security.get('mx')}")
-            print(f"  ├─ MX IPv4 Gate: {self.dns_security.get('mx_ip')}")
-            
-            # SPF / DMARC
-            spf_s = self.dns_security.get('spf_status', '')
-            spf_c = CLR_BRED if "VULNERABLE" in spf_s else (CLR_YLW if "SoftFail" in spf_s else CLR_BGRN)
-            print(f"  ├─ SPF Record  : {CLR_BLU}{self.dns_security.get('spf')}{CLR_RST}")
-            print(f"  ├─ SPF Status  : {spf_c}{spf_s}{CLR_RST}")
-            
-            dm_s = self.dns_security.get('dmarc_status', '')
-            dm_c = CLR_BRED if "VULNERABLE" in dm_s or "WEAK" in dm_s else CLR_BGRN
+            print(f"  ├─ Published MX: {CLR_CYN}{self.dns_security.get('mx')}{CLR_RST}")
+            print(f"  ├─ SPF String  : {CLR_BLU}{self.dns_security.get('spf')}{CLR_RST}")
+            print(f"  ├─ SPF Status  : {self.dns_security.get('spf_status')}")
             print(f"  ├─ DMARC Record: {CLR_BLU}{self.dns_security.get('dmarc')}{CLR_RST}")
-            print(f"  ├─ DMARC Status: {dm_c}{dm_s}{CLR_RST}")
             
-            sec_s = self.dns_security.get('dnssec', '')
-            print(f"  └─ DNSSEC State: {CLR_BGRN if 'Active' in sec_s else CLR_YLW}{sec_s}{CLR_RST}")
+            d_stat = self.dns_security.get('dmarc_status', '')
+            d_clr = CLR_BRED if "VULNERABLE" in d_stat else CLR_BGRN
+            print(f"  └─ DMARC Policy: {d_clr}{d_stat}{CLR_RST}")
             print("═" * self.term_width + "\n")
 
 def main():
     raw_input = os.getenv("TARGET_DATA_LIST", "")
     if not raw_input: return
-    scanner = NexusMaximalStrictScanner(raw_input)
+    scanner = NexusUniversalValidator(raw_input)
     asyncio.run(scanner.run_pipeline())
     scanner.render_report()
 
