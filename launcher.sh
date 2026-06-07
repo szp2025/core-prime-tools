@@ -3808,8 +3808,9 @@ function run_nexus_breach_intel() {
         return 0
     fi
 
-    NORMALIZED_INPUT=$(RAW_TARGET_INPUT | tr ';' ',')
-    IFS=',' read -ra TARGET_ARRAY <<< "$NORMALIZED_INPUT"
+    NORMALIZED_INPUT=$(tr ';' ',' <<< "$RAW_TARGET_INPUT")
+    IFS=',' 
+    read -ra TARGET_ARRAY <<< "$NORMALIZED_INPUT"
     
     TOTAL_TARGETS=${#TARGET_ARRAY[@]}
     CURRENT_IDX=1
