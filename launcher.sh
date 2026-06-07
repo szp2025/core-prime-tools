@@ -3785,11 +3785,12 @@ function run_nexus_breach_intel() {
 
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo "       NEXUS OMNISCIENT FORENSIC COMPLIANCE CORE "
-    echo "          [INTELLIGENT SEPARATION ENGINE v7.0] "
+    echo "           [MONOLITH INTERFACE ENGINE v7.5] "
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo ""
     echo "CROSS-PLATFORM LEGITIMATE CAPABILITIES:"
     echo "    • Strict Multi-Provider Separation (Fixes Microsoft/Google Overlap Bug)"
+    echo "    • Smart Word-Wrap Layout Engine (Fixes Broken Pseudo-Graphic Borders)"
     echo "    • Enhanced MX-Based Heuristic Profiler (Proton, Zoho, iCloud, Local Postfix/Exchange)"
     echo "    • Domain-Wide 2FA/MFA Requirement Matrix Execution & Policy Audit"
     echo "    • Multi-Resolver DNS Mining via Isolated Public Relays (Failsafe Topology)"
@@ -3845,8 +3846,8 @@ CLR_BRED = "\033[1;31m"
 
 class NexusIntelligentValidator:
     """
-    Advanced Forensic Core v7.0 engineered with explicit identity validation paths,
-    eliminating Microsoft/Google overlap bugs and resolving multi-vendor 2FA/MFA scopes.
+    Advanced Forensic Core v7.5 engineered with word-wrap visual padding alignments,
+    preventing pseudo-graphic border degradation on space-restricted mobile viewports.
     """
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
@@ -3982,7 +3983,6 @@ class NexusIntelligentValidator:
         """
         if not self.target_domain: return
         
-        # Isolated path for commercial global public platforms to avoid false positives
         is_public_provider = self.target_domain in ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "free.fr"]
         
         if is_public_provider:
@@ -3993,9 +3993,9 @@ class NexusIntelligentValidator:
                 if self.mode == "email":
                     self.mailbox_status = "VERIFIED / ACTIVE (Standard Web-Identity Exists)"
             elif "free.fr" in self.target_domain:
-                self.platform_detected = "Free ISP Webmail Infrastructure (Free.fr France)"
-                self.mfa_engine = "Free Telecom Auth Core"
-                self.mfa_policy = "OPTIONAL (Controlled via Free Subscriber Account Console)"
+                self.platform_detected = "Free Telecom Infrastructure (Proxad ISP Network France)"
+                self.mfa_engine = "Free.fr Central Radius Access Control"
+                self.mfa_policy = "OPTIONAL / User Managed Console Protection"
             return
 
         # Querying M365 Real Realm Status for Enterprise/Custom Targets only
@@ -4042,12 +4042,11 @@ class NexusIntelligentValidator:
         mx_str = self.dns_security.get("mx", "").lower()
         if not mx_str or "no public" in mx_str: return
 
-        # Custom heuristic layer checking signature tokens
         if "protection.outlook.com" in mx_str:
             if "Microsoft 365" not in self.platform_detected:
                 self.platform_detected = "Microsoft 365 Cloud Protection Gateway"
                 self.mfa_engine = "Microsoft Entra Identity Layer"
-                self.mfa_policy = "STRICT / ENFORCED via Corporate Cloud Tennant Policies"
+                self.mfa_policy = "STRICT / ENFORCED via Corporate Cloud Tenant Policies"
         elif "googlemail.com" in mx_str or "aspmx.l.google.com" in mx_str:
             if "Google" not in self.platform_detected:
                 self.platform_detected = "Google Workspace Cloud Architecture"
@@ -4086,7 +4085,6 @@ class NexusIntelligentValidator:
             self.mfa_engine = "DSM Local Security Account Manager"
             self.mfa_policy = "OPTIONAL / Admin Enforced via Synology Secure SignIn"
         
-        # Evaluating explicit multi-factor protection flags based on DMARC/MTA-STS status strings
         dmarc_raw = self.dns_security.get("dmarc", "").lower()
         if "p=reject" in dmarc_raw or "p=quarantine" in dmarc_raw:
             if "User Profile" in self.mfa_policy or "Optional" in self.mfa_policy:
@@ -4140,10 +4138,8 @@ class NexusIntelligentValidator:
                 break
             except Exception: pass
 
-        # Triggering pattern parsing engine
         self._apply_mx_heuristic_overrides()
 
-        # Cloud prediction proxy routine
         best_mx_candidate = mx_hosts[0] if mx_hosts else main_ip
         if ("Microsoft 365" in self.platform_detected) and (not mx_hosts):
             mx_prefix = self.target_domain.replace(".", "-")
@@ -4223,26 +4219,76 @@ class NexusIntelligentValidator:
 
     def _smart_wrap_print(self, prefix: str, text: str, color_code: str = ""):
         """
-        Dynamically wraps long text lines safely to maintain perfect visual table formatting.
+        Advanced word-based layout engine that guarantees strict alignment 
+        and prevents terminal overflow text fragmentation.
         """
-        max_chunk = self.term_width - len(prefix) - 5
-        if max_chunk <= 10: max_chunk = 40
+        clean_prefix = re.sub(r'\033\[[0-9;]*m', '', prefix)
+        prefix_len = len(clean_prefix)
+        max_chunk = self.term_width - prefix_len - 4
+        if max_chunk <= 15: max_chunk = 45
         
-        raw_str = str(text)
-        chunks = [raw_str[i:i+max_chunk] for i in range(0, len(raw_str), max_chunk)]
+        words = str(text).split(' ')
+        lines = []
+        current_line = []
+        current_len = 0
         
-        if not chunks:
+        for word in words:
+            clean_word = re.sub(r'\033\[[0-9;]*m', '', word)
+            word_len = len(clean_word)
+            
+            # If a single ultra-long string (like tokenized MX keys) exceeds limit, force slice it
+            if word_len > max_chunk:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    current_line = []
+                    current_len = 0
+                
+                start = 0
+                while start < len(word):
+                    lines.append(word[start:start+max_chunk])
+                    start += max_chunk
+                continue
+
+            if current_len + word_len + (1 if current_line else 0) <= max_chunk:
+                current_line.append(word)
+                current_len += word_len + (1 if current_line else 0)
+            else:
+                lines.append(" ".join(current_line))
+                current_line = [word]
+                current_len = word_len
+                
+        if current_line:
+            lines.append(" ".join(current_line))
+            
+        if not lines:
             print(f"{prefix}{color_code}None{CLR_RST}")
             return
             
-        print(f"{prefix}{color_code}{chunks[0]}{CLR_RST}")
-        for extra in chunks[1:]:
-            blank_prefix = " " * (len(prefix) - 4) + "│  "
+        print(f"{prefix}{color_code}{lines[0]}{CLR_RST}")
+        
+        # Calculate trailing link spacing perfectly matching structural tree lines
+        is_last_item = "└─" in prefix or "  " in clean_prefix and not "├─" in prefix
+        connector = "   " if is_last_item else "│  "
+        
+        # Base indent depth matching exact prefix signature boundaries
+        match = re.match(r'^(\s*[├└]─\s*)', clean_prefix)
+        if match:
+            indent_space = " " * (prefix_len - 3)
+            blank_prefix = f"{indent_space}{connector}"
+        else:
+            match_sub = re.match(r'^(\s*│\s*[├└]─\s*)', clean_prefix)
+            if match_sub:
+                indent_space = " " * (prefix_len - 3)
+                blank_prefix = f"{indent_space}{connector}"
+            else:
+                blank_prefix = " " * prefix_len
+
+        for extra in lines[1:]:
             print(f"{blank_prefix}{color_code}{extra}{CLR_RST}")
 
     def render_report(self):
         print("\n" + "═" * self.term_width)
-        print(f" NEXUS STAGE-7 UNIVERSAL COMPLIANCE REPORT [INTELLIGENT RUN]")
+        print(f" NEXUS STAGE-7 UNIVERSAL COMPLIANCE REPORT [MONOLITH INTERFACE]")
         print("═" * self.term_width)
         print(f"\n[#] DEPLOYED VECTOR -> {self.raw_input.upper()}")
         print("─" * self.term_width)
