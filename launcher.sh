@@ -3785,15 +3785,15 @@ function run_nexus_breach_intel() {
 
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo "       NEXUS OMNISCIENT ULTRA-UNIVERSAL FORENSIC CORE "
-    echo "          [100% REAL DATA / UNIVERSAL DOMAIN PROBE v5.0] "
+    echo "          [STRICT REAL DATA / FAILSAFE EDITION v5.2] "
     echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
     echo ""
     echo "CROSS-PLATFORM LEGITIMATE CAPABILITIES:"
     echo "    • Multi-Provider Mailbox Existence Verification (Direct SMTP Probe)"
-    echo "    • Smart Microsoft 365 / Google Workspace Tenant Discovery"
+    echo "    • Failsafe HTTPS/RDAP Fallback for Whois Domain Lifespans"
+    echo "    • High-Precision M365 Auth Realm & Google Workspace Segregation"
     echo "    • Raw Core DNS Perimeter Auditing (A, NS, MX, TXT Records)"
     echo "    • Strict SPF & DMARC Enforcement Evaluation"
-    echo "    • Low-Level Socket WHOIS Registry Scraping (No Fake Approximations)"
     echo "    • Genuine Historic Breach Data & Incident Timelines"
     echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
     
@@ -3842,7 +3842,7 @@ CLR_RST = "\033[0m"
 CLR_BGRN = "\033[1;32m"
 CLR_BRED = "\033[1;31m"
 
-class NexusUniversalValidator:
+class NexusFailsafeValidator:
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
         self.target_email = None
@@ -3860,7 +3860,7 @@ class NexusUniversalValidator:
             self.target_domain = self.raw_input.lower()
 
         self.dns_security = {}
-        self.whois_data = {}
+        self.whois_data = {"created": "N/A", "expiry": "N/A", "registrar": "N/A"}
         self.mailbox_status = "N/A (Введен только домен)" if self.mode == "domain" else "Checking..."
         self.platform_detected = "Generic / Custom Infrastructure"
         self.breach_results = []
@@ -3872,55 +3872,83 @@ class NexusUniversalValidator:
         except OSError:
             self.term_width = 75
 
-    def _fetch_real_whois(self):
+    async def _fetch_failsafe_whois(self, session: aiohttp.ClientSession):
+        """Отказоустойчивое извлечение WHOIS через падение на резервный HTTPS/RDAP шлюз"""
         if not self.target_domain: return
+        
+        # Шаг 1: Попытка через стандартный низкоуровневый сокет
         try:
+            loop = asyncio.get_event_loop()
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(3.5)
-            s.connect(("whois.iana.org", 43))
-            s.send((self.target_domain + "\r\n").encode())
-            iana_text = s.recv(8192).decode('utf-8', errors='ignore')
+            s.settimeout(2.5)
+            await loop.run_in_executor(None, s.connect, ("whois.iana.org", 43))
+            await loop.run_in_executor(None, s.send, (self.target_domain + "\r\n").encode())
+            iana_bytes = await loop.run_in_executor(None, s.recv, 8192)
             s.close()
+            iana_text = iana_bytes.decode('utf-8', errors='ignore')
             
-            refer_server = "whois.iana.org"
+            refer_server = None
             for line in iana_text.splitlines():
                 if line.lower().startswith("refer:"):
                     refer_server = line.split(":", 1)[1].strip()
                     break
             
-            s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s2.settimeout(3.5)
-            s2.connect((refer_server, 43))
-            s2.send((self.target_domain + "\r\n").encode())
-            whois_text = s2.recv(8192).decode('utf-8', errors='ignore')
-            s2.close()
-            
-            created, expiry, registrar = "N/A", "N/A", "N/A"
-            for line in whois_text.splitlines():
-                l = line.strip()
-                if re.match(r'(?i)(Creation Date|Created On|created):', l):
-                    created = l.split(":", 1)[1].strip()
-                if re.match(r'(?i)(Registry Expiry Date|Expiration Date|Expires On|expiry):', l):
-                    expiry = l.split(":", 1)[1].strip()
-                if re.match(r'(?i)(Registrar:|registrar|Sponsoring Registrar):', l):
-                    registrar = l.split(":", 1)[1].strip()
-            
-            self.whois_data['created'] = created[:35] if created else "N/A"
-            self.whois_data['expiry'] = expiry[:35] if expiry else "N/A"
-            self.whois_data['registrar'] = registrar[:45] if registrar else "N/A"
+            if refer_server:
+                s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s2.settimeout(2.5)
+                await loop.run_in_executor(None, s2.connect, (refer_server, 43))
+                await loop.run_in_executor(None, s2.send, (self.target_domain + "\r\n").encode())
+                whois_bytes = await loop.run_in_executor(None, s2.recv, 8192)
+                s2.close()
+                whois_text = whois_bytes.decode('utf-8', errors='ignore')
+                
+                for line in whois_text.splitlines():
+                    l = line.strip()
+                    if re.match(r'(?i)(Creation Date|Created On|created|Registration Time):', l):
+                        self.whois_data['created'] = l.split(":", 1)[1].strip()[:25]
+                    if re.match(r'(?i)(Registry Expiry Date|Expiration Date|Expires On|expiry):', l):
+                        self.whois_data['expiry'] = l.split(":", 1)[1].strip()[:25]
+                    if re.match(r'(?i)(Registrar:|registrar|Sponsoring Registrar):', l):
+                        self.whois_data['registrar'] = l.split(":", 1)[1].strip()[:35]
+                
+                if self.whois_data['created'] != "N/A":
+                    return # Успешно вытащили сокетом
+        except Exception: pass
+
+        # Шаг 2: Резервный обходной путь через публичный HTTPS-сервис RDAP
+        rdap_url = f"https://rdap.org/domain/{self.target_domain}"
+        try:
+            async with session.get(rdap_url, timeout=4.0) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    # Парсим события домена
+                    for event in data.get("events", []):
+                        action = event.get("eventAction", "").lower()
+                        if action == "registration":
+                            self.whois_data['created'] = event.get("eventDate", "N/A")[:25]
+                        elif action == "expiration":
+                            self.whois_data['expiry'] = event.get("eventDate", "N/A")[:25]
+                    
+                    # Парсим регистратора
+                    for entity in data.get("entities", []):
+                        if "registrar" in entity.get("roles", []):
+                            vcard = entity.get("vcardArray", [None, []])[1]
+                            for prop in vcard:
+                                if prop[0] == "fn":
+                                    self.whois_data['registrar'] = prop[3][:35]
+                                    break
         except Exception:
-            self.whois_data['created'] = "Error / Restricted WHOIS"
-            self.whois_data['expiry'] = "Error / Restricted WHOIS"
+            self.whois_data['created'] = "Access Restricted / Timeout"
+            self.whois_data['expiry'] = "Access Restricted / Timeout"
             self.whois_data['registrar'] = "N/A"
 
     def _verify_mailbox_via_smtp(self, mx_host):
-        """Прямой низкоуровневый SMTP-диалог для верификации существования ящика на сервере"""
         if not self.target_email: return
         try:
             server = smtplib.SMTP(timeout=4.0)
             server.connect(mx_host, 25)
             server.helo(socket.gethostname())
-            server.mail('forensic-audit@non-existent-probe-perimeter.org')
+            server.mail('forensic-probe@perimeter-defense-core.net')
             code, message = server.rcpt(str(self.target_email))
             server.quit()
             
@@ -3930,13 +3958,13 @@ class NexusUniversalValidator:
                 self.mailbox_status = f"NOT FOUND / INVALID (Код сервера: {code} - Не существует)"
             else:
                 self.mailbox_status = f"AMBIGUOUS / PROTECTED (Сервер ответил кодом {code})"
-        except Exception as e:
+        except Exception:
             self.mailbox_status = "UNKNOWN / SMTP PROBE BLOCKED (Защита брандмауэра / Скрытый реле)"
 
     async def _detect_cloud_platform(self, session: aiohttp.ClientSession):
         if not self.target_domain: return
         
-        # 1. Проверка на Microsoft 365
+        # 1. Строгая проверка на Microsoft 365 через GetUserRealm
         realm_url = f"https://login.microsoftonline.com/getuserrealm.srf?login=probe@{self.target_domain}&xml=1"
         try:
             async with session.get(realm_url, timeout=3.5) as resp:
@@ -3946,7 +3974,6 @@ class NexusUniversalValidator:
                     if ns is not None and ns.text != "Unknown":
                         self.platform_detected = f"Microsoft 365 ({ns.text} Tenant)"
                         if self.mode == "email" and ns.text == "Managed":
-                            # Перепроверяем существование в M365 API
                             chk_url = f"https://login.microsoftonline.com/getuserrealm.srf?login={self.target_email}&xml=1"
                             async with session.get(chk_url, timeout=3) as r2:
                                 root2 = ET.fromstring(await r2.text())
@@ -3955,21 +3982,22 @@ class NexusUniversalValidator:
                         return
         except Exception: pass
 
-        # 2. Проверка на Google Workspace
-        g_url = f"https://www.google.com/a/{self.target_domain}/ServiceLogin?service=mail"
+        # 2. Изолированная точечная проверка на Google Workspace
+        g_url = f"https://www.google.com/accounts/ClientLogin"
         try:
-            async with session.get(g_url, timeout=3.5) as resp:
-                if "google.com/a/" in str(resp.url) or resp.status == 200:
+            async with session.get(f"https://www.google.com/a/{self.target_domain}/ServiceLogin", timeout=3.0, allow_redirects=False) as resp:
+                if resp.status == 302 and "google.com/a/" in resp.headers.get("Location", ""):
                     self.platform_detected = "Google Workspace (Enterprise Mail)"
+                    return
         except Exception: pass
 
     async def _audit_dns_infrastructure(self):
         if not self.target_domain: return
         resolver = dns.resolver.Resolver()
-        resolver.timeout = 2.5
-        resolver.lifetime = 2.5
+        resolver.timeout = 3.0
+        resolver.lifetime = 3.0
         
-        # IP домена
+        # IP адреса домена
         try:
             a_ans = resolver.resolve(self.target_domain, 'A')
             self.dns_security['domain_ips'] = ", ".join([str(ip) for ip in a_ans])
@@ -3978,7 +4006,7 @@ class NexusUniversalValidator:
             self.dns_security['domain_ips'] = "No A Records"
             main_ip = None
 
-        # MX записи
+        # MX серверы
         mx_hosts = []
         try:
             mx_answers = resolver.resolve(self.target_domain, 'MX')
@@ -3986,13 +4014,17 @@ class NexusUniversalValidator:
                 mx_hosts.append(str(rdata.exchange).rstrip('.'))
             self.dns_security['mx'] = ", ".join(mx_hosts)
         except Exception:
-            self.dns_security['mx'] = "No MX Records (Внешние почтовые шлюзы не опубликованы)"
+            self.dns_security['mx'] = "No MX Records Detected (Внешние шлюзы скрыты)"
 
-        # Если MX записей нет, но есть IP домена, пробуем стучаться на IP домена как на почтовик по умолчанию
         best_mx_candidate = mx_hosts[0] if mx_hosts else main_ip
         
+        # Если это Microsoft тендант и внешних MX нет — вычисляем внутренний защищенный эндпоинтoutlook
+        if ("Microsoft 365" in self.platform_detected) and (not mx_hosts):
+            mx_prefix = self.target_domain.replace(".", "-")
+            best_mx_candidate = f"{mx_prefix}.mail.protection.outlook.com"
+            self.dns_security['mx'] = f"{best_mx_candidate} [Internal Cloud Prediction]"
+
         if self.mode == "email" and best_mx_candidate and "Checking" in self.mailbox_status:
-            # Запускаем SMTP-проверку в потоке, чтобы не вешать асинхронность
             await asyncio.get_event_loop().run_in_executor(None, self._verify_mailbox_via_smtp, best_mx_candidate)
 
         # SPF
@@ -4043,43 +4075,37 @@ class NexusUniversalValidator:
         except Exception: pass
 
     async def run_pipeline(self):
-        await asyncio.get_event_loop().run_in_executor(None, self._fetch_real_whois)
         async with aiohttp.ClientSession() as session:
-            # Сначала определяем платформу
             await self._detect_cloud_platform(session)
-            # Затем разворачиваем сетевой и SMTP-анализ
             await asyncio.gather(
+                self._fetch_failsafe_whois(session),
                 self._audit_dns_infrastructure(),
                 self._check_pwned_emails(session)
             )
 
     def render_report(self):
         print("\n" + "═" * self.term_width)
-        print(f" NEXUS UNIVERSAL FORENSIC REPORT [100% REAL DATA MODE]")
+        print(f" NEXUS STAGE-5 UNIVERSAL REPORT [FAILSAFE COMPLIANCE MODE]")
         print("═" * self.term_width)
         print(f"\n[#] DEPLOYED VECTOR -> {self.raw_input.upper()}")
         print("─" * self.term_width)
         
-        # 1. Блок архитектурного анализа провайдера
         print(f"{CLR_CYN}● INFRASTRUCTURE PROVIDER INTELLIGENCE:{CLR_RST}")
         print(f"  ├─ Platform Detected: {CLR_YLW}{self.platform_detected}{CLR_RST}")
         
-        # Статус существования
         m_stat = self.mailbox_status
         m_clr = CLR_BGRN if "VERIFIED" in m_stat else (CLR_BRED if "NOT FOUND" in m_stat else CLR_YLW)
         print(f"  └─ Mailbox Existence: {m_clr}{m_stat}{CLR_RST}")
         
-        # 2. Блок реальных утекших баз
         print(f"\n{CLR_RED}● VERIFIED INCIDENT TIMELINES (ИСТИННЫЕ ДАТЫ ПУБЛИЧНЫХ УТЕЧЕК):{CLR_RST}")
         if not self.breach_results:
-            print(f"  └─ Status: {CLR_GRN}Утечек по открытым базам инцидентов для данного адреса не найдено.{CLR_RST}")
+            print(f"  └─ Status: {CLR_GRN}Утечек в открытых базах данных инцидентов для данного адреса не найдено.{CLR_RST}")
         else:
             for idx, data in enumerate(self.breach_results, 1):
                 print(f"  ├─ Incident [{idx}]: {CLR_BRED}{data['source']}{CLR_RST}")
                 print(f"  │  ├─ Дата фиксации: {CLR_YLW}{data['date']}{CLR_RST}")
                 print(f"  │  └─ Слитые классы : {CLR_MAG}{data['details']}{CLR_RST}")
 
-        # 3. Полный реальный DNS-периметр
         if self.target_domain:
             print("\n" + "─" * self.term_width)
             print(f"{CLR_MAG}● RAW NETWORK PERIMETER RECORDS (АКТУАЛЬНЫЙ DNS-ПЕРИМЕТР):{CLR_RST}")
@@ -4100,7 +4126,7 @@ class NexusUniversalValidator:
 def main():
     raw_input = os.getenv("TARGET_DATA_LIST", "")
     if not raw_input: return
-    scanner = NexusUniversalValidator(raw_input)
+    scanner = NexusFailsafeValidator(raw_input)
     asyncio.run(scanner.run_pipeline())
     scanner.render_report()
 
