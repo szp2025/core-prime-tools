@@ -3781,8 +3781,8 @@ function run_nexus_breach_intel() {
     clear
     # Dynamic terminal width detection with fallback for older units
     try_width=$(tput cols 2>/dev/null || echo 80)
-    [ "$try_width" -lt 60 ] && try_width=60
-    [ "$try_width" -gt 105 ] && try_width=95
+    [ "$try_width" -lt 30 ] && try_width=30
+    [ "$try_width" -gt 90 ] && try_width=75
 
     # Target width for perfectly solid graphical borders
     SOLID_BORDER=$(printf '═'%.0s $(seq 1 "$try_width"))
@@ -3790,8 +3790,8 @@ function run_nexus_breach_intel() {
 
     # Render Monolithic Main Header
     echo "${SOLID_BORDER}"
-    echo "       NEXUS OMNISCIENT FORENSIC COMPLIANCE CORE       "
-    echo "            [STEALTH PROFESSIONAL ENGINE v9.6]            "
+    echo "   NEXUS OMNISCIENT FORENSIC COMPLIANCE CORE       "
+    echo "   [STEALTH PROFESSIONAL ENGINE v9.6]  "
     echo "${SOLID_BORDER}"
     echo ""
     echo "PASSIVE STEALTH CAPABILITIES (NO-PROBE MATRIX):"
