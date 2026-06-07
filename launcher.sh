@@ -3888,10 +3888,10 @@ class NexusStealthProfessional:
         
         try:
             self.term_width = os.get_terminal_size().columns
-            if self.term_width < 60: self.term_width = 60
-            if self.term_width > 105: self.term_width = 95
+            if self.term_width < 60: self.term_width = 30
+            if self.term_width > 105: self.term_width = 75
         except OSError:
-            self.term_width = 60
+            self.term_width = 30
 
     async def _fetch_passive_whois(self, session: aiohttp.ClientSession):
         if not self.target_domain: return
