@@ -3888,7 +3888,7 @@ class NexusStealthProfessional:
         
         try:
             self.term_width = os.get_terminal_size().columns
-            if self.term_width < 60: self.term_width = 30
+            if self.term_width < 60: self.term_width = 50
             if self.term_width > 105: self.term_width = 75
         except OSError:
             self.term_width = 30
