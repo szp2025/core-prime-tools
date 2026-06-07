@@ -3779,20 +3779,26 @@ EOF
 
 function run_nexus_breach_intel() {
     clear
+    # Dynamic terminal width detection with fallback for older units
     try_width=$(tput cols 2>/dev/null || echo 80)
     [ "$try_width" -lt 60 ] && try_width=60
     [ "$try_width" -gt 105 ] && try_width=95
 
-    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
-    echo "       NEXUS OMNISCIENT FORENSIC COMPLIANCE CORE "
-    echo "            [STEALTH MONOLITH ENGINE v9.5] "
-    echo "$(printf '═'%.0s $(seq 1 "$try_width"))"
+    # Target width for perfectly solid graphical borders
+    SOLID_BORDER=$(printf '═'%.0s $(seq 1 "$try_width"))
+    SOLID_SEP=$(printf '─'%.0s $(seq 1 "$try_width"))
+
+    # Render Monolithic Main Header
+    echo "${SOLID_BORDER}"
+    echo "       NEXUS OMNISCIENT FORENSIC COMPLIANCE CORE       "
+    echo "            [STEALTH PROFESSIONAL ENGINE v9.6]            "
+    echo "${SOLID_BORDER}"
     echo ""
     echo "PASSIVE STEALTH CAPABILITIES (NO-PROBE MATRIX):"
     echo "  • Zero-Trace Architecture      • Passive Leak Harvester"
-    echo "  • Wiko Lenny 3 Compact Layout  • Cloud Realm Identity Map"
+    echo "  • Adaptive Word-Wrap Layout    • Cloud Realm Identity Map"
     echo "  • EntraID/Workspace MFA Matrix • Third-Party DNS Resolving"
-    echo "$(printf '─'%.0s $(seq 1 "$try_width"))"
+    echo "${SOLID_SEP}"
     
     read -r -p " ENTER TARGET (Email or Domain) > " RAW_TARGET_INPUT
     
@@ -3802,7 +3808,7 @@ function run_nexus_breach_intel() {
         return 0
     fi
 
-    NORMALIZED_INPUT=$(echo "$RAW_TARGET_INPUT" | tr ';' ',')
+    NORMALIZED_INPUT=$(RAW_TARGET_INPUT | tr ';' ',')
     IFS=',' read -ra TARGET_ARRAY <<< "$NORMALIZED_INPUT"
     
     TOTAL_TARGETS=${#TARGET_ARRAY[@]}
@@ -3827,6 +3833,7 @@ import dns.resolver
 import aiohttp
 import xml.etree.ElementTree as ET
 
+# Strict ANSI Color Palette for Forensic Context
 CLR_RED = "\033[91m"
 CLR_GRN = "\033[92m"
 CLR_YLW = "\033[93m"
@@ -3837,7 +3844,11 @@ CLR_RST = "\033[0m"
 CLR_BGRN = "\033[1;32m"
 CLR_BRED = "\033[1;31m"
 
-class NexusStealthValidator:
+class NexusStealthProfessional:
+    """
+    Professional Forensic Core v9.6 utilized for high-density, 
+    passive OSINT collection without triggering perimeter alerts.
+    """
     def __init__(self, target_input: str):
         self.raw_input = target_input.strip()
         self.target_email = None
@@ -3854,6 +3865,7 @@ class NexusStealthValidator:
             self.mode = "domain"
             self.target_domain = self.raw_input.lower()
 
+        # Perimeter schema structural maps
         self.dns_security = {
             "domain_ips": "No public A records",
             "mx": "No public MX endpoints",
@@ -3868,6 +3880,7 @@ class NexusStealthValidator:
         self.mailbox_status = "PASSIVE / UNTRACKED" if self.mode == "domain" else "PASSIVE / UNTRACKED"
         self.platform_detected = "Generic / Custom Node"
         
+        # Identity Verification Variables
         self.mfa_engine = "Standard Auth Gate"
         self.mfa_policy = "Optional / Profile Dependent"
         self.breach_results = []
@@ -3897,6 +3910,9 @@ class NexusStealthValidator:
         except Exception: pass
 
     async def _detect_cloud_identity(self, session: aiohttp.ClientSession):
+        """
+        Passive realm parsing to uncover cloud identity attachments without probes.
+        """
         if not self.target_domain: return
         is_public = self.target_domain in ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "icloud.com", "free.fr"]
         
@@ -3929,6 +3945,9 @@ class NexusStealthValidator:
         except Exception: pass
 
     def _apply_mx_heuristic_overrides(self):
+        """
+        MX string pattern mining to resolve complex infrastructure platforms.
+        """
         mx_str = self.dns_security.get("mx", "").lower()
         if not mx_str or "no public" in mx_str: return
 
@@ -3982,7 +4001,7 @@ class NexusStealthValidator:
 
         self._apply_mx_heuristic_overrides()
 
-        # Пассивный маппинг общедоступных хостов без прямой отправки пакетов
+        # Passive mappings of discovered hosts
         subs = []
         for pfx in ['mail', 'webmail', 'smtp', 'autodiscover', 'vpn', 'cloud']:
             try:
@@ -3991,13 +4010,14 @@ class NexusStealthValidator:
             except Exception: pass
         if subs: self.dns_security['subdomains_found'] = " | ".join(subs)
 
+        # Parsing TXT, SPF, DMARC
         try:
             ans = r.resolve(self.target_domain, 'TXT')
             for rd in ans:
                 t = rd.to_text()
                 if "v=spf1" in t:
                     self.dns_security['spf'] = t.strip('"')
-                    self.dns_security['spf_status'] = "HardFail (-all)" if "-all" in t else ("SoftFail (~all)" if "~all" in t else "Custom")
+                    self.dns_security['spf_status'] = "HardFail (-all) - Protected" if "-all" in t else ("SoftFail (~all) - Weak" if "~all" in t else "Custom Configuration")
                     break
         except Exception: pass
 
@@ -4007,7 +4027,7 @@ class NexusStealthValidator:
                 t = rd.to_text()
                 if "v=DMARC1" in t:
                     self.dns_security['dmarc'] = t.strip('"')
-                    self.dns_security['dmarc_status'] = "Reject" if "p=reject" in t else ("Quarantine" if "p=quarantine" in t else "Monitor")
+                    self.dns_security['dmarc_status'] = "Reject (Protected)" if "p=reject" in t else ("Quarantine (Protected)" if "p=quarantine" in t else "Monitor (Weak Policy)")
                     break
         except Exception: pass
 
@@ -4021,7 +4041,7 @@ class NexusStealthValidator:
                         for b in data["breaches"]:
                             self.breach_results.append({
                                 "target": query_term,
-                                "src": b.get("name", "Leak"),
+                                "src": b.get("name", "Leak Source"),
                                 "date": b.get("date", "N/A"),
                                 "class": ", ".join(b.get('data_classes', []))[:35]
                             })
@@ -4035,11 +4055,10 @@ class NexusStealthValidator:
                 self._fetch_passive_whois(session)
             )
             
-            # Пассивная разведка утечек
+            # Passive leak intelligence gathering
             if self.mode == "email":
                 await self._query_leak_repository(session, self.target_email)
             else:
-                # В режиме домена ищем утечки по самому корню домена (захватывает системные привязки)
                 await self._query_leak_repository(session, self.target_domain)
 
     def _compact_print(self, prefix: str, text: str, color_code: str = "", token: str = None):
@@ -4082,27 +4101,32 @@ class NexusStealthValidator:
             print(f"{indent}{color_code}{extra}{CLR_RST}")
 
     def render_report(self):
+        # Calculate Monolithic Final Header
+        final_h = " NEXUS v9.6 STEALTH PRO COMPLIANCE REPORT "
         print("\n" + "═" * self.term_width)
-        print(f" NEXUS v9.5 STEALTH OSINT COMPLIANCE REPORT")
+        print(final_h)
         print("═" * self.term_width)
         print(f"[#] TARGET: {self.raw_input.upper()}")
         print("─" * self.term_width)
         
-        print(f"{CLR_CYN}● IDENTITY SECURITY & MFA MATRIX (STEALTH):{CLR_RST}")
-        self._compact_print("  ├─ Platform: ", self.platform_detected, CLY_YLW if "Generic" in self.platform_detected else CLR_YLW)
+        # Identity and MFA Matrix
+        print(f"{CLR_CYN}● IDENTITY SECURITY & MFA MATRIX (PASSIVE):{CLR_RST}")
+        self._compact_print("  ├─ Platform: ", self.platform_detected, CLR_YLW if "Generic" in self.platform_detected else CLR_YLW)
         self._compact_print("  ├─ Gateway : ", self.mfa_engine, CLR_YLW)
         p_clr = CLR_BGRN if any(x in self.mfa_policy for x in ["ENFORCED", "STRICT", "MANDATORY"]) else CLR_YLW
         self._compact_print("  ├─ MFA Rule: ", self.mfa_policy, p_clr)
         self._compact_print("  └─ Status  : ", self.mailbox_status, CLR_GRN)
         
-        print(f"\n{CLR_RED}● INCIDENT REPOSITORY MATCHES (PASSIVE LEAKS):{CLR_RST}")
+        # Public Incidents
+        print(f"\n{CLR_RED}● INCIDENT REPOSITORY MATCHES (HISTORIC LEAKS):{CLR_RST}")
         if not self.breach_results:
-            print(f"  └─ Logs: {CLR_GRN}No data leaks detected via index matching.{CLR_RST}")
+            print(f"  └─ Logs: {CLR_GRN}No data leaks discovered inside public indexes.{CLR_RST}")
         else:
             for idx, data in enumerate(self.breach_results, 1):
                 print(f"  ├─ Breach [{idx}]: {CLR_BRED}{data['target']}{CLR_RST} -> {data['src']}")
                 self._compact_print("  │  └─ Exposed: ", f"({data['date']}) {data['class']}", CLR_MAG)
 
+        # Passive Network Structural Records
         if self.target_domain:
             print("\n" + "─" * self.term_width)
             print(f"{CLR_MAG}● PASSIVE NETWORK PERIMETER RECORDS:{CLR_RST}")
@@ -4119,14 +4143,14 @@ class NexusStealthValidator:
             self._compact_print("  ├─ DMARC Rec : ", self.dns_security.get('dmarc'), CLR_BLU, token=";")
             
             d_stat = self.dns_security.get('dmarc_status', '')
-            d_clr = CLR_BRED if "VULNERABLE" in d_stat else CLR_BGRN
+            d_clr = CLR_BRED if "VULNERABLE" in d_stat or "Weak" in d_stat else CLR_BGRN
             print(f"  └─ DMARC Rule: {d_clr}{d_stat}{CLR_RST}")
             print("═" * self.term_width + "\n")
 
 def main():
     raw_input = os.getenv("TARGET_DATA_LIST", "")
     if not raw_input: return
-    scanner = NexusStealthValidator(raw_input)
+    scanner = NexusStealthProfessional(raw_input)
     asyncio.run(scanner.run_pipeline())
     scanner.render_report()
 
@@ -4139,10 +4163,6 @@ EOF
     echo ""
     read -n 1 -s -r -p "Press any key to return to main menu..."
 }
-
-
-
-
 
 
 
