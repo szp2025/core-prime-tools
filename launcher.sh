@@ -8606,39 +8606,46 @@ pc_password_management() {
 run_ghost_commander() {
     clear
     
-    # --- Высокотехнологичная цветовая палитра ---
-    local R='\033;31m'        # Красный
-    local G='\033;32m'        # Зеленый
-    local Y='\033;33m'        # Желтый
-    local B='\033;34m'        # Синий
-    local M='\033;35m'        # Пурпурный
-    local C='\033;36m'        # Циановый
-    local W='\033;37m'        # Белый
-    local DG='\033[1;30m'     # Серый
-    local BR='\033[1;31m'     # Жирный красный
-    local BG='\033[1;32m'     # Жирный зеленый
-    local BY='\033[1;33m'     # Жирный желтый
-    local BC='\033[1;36m'     # Жирный циановый
-    local BW='\033[1;37m'     # Жирный белый
-    local NC='\033[0m'        # Сброс стилей
+    # ==============================================================================
+    # БЛОК 0: ВЫСОКОТЕХНОЛОГИЧНАЯ ЦВЕТОВАЯ ПАЛИТРА И СТРУКТУРНЫЕ МАРКЕРЫ
+    # ==============================================================================
+    local R='\033;31m'        # Красный (Ошибки / Сбои)
+    local G='\033;32m'        # Зеленый (Успешные статусы)
+    local Y='\033;33m'        # Желтый (Предупреждения / Внимание)
+    local B='\033;34m'        # Синий (Информационные сообщения)
+    local M='\033;35m'        # Пурпурный (Пути к файлам, логи, MAC-адреса)
+    local C='\033;36m'        # Циановый (Разделители и метаданные)
+    local W='\033;37m'        # Белый (Стандартный текст)
+    local DG='\033[1;30m'     # Серый (Служебная графика, ветви дерева)
+    
+    local BR='\033[1;31m'     # Жирный красный (Критический статус / Системный Root)
+    local BG='\033[1;32m'     # Жирный зеленый (Успешная верификация)
+    local BY='\033[1;33m'     # Жирный желтый (Интерактивные сессии)
+    local BC='\033[1;36m'     # Жирный циановый (Заголовки и индикаторы)
+    local BW='\033[1;37m'     # Жирный белый (Акценты на адресах и моделях)
+    local NC='\033[0m'        # Сброс стилей терминала
 
-    core_engine_ui "h" "GHOST COMMANDER: MULTI-MATRIX GATEWAY v4.0"
+    core_engine_ui "h" "GHOST COMMANDER: MULTI-MATRIX GATEWAY v4.1 [PRODUCTION]"
 
-    # 1. Валидация ADB через системный мост
+    # ==============================================================================
+    # БЛОК 1: СИСТЕМНАЯ ВАЛИДАЦИЯ ЗАВИСИМОСТЕЙ
+    # ==============================================================================
     core_engine_validator "pkg" "adb" "ADB Engine" || return
 
-    # 2. Интерактивный интеллектуальный ввод цели
+    # ==============================================================================
+    # БЛОК 2: ИНТЕЛЛЕКТУАЛЬНЫЙ СБОР ВХОДНЫХ ДАННЫХ
+    # ==============================================================================
     local target_input
-    target_input=$(core_engine_input "text" "Enter Target (IP / MAC / Domain / Serial / Alias или Пусто для сканирования)")
+    target_input=$(core_engine_input "text" "Enter Target (IP / MAC / Domain / USB-Serial или Оставьте Пустым для автоматического сканирования)")
     
-    # Очистка входной строки от лишних пробелов
+    # Атомарное удаление концевых и начальных пробелов из входного потока
     target_input=$(echo "$target_input" | xargs)
 
     local t_ip=""
     local t_serial=""
-    local mode="network" # Режимы выполнения: network / local_serial
+    local mode="network" # Дефолтный триггер режима выполнения: network / local_serial
 
-    # Анимация ожидания (Spinner)
+    # Фоновая анимация состояния (Асинхронный Spinner)
     show_spinner() {
         local pid=$1
         local message=$2
@@ -8649,34 +8656,27 @@ run_ghost_commander() {
                 sleep 0.1
             done
         done
+        # Полная очистка строки вывода после остановки процесса
         echo -ne "                                                              \r"
     }
 
     # ==============================================================================
     # БЛОК 3: ИНТЕЛЛЕКТУАЛЬНЫЙ СИНТАКСИЧЕСКИЙ АНАЛИЗАТОР ЦЕЛИ (PARSING MATRIX)
     # ==============================================================================
-    
-    # Шаблоны регулярных выражений для валидации данных
     local ip_regex="^[0-9]{1,3}(\.[0-9]{1,3}){3}$"
     local mac_regex="^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$"
     local domain_regex="^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 
     if [[ -n "$target_input" ]]; then
-        # ПРОВЕРКА 1: Проверка на локальный Alias/Тег
-        # Позволяет быстро подключаться к частым устройствам по кодовому слову
-        case "$target_input" in
-            "phone_mom")      target_input="192.168.1.150" ;;
-            "test_tablet")    target_input="192.168.1.165" ;;
-            "tv_box")         target_input="00:1A:3F:A4:B5:C6" ;;
-        esac
 
-        # ПРОВЕРКА 2: Физический MAC-адрес
+        # КАТЕГОРИЯ 1: Физический MAC-адрес (Канальный уровень OSI)
         if [[ "$target_input" =~ $mac_regex ]]; then
-            core_engine_ui "i" "Target identified as MAC Address. Resolving via ARP Cache..."
+            core_engine_ui "i" "Target identified as MAC Address. Resolving via ARP/Neighbor infrastructure..."
             local target_mac=$(echo "$target_input" | tr '[:upper:]' '[:lower:]' | tr '-' ':')
             
-            # Агрессивный фоновый прогрев ARP-таблиц ядра
-            local subnet=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
+            # Агрессивный параллельный прогрев кэша таблиц ядра (ARP-таблицы)
+            local subnet
+            subnet=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
             if [[ -n "$subnet" ]]; then
                 (
                     for i in {1..254}; do 
@@ -8684,66 +8684,71 @@ run_ghost_commander() {
                         if (( i % 80 == 0 )); then wait; fi
                     done; wait
                 ) &
-                show_spinner $! "Синхронизация локальных MAC/IP таблиц окружения"
+                show_spinner $! "Синхронизация и актуализация локальных MAC/IP таблиц окружения"
             fi
 
-            # Чтение физического адреса
+            # Чтение и сопоставление физического адреса в системных базах хоста
             t_ip=$(arp -an | grep -i "$target_mac" | grep -oP '\(\K[0-9.]+(?=\))' | head -n 1)
             [[ -z "$t_ip" ]] && t_ip=$(ip neigh show | grep -i "$target_mac" | awk '{print $1}' | head -n 1)
 
             if [[ -z "$t_ip" ]]; then
-                core_engine_ui "e" "MAC Resolution Error: Хост с MAC $target_mac не найден в сети."
-                core_engine_wait; return 1
+                core_engine_ui "e" "MAC Resolution Error: Хост с физическим адресом $target_mac не обнаружен в локальном сегменте."
+                core_engine_wait
+                return 1
             fi
-            core_engine_ui "s" "MAC successfully resolved to: ${BG}$t_ip${NC}"
+            core_engine_ui "s" "MAC адрес успешно транслирован в сетевой IP: ${BG}$t_ip${NC}"
 
-        # ПРОВЕРКА 3: Обычный IP-адрес
+        # КАТЕГОРИЯ 2: Сетевой IP-адрес (Сетевой уровень OSI)
         elif [[ "$target_input" =~ $ip_regex ]]; then
             t_ip="$target_input"
             core_engine_ui "i" "Target identified as Direct IP Address: ${BW}$t_ip${NC}"
 
-        # ПРОВЕРКА 4: Серийный номер из пула подключенных по USB (или эмуляторов)
+        # КАТЕГОРИЯ 3: Уникальный серийный номер аппаратной шины USB / Локальный Эмулятор
         elif adb devices 2>/dev/null | grep -v "List" | grep -q "^$target_input\s"; then
             t_serial="$target_input"
             mode="local_serial"
-            core_engine_ui "i" "Target identified as Direct USB Serial / Emulator identifier."
+            core_engine_ui "i" "Target identified as Direct USB Hardware Serial / Local Emulator socket."
 
-        # ПРОВЕРКА 5: Доменное имя (DNS Resolution)
+        # КАТЕГОРИЯ 4: Буквенное доменное имя (DNS Инфраструктура)
         elif [[ "$target_input" =~ $domain_regex ]]; then
-            core_engine_ui "i" "Target identified as Domain Name. Querying DNS infrastructure..."
+            core_engine_ui "i" "Target identified as Domain Name. Interrogating DNS infrastructure..."
             
-            # Разрешение через getent или dig
+            # Разрешение сетевого имени через системный getent или утилиту dig
             t_ip=$(getent hosts "$target_input" | awk '{print $1}' | head -n 1)
             [[ -z "$t_ip" && -x $(which dig) ]] && t_ip=$(dig +short "$target_input" | tail -n1)
 
             if [[ -z "$t_ip" || ! "$t_ip" =~ $ip_regex ]]; then
-                core_engine_ui "e" "DNS Resolution Error: Не удалось разрешить домен $target_input"
-                core_engine_wait; return 1
+                core_engine_ui "e" "DNS Resolution Error: Не удалось преобразовать доменное имя $target_input в валидный IP-адрес."
+                core_engine_wait
+                return 1
             fi
-            core_engine_ui "s" "Domain resolved to active IP: ${BG}$t_ip${NC}"
+            core_engine_ui "s" "Доменное имя успешно разрешено в рабочий IP: ${BG}$t_ip${NC}"
         
-        # СБОЙ АНАЛИЗА
+        # КАТЕГОРИЯ ИСКЛЮЧЕНИЙ: Синтаксическая ошибка ввода
         else
-            core_engine_ui "e" "Syntax error: Неизвестный формат цели (Ожидался IP, MAC, Domain или Serial)."
-            core_engine_wait; return 1
+            core_engine_ui "e" "Syntax error: Неизвестный формат целевой структуры (Ожидался IP, MAC, Domain или Serial)."
+            core_engine_wait
+            return 1
         fi
     fi
 
     # ==============================================================================
-    # БЛОК 4: СКАНИРОВАНИЕ ПОДСЕТИ ПРИ ПУСТОМ ВВОДЕ
+    # БЛОК 4: АВТОМАТИЧЕСКОЕ СКАНИРОВАНИЕ ПОДСЕТИ (ПРИ ПУСТОМ ВВОДЕ СТРОКИ)
     # ==============================================================================
     if [[ -z "$target_input" ]]; then 
-        core_engine_ui "i" "No target provided. Activating Stealth-Scan Mode..."
-        local subnet=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
+        core_engine_ui "i" "No target string provided. Activating Adaptive Stealth-Scan Mode..."
+        local subnet
+        subnet=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
         
         if [[ -z "$subnet" ]]; then
-            core_engine_ui "e" "Unable to determine local subnet. Check your interfaces."
+            core_engine_ui "e" "Network Error: Не удалось определить маску и адрес локальной подсети. Проверьте интерфейсы."
             return 1
         fi
 
         local tmp_scan="/tmp/adb_scan_$$"
         touch "$tmp_scan"
 
+        # Многопоточный контролируемый скан открытого сетевого пула портов 5555
         (
             for i in {1..254}; do 
                 local check_ip="$subnet.$i"
@@ -8751,35 +8756,36 @@ run_ghost_commander() {
                 if (( i % 60 == 0 )); then wait; fi
             done; wait
         ) &
-        show_spinner $! "Глубокое сканирование портов ADB в подсети"
+        show_spinner $! "Глубокое асинхронное сканирование активных портов ADB в подсети"
 
-        echo -e "\n${BG}📊 КАРТА АКТИВНЫХ УСТРОЙСТВ ADB В СЕГМЕНТЕ:${NC}"
+        echo -e "\n${BG}📊 СТРУКТУРНАЯ КАРТА АКТИВНЫХ ОТПЕЧАТКОВ ADB В ЛОКАЛЬНОМ СЕГМЕНТЕ:${NC}"
         echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
         if [ -s "$tmp_scan" ]; then
             while read -r found_host; do
-                local found_mac=$(ip neigh show to "$found_host" | awk '{print $5}')
+                # Извлечение сопутствующих MAC-адресов для обнаруженных хостов из кэша
+                local found_mac
+                found_mac=$(ip neigh show to "$found_host" | awk '{print $5}')
                 [[ -z "$found_mac" ]] && found_mac=$(arp -n "$found_host" | grep "$found_host" | awk '{print $3}')
                 [[ -z "$found_mac" || "$found_mac" == "и" ]] && found_mac="Вне локального кэша"
                 
                 printf "  ${DG}├──${NC} ${W}%-16s${NC} [MAC: ${M}%-17s${NC}] → ${BG}[ОТКРЫТ ПОРТ 5555]${NC}\n" "$found_host" "$found_mac"
             done < "$tmp_scan"
-            echo -e "  ${DG}└── [АНАЛИЗ ЗАВЕРШЕНО]${NC}\n"
+            echo -e "  ${DG}└── [АНАЛИЗ СЕТЕВОЙ МАТРИЦЫ ЗАВЕРШЕН]${NC}\n"
         else
-            echo -e "  ${DG}└── [🎯] Активных отпечатков ADB в текущей подсети не найдено.${NC}\n"
+            echo -e "  ${DG}└── [🎯] Активных открытых интерфейсов ADB в текущей подсети не обнаружено.${NC}\n"
         fi
         rm -f "$tmp_scan"
-        core_engine_wait; return 0
+        core_engine_wait
+        return 0
     fi
 
     # ==============================================================================
-    # БЛОК 5: ИНИЦИАЛИЗАЦИЯ И ПОДКЛЮЧЕНИЕ СЕТЕВОГО ИЛИ USB ХОСТА
+    # БЛОК 5: АТОМАРНАЯ ИНИЦИАЛИЗАЦИЯ И ПОДКЛЮЧЕНИЕ СЕТЕВОГО ИЛИ USB ХОСТА
     # ==============================================================================
-    
-    # Селектор идентификатора вызова adb команд
     local target_id=""
 
     if [[ "$mode" == "network" ]]; then
-        core_engine_ui "i" "Resetting ADB socket pool and linking to remote daemon..."
+        core_engine_ui "i" "Resetting ADB socket pool and linking to remote network daemon..."
         { adb kill-server; adb start-server; } >/dev/null 2>&1
         
         local connect_output
@@ -8790,14 +8796,15 @@ run_ghost_commander() {
         fi
         target_id="$t_ip:5555"
     else
-        # Режим прямой отладки (USB/Эмулятор)
+        # Прямое сопряжение через локальную физическую шину USB / Эмулятор
         target_id="$t_serial"
-        core_engine_ui "i" "Engaging local target connection directly via hardware bridge..."
+        core_engine_ui "i" "Engaging hardware target connection directly via physical USB bridge..."
     fi
 
-    core_engine_ui "+" "Ghost-Protocol fully engaged. Target ID: $target_id"
+    core_engine_ui "+" "Ghost-Protocol fully engaged. Active Target Identifier: $target_id"
     core_engine_loot "ghost" "Session initiated. Target Reference: $target_id"
 
+    # Создание директории трофеев и генерация уникального имени лог-файла хоста
     local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
     mkdir -p "$loot_dir" 2>/dev/null
     local host_log="$loot_dir/ghost_session_${target_id//./_}_$(date +%s).log"
@@ -8805,23 +8812,27 @@ run_ghost_commander() {
     # ==============================================================================
     # БЛОК 6: КОГНИТИВНЫЙ РАЗВЕДЫВАТЕЛЬНЫЙ ЭКСПРЕСС-АНАЛИЗ (COGNITIVE RECON)
     # ==============================================================================
-    core_engine_ui "i" "Extracting low-level machine metrics..."
+    core_engine_ui "i" "Extracting low-level machine metrics and software signatures..."
     
-    local d_model=$(adb -s "$target_id" shell getprop ro.product.model 2>/dev/null | tr -d '\r\n')
-    local d_os=$(adb -s "$target_id" shell getprop ro.build.version.release 2>/dev/null | tr -d '\r\n')
-    local d_su=$(adb -s "$target_id" shell which su 2>/dev/null | tr -d '\r\n')
-    local d_sec=$(adb -s "$target_id" shell getprop ro.build.version.security_patch 2>/dev/null | tr -d '\r\n')
+    local d_model
+    d_model=$(adb -s "$target_id" shell getprop ro.product.model 2>/dev/null | tr -d '\r\n')
+    local d_os
+    d_os=$(adb -s "$target_id" shell getprop ro.build.version.release 2>/dev/null | tr -d '\r\n')
+    local d_su
+    d_su=$(adb -s "$target_id" shell which su 2>/dev/null | tr -d '\r\n')
+    local d_sec
+    d_sec=$(adb -s "$target_id" shell getprop ro.build.version.security_patch 2>/dev/null | tr -d '\r\n')
 
     echo -e "\n${BC}🧬 СТРУКТУРНЫЙ ЦИФРОВОЙ ПРОФИЛЬ ЦЕЛИ:${NC}"
     echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
     printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${BW}%s${NC}\n" "Аппаратная модель" "${d_model:-Неизвестно}"
     printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${CY}Android %s${NC}\n" "Операционная система" "${d_os:-Неизвестно}"
-    printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${M}%s${NC}\n" "Патч безопасности" "${d_sec:-Отсутствует}"
+    printf "  ${DG}├──${NC} ${W}%-25s${NC} : ${M}%s${NC}\n" "Патч безопасности SPL" "${d_sec:-Отсутствует}"
     
     if [[ -n "$d_su" ]]; then
-        printf "  ${DG}└──${NC} ${W}%-25s${NC} : ${BR}[ROOT-СТАТУС АКТИВЕН]${NC}\n" "Уровень привилегий"
+        printf "  ${DG}└──${NC} ${W}%-25s${NC} : ${BR}[ROOT-СТАТУС АКТИВЕН] (Административные привилегии ядра)${NC}\n" "Уровень доступа"
     else
-        printf "  ${DG}└──${NC} ${W}%-25s${NC} : ${G}[USER-MODE SANDBOX]${NC}\n" "Уровень привилегий"
+        printf "  ${DG}└──${NC} ${W}%-25s${NC} : ${G}[USER-MODE SANDBOX] (Стандартная песочница среды)${NC}\n" "Уровень доступа"
     fi
     echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}\n"
 
@@ -8829,19 +8840,21 @@ run_ghost_commander() {
     # БЛОК 7: ВХОД В ТЕНЕВУЮ ИНТЕРАКТИВНУЮ ОБОЛОЧКУ (SHADOW-SHELL EXECUTION)
     # ==============================================================================
     echo -e "${BY}[АКТИВАЦИЯ ИНТЕРАКТИВНОГО ШЛЮЗА SHADOW-SHELL]${NC}"
-    echo -e "${DG}Аудит-копия пишется локально на хосте: $host_log${NC}"
+    echo -e "${DG}Ввод и вывод полностью дублируются в локальный файл аудита: $host_log${NC}"
     echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
     
-    # -t : Выделение PTY обеспечивает полную интерактивность и отрисовку приглашения командной строки
+    # Флаг -t принудительно выделяет псевдотерминал PTY на удаленной стороне,
+    # обеспечивая обработку управляющих символов (Ctrl+C) и отрисовку приглашения командной строки.
+    # tee дублирует интерактивный терминальный сеанс на хост в режиме реального времени без задержек.
     adb -s "$target_id" shell -t "export PS1='[GHOST-SESSION] # '; exec /system/bin/sh" 2>&1 | tee "$host_log"
     
     echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
-    echo -e "${BY}[СЕССИЯ SHADOW-SHELL ЗАКРЫТА ПОЛЬЗОВАТЕЛЕМ]${NC}\n"
+    echo -e "${BY}[СЕССИЯ SHADOW-SHELL УСПЕШНО ЗАКРЫТА ПОЛЬЗОВАТЕЛЕМ]${NC}\n"
 
     # ==============================================================================
-    # БЛОК 8: СТЕЛС-ФИНАЛИЗАЦИЯ И СБРОС ИНФРАСТРУКТУРЫ
+    # БЛОК 8: СТЕЛС-ФИНАЛИЗАЦИЯ И СБРОС ИНФРАСТРУКТУРЫ СЕТЕВЫХ СОКЕТОВ
     # ==============================================================================
-    core_engine_ui "i" "Clearing master sockets and wiping transient endpoints..."
+    core_engine_ui "i" "Clearing master sockets and wiping transient network endpoints..."
     if [[ "$mode" == "network" ]]; then
         adb disconnect "$target_id" >/dev/null 2>&1
     fi
