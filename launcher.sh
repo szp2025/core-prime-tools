@@ -3205,7 +3205,9 @@ get_tool_info() {
 
 # ==============================================================================
 # MODULE NEXUS CORE: UNIVERSAL FORENSIC DISPATCHER + DEEP AUTO-REGISTRY v4.5
-# ==============================================================================function run_nexus_forensic() {
+# ==============================================================================
+
+function run_nexus_forensic() {
     clear
     echo "===================================================="
     echo "  NEXUS GLOBAL FORENSIC // CORE v5.1 [DYNAMIC ENGINE]"
