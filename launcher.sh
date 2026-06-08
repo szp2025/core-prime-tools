@@ -3207,7 +3207,372 @@ get_tool_info() {
 # MODULE NEXUS CORE: UNIVERSAL FORENSIC DISPATCHER + DEEP AUTO-REGISTRY v4.5
 # ==============================================================================
 
+
 function run_nexus_forensic() {
+    clear
+    echo "===================================================="
+    echo "  NEXUS GLOBAL FORENSIC // CORE v5.1 [DYNAMIC ENGINE]"
+    echo "===================================================="
+    echo " ACCEPTED INPUT SIGNATURES & VALIDATION CORE:"
+    echo " • [Vehicles]    FR SIV / RU CIS Plates"
+    echo " • [Business]    SIRET, SIREN, LEI, Corporate Name"
+    echo " • [Geoloc]      Physical Addresses / BAN Vectors"
+    echo " • [Finance]     IBAN ISO MOD-97 Compliance"
+    echo " • [Telecom]     Phone E.164 / Email / Nicknames"
+    echo "────────────────────────────────────────────────────"
+    read -r -p " [INPUT] TARGET SIGNATURE > " TARGET_DATA
+    
+    if [ -z "${TARGET_DATA}" ]; then
+        echo -e "\n [!] Sequence empty. Terminating..."
+        sleep 1
+        return 0
+    fi
+
+    echo -e "\n [+] Deploying dynamic signature matrix..."
+  
+    local UA_JOINED=""
+    if [ -n "${GLOBAL_NETWORK_UA[*]}" ]; then
+        for ua in "${GLOBAL_NETWORK_UA[@]}"; do
+            if [ -z "${UA_JOINED}" ]; then
+                UA_JOINED="${ua}"
+            else
+                UA_JOINED="${UA_JOINED}|||${ua}"
+            fi
+        done
+    fi
+
+    if [ -d ".venv" ]; then
+        source .venv/bin/activate
+    fi
+
+    export TARGET_DATA="${TARGET_DATA}"
+    export NEXUS_EXT_UA="${UA_JOINED}"
+    
+    python3 << 'EOF'
+import os
+import sys
+import asyncio
+import aiohttp
+import re
+import random
+import socket
+import urllib.parse
+import json
+import textwrap
+
+HAS_BROTLI = False
+try:
+    import brotli
+    HAS_BROTLI = True
+except ImportError:
+    try:
+        import brotlicffi as brotli
+        HAS_BROTLI = True
+    except ImportError:
+        pass
+
+try:
+    import phonenumbers
+    from phonenumbers import geocoder, carrier, timezone
+except ImportError:
+    print("\n [!] 'phonenumbers' missing. Environment unstable.")
+    sys.exit(1)
+
+ext_ua_raw = os.getenv("NEXUS_EXT_UA", "")
+if ext_ua_raw:
+    GLOBAL_NETWORK_UA = ext_ua_raw.split("|||")
+else:
+    GLOBAL_NETWORK_UA = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ]
+
+def get_rotated_headers():
+    encoding = "gzip, deflate, br" if HAS_BROTLI else "gzip, deflate"
+    return {
+        "User-Agent": random.choice(GLOBAL_NETWORK_UA),
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Encoding": encoding,
+        "Cache-Control": "no-cache"
+    }
+
+def verify_iban_checksum(iban: str) -> bool:
+    if len(iban) < 4: return False
+    rearranged = iban[4:] + iban[:4]
+    integer_string = "".join(str(ord(char) - 55) if char.isalpha() else char for char in rearranged)
+    try: return int(integer_string) % 97 == 1
+    except ValueError: return False
+
+def calculate_french_vat(siren: str) -> str:
+    try:
+        siren_int = int(siren.replace(" ", ""))
+        vat_key = (12 + 3 * (siren_int % 97)) % 97
+        return f"FR{vat_key:02d}{siren_int}"
+    except: return "N/A"
+
+class NexusForensicDispatcher:
+    def __init__(self):
+        self.report = []
+        # Ширина левой колонки для ключей (включая маркер)
+        self.key_width = 22 
+        # Допустимая общая ширина контента для узких экранов мобильных устройств
+        self.max_width = 54
+
+    def section(self, name):
+        return f"\n─── [ {name} ] ──────────────────────────────────────"
+
+    def row(self, key, val, sym="•"):
+        val_str = str(val).strip()
+        prefix = f" [{sym}] {key:<14} : "
+        indent = " " * len(prefix)
+        
+        # Доступная ширина для самого значения на одну строку
+        available_width = max(20, self.max_width - len(prefix))
+        
+        # Умный динамический перенос без обрезания данных
+        wrapped_lines = textwrap.wrap(val_str, width=available_width)
+        
+        if not wrapped_lines:
+            return f"{prefix}N/A"
+            
+        res = f"{prefix}{wrapped_lines[0]}"
+        for line in wrapped_lines[1:]:
+            res += f"\n{indent}{line}"
+        return res
+
+    def link(self, key, url):
+        return self.row(key, url, sym="↗")
+
+    async def process_license_plate(self, session, clean_data, country_hint):
+        self.report.append(self.section("VEHICLE CORE"))
+        self.report.append(self.row("SIGNATURE", clean_data))
+        self.report.append(self.row("COUNTRY", country_hint))
+        
+        if country_hint == "FRANCE (SIV / F-Plate)":
+            formatted = f"{clean_data[:2]}-{clean_data[2:5]}-{clean_data[5:]}" if len(clean_data) == 7 else clean_data
+            url = f"https://www.oscaro.com/catalog/vehicles/v2/plates/{formatted}"
+            try:
+                async with session.get(url, headers=get_rotated_headers(), timeout=12) as resp:
+                    if resp.status == 200:
+                        if 'br' in resp.headers.get('Content-Encoding', '').lower() and HAS_BROTLI:
+                            res_json = json.loads(brotli.decompress(await resp.read()).decode('utf-8'))
+                        else:
+                            res_json = await resp.json()
+
+                        v = res_json.get('vehicle', {}) or res_json.get('data', {}) if res_json else {}
+                        if v:
+                            self.report.extend([
+                                self.row("BRAND", str(v.get('brand', v.get('make', 'N/A'))).upper(), "+"),
+                                self.row("MODEL", str(v.get('model', 'N/A')).upper(), "+"),
+                                self.row("BODY", str(v.get('body_type', 'N/A')).upper(), "+"),
+                                self.row("FUEL", str(v.get('engine', v.get('energy', 'N/A'))).upper(), "+"),
+                                self.row("POWER", f"{v.get('power','N/A')} HP / {v.get('kw','N/A')} KW", "+"),
+                                self.row("GEARBOX", str(v.get('gearbox', 'N/A')).upper(), "+"),
+                                self.row("CRIT_AIR", v.get('critair', 'N/A'), "+"),
+                                self.row("YEAR", v.get('year', 'N/A'), "+")
+                            ])
+                        else: self.report.append(self.row("DATABASE STATUS", "EMPTY OBJECT", "!"))
+                    else: self.report.append(self.row("RESTRICTION", f"HTTP {resp.status}", "!"))
+            except Exception as e: self.report.append(self.row("DECODE ERROR", str(e), "!"))
+            self.report.extend([self.link("Oscaro Profile", f"https://www.oscaro.com"), self.link("SevenPlates Core", f"https://www.sevenplates.com")])
+        elif country_hint == "RUSSIA / CIS (RU-Plate)":
+            self.report.append(self.link("EAISTO Google", f"https://www.google.com/search?q=%22{clean_data}%22"))
+            self.report.append(self.link("RSA Insurance", "https://dkbm-web.autoins.ru/dkbm-web-1.0/bso.htm"))
+
+    async def process_sirene(self, session, raw_data):
+        self.report.append(self.section("REPERTOIRE SIRENE"))
+        url = f"https://recherche-entreprises.api.gouv.fr/search?q={urllib.parse.quote(raw_data)}&per_page=2"
+        try:
+            async with session.get(url, headers=get_rotated_headers(), timeout=10) as resp:
+                if resp.status == 200:
+                    results = (await resp.json()).get('results', [])
+                    if not results:
+                        self.report.append(self.row("REGISTRY RECORD", "0 MATCHES FOUND", "!"))
+                        return
+                    
+                    for idx, company in enumerate(results[:2], 1):
+                        siren = company.get('siren', '')
+                        siege = company.get('siege', {})
+                        if idx > 1: self.report.append("  ──────────────────────────────────────────────────")
+                        self.report.extend([
+                            self.row(f"MATCH #{idx}", company.get('nom_complet', 'N/A'), "#"),
+                            self.row("SIREN", siren, "+"),
+                            self.row("SIRET HQ", siege.get('siret', 'N/A'), "+"),
+                            self.row("FR VAT KEY", calculate_french_vat(siren), "+"),
+                            self.row("NAF/APE CODE", company.get('activite_principale', 'N/A'), "+"),
+                            self.row("CREATION DATE", company.get('date_creation', 'N/A'), "+"),
+                            self.row("HQ ADDRESS", company.get('adresse_complete', 'N/A'), "+")
+                        ])
+                        dirigeants = company.get('dirigeants', [])
+                        if dirigeants:
+                            for dg in dirigeants[:3]:
+                                t = "PHY" if dg.get('nature_juridique') == 'PHY' else 'CORP'
+                                name = f"{dg.get('prenoms', '')} {dg.get('nom', '')}".strip()
+                                self.report.append(self.row(f"DIRIGEANT ({t})", f"{name} ({dg.get('qualite', 'Gérant')})", "i"))
+                        if siren:
+                            self.report.append(self.link("Pappers Link", f"https://www.pappers.fr/entreprise/{siren}"))
+                            self.report.append(self.link("Societe Link", f"https://www.societe.com/societe/structure-{siren}.html"))
+                else: self.report.append(self.row("INSEE GATEWAY", f"HTTP CODE {resp.status}", "!"))
+        except Exception as e: self.report.append(self.row("PIPELINE ERROR", str(e), "!"))
+
+    async def process_physical_address(self, session, raw_data):
+        self.report.append(self.section("GEOGRAPHIC CADASTRAL"))
+        url = f"https://api-adresse.data.gouv.fr/search/?q={urllib.parse.quote(raw_data)}&limit=1"
+        try:
+            async with session.get(url, headers=get_rotated_headers(), timeout=8) as resp:
+                if resp.status == 200:
+                    features = (await resp.json()).get('features', [])
+                    if features:
+                        target = features[0]
+                        coords = target.get('geometry', {}).get('coordinates', [0, 0])
+                        prop = target.get('properties', {})
+                        self.report.extend([
+                            self.row("LABEL", prop.get('label', 'N/A'), "+"),
+                            self.row("ACCURACY", f"{prop.get('score', 0) * 100:.2f}% Match", "+"),
+                            self.row("POSTCODE", prop.get('postcode', 'N/A'), "+"),
+                            self.row("INSEE CODE", prop.get('citycode', 'N/A'), "+"),
+                            self.row("LATITUDE", str(coords[1]), "+"),
+                            self.row("LONGITUDE", str(coords[0]), "+")
+                        ])
+                        self.report.append(self.link("OpenStreetMap", f"https://www.openstreetmap.org/?mlat={coords[1]}&mlon={coords[0]}"))
+                        self.report.append(self.link("Google Satellite", f"http://maps.google.com/?q={coords[1]},{coords[0]}"))
+                    else: self.report.append(self.row("RESOLVER MATRIX", "0 VECTORS FOUND", "!"))
+                else: self.report.append(self.row("ENGINE CODE", f"HTTP {resp.status}", "!"))
+        except Exception as e: self.report.append(self.row("RESOLVER ERROR", str(e), "!"))
+
+    async def process_iban(self, session, clean_data):
+        self.report.append(self.section("FINANCIAL SEPA TRACER"))
+        self.report.append(self.row("IBAN SIG", clean_data))
+        chk = verify_iban_checksum(clean_data)
+        self.report.append(self.row("ISO MOD-97", "PASSED" if chk else "CORRUPTED", "+" if chk else "!"))
+        self.report.append(self.row("COUNTRY CODE", clean_data[:2], "+"))
+        
+        url = f"https://api.openiban.org/validate/{clean_data}"
+        try:
+            async with session.get(url, headers=get_rotated_headers(), timeout=8) as resp:
+                if resp.status == 200:
+                    b = (await resp.json()).get('bankData', {})
+                    if b:
+                        self.report.extend([
+                            self.row("BANK NAME", b.get('name', 'N/A'), "+"),
+                            self.row("BIC/SWIFT", b.get('bic', 'N/A'), "+"),
+                            self.row("ROUTING CODE", b.get('bankCode', 'N/A'), "+"),
+                            self.row("BANK CITY", b.get('city', 'N/A'), "+")
+                        ])
+                    else: self.report.append(self.row("SEPA REGISTRY", "NO DATA SHAPE", "i"))
+                else: self.report.append(self.row("GATEWAY REJECT", f"HTTP {resp.status}", "!"))
+        except Exception as e: self.report.append(self.row("TRACER CRASH", str(e), "!"))
+        self.report.append(self.link("IBAN Calc Hub", "https://www.ibancalculator.com"))
+
+    async def process_phone(self, session, clean_data):
+        norm = re.sub(r'[^0-9+]', '', clean_data)
+        if not norm.startswith('+'): norm = '+7' + norm[1:] if norm.startswith('8') else '+' + norm
+        self.report.append(self.section("TELECOM MATRIX"))
+        self.report.append(self.row("E.164 DATA", norm))
+        try:
+            p = phonenumbers.parse(norm, None)
+            if phonenumbers.is_valid_number(p):
+                rc = phonenumbers.region_code_for_number(p)
+                carrier_name = carrier.name_for_number(p, "fr" if rc == "FR" else "en") or "UNKNOWN"
+                self.report.extend([
+                    self.row("COMPLIANCE", "VALIDATED CELLULAR SIGNATURE", "+"),
+                    self.row("ALLOCATION", geocoder.description_for_number(p, "en"), "+"),
+                    self.row("PROVIDER", carrier_name, "+"),
+                    self.row("NATIONAL FORM", phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL), "+")
+                ])
+                digits = norm.replace("+", "")
+                self.report.extend([
+                    self.link("WhatsApp Mesh", f"https://wa.me/{digits}"),
+                    self.link("Telegram Route", f"https://t.me/{norm}")
+                ])
+            else: self.report.append(self.row("E.164 COMPLIANCE", "FAIL MASK MATCH", "!"))
+        except Exception as e: self.report.append(self.row("PROCESS CRASH", str(e), "!"))
+
+    async def process_email(self, session, clean_data):
+        domain = clean_data.split('@')[-1]
+        self.report.append(self.section("EMAIL INFRASTRUCTURE"))
+        self.report.append(self.row("TARGET MX", clean_data))
+        self.report.append(self.row("APEX DOMAIN", domain))
+        loop = asyncio.get_event_loop()
+        try:
+            ip = await loop.run_in_executor(None, lambda: socket.gethostbyname(domain))
+            self.report.append(self.row("A RECORD IPV4", ip, "+"))
+        except: self.report.append(self.row("A RECORD IPV4", "RESOLVE REFUSED", "!"))
+        self.report.append(self.link("Hunter.io Scraper", f"https://hunter.io/try/domain/{domain}"))
+        self.report.append(self.link("MXToolbox Core", f"https://mxtoolbox.com/SuperTool.aspx?action=mx%3a{domain}"))
+
+    async def process_domain(self, session, clean_data):
+        self.report.append(self.section("SERVER RECON MATRIX"))
+        self.report.append(self.row("HOSTNAME", clean_data))
+        try:
+            ip = await asyncio.get_event_loop().run_in_executor(None, lambda: socket.gethostbyname(clean_data))
+            self.report.append(self.row("RESOLVED IPV4", ip, "+"))
+            self.report.append(self.link("Shodan Node", f"https://www.shodan.io/host/{ip}"))
+        except:
+            self.report.append(self.row("RESOLVED IPV4", "OFFLINE / COLD", "!"))
+        self.report.append(self.link("CRT.sh Certs", f"https://crt.sh/?q={clean_data}"))
+
+    async def process_nickname(self, session, data):
+        self.report.append(self.section("ALIAS SCANNER CORE"))
+        self.report.append(self.row("TARGET NICK", data))
+        async def scan(plat, template):
+            try:
+                async with session.get(template.format(data), headers=get_rotated_headers(), timeout=4) as r:
+                    if r.status == 200: return self.row(plat, f"FOUND LAYER -> {template.format(data)}", "+")
+                    return None
+            except: return None
+        results = await asyncio.gather(
+            scan('GitHub Code', 'https://github.com/{}'),
+            scan('Twitter / X', 'https://twitter.com/{}'),
+            scan('Reddit User', 'https://www.reddit.com/user/{}')
+        )
+        for res in results:
+            if res: self.report.append(res)
+
+    async def run_pipeline(self, raw_data):
+        raw_stripped = raw_data.strip()
+        clean_data = raw_stripped.replace(" ", "").replace("-", "").upper()
+        resolved_mode = "NICK"
+
+        if '@' in raw_stripped and not raw_stripped.startswith('@'): resolved_mode = "EMAIL"
+        elif raw_stripped.startswith('@'): resolved_mode = "NICK"; clean_data = raw_stripped.replace('@', '')
+        elif re.match(r'^[A-Z]{2}[0-9]{3}[A-Z]{2}$', clean_data) or re.match(r'^[0-9]{1,4}[A-Z]{2,3}[0-9]{2,3}$', clean_data): resolved_mode = "PLATE"; hint = "FRANCE (SIV / F-Plate)"
+        elif re.match(r'^[ABEKMHOPCTYX]{1}[0-9]{3}[ABEKMHOPCTYX]{2}[0-9]{2,3}$', clean_data): resolved_mode = "PLATE"; hint = "RUSSIA / CIS (RU-Plate)"
+        elif clean_data.isdigit() and (len(clean_data) == 9 or len(clean_data) == 14): resolved_mode = "SIRENE"
+        elif re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data) and any(c.isalpha() for c in clean_data[:2]): resolved_mode = "IBAN"
+        elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data: resolved_mode = "PHONE"
+        elif any(i in raw_stripped.lower() for i in ["rue", "avenue", "boulevard", "all.", "allée", "place", "улица", "дом"]): resolved_mode = "ADDRESS"
+        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$', clean_data): resolved_mode = "DOMAIN"
+        else:
+            if len(raw_stripped) > 3 and not '.' in raw_stripped: resolved_mode = "SIRENE"
+
+        print(f" [VCTR] DISPATCH ROUTE -> {resolved_mode}")
+
+        async with aiohttp.ClientSession(headers=get_rotated_headers()) as session:
+            if resolved_mode == "PLATE": await self.process_license_plate(session, clean_data, hint)
+            elif resolved_mode == "SIRENE": await self.process_sirene(session, raw_stripped)
+            elif resolved_mode == "ADDRESS": await self.process_physical_address(session, raw_stripped)
+            elif resolved_mode == "PHONE": await self.process_phone(session, clean_data)
+            elif resolved_mode == "EMAIL": await self.process_email(session, raw_stripped)
+            elif resolved_mode == "DOMAIN": await self.process_domain(session, clean_data)
+            elif resolved_mode == "NICK": await self.process_nickname(session, clean_data)
+
+        print("\n".join(self.report))
+
+if __name__ == "__main__":
+    d = os.getenv("TARGET_DATA", "")
+    dispatcher = NexusForensicDispatcher()
+    asyncio.run(dispatcher.run_pipeline(d))
+EOF
+
+    if [ -d ".venv" ]; then
+        deactivate
+    fi
+    echo ""
+    read -n 1 -s -r -p " [CONTINUE] Press any key to return..."
+}
+
+
+function run_nexus_forensicold1() {
     clear
     echo "======================================================================"
     echo "NEXUS AUTOMATIC GLOBAL OSINT & FORENSIC CORE v4.9 [PRODUCTION ENGINE]"
