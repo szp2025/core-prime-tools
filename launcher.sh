@@ -3609,44 +3609,58 @@ class NexusForensicDispatcher:
         except Exception as e:
             report.append(f"[PHN] Telecom engine signature validation exception: {str(e)}")
 
-    # --- SUBMODULE: MAIL INFRASTRUCTURE & EXTENDED DNS MATRIX ---
+       # --- SUBMODULE: MAIL INFRASTRUCTURE & EXTENDED DNS MATRIX ---
     async def process_email(self, session, clean_data, report):
         domain = clean_data.split('@')[-1]
         report.append(f"\n=== [EMAIL FORENSIC TARGET ANALYSIS & MX INFRASTRUCTURE: {clean_data}] ===")
         report.append(f"[DNS] EXTRACTED TARGET DOMAIN : {domain}")
         
-        dns_resolver = aiodns.DNSResolver()
+        loop = asyncio.get_event_loop()
         
-        async def fetch_dns_record(record_type):
+        # Автономный резолвер через встроенный низкоуровневый socket.getaddrinfo
+        async def fetch_dns_fallback(q_domain):
             try:
-                res = await dns_resolver.query_dns(domain, record_type) if hasattr(dns_resolver, 'query_dns') else await dns_resolver.query(domain, record_type)
-                return record_type, res
-            except Exception as e:
-                return record_type, None
+                # Безопасный вызов блокирующей системной функции в пуле потоков
+                addr_info = await loop.run_in_executor(None, lambda: socket.getaddrinfo(q_domain, None))
+                if addr_info:
+                    return addr_info[0][4][0]
+                return None
+            except Exception:
+                return None
 
-        dns_results = await asyncio.gather(
-            fetch_dns_record('MX'),
-            fetch_dns_record('A'),
-            fetch_dns_record('AAAA'),
-            fetch_dns_record('TXT')
+        # Пассивный сбор MX записей через системную утилиту nslookup / host (вызов из Python)
+        async def fetch_mx_system(q_domain):
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    'nslookup', '-type=mx', q_domain,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, _ = await proc.communicate()
+                output = stdout.decode(errors='ignore')
+                mx_matches = re.findall(r'mail exchanger\s*=\s*([a-zA-Z0-9.-]+)', output, re.IGNORECASE)
+                if mx_matches:
+                    return mx_matches[0].strip('.')
+                return None
+            except Exception:
+                return None
+
+        # Параллельный запуск задач без привлечения сторонней библиотеки aiodns
+        ipv4_res, mx_res = await asyncio.gather(
+            fetch_dns_fallback(domain),
+            fetch_mx_system(domain)
         )
-        
-        for r_type, records in dns_results:
-            if not records:
-                report.append(f"[DNS] {r_type:<22} RECORD : NOT ACTIVE / REFUSED")
-                continue
+
+        if ipv4_res:
+            report.append(f"[DNS] {'A RESOLVED IPV4':<22} : {ipv4_res}")
+        else:
+            report.append(f"[DNS] A RESOLVED IPV4        : NOT ACTIVE / REFUSED")
+
+        if mx_res:
+            report.append(f"[DNS] {'MX ROUTING CORE':<22} : {mx_res} (Priority: Auto)")
+        else:
+            report.append(f"[DNS] MX ROUTING CORE        : NOT ACTIVE / REFUSED")
             
-            if r_type == 'MX':
-                report.append(f"[DNS] {'MX ROUTING CORE':<22} : {records[0].host if hasattr(records[0], 'host') else str(records[0])} (Priority: {getattr(records[0], 'priority', 0)})")
-            elif r_type == 'A':
-                report.append(f"[DNS] {'A RESOLVED IPV4':<22} : {records[0].host if hasattr(records[0], 'host') else str(records[0])}")
-            elif r_type == 'AAAA':
-                report.append(f"[DNS] {'AAAA RESOLVED IPV6':<22} : {records[0].host if hasattr(records[0], 'host') else str(records[0])}")
-            elif r_type == 'TXT':
-                for idx, txt_rec in enumerate(records[:3], 1):
-                    txt_str = txt_rec.text if hasattr(txt_rec, 'text') else str(txt_rec)
-                    report.append(f"[DNS] {'TXT DATA BLOB ' + str(idx):<22} : {txt_str[:65]}...")
-                    
         report.append("\n--- [EXTERNAL DOMAIN INTEL RECON]")
         report.extend([
             f"[LNK] {'Hunter Io Mail Scraper':<22} : https://hunter.io/try/domain/{domain}",
