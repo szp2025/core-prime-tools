@@ -4523,7 +4523,7 @@ import random
 import time
 import phonenumbers
 import asyncio
-import aiodns
+
 import aiohttp
 import smtplib
 import dns.asyncresolver
