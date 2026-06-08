@@ -6576,7 +6576,9 @@ def scan_url():
     heuristic_flags = 0
     
     try:
+        # ИСПРАВЛЕНИЕ: Добавлен явный импорт urlparse для предотвращения NameError
         from urllib.parse import urlparse
+        
         parsed_url = urlparse(target_url)
         domain = parsed_url.netloc.lower()
         path = parsed_url.path.lower()
@@ -6689,7 +6691,6 @@ def scan_url():
             report.append("[+] Zero-pixel iframe malicious rendering verification passed.")
 
         # Calculate Shannon Entropy of source HTML code to detect packed/obfuscated code blocks
-        # ИСПРАВЛЕН КРИТИЧЕСКИЙ ТИП ДАННЫХ: Добавлена конвертация строки (str) в байты (bytes)
         code_entropy = calculate_entropy(html_body.encode('utf-8', errors='ignore'))
         report.append(f"[SYS] {'PAGE CODE SHANNON ENTROPY':<32} : {code_entropy:.4f}")
         if code_entropy > 6.9:
