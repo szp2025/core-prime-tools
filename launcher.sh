@@ -5528,6 +5528,17 @@ def index():
     btn_text="INITIATE ENTITY DEEP SCAN"
     )
 
+    # НОВЫЙ БЛОК: Модуль сканирования и детонации URL-адресов
+    form_html += render_prime_form(
+        "/scan/url",
+        fields=[
+            {"type": "url", "name": "url", "label": "TARGET DETONATION URL", "placeholder": "https://example.com/path/to/payload"},
+            {"type": "hidden", "name": "action", "value": "initiate_url_detonation"}
+        ],
+        btn_text="INITIATE URL DETONATION & DEEP SCAN"
+    )
+
+
     form_html2 = render_prime_form(
         "/audit/dispatch", 
         fields=[
@@ -5939,7 +5950,7 @@ async def audit_dispatch():
             ])
             report.append("=== [END OF ANALYSIS] ===")
 
-# --- 2. ТЕЛЕФОН: ТОТАЛЬНАЯ МЕЖДУНАРОДНАЯ КРИМИНАЛИСТИКА И ЭКСПЕРТНЫЙ ANTI-FRAUD СКОРИНГ ---
+        # --- 2. ТЕЛЕФОН: ТОТАЛЬНАЯ МЕЖДУНАРОДНАЯ КРИМИНАЛИСТИКА И ЭКСПЕРТНЫЙ ANTI-FRAUD СКОРИНГ ---
         elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data):
             # Глубокая нормализация: оставляем только цифры и знак плюс
             normalized_phone = re.sub(r'[^0-9+]', '', clean_data)
@@ -6536,6 +6547,192 @@ async def searinfo():
         render_prime_page("MAXIMUM FORENSIC DOSSIER", f"<pre>{final_text_report}</pre><br><a href='/'>[ RETURN ]</a>")
     )
 
+
+# ==============================================================================
+# БЛОК 5: НОВЫЙ МОДУЛЬ СКАНИРОВАНИЯ И ДЕТОНАЦИИ URL (АНТИВИРУСНЫЙ И АНТИФИШИНГОВЫЙ СЛОЙ)
+# ==============================================================================
+@app.route('/scan/url', methods=['POST'])
+def scan_url():
+    """
+    Endpoint performs a deep heuristic, contextual, and dynamic analysis of a 
+    target URL address to detect viruses, hidden cross-domain redirects, 
+    and social engineering mechanisms.
+    """
+    target_url = request.form.get('url')
+    if not target_url:
+        return "Empty URL Payload", 400
+
+    report = [
+        f"======================================================================",
+        f"     CAME-NEXUS: DEEP INTELLIGENCE URL SCANNER & ANOMALY DETECTOR    ",
+        f"======================================================================",
+        f"[SYS] {'TARGET NETWORK URL OBJECT':<32} : {target_url}",
+        f"[SYS] {'ENGINE ENGAGEMENT TIME':<32} : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"----------------------------------------------------------------------"
+    ]
+    
+    threat_count = 0
+    critical_indicators = 0
+    heuristic_flags = 0
+    
+    try:
+        parsed_url = urlparse(target_url)
+        domain = parsed_url.netloc.lower()
+        path = parsed_url.path.lower()
+        scheme = parsed_url.scheme.lower()
+    except Exception as err:
+        return f"Invalid URL Specification Structure: {err}", 400
+
+    report.append("\n--- [STAGE 1: STATIC RECONNAISSANCE OF THE DOMAIN MATRIX] ---")
+    
+    # Heuristic 1.0: Protocol Scheme Validation
+    report.append(f"[SYS] {'DETECTED PROTOCOL SCHEME':<32} : {scheme.upper()}")
+    if scheme == 'http':
+        report.append("[!] WARNING: Unencrypted HTTP channel detected. Vulnerable to Man-in-the-Middle (MitM) interception.")
+        threat_count += 1
+        heuristic_flags += 1
+    elif scheme == 'https':
+        report.append("[+] Cryptographic transport channel layer verified (HTTPS).")
+    else:
+        report.append("[!] ALERT: Non-standard or high-risk protocol scheme detected.")
+        threat_count += 2
+        critical_indicators += 1
+
+    # Heuristic 1.1: Verification of dangerous Top-Level Domains (TLD)
+    tld_match_found = False
+    for tld in GLOBAL_SUSPICIOUS_TLDS:
+        if domain.endswith(tld):
+            report.append(f"[!] WARNING: Registered suspicious TLD zone [{tld}]. High risk of malicious disposal / temporary bulletproof hosting.")
+            threat_count += 1
+            heuristic_flags += 1
+            tld_match_found = True
+            break
+    if not tld_match_found:
+        report.append("[+] Domain TLD classification does not match standard malicious zones registry.")
+
+    # Heuristic 1.2: Phishing signature matching in domain/path
+    mal_pattern_triggered = False
+    for mal_pattern in GLOBAL_MALICIOUS_DOMAINS:
+        if re.search(mal_pattern, domain, re.I):
+            report.append(f"[!!! SECURITY THREAT !!!] Fraudulent blacklisted domain signature matched: '{mal_pattern}'")
+            threat_count += 3
+            critical_indicators += 1
+            mal_pattern_triggered = True
+            break
+    if not mal_pattern_triggered:
+        report.append("[+] Domain name pattern cleared from critical brand-spoofing blacklists.")
+
+    # Heuristic 1.3: Social Engineering Slang Analysis (Fake Cabinets/Banking)
+    matched_keywords = [kw for kw in GLOBAL_URL_PHISHING_KEYWORDS if kw in path or kw in domain]
+    if matched_keywords:
+        report.append(f"[!] ATTACK VECTOR SIGNAL: Data harvesting phishing markers identified: {', '.join(matched_keywords)}")
+        threat_count += len(matched_keywords)
+        heuristic_flags += 1
+    else:
+        report.append("[+] Contextual text stream contains no active credential-harvesting triggers.")
+
+    report.append("\n--- [STAGE 2: DYNAMIC NETWORK SESSION ANALYSIS (DETONATION LAYER)] ---")
+    try:
+        # Simulate legitimate browser profile from the global UA matrix
+        custom_headers = {'User-Agent': GLOBAL_NETWORK_UA[0]}
+        report.append(f"[SYS] {'SIMULATED USER-AGENT PROFILE':<32} : {custom_headers['User-Agent']}")
+        report.append("[SYS] Executing live request detonation with complete recursive redirection tracking...")
+        
+        # Execute live request with redirection tracking, ignoring SSL self-signed faults for analysis
+        response = requests.get(target_url, headers=custom_headers, timeout=8, verify=False, allow_redirects=True)
+        
+        # Inspection of HTTP Redirect Cascade (Hidden Scammer Routing)
+        if len(response.history) > 0:
+            report.append(f"[!] ALERT: System intercepted an active server-side redirect chain:")
+            for index, step in enumerate(response.history):
+                report.append(f"    -> Step #{index + 1} | HTTP [{step.status_code}] Route Target: {step.url}")
+            report.append(f"    -> Final Detonation Endpoint Node: [{response.status_code}] {response.url}")
+            
+            # Cross-Domain Jump Analysis
+            final_domain = urlparse(response.url).netloc.lower()
+            if final_domain != domain:
+                report.append(f"[!!! CRITICAL ALERT !!!] Cross-Domain Redirect Detected! Traffic rerouted to third-party resource: {final_domain}")
+                threat_count += 3
+                critical_indicators += 1
+            else:
+                report.append("[+] Redirect sequence loops within the boundaries of the origin primary domain.")
+        else:
+            report.append("[+] Direct network tracing clean. No server-side HTTP redirects recorded.")
+
+        # DOM Structure and HTML body payload binary triage
+        html_body = response.text
+        report.append("\n--- [STAGE 3: HEURISTIC ANALYSIS OF CLIENT-SIDE PAYLOAD (HTML/JS)] ---")
+        report.append(f"[SYS] {'DOWNLOADED PAYLOAD SIZE':<32} : {len(html_body)} bytes")
+        
+        # Client-Side JavaScript execution redirect pattern scan
+        client_redirect_triggered = False
+        for js_pattern in GLOBAL_HIDDEN_REDIRECT_PATTERNS:
+            if re.search(js_pattern, html_body, re.I):
+                report.append(f"[!!! HIDDEN SCRIPT !!!] Detected active client-side forced location-switch injection: Pattern: '{js_pattern}'")
+                client_redirect_triggered = True
+                threat_count += 2
+                heuristic_flags += 1
+                
+        if not client_redirect_triggered:
+            report.append("[+] No active client-side JS hard-location manipulation signatures found.")
+
+        # Zero-allocation hidden iframe detection (Drive-by Malware delivery vectors)
+        hidden_iframes = re.findall(r"<iframe[^>]*width=[\"']0[\"'][^>]*>", html_body, re.I) or \
+                         re.findall(r"<iframe[^>]*style=[\"'][^']*display:\s*none[^\"'][^>]*>", html_body, re.I) or \
+                         re.findall(r"<iframe[^>]*height=[\"']0[\"'][^>]*>", html_body, re.I)
+        if hidden_iframes:
+            report.append(f"[!!! CRITICAL HTML EXPLOIT ALERT !!!] Invisible IFRAME elements discovered ({len(hidden_iframes)} match found)! Direct vector for background Drive-by Malware downloads.")
+            threat_count += 3
+            critical_indicators += 1
+        else:
+            report.append("[+] Zero-pixel iframe malicious rendering verification passed.")
+
+        # Calculate Shannon Entropy of source HTML code to detect packed/obfuscated code blocks
+        code_entropy = calculate_entropy(html_body)
+        report.append(f"[SYS] {'PAGE CODE SHANNON ENTROPY':<32} : {code_entropy:.4f}")
+        if code_entropy > 6.9:
+            report.append("[!] WARNING: Extreme code blocks entropy values detected. Script structures are heavily obfuscated/packed. High probability of weaponized zero-day exploit script.")
+            threat_count += 2
+            heuristic_flags += 1
+        else:
+            report.append("[+] Code density entropy matches baseline open-text layout criteria.")
+
+    except requests.exceptions.Timeout:
+        report.append("[!] NETWORK TIMEOUT FAILURE: Destination host dropped validation packets. Possible defensive Tarpit trap or dead phishing node.")
+        threat_count += 1
+        heuristic_flags += 1
+    except requests.exceptions.ConnectionError:
+        report.append("[!] NETWORK CONNECTION ERROR: Connection refused by target endpoint node. Host is either offline, down, or filtering scanners.")
+        threat_count += 1
+        heuristic_flags += 1
+    except Exception as global_ex:
+        report.append(f"[!] SYSTEM FAILURE DURING NETWORK OPERATIONS LAYER TRACE: {global_ex}")
+        threat_count += 1
+
+    # Evaluation Matrix and Verdict Assignment
+    report.append("\n--- [STAGE 4: RISK EVALUATION MATRIX INTEGRATION] ---")
+    report.append(f"[SYS] {'TOTAL QUANTITATIVE THREAT WEIGHT':<32} : {threat_count}")
+    report.append(f"[SYS] {'CRITICAL ALERTS REGISTERED':<32} : {critical_indicators}")
+    report.append(f"[SYS] {'HEURISTIC ANOMALIES FLAG COUNT':<32} : {heuristic_flags}")
+
+    if critical_indicators > 0 or threat_count >= 4:
+        final_url_verdict = 'MALICIOUS / INFECTED'
+    elif threat_count > 0:
+        final_url_verdict = 'SUSPICIOUS / UNWANTED'
+    else:
+        final_url_verdict = 'CLEAN / SECURE'
+        
+    session['last_verdict'] = final_url_verdict
+    
+    report.append("\n======================================================================")
+    report.append(f" FINAL COMPREHENSIVE SECURITY VERDICT FOR TARGET URL: {final_url_verdict}")
+    report.append(f" TOTAL SYSTEM THREAT MARKERS TRIGGERED: {threat_count}")
+    report.append("======================================================================")
+
+    output_payload = chr(10).join(report)
+    return render_template_string(render_prime_page("URL FORENSIC REPORT", f"<pre>{output_payload}</pre><br><a href='/'>RETURN TO MAIN PORTAL</a>"))
+
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 EOF
