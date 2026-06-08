@@ -8854,9 +8854,6 @@ run_smart_auditor_nexus() {
 }
 
 
-
-
-
 run_smart_auditor_nexusold() {
     clear
     core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v2.0"
