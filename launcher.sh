@@ -5439,7 +5439,7 @@ import dns.asyncresolver
 from phonenumbers import geocoder, carrier, number_type
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from datetime import datetime
 
@@ -6576,9 +6576,7 @@ def scan_url():
     heuristic_flags = 0
     
     try:
-        # ИСПРАВЛЕНИЕ: Добавлен явный импорт urlparse для предотвращения NameError
-        from urllib.parse import urlparse
-        
+        # Теперь работает глобально, так как мы добавили его к 'quote' вверху файла
         parsed_url = urlparse(target_url)
         domain = parsed_url.netloc.lower()
         path = parsed_url.path.lower()
