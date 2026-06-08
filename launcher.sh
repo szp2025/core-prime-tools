@@ -8655,21 +8655,36 @@ run_ghost_commander() {
 
 run_smart_auditor_nexus() {
     clear
+    
+    # --- Расширенная палитра ANSI-цветов для построения High-Tech UI ---
+    local R='\033[0;31m'       # Красный (Критические уязвимости)
+    local G='\033[0;32m'       # Зеленый (Безопасно / Успех)
+    local Y='\033[0;33m'       # Желтый (Предупреждения / Внимание)
+    local B='\033[0;34m'       # Синий (Информационные маркеры)
+    local M='\033[0;35m'       # Пурпурный (Пути к логам / Метаданные)
+    local C='\033[0;36m'       # Циановый (Элементы структурных сеток)
+    local W='\033[0;37m'       # Белый основной
+    local DG='\033[1;30m'      # Темно-серый (Второстепенные разделители)
+    
+    # Яркие / Жирные модификаторы
+    local BR='\033[1;31m'
+    local BG='\033[1;32m'
+    local BY='\033[1;33m'
+    local BC='\033[1;36m'
+    local BW='\033[1;37m'
+    
+    # Фоновые подложки для статусов (Badge)
+    local BG_RED='\033[41;1;37m'
+    local BG_GREEN='\033[42;1;30m'
+    local BG_YELLOW='\033[43;1;30m'
+    local BG_BLUE='\033[44;1;37m'
+    local NC='\033[0m'         # Сброс стилей
+
     core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v2.0"
 
     local input
     input=$(core_engine_input "text" "Enter Target (Domain, IP, or Service URL)")
     [[ -z "$input" ]] && return
-
-    # --- Цветовая палитра для профессионального вывода (если не заданы глобально) ---
-    local R='\033[0;31m'
-    local G='\033[0;32m'
-    local Y='\033[0;33m'
-    local B='\033[0;34m'
-    local M='\033[0;35m'
-    local C='\033[0;36m'
-    local NC='\033[0m'
-    local BOLD='\033[1m'
 
     # --- 0. ИНТЕЛЛЕКТУАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ (Target Analyzer) ---
     local target_type="unknown"
@@ -8683,9 +8698,24 @@ run_smart_auditor_nexus() {
         target_type="service"
     fi
 
+    # Вспомогательная функция анимации ожидания (Spinner)
+    show_spinner() {
+        local pid=$1
+        local message=$2
+        local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+        while kill -0 "$pid" 2>/dev/null; do
+            for i in $(seq 0 9); do
+                echo -ne "  ${BC}[${spin:$i:1}]${NC} ${W}${message}...${NC}\r"
+                sleep 0.1
+            done
+        done
+        echo -ne "                                                              \r"
+    }
+
     # --- 1. ВЫПОЛНЕНИЕ ПО ТИПУ ЦЕЛИ ---
     case "$target_type" in
         "web")
+            echo -e "\n${DG}📝[INITIALIZING]${NC} Сбор первичных векторов для веб-ресурса..."
             core_engine_ui "i" "Mode: WEB APPLICATION AUDIT (Deep Discovery)"
             
             local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
@@ -8693,27 +8723,31 @@ run_smart_auditor_nexus() {
             local results_file="$loot_dir/audit_full_${host//[^a-zA-Z0-9]/_}_$(date +%Y%m%d_%H%M%S).log"
             local signals_file="/tmp/signals_$$"
 
-            # Счётчики для финальной статистики
+            # Счётчики
             local count_critical=0
             local count_files=0
 
             # 1.1 Пассивная разведка
-            core_engine_ui "i" "Phase 1: Ingesting target aura..."
+            echo -e "  ${DG}├──${NC} Запуск пассивной разведки сетевой сигнатуры..."
             {
                 curl -Is --connect-timeout 5 --max-time 7 -A "$GLOBAL_NETWORK_UA" "https://$host"
                 host -t txt "$host" 2>/dev/null
                 whois "$host" 2>/dev/null | grep -iE "city|country|orgname"
-            } > "$signals_file" 2>&1
+            } > "$signals_file" 2>&1 &
+            
+            show_spinner $! "Анализ сетевой ауры целевого хоста"
 
             local is_high_risk=false
             grep -qiE "${GLOBAL_SECURITY_MATRIX[0]}" "$signals_file" && is_high_risk=true
 
-            # 1.2 Активный аудит (только если риск низкий)
+            # 1.2 Активный аудит
             if [ "$is_high_risk" = false ]; then
-                core_engine_ui "s" "Target safe. Deploying Active Probe..."
+                echo -e "  ${BG}[✓] СИСТЕМА ЗАЩИТЫ НЕ ОБНАРУЖЕНА.${NC} Развертывание глубокого сканирования."
+                
                 local tmp_pipe="/tmp/prime_pipe_$$"
                 touch "$tmp_pipe"
                 
+                # Запуск сканирования в фоновом режиме для анимации прогресс-бара
                 (
                     curl -s -k -L --max-time 7 "https://$host" | grep -oE "\.(php|js|json|sql|env|xml|yaml|config)" | sort -u | awk '{print "HIT|"$1}' >> "$tmp_pipe"
                     for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
@@ -8721,36 +8755,48 @@ run_smart_auditor_nexus() {
                         [[ $(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 2 "https://$host/$f") == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
                     done
                 ) &
-                wait $!
+                local scan_pid=$!
+                
+                # Кастомный кибер-прогресс-бар во время выполнения фаззинга
+                local progress=0
+                while kill -0 "$scan_pid" 2>/dev/null; do
+                    if [ $progress -lt 90 ]; then
+                        ((progress+=5))
+                    fi
+                    local fill_chars=$((progress / 3))
+                    local empty_chars=$((30 - fill_chars))
+                    local bar=$(printf "%0${fill_chars}s" | tr ' ' '■')
+                    local spaces=$(printf "%0${empty_chars}s" | tr ' ' ' ')
+                    echo -ne "  ${BY}[FUZZING]${NC} 🖥️ Пейлоад: ${BC}[${bar}${DG}${spaces}${BC}]${NC} ${progress}%\r"
+                    sleep 0.2
+                done
+                echo -e "  ${BG}[FUZZING COMPLETE]${NC} Все запросы успешно детонировали.                \n"
 
-                # Шапка таблицы результатов на экране
-                echo -e "\n${BOLD}${C}┌──────────────────────────────────────────────────────────────────────────┐${NC}"
-                echo -e "${BOLD}${C}│                           AUDIT TARGET OBJECTS                           │${NC}"
-                echo -e "${BOLD}${C}├───────────────────────┬──────────────┬───────────────────────────────────┤${NC}"
-                printf "${BOLD}${C}│ %-21s │ %-12s │ %-33s │\n${NC}" "TARGET ENDPOINT" "SEVERITY" "STATUS / ACTION"
-                echo -e "${BOLD}${C}├───────────────────────┼──────────────┼───────────────────────────────────┤${NC}"
+                # ФОРМИРОВАНИЕ ПРОФЕССИОНАЛЬНОЙ КАРТЫ РЕЗУЛЬТАТОВ (HIGH-TECH DASHBOARD)
+                echo -e "${BC}┌───────────────────────── ⚡ DEEP NEXUS OBJECT MAP ⚡ ─────────────────────────┐${NC}"
+                printf "${BC}│ ${BW}%-28s ${BC}│ ${BW}%-14s ${BC}│ ${BW}%-31s ${BC}│\n" "ОБЪЕКТ СКАНИРОВАНИЯ" "МАРКЕР РИСКА" "СТАТУС ИНЖЕКЦИИ / ОПЕРАЦИЯ"
+                echo -e "${BC}├───────────────────────────────┼────────────────┼──────────────────────────────┤${NC}"
 
                 while IFS='|' read -r tag target; do
                     [[ -z "$target" ]] && continue
                     local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
                     
                     if ! echo "$head_check" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}"; then
-                        # Обрезаем имя файла для красивого выравнивания в таблице, если оно слишком длинное
                         local display_target="$target"
-                        [[ ${#display_target} -gt 21 ]] && display_target="${display_target:0:18}..."
+                        [[ ${#display_target} -gt 28 ]] && display_target="${display_target:0:25}..."
 
                         if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}|\.(sql|env|config)$"; then
                             core_engine_loot "CRITICAL" "Exposed: $target on $host"
                             echo -e "${R}[CRITICAL]${NC} $target" >> "$results_file"
                             
-                            # Вывод строки CRITICAL в таблицу
-                            printf "│ %-21s │ ${R}%-12s${NC} │ ${Y}%-33s${NC} │\n" "$display_target" "CRITICAL" "Exposed Data Leak Detected"
+                            # Вывод критической строки с LED-подсветкой фона
+                            printf "${BC}│ ${W}%-28s ${BC}│ ${BG_RED} CRITICAL 🚨 ${NC} │ ${BR}%-31s ${BC}│\n" "$display_target" "DATA EXPOSURE DETECTED!"
                             ((count_critical++))
                         else
                             echo -e "${G}[FILE]${NC} $target" >> "$results_file"
                             
-                            # Вывод строки FILE в таблицу
-                            printf "│ %-21s │ ${G}%-12s${NC} │ %-33s │\n" "$display_target" "LOW/INFO" "File Verified (200 OK)"
+                            # Вывод стандартной строки
+                            printf "${BC}│ ${W}%-28s ${BC}│ ${BG_GREEN}   SAFE ✓    ${NC} │ ${G}%-31s ${BC}│\n" "$display_target" "Identified (HTTP 200)"
                             ((count_files++))
                         fi
                         
@@ -8760,18 +8806,22 @@ run_smart_auditor_nexus() {
                     fi
                 done < <(sort -u "$tmp_pipe")
                 
-                echo -e "${BOLD}${C}└───────────────────────┴──────────────┴───────────────────────────────────┘${NC}"
+                echo -e "${BC}└──────────────────────────────────────────────────────────────────────────────┘${NC}"
                 rm -f "$tmp_pipe"
 
-                # Компактная профессиональная панель со статистикой
-                echo -e "\n${BOLD}${B}[📊 SUMMARY REPORT]${NC}"
-                echo -e " └── Target Host     : ${BOLD}${Y}$host${NC}"
-                echo -e " └── Critical Risks : ${BOLD}${R}$count_critical${NC} объектов обнаружено"
-                echo -e " └── Standard Files : ${BOLD}${G}$count_files${NC} объектов обнаружено"
-                echo -e " └── Log Storage    : ${M}$results_file${NC}\n"
+                # ДЕТАЛЬНАЯ СВОДНАЯ ИНФОРМАЦИОННАЯ КАРТОЧКА СЕРВЕРА
+                echo -e "\n${BW}╔═════════════════════════════════════════════════════════════════════════════╗${NC}"
+                echo -e "${BW}║                 📊 ИТОГОВЫЙ СТАТИСТИЧЕСКИЙ ОТЧЕТ АУДИТА                     ║${NC}"
+                echo -e "${BW}╠═════════════════════════════════════════════════════════════════════════════╣${NC}"
+                printf "${BW}║ ${DG}├── ${W}%-21s : ${BY}%-46s ${BW}║\n" "Целевой хост" "$host"
+                printf "${BW}║ ${DG}├── ${W}%-21s : ${BR}%-46s ${BW}║\n" "Угрозы (CRITICAL)" "$count_critical уязвимостей найдено"
+                printf "${BW}║ ${DG}├── ${W}%-21s : ${BG}%-46s ${BW}║\n" "Проверено файлов" "$count_files объектов в структуре"
+                printf "${BW}║ ${DG}└── ${W}%-21s : ${M}%-46s ${BW}║\n" "Локальный лог-файл" "$results_file"
+                echo -e "${BW}╚═════════════════════════════════════════════════════════════════════════════╝${NC}\n"
             else
                 core_engine_ui "e" "Active Probe bypassed to maintain stealth."
-                echo -e "${Y}[!] Причина:${NC} Обнаружены сигнатуры средств защиты (WAF/IDS) в ауре цели."
+                echo -e "  ${BY}[!] АКТИВАЦИЯ РЕЖИМА СКРЫТНОСТИ:${NC} Обнаружены активные системы фильтрации трафика."
+                echo -e "  ${DG}└──${NC} Сигнатура фильтра: ${R}$(grep -oE "${GLOBAL_SECURITY_MATRIX[0]}" "$signals_file" | head -n 1)${NC}"
             fi
             rm -f "$signals_file"
             ;;
@@ -8781,33 +8831,44 @@ run_smart_auditor_nexus() {
             local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
             local results_file="$loot_dir/infra_scan_$(date +%s).log"
             
-            echo -e "${Y}[*] Запуск сетевого сканирования Nmap для инфраструктуры ${BOLD}$input${Y}...${NC}"
-            nmap -T3 -n -Pn -sV --script="safe,discovery" -p "80,443,22,21,8080" "$input" >> "$results_file" 2>&1
+            echo -e "\n  ${BY}[*] ЗАПУСК ПОРТ-СКАНЕРА NMAP ДЛЯ:${NC} ${BW}$input${NC}"
             
-            # Красивый вывод результата nmap на экран
-            echo -e "\n${BOLD}${G}┌──────────────────────────────────────────────────────────────────────────┐${NC}"
-            echo -e "${BOLD}${G}│                       INFRASTRUCTURE SCAN COMPLETE                       │${NC}"
-            echo -e "${BOLD}${G}└──────────────────────────────────────────────────────────────────────────┘${NC}"
-            echo -e " └── Target IP   : ${BOLD}${Y}$input${NC}"
-            echo -e " └── Raw Log     : ${M}$results_file${NC}"
-            echo -e "\n${BOLD}${B}[Последние 10 строк отчета Nmap]:${NC}"
-            tail -n 12 "$results_file" | sed 's/^/  /'
+            # Фоновое выполнение nmap со спиннером
+            nmap -T3 -n -Pn -sV --script="safe,discovery" -p "80,443,22,21,8080" "$input" >> "$results_file" 2>&1 &
+            show_spinner $! "Глубокое зондирование сетевых портов и версий служб"
+            
+            echo -e "\n${BG}┌──────────────────────────────────────────────────────────────────────────┐${NC}"
+            echo -e "${BG}│                  ИНФРАСТРУКТУРНЫЙ АНАЛИЗ УСПЕШНО ЗАВЕРШЕН                │${NC}"
+            echo -e "${BG}└──────────────────────────────────────────────────────────────────────────┘${NC}"
+            echo -e "   ${DG}├──${NC} Целевой IP:    ${BW}$input${NC}"
+            echo -e "   ${DG}└──${NC} Файл отчета:  ${M}$results_file${NC}"
+            echo -e "\n${BC}[ТОПОЛОГИЯ ОТКРЫТЫХ ПОРТОВ И СЛУЖБ]:${NC}"
+            
+            # Интеллектуальный вывод отчета nmap с подсветкой слова 'open'
+            if [ -f "$results_file" ]; then
+                grep -E "^[0-9]+/tcp|/[a-z]|^\|" "$results_file" | sed -e "s/open/${BG}open${NC}/g" -e "s/filtered/${BY}filtered${NC}/g" | sed 's/^/    /'
+            else
+                echo -e "    ${R}[!] Ошибка чтения файла вывода Nmap.${NC}"
+            fi
             echo ""
             ;;
             
         "service")
             core_engine_ui "i" "Mode: SERVICE PROBE (Fingerprinting)"
-            echo -e "${Y}[*] Отправка проверочного запроса к ${BOLD}$input${Y}...${NC}\n"
+            echo -e "  ${BY}[*] ТРАССИРОВКА ЗАГОЛОВКОВ ДЛЯ:${NC} ${BW}$input${NC}"
             
             local service_output
-            service_output=$(curl -I -s --connect-timeout 5 "$input")
+            service_output=$(curl -I -s --connect-timeout 5 "$input") &
+            show_spinner $! "Запрос метаданных HTTP/Сервиса"
             
             if [[ -n "$service_output" ]]; then
-                echo -e "${BOLD}${G}┌─── [HTTP/SERVICE HEADERS] ───────────────────────────────────────────────┐${NC}"
-                echo "$service_output" | sed 's/^/ │ /'
-                echo -e "${BOLD}${G}└──────────────────────────────────────────────────────────────────────────┘${NC}"
+                echo -e "\n${BC}┌─── [🧬 СЛУЖЕБНЫЕ ЗАГОЛОВКИ ОТВЕТА СЕРВЕРА] ──────────────────────────────┐${NC}"
+                # Форматируем вывод заменяя стандартные двоеточия для контрастности
+                echo "$service_output" | sed -e 's/^[A-Za-z0-9-]*:/✓ \0/' -e "s/✓ /${G}✓ ${NC}/g" | sed 's/^/ │ /'
+                echo -e "${BC}└──────────────────────────────────────────────────────────────────────────┘${NC}\n"
             else
                 core_engine_ui "e" "Service non-responsive"
+                echo -e "  ${R}[!] Целевой узел сбросил пакет или заблокировал входящий TCP-Handshake.${NC}\n"
             fi
             ;;
             
