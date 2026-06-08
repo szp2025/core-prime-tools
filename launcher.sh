@@ -8673,7 +8673,7 @@ run_smart_auditor_nexus() {
     local BW='\033[1;37m'      # Жирный белый
     local NC='\033[0m'         # Сброс стилей
 
-    core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v2.0"
+    core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v3.0 [ULTIMATE EDITION]"
 
     local input
     input=$(core_engine_input "text" "Enter Target (Domain, IP, or Service URL)")
@@ -8718,83 +8718,124 @@ run_smart_auditor_nexus() {
             local count_critical=0
             local count_files=0
 
-            # 1.1 Пассивная разведка
-            echo -e "  ${DG}🏃 [1/2]${NC} Сбор пассивных отпечатков..."
+            # 1.1 Пассивная разведка и анализ барьеров
+            echo -e "  ${DG}🏃 [1/2]${NC} Анализ защитных барьеров (WAF Matrix)..."
             {
-                curl -Is --connect-timeout 5 --max-time 7 -A "$GLOBAL_NETWORK_UA" "https://$host"
+                # Используем первый UA из нашей глобальной матрицы
+                curl -Is --connect-timeout 5 --max-time 7 -A "${GLOBAL_NETWORK_UA[0]}" "https://$host"
                 host -t txt "$host" 2>/dev/null
                 whois "$host" 2>/dev/null | grep -iE "city|country|orgname"
             } > "$signals_file" 2>&1 &
             
-            show_spinner $! "Инициализация детонационного слоя"
+            show_spinner $! "Зондирование сетевой ауры"
 
             local is_high_risk=false
             grep -qiE "${GLOBAL_SECURITY_MATRIX[0]}" "$signals_file" && is_high_risk=true
 
-            # 1.2 Активный аудит
-            if [ "$is_high_risk" = false ]; then
-                echo -e "  ${DG}🏃 [2/2]${NC} Развертывание активных зондов..."
+            local tmp_pipe="/tmp/prime_pipe_$$"
+            touch "$tmp_pipe"
+
+            # 1.2 Адаптивный выбор стратегии аудита (Стелс или Скорость)
+            if [ "$is_high_risk" = true ]; then
+                echo -e "  ${BY}[!] ВНИМАНИЕ:${NC} Обнаружен файрвол/WAF. Включение ${BY}Стелс-Маневра (OpSec)${NC}."
+                echo -e "  ${DG}└──${NC} Внедрение микрозадержек, спуфинг IP-адресов и динамическая ротация User-Agent."
                 
-                local tmp_pipe="/tmp/prime_pipe_$$"
-                touch "$tmp_pipe"
-                
+                # АСИНХРОННЫЙ ПОТОК: Стелс-фаззинг с контролем таймингов
                 (
-                    curl -s -k -L --max-time 7 "https://$host" | grep -oE "\.(php|js|json|sql|env|xml|yaml|config)" | sort -u | awk '{print "HIT|"$1}' >> "$tmp_pipe"
                     for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
                         [[ -z "$f" ]] && continue
-                        [[ $(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 2 "https://$host/$f") == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
+                        
+                        # Рандомизация параметров для обхода сигнатурных фильтров WAF
+                        local rand_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
+                        local fake_ip="$((RANDOM%223+1)).$((RANDOM%254)).$((RANDOM%254)).$((RANDOM%254))"
+                        
+                        local http_code=$(curl -s -k -L -I -w "%{http_code}" -o /dev/null \
+                            --connect-timeout 3 \
+                            -A "$rand_ua" \
+                            -H "X-Forwarded-For: $fake_ip" \
+                            -H "X-Real-IP: $fake_ip" \
+                            -H "Client-IP: $fake_ip" \
+                            "https://$host/$f")
+                        
+                        if [ "$http_code" == "200" ]; then
+                            echo "HIT|$f" >> "$tmp_pipe"
+                        fi
+                        # Рандомная задержка для разрушения циклических таймингов систем IDS
+                        sleep 1
                     done
                 ) &
-                show_spinner $! "Выполнение фаззинг-матрицы ядра"
-
-                # ЗАГОЛОВОК СТРУКТУРНЫХ КОЛОНН (БЕЗ РАМОК)
-                echo -e "\n${BW}  📌 ОБНАРУЖЕННЫЕ КОМПОНЕНТЫ И УЯЗВИМОСТИ СТРУКТУРЫ:${NC}"
-                echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
-
-                while IFS='|' read -r tag target; do
-                    [[ -z "$target" ]] && continue
-                    local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
-                    
-                    if ! echo "$head_check" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}"; then
-                        
-                        # Выравнивание колонок через встроенный printf (без внешних модулей)
-                        # Первая колонна: 32 символа под объект. Вторая: под статус риска.
-                        if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}|\.(sql|env|config)$"; then
-                            core_engine_loot "CRITICAL" "Exposed: $target on $host"
-                            echo -e "${R}[CRITICAL]${NC} $target" >> "$results_file"
-                            
-                            # Вывод в виде аккуратных колонок дерева
-                            printf "  ${DG}├──${NC} ${BR}%-32s${NC} →   ${R}[КРИТИЧЕСКИЙ СБОЙ]${NC} 🔥 Утечка данных конфигурации\n" "$target"
-                            ((count_critical++))
-                        else
-                            echo -e "${G}[FILE]${NC} $target" >> "$results_file"
-                            
-                            printf "  ${DG}├──${NC} ${W}%-32s${NC} →   ${G}[АКТИВНЫЙ ФАЙЛ]${NC}    ✓ Доступен (HTTP 200)\n" "$target"
-                            ((count_files++))
-                        fi
-                        
-                        if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[2]}|${GLOBAL_SAST_MATRIX[3]}"; then
-                            run_deep_file_probe "$host" "$target" "$head_check"
-                        fi
-                    fi
-                done < <(sort -u "$tmp_pipe")
-                
-                # Конечная ветка дерева
-                echo -e "  ${DG}└──  [КОНЕЦ СТРУКТУРНОГО ДЕРЕВА]${NC}"
-                echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
-                rm -f "$tmp_pipe"
-
-                # СОВРЕМЕННЫЙ КОМПАКТНЫЙ РЕЗЮМИРУЮЩИЙ БЛОК (SUMMARY)
-                echo -e "\n${BC}⚡  ДЕТАЛИЗАЦИЯ СЕССИИ АУДИТА:${NC}"
-                echo -e "    ${C}🎯 Хост:${NC} ${BW}$host${NC}"
-                echo -e "    ${R}🚨 Критические риски:${NC} ${BR}$count_critical уязвимостей${NC}"
-                echo -e "    ${G}📂 Найдено скриптов:${NC} ${BG}$count_files объектов структуры${NC}"
-                echo -e "    ${M}📦 Результирующий лог:${NC} ${M}$results_file${NC}\n"
+                show_spinner $! "Анализ распределенной матрицы ядра"
             else
-                core_engine_ui "e" "Active Probe bypassed to maintain stealth."
-                echo -e "  ${BY}[!] АКТИВИРОВАН ОПТИМИЗИРОВАННЫЙ СТЕЛС-РЕЖИМ:${NC} Обнаружен файрвол / WAF."
+                echo -e "  ${BG}[✓] СИСТЕМА ЗАЩИТЫ ЧИСТА.${NC} Запуск высокоскоростного многопоточного зондирования."
+                
+                # АСИНХРОННЫЙ ПОТОК: Сбор структуры без искусственных задержек
+                (
+                    # Пассивный сбор ссылок из тела главной страницы
+                    curl -s -k -L --max-time 7 "https://$host" | grep -oE "\.(php|js|json|sql|env|xml|yaml|config)" | sort -u | awk '{print "HIT|"$1}' >> "$tmp_pipe"
+                    
+                    # Быстрый последовательно-фоновый перебор словаря
+                    for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
+                        [[ -z "$f" ]] && continue
+                        (
+                            local code=$(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 2 "https://$host/$f")
+                            [[ "$code" == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
+                        ) &
+                    done
+                    wait
+                ) &
+                show_spinner $! "Многопоточный перебор сигнатурной матрицы"
             fi
-            rm -f "$signals_file"
+
+            # 1.3 Вывод результатов в стиле вертикального дерева с контентной фильтрацией
+            echo -e "\n${BW}  📌 ОБНАРУЖЕННЫЕ КОМПОНЕНТЫ И УЯЗВИМОСТИ СТРУКТУРЫ:${NC}"
+            echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+
+            while IFS='|' read -r tag target; do
+                [[ -z "$target" ]] && continue
+                
+                # Загружаем первые 500 байт для точной верификации содержимого
+                local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
+                
+                # ЗАЩИТНЫЙ ФИЛЬТР SOFT-404: Отсекаем фальшивые страницы успешного ответа
+                if echo "$head_check" | grep -qiE "not found|страница не найдена|error 404|ошибка 404|welcome to nginx|forbidden"; then
+                    continue
+                fi
+                
+                # Если контент прошел валидацию и не содержит сигнатур блокировок
+                if ! echo "$head_check" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}"; then
+                    
+                    # Проверяем объект на принадлежность к критическим файлам конфигурации
+                    if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}|\.(sql|env|config|yaml|local)$"; then
+                        core_engine_loot "CRITICAL" "Exposed: $target on $host"
+                        echo -e "${R}[CRITICAL]${NC} $target" >> "$results_file"
+                        
+                        # Колонна выстроена строго по ширине в 32 символа
+                        printf "  ${DG}├──${NC} ${BR}%-32s${NC} →   ${R}[КРИТИЧЕСКИЙ СБОЙ]${NC} 🔥 Данные конфигурации в открытом доступе\n" "$target"
+                        ((count_critical++))
+                    else
+                        echo -e "${G}[FILE]${NC} $target" >> "$results_file"
+                        
+                        printf "  ${DG}├──${NC} ${W}%-32s${NC} →   ${G}[АКТИВНЫЙ ФАЙЛ]${NC}    ✓ Объект структуры доступен (HTTP 200)\n" "$target"
+                        ((count_files++))
+                    fi
+                    
+                    # Если файл текстовый/скриптовый — отправляем на глубокий контентный анализ
+                    if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[2]}|${GLOBAL_SAST_MATRIX[3]}"; then
+                        run_deep_file_probe "$host" "$target" "$head_check"
+                    fi
+                fi
+            done < <(sort -u "$tmp_pipe")
+            
+            echo -e "  ${DG}└──  [КОНЕЦ СТРУКТУРНОГО ДЕРЕВА]${NC}"
+            echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+            rm -f "$tmp_pipe" "$signals_file"
+
+            # СОВРЕМЕННЫЙ КОМПАКТНЫЙ РЕЗЮМИРУЮЩИЙ БЛОК (SUMMARY)
+            echo -e "\n${BC}⚡  ДЕТАЛИЗАЦИЯ СЕССИИ АУДИТА:${NC}"
+            echo -e "    ${C}🎯 Хост:${NC} ${BW}$host${NC}"
+            echo -e "    ${R}🚨 Критические риски:${NC} ${BR}$count_critical уязвимостей${NC}"
+            echo -e "    ${G}📂 Найдено скриптов:${NC} ${BG}$count_files объектов структуры${NC}"
+            echo -e "    ${M}📦 Результирующий лог:${NC} ${M}$results_file${NC}\n"
             ;;
             
         "infrastructure")
@@ -8804,14 +8845,15 @@ run_smart_auditor_nexus() {
             
             echo -e "\n  ${BY}[*] АНАЛИЗ ИНФРАСТРУКТУРНОЙ МАТРИЦЫ:${NC} ${BW}$input${NC}"
             
-            nmap -T3 -n -Pn -sV --script="safe,discovery" -p "80,443,22,21,8080" "$input" >> "$results_file" 2>&1 &
+            # Настройка nmap на оптимальный баланс скрытности и скорости сканирования базовых портов
+            nmap -T3 -n -Pn -sV --script="safe,discovery" -p "80,443,22,21,8080,3306,5432" "$input" >> "$results_file" 2>&1 &
             show_spinner $! "Зондирование сетевой карты портов"
             
             echo -e "\n${BG}📊 КАРТА ДИСЛОКАЦИИ СЕТЕВЫХ СЛУЖБ:${NC}"
             echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
             
             if [ -f "$results_file" ]; then
-                # Строим вывод nmap в виде ветвей дерева
+                # Трансформируем сырой вывод утилиты в красивое дерево ветвления
                 grep -E "^[0-9]+/tcp|/[a-z]|^\|" "$results_file" | sed \
                     -e "s/open/${BG}ОТКРЫТ${NC}/g" \
                     -e "s/filtered/${BY}ФИЛЬТР${NC}/g" \
@@ -8827,13 +8869,13 @@ run_smart_auditor_nexus() {
             echo -e "  ${BY}[*] ЗАПРОС К КОРНЕВЫМ МЕТАДАННЫМ СЛУЖБЫ...${NC}"
             
             local service_output
-            service_output=$(curl -I -s --connect-timeout 5 "$input") &
+            service_output=$(curl -I -s --connect-timeout 5 -A "${GLOBAL_NETWORK_UA[0]}" "$input") &
             show_spinner $! "Анализ ответов веб-сервера"
             
             if [[ -n "$service_output" ]]; then
                 echo -e "\n${BC}🧬 МЕТАДАННЫЕ И СЛУЖЕБНЫЕ СПЕЦИФИКАЦИИ СЛУЖБЫ:${NC}"
                 echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
-                # Превращаем сырые заголовки в красивое бестабличное дерево
+                # Превращаем сырые заголовки HTTP-ответа в красивую бестабличную колонну
                 echo "$service_output" | sed 's/\r//' | while read -r line; do
                     [[ -z "$line" ]] && continue
                     echo -e "  ${DG}├──${NC} ${W}$line${NC}"
