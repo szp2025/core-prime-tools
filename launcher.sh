@@ -3209,25 +3209,27 @@ get_tool_info() {
 
 function run_nexus_forensic() {
     clear
-    echo "===================================================="
-    echo "  NEXUS GLOBAL FORENSIC // CORE v5.1 [DYNAMIC ENGINE]"
-    echo "===================================================="
-    echo " ACCEPTED INPUT SIGNATURES & VALIDATION CORE:"
-    echo " • [Vehicles]    FR SIV / RU CIS Plates"
-    echo " • [Business]    SIRET, SIREN, LEI, Corporate Name"
-    echo " • [Geoloc]      Physical Addresses / BAN Vectors"
-    echo " • [Finance]     IBAN ISO MOD-97 Compliance"
-    echo " • [Telecom]     Phone E.164 / Email / Nicknames"
-    echo "────────────────────────────────────────────────────"
-    read -r -p " [INPUT] TARGET SIGNATURE > " TARGET_DATA
+    echo "======================================================================"
+    echo "NEXUS AUTOMATIC GLOBAL OSINT & FORENSIC CORE v4.9 [PRODUCTION ENGINE]"
+    echo "======================================================================"
+    echo "ACCEPTED INPUT SIGNATURES & VALIDATION PARAMETERS:"
+    echo "  • [Vehicles]    French Plates (SIV MASK: AA-000-AA / AA000AA), RU/CIS (X000XX00)"
+    echo "  • [Business FR] Enterprise Registry: SIRET (14-dig), SIREN (9-dig), Corporate Name"
+    echo "  • [Business Glb] Legal Entity Identifier (LEI - 20 alphanumeric characters)"
+    echo "  • [Geolocation] Physical Addresses (Streets, Cities, BAN Vectors, OSM Geocodes)"
+    echo "  • [Finances]    International Bank Account Numbers (IBAN ISO MOD-97 Compliance)"
+    echo "  • [Telecom]     Phone Numbers (E.164 Global Format, Mobile/VOIP), Corporate Domains"
+    echo "  • [Network]     Email Intercepts (User@Domain), IP Addresses, Alias Nicknames (@Name)"
+    echo "----------------------------------------------------------------------"
+    read -r -p "ENTER TARGET DATA FOR EXTENDED DISPATCHING > " TARGET_DATA
     
     if [ -z "${TARGET_DATA}" ]; then
-        echo -e "\n [!] Sequence empty. Terminating..."
+        echo -e "\n[CANCEL] Target sequence empty. Terminating pipeline..."
         sleep 1
         return 0
     fi
 
-    echo -e "\n [+] Deploying dynamic signature matrix..."
+    echo -e "\n[+] Deploying sub-modules and high-density signature matrix..."
   
     local UA_JOINED=""
     if [ -n "${GLOBAL_NETWORK_UA[*]}" ]; then
@@ -3257,7 +3259,6 @@ import random
 import socket
 import urllib.parse
 import json
-import textwrap
 
 HAS_BROTLI = False
 try:
@@ -3274,7 +3275,7 @@ try:
     import phonenumbers
     from phonenumbers import geocoder, carrier, timezone
 except ImportError:
-    print("\n [!] 'phonenumbers' missing. Environment unstable.")
+    print("\n[CRITICAL SYSTEM ERROR] 'phonenumbers' dependency missing. Environment unstable.")
     sys.exit(1)
 
 ext_ua_raw = os.getenv("NEXUS_EXT_UA", "")
@@ -3282,7 +3283,8 @@ if ext_ua_raw:
     GLOBAL_NETWORK_UA = ext_ua_raw.split("|||")
 else:
     GLOBAL_NETWORK_UA = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
     ]
 
 def get_rotated_headers():
@@ -3290,270 +3292,410 @@ def get_rotated_headers():
     return {
         "User-Agent": random.choice(GLOBAL_NETWORK_UA),
         "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
         "Accept-Encoding": encoding,
-        "Cache-Control": "no-cache"
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
     }
 
 def verify_iban_checksum(iban: str) -> bool:
-    if len(iban) < 4: return False
+    if len(iban) < 4: 
+        return False
     rearranged = iban[4:] + iban[:4]
     integer_string = "".join(str(ord(char) - 55) if char.isalpha() else char for char in rearranged)
-    try: return int(integer_string) % 97 == 1
-    except ValueError: return False
+    try: 
+        return int(integer_string) % 97 == 1
+    except ValueError: 
+        return False
 
 def calculate_french_vat(siren: str) -> str:
     try:
         siren_int = int(siren.replace(" ", ""))
         vat_key = (12 + 3 * (siren_int % 97)) % 97
         return f"FR{vat_key:02d}{siren_int}"
-    except: return "N/A"
+    except Exception:
+        return "N/A"
 
 class NexusForensicDispatcher:
     def __init__(self):
         self.report = []
-        # Ширина левой колонки для ключей (включая маркер)
-        self.key_width = 22 
-        # Допустимая общая ширина контента для узких экранов мобильных устройств
-        self.max_width = 54
 
-    def section(self, name):
-        return f"\n─── [ {name} ] ──────────────────────────────────────"
+    def format_section_header(self, title):
+        return f"\n┌─── [ {title} ] " + "─" * (58 - len(title))
 
-    def row(self, key, val, sym="•"):
-        val_str = str(val).strip()
-        prefix = f" [{sym}] {key:<14} : "
-        indent = " " * len(prefix)
-        
-        # Доступная ширина для самого значения на одну строку
-        available_width = max(20, self.max_width - len(prefix))
-        
-        # Умный динамический перенос без обрезания данных
-        wrapped_lines = textwrap.wrap(val_str, width=available_width)
-        
-        if not wrapped_lines:
-            return f"{prefix}N/A"
-            
-        res = f"{prefix}{wrapped_lines[0]}"
-        for line in wrapped_lines[1:]:
-            res += f"\n{indent}{line}"
-        return res
+    def format_row(self, label, value, tag=" "):
+        return f"│ [{tag}] {label:<26} : {value}"
 
-    def link(self, key, url):
-        return self.row(key, url, sym="↗")
+    def format_link_row(self, label, value):
+        return f"│ [↗] {label:<26} : {value}"
+
+    def format_footer(self):
+        return "└─────────────────────────────────────────────────────────────────────"
 
     async def process_license_plate(self, session, clean_data, country_hint):
-        self.report.append(self.section("VEHICLE CORE"))
-        self.report.append(self.row("SIGNATURE", clean_data))
-        self.report.append(self.row("COUNTRY", country_hint))
+        self.report.append(self.format_section_header("VEHICLE INTELLIGENCE REGISTER"))
+        self.report.append(self.format_row("IDENTIFIED SIGNATURE", clean_data, "•"))
+        self.report.append(self.format_row("REGISTRATION COUNTRY", country_hint, "•"))
         
         if country_hint == "FRANCE (SIV / F-Plate)":
-            formatted = f"{clean_data[:2]}-{clean_data[2:5]}-{clean_data[5:]}" if len(clean_data) == 7 else clean_data
+            formatted = clean_data
+            if len(clean_data) == 7:
+                formatted = f"{clean_data[:2]}-{clean_data[2:5]}-{clean_data[5:]}"
+            
+            self.report.append(self.format_row("NORMALIZED SIV MASK", formatted, "•"))
             url = f"https://www.oscaro.com/catalog/vehicles/v2/plates/{formatted}"
             try:
                 async with session.get(url, headers=get_rotated_headers(), timeout=12) as resp:
+                    res_json = None
                     if resp.status == 200:
-                        if 'br' in resp.headers.get('Content-Encoding', '').lower() and HAS_BROTLI:
-                            res_json = json.loads(brotli.decompress(await resp.read()).decode('utf-8'))
+                        content_encoding = resp.headers.get('Content-Encoding', '').lower()
+                        if 'br' in content_encoding:
+                            raw_bytes = await resp.read()
+                            if HAS_BROTLI:
+                                decoded_text = brotli.decompress(raw_bytes).decode('utf-8')
+                                res_json = json.loads(decoded_text)
+                            else:
+                                raise RuntimeError("Brotli core compressed, but library missing.")
                         else:
                             res_json = await resp.json()
 
-                        v = res_json.get('vehicle', {}) or res_json.get('data', {}) if res_json else {}
-                        if v:
+                        vehicle = res_json.get('vehicle', {}) or res_json.get('data', {}) if res_json else {}
+                        if vehicle:
                             self.report.extend([
-                                self.row("BRAND", str(v.get('brand', v.get('make', 'N/A'))).upper(), "+"),
-                                self.row("MODEL", str(v.get('model', 'N/A')).upper(), "+"),
-                                self.row("BODY", str(v.get('body_type', 'N/A')).upper(), "+"),
-                                self.row("FUEL", str(v.get('engine', v.get('energy', 'N/A'))).upper(), "+"),
-                                self.row("POWER", f"{v.get('power','N/A')} HP / {v.get('kw','N/A')} KW", "+"),
-                                self.row("GEARBOX", str(v.get('gearbox', 'N/A')).upper(), "+"),
-                                self.row("CRIT_AIR", v.get('critair', 'N/A'), "+"),
-                                self.row("YEAR", v.get('year', 'N/A'), "+")
+                                self.format_row("MANUFACTURER / BRAND", str(vehicle.get('brand', vehicle.get('make', 'N/A'))).upper(), "+"),
+                                self.format_row("MODEL SPECIFICATION", str(vehicle.get('model', 'N/A')).upper(), "+"),
+                                self.format_row("BODY CONFIGURATION", str(vehicle.get('body_type', 'N/A')).upper(), "+"),
+                                self.format_row("FUEL / ENERGY CODE", str(vehicle.get('engine', vehicle.get('energy', 'N/A'))).upper(), "+"),
+                                self.format_row("POWER SPECS (HP / KW)", f"{vehicle.get('power', 'N/A')} HP / {vehicle.get('kw', 'N/A')} KW", "+"),
+                                self.format_row("GEARBOX TRANSMISSION", str(vehicle.get('gearbox', 'N/A')).upper(), "+"),
+                                self.format_row("CRIT_AIR CAPACITY", vehicle.get('critair', 'N/A'), "+"),
+                                self.format_row("PRODUCTION YEAR MATRIX", vehicle.get('year', 'N/A'), "+")
                             ])
-                        else: self.report.append(self.row("DATABASE STATUS", "EMPTY OBJECT", "!"))
-                    else: self.report.append(self.row("RESTRICTION", f"HTTP {resp.status}", "!"))
-            except Exception as e: self.report.append(self.row("DECODE ERROR", str(e), "!"))
-            self.report.extend([self.link("Oscaro Profile", f"https://www.oscaro.com"), self.link("SevenPlates Core", f"https://www.sevenplates.com")])
+                        else:
+                            self.report.append(self.format_row("OSCARO DATABASE STATUS", "EMPTY VEHICLE SHAPE OBJECT", "!"))
+                    else:
+                        self.report.append(self.format_row("CATALOG RESTRICTION", f"HTTP STATUS CODE {resp.status}", "!"))
+            except Exception as e:
+                self.report.append(self.format_row("DECODING PIPELINE BREAK", str(e), "!"))
+                
+            self.report.append("│")
+            self.report.append(self.format_link_row("Oscaro Catalog Profile", "https://www.oscaro.com/"))
+            self.report.append(self.format_link_row("SevenPlates History Core", "https://www.sevenplates.com/"))
+                
         elif country_hint == "RUSSIA / CIS (RU-Plate)":
-            self.report.append(self.link("EAISTO Google", f"https://www.google.com/search?q=%22{clean_data}%22"))
-            self.report.append(self.link("RSA Insurance", "https://dkbm-web.autoins.ru/dkbm-web-1.0/bso.htm"))
+            self.report.append("│")
+            self.report.append(self.format_link_row("EAISTO Diagnostic Audit", f"https://www.google.com/search?q=%22{clean_data}%22+AND+%22техосмотр%22"))
+            self.report.append(self.format_link_row("Commercial Taxi Check", f"https://www.google.com/search?q=%22{clean_data}%22+AND+%22такси%22"))
+            self.report.append(self.format_link_row("AvtoKod Registry Dork", f"https://www.google.com/search?q=%22{clean_data}%22+AND+%22vin%22"))
+            self.report.append(self.format_link_row("RSA Insurance Core Locator", "https://dkbm-web.autoins.ru/dkbm-web-1.0/bso.htm"))
+            
+        self.report.append(self.format_footer())
 
     async def process_sirene(self, session, raw_data):
-        self.report.append(self.section("REPERTOIRE SIRENE"))
-        url = f"https://recherche-entreprises.api.gouv.fr/search?q={urllib.parse.quote(raw_data)}&per_page=2"
+        self.report.append(self.format_section_header("REPERTOIRE SIRENE NATIONAL FR"))
+        self.report.append(self.format_row("TARGET SEARCH QUERY", raw_data, "•"))
+        
+        encoded_query = urllib.parse.quote(raw_data)
+        url = f"https://recherche-entreprises.api.gouv.fr/search?q={encoded_query}&per_page=3"
         try:
             async with session.get(url, headers=get_rotated_headers(), timeout=10) as resp:
                 if resp.status == 200:
-                    results = (await resp.json()).get('results', [])
+                    data = await resp.json()
+                    results = data.get('results', [])
                     if not results:
-                        self.report.append(self.row("REGISTRY RECORD", "0 MATCHES FOUND", "!"))
+                        self.report.append(self.format_row("INSEE REGISTRY RECORD", "0 MATCHES FOUND IN DATABASE", "!"))
+                        self.report.append(self.format_footer())
                         return
                     
                     for idx, company in enumerate(results[:2], 1):
                         siren = company.get('siren', '')
                         siege = company.get('siege', {})
-                        if idx > 1: self.report.append("  ──────────────────────────────────────────────────")
+                        
+                        if idx > 1:
+                            self.report.append("├─────────────────────────────────────────────────────────────────────")
+                            
                         self.report.extend([
-                            self.row(f"MATCH #{idx}", company.get('nom_complet', 'N/A'), "#"),
-                            self.row("SIREN", siren, "+"),
-                            self.row("SIRET HQ", siege.get('siret', 'N/A'), "+"),
-                            self.row("FR VAT KEY", calculate_french_vat(siren), "+"),
-                            self.row("NAF/APE CODE", company.get('activite_principale', 'N/A'), "+"),
-                            self.row("CREATION DATE", company.get('date_creation', 'N/A'), "+"),
-                            self.row("HQ ADDRESS", company.get('adresse_complete', 'N/A'), "+")
+                            self.format_row(f"MATCH POSITION #{idx}", company.get('nom_complet', 'N/A'), "#"),
+                            self.format_row("SIREN IDENTIFIER", siren, "+"),
+                            self.format_row("SIRET HQ IDENTIFIER", siege.get('siret', 'N/A'), "+"),
+                            self.format_row("CALCULATED FR VAT", calculate_french_vat(siren), "+"),
+                            self.format_row("MAIN NAF/APE ACTIVITY", company.get('activite_principale', 'N/A'), "+"),
+                            self.format_row("LEGAL NATURE FORM", company.get('nature_juridique', 'N/A'), "+"),
+                            self.format_row("DATE OF CREATION", f"{company.get('date_creation', 'N/A')} (Active: {company.get('etat_administratif', 'N/A')})", "+"),
+                            self.format_row("TOTAL EMPLOYEES BAND", company.get('tranche_effectif_salarie', 'N/A'), "+"),
+                            self.format_row("REGISTERED HQ ADDRESS", company.get('adresse_complete', 'N/A'), "+")
                         ])
+                        
                         dirigeants = company.get('dirigeants', [])
                         if dirigeants:
+                            self.report.append("│ [i] --- STRUCTURAL REPRESENTATIVES / DIRIGEANTS ---")
                             for dg in dirigeants[:3]:
-                                t = "PHY" if dg.get('nature_juridique') == 'PHY' else 'CORP'
-                                name = f"{dg.get('prenoms', '')} {dg.get('nom', '')}".strip()
-                                self.report.append(self.row(f"DIRIGEANT ({t})", f"{name} ({dg.get('qualite', 'Gérant')})", "i"))
+                                dg_type = "PHYSICAL" if dg.get('nature_juridique') == 'PHY' else 'MORAL'
+                                name_str = f"{dg.get('prenoms', '')} {dg.get('nom', '')}".strip()
+                                self.report.append(f"│     • [{dg_type}] {name_str} ({dg.get('qualite', 'Responsable')})")
+                        
                         if siren:
-                            self.report.append(self.link("Pappers Link", f"https://www.pappers.fr/entreprise/{siren}"))
-                            self.report.append(self.link("Societe Link", f"https://www.societe.com/societe/structure-{siren}.html"))
-                else: self.report.append(self.row("INSEE GATEWAY", f"HTTP CODE {resp.status}", "!"))
-        except Exception as e: self.report.append(self.row("PIPELINE ERROR", str(e), "!"))
+                            self.report.append("│")
+                            self.report.append(self.format_link_row("Pappers Corporate Profile", f"https://www.pappers.fr/entreprise/{siren}"))
+                            self.report.append(self.format_link_row("Societe Commercial ID", f"https://www.societe.com/societe/structure-{siren}.html"))
+                            self.report.append(self.format_link_row("Infogreffe Greffe Search", f"https://www.infogreffe.fr/recherche-greffe/entreprises/{siren}"))
+                else:
+                    self.report.append(self.format_row("INSEE API INTERCEPT FAILURE", f"HTTP CODE {resp.status}", "!"))
+        except Exception as e:
+            self.report.append(self.format_row("TRANSMISSION PIPELINE ERROR", str(e), "!"))
+            
+        self.report.append(self.format_footer())
 
     async def process_physical_address(self, session, raw_data):
-        self.report.append(self.section("GEOGRAPHIC CADASTRAL"))
+        self.report.append(self.format_section_header("GEOGRAPHIC CADASTRAL FORENSIC ENGINE"))
+        self.report.append(self.format_row("INPUT GEOLOCATION DATA", raw_data, "•"))
+        
         url = f"https://api-adresse.data.gouv.fr/search/?q={urllib.parse.quote(raw_data)}&limit=1"
         try:
             async with session.get(url, headers=get_rotated_headers(), timeout=8) as resp:
                 if resp.status == 200:
-                    features = (await resp.json()).get('features', [])
+                    data = await resp.json()
+                    features = data.get('features', [])
                     if features:
                         target = features[0]
                         coords = target.get('geometry', {}).get('coordinates', [0, 0])
                         prop = target.get('properties', {})
+                        
                         self.report.extend([
-                            self.row("LABEL", prop.get('label', 'N/A'), "+"),
-                            self.row("ACCURACY", f"{prop.get('score', 0) * 100:.2f}% Match", "+"),
-                            self.row("POSTCODE", prop.get('postcode', 'N/A'), "+"),
-                            self.row("INSEE CODE", prop.get('citycode', 'N/A'), "+"),
-                            self.row("LATITUDE", str(coords[1]), "+"),
-                            self.row("LONGITUDE", str(coords[0]), "+")
+                            self.format_row("STANDARDIZED GEO LABEL", prop.get('label', 'N/A'), "+"),
+                            self.format_row("ACCURACY MATCH SCORE", f"{prop.get('score', 0) * 100:.2f}% Reliability", "+"),
+                            self.format_row("POSTAL CODE ZONE", prop.get('postcode', 'N/A'), "+"),
+                            self.format_row("NATIONAL INSEE CITY CODE", prop.get('citycode', 'N/A'), "+"),
+                            self.format_row("ADMINISTRATIVE DISTRICT", prop.get('context', 'N/A'), "+"),
+                            self.format_row("GEOMETRIC LONGITUDE", str(coords[0]), "+"),
+                            self.format_row("GEOMETRIC LATITUDE", str(coords[1]), "+")
                         ])
-                        self.report.append(self.link("OpenStreetMap", f"https://www.openstreetmap.org/?mlat={coords[1]}&mlon={coords[0]}"))
-                        self.report.append(self.link("Google Satellite", f"http://maps.google.com/?q={coords[1]},{coords[0]}"))
-                    else: self.report.append(self.row("RESOLVER MATRIX", "0 VECTORS FOUND", "!"))
-                else: self.report.append(self.row("ENGINE CODE", f"HTTP {resp.status}", "!"))
-        except Exception as e: self.report.append(self.row("RESOLVER ERROR", str(e), "!"))
+                        
+                        self.report.append("│")
+                        self.report.append(self.format_link_row("OpenStreetMap Mapping", f"https://www.openstreetmap.org/?mlat={coords[1]}&mlon={coords[0]}#map=18/{coords[1]}/{coords[0]}"))
+                        self.report.append(self.format_link_row("Google Maps Satellite", f"http://maps.google.com/?q={coords[1]},{coords[0]}&t=k"))
+                        self.report.append(self.format_link_row("Géoportail National FR", f"https://www.geoportail.gouv.fr/carte?c={coords[0]},{coords[1]}&z=17&permalink=yes"))
+                    else:
+                        self.report.append(self.format_row("GEOCODING RESOLVER MATRIX", "RETURNED 0 VECTOR COORDINATES", "!"))
+                else:
+                    self.report.append(self.format_row("SPATIAL ENGINE FAILURE", f"HTTP STATUS {resp.status}", "!"))
+        except Exception as e:
+            self.report.append(self.format_row("CADASTRAL RESOLVER ERROR", str(e), "!"))
+            
+        self.report.append(self.format_footer())
 
     async def process_iban(self, session, clean_data):
-        self.report.append(self.section("FINANCIAL SEPA TRACER"))
-        self.report.append(self.row("IBAN SIG", clean_data))
-        chk = verify_iban_checksum(clean_data)
-        self.report.append(self.row("ISO MOD-97", "PASSED" if chk else "CORRUPTED", "+" if chk else "!"))
-        self.report.append(self.row("COUNTRY CODE", clean_data[:2], "+"))
+        self.report.append(self.format_section_header("FINANCIAL AUDIT SEPA TRACER"))
+        self.report.append(self.format_row("IBAN DIGIT SEQUENCE", clean_data, "•"))
+        
+        checksum_pass = verify_iban_checksum(clean_data)
+        status_msg = "PASSED STRUCTURE INTEGRITY" if checksum_pass else "CORRUPTED CONTROLSUM SIGNATURE"
+        self.report.append(self.format_row("ISO MOD-97 VALIDATION", status_msg, "+" if checksum_pass else "!"))
+        self.report.append(self.format_row("ISSUING COUNTRY ISOLATION", clean_data[:2], "+"))
         
         url = f"https://api.openiban.org/validate/{clean_data}"
         try:
             async with session.get(url, headers=get_rotated_headers(), timeout=8) as resp:
                 if resp.status == 200:
-                    b = (await resp.json()).get('bankData', {})
-                    if b:
+                    res_data = await resp.json()
+                    bank_data = res_data.get('bankData', {})
+                    if bank_data:
                         self.report.extend([
-                            self.row("BANK NAME", b.get('name', 'N/A'), "+"),
-                            self.row("BIC/SWIFT", b.get('bic', 'N/A'), "+"),
-                            self.row("ROUTING CODE", b.get('bankCode', 'N/A'), "+"),
-                            self.row("BANK CITY", b.get('city', 'N/A'), "+")
+                            self.format_row("CENTRAL INSTITUTION NAME", bank_data.get('name', 'N/A'), "+"),
+                            self.format_row("BIC / SWIFT ROUTING KEY", bank_data.get('bic', 'N/A'), "+"),
+                            self.format_row("NATIONAL BANK ROUTING ID", bank_data.get('bankCode', 'N/A'), "+"),
+                            self.format_row("REGISTRATION CITY ORIGIN", bank_data.get('city', 'N/A'), "+"),
+                            self.format_row("ZIP CODE LOCATOR", bank_data.get('zip', 'N/A'), "+")
                         ])
-                    else: self.report.append(self.row("SEPA REGISTRY", "NO DATA SHAPE", "i"))
-                else: self.report.append(self.row("GATEWAY REJECT", f"HTTP {resp.status}", "!"))
-        except Exception as e: self.report.append(self.row("TRACER CRASH", str(e), "!"))
-        self.report.append(self.link("IBAN Calc Hub", "https://www.ibancalculator.com"))
+                    else:
+                        self.report.append(self.format_row("SEPA REGISTRY TRACE", "VALID CHECKSUM, PROFILE DETAIL MISSING", "i"))
+                else:
+                    self.report.append(self.format_row("FINANCIAL GATEWAY PROFILE", f"REJECTED WITH STATUS {resp.status}", "!"))
+        except Exception as e:
+            self.report.append(self.format_row("SEPA TRACER PIPELINE ERROR", str(e), "!"))
+            
+        self.report.append("│")
+        self.report.append(self.format_link_row("IBAN Calculator Intel Hub", "https://www.ibancalculator.com/"))
+        self.report.append(self.format_footer())
 
     async def process_phone(self, session, clean_data):
-        norm = re.sub(r'[^0-9+]', '', clean_data)
-        if not norm.startswith('+'): norm = '+7' + norm[1:] if norm.startswith('8') else '+' + norm
-        self.report.append(self.section("TELECOM MATRIX"))
-        self.report.append(self.row("E.164 DATA", norm))
+        normalized = re.sub(r'[^0-9+]', '', clean_data)
+        if not normalized.startswith('+'):
+            normalized = '+7' + normalized[1:] if normalized.startswith('8') else '+' + normalized
+            
+        self.report.append(self.format_section_header("TELECOMMUNICATION CARRIER FORENSIC"))
+        self.report.append(self.format_row("NORMALIZED E.164 MATRIX", normalized, "•"))
+        
         try:
-            p = phonenumbers.parse(norm, None)
+            p = phonenumbers.parse(normalized, None)
             if phonenumbers.is_valid_number(p):
-                rc = phonenumbers.region_code_for_number(p)
-                carrier_name = carrier.name_for_number(p, "fr" if rc == "FR" else "en") or "UNKNOWN"
+                region_code = phonenumbers.region_code_for_number(p)
+                lang = "fr" if region_code == "FR" else "en"
+                tz_list = timezone.time_zones_for_number(p)
+                carrier_name = carrier.name_for_number(p, lang) or "VIRTUAL / VOIP / UNKNOWN"
+                
                 self.report.extend([
-                    self.row("COMPLIANCE", "VALIDATED CELLULAR SIGNATURE", "+"),
-                    self.row("ALLOCATION", geocoder.description_for_number(p, "en"), "+"),
-                    self.row("PROVIDER", carrier_name, "+"),
-                    self.row("NATIONAL FORM", phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL), "+")
+                    self.format_row("E.164 COMPLIANCE STATUS", "VALIDATED CELLULAR SIGNATURE", "+"),
+                    self.format_row("GEOGRAPHICAL ALLOCATION", f"{geocoder.description_for_number(p, lang)} ({region_code})", "+"),
+                    self.format_row("ORIGINAL NETWORK PROVIDER", carrier_name, "+"),
+                    self.format_row("INFRASTRUCTURE TIMEZONES", ", ".join(tz_list), "+"),
+                    self.format_row("NATIONAL FORMAT PATTERN", phonenumbers.format_number(p, phonenumbers.PhoneNumberFormat.NATIONAL), "+")
                 ])
-                digits = norm.replace("+", "")
-                self.report.extend([
-                    self.link("WhatsApp Mesh", f"https://wa.me/{digits}"),
-                    self.link("Telegram Route", f"https://t.me/{norm}")
-                ])
-            else: self.report.append(self.row("E.164 COMPLIANCE", "FAIL MASK MATCH", "!"))
-        except Exception as e: self.report.append(self.row("PROCESS CRASH", str(e), "!"))
+                
+                self.report.append("│")
+                self.report.append(self.format_row("CELLULAR COMMUNICATIONS LINKAGE MATRIX", "", "i"))
+                digits_only = normalized.replace("+", "")
+                self.report.append(self.format_link_row("WhatsApp Direct API Mesh", f"https://wa.me/{digits_only}"))
+                self.report.append(self.format_link_row("Telegram Direct Routing", f"https://t.me/{normalized}"))
+                self.report.append(self.format_link_row("Viber Internal Protocol", f"viber://chat?number={digits_only}"))
+                self.report.append(self.format_link_row("PhoneYourBuddy OSINT Node", "https://lookid.com/"))
+            else:
+                self.report.append(self.format_row("GOOGLE E.164 COMPLIANCE", "FAILED INTERNAL VALIDATION MASK", "!"))
+        except Exception as e:
+            self.report.append(self.format_row("TELECOM PROCESSING CRASH", str(e), "!"))
+            
+        self.report.append(self.format_footer())
 
     async def process_email(self, session, clean_data):
         domain = clean_data.split('@')[-1]
-        self.report.append(self.section("EMAIL INFRASTRUCTURE"))
-        self.report.append(self.row("TARGET MX", clean_data))
-        self.report.append(self.row("APEX DOMAIN", domain))
+        self.report.append(self.format_section_header("TARGET EMAIL & MX INFRASTRUCTURE"))
+        self.report.append(self.format_row("EMAIL ADDRESS TARGET", clean_data, "•"))
+        self.report.append(self.format_row("ISOLATED APEX DOMAIN", domain, "•"))
+        
         loop = asyncio.get_event_loop()
         try:
-            ip = await loop.run_in_executor(None, lambda: socket.gethostbyname(domain))
-            self.report.append(self.row("A RECORD IPV4", ip, "+"))
-        except: self.report.append(self.row("A RECORD IPV4", "RESOLVE REFUSED", "!"))
-        self.report.append(self.link("Hunter.io Scraper", f"https://hunter.io/try/domain/{domain}"))
-        self.report.append(self.link("MXToolbox Core", f"https://mxtoolbox.com/SuperTool.aspx?action=mx%3a{domain}"))
+            ip_v4 = await loop.run_in_executor(None, lambda: socket.gethostbyname(domain))
+            self.report.append(self.format_row("A RECORD DOMAIN IPV4", ip_v4, "+"))
+        except:
+            self.report.append(self.format_row("A RECORD DOMAIN IPV4", "RESOLVE HOSTNAME REFUSED / COLD", "!"))
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                'nslookup', '-type=mx', domain,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await proc.communicate()
+            output = stdout.decode(errors='ignore')
+            mx_matches = re.findall(r'(?:mail exchanger\s*=\s*|exchanger\s*=\s*)([a-zA-Z0-9.-]+)', output, re.IGNORECASE) or re.findall(r'MX\s+[0-9]+\s+([a-zA-Z0-9.-]+)', output)
+                
+            if mx_matches:
+                for idx, mx_srv in enumerate(mx_matches[:3], 1):
+                    mx_clean = mx_srv.strip('.')
+                    try:
+                        mx_ip = await loop.run_in_executor(None, lambda: socket.gethostbyname(mx_clean))
+                        ip_str = f"({mx_ip})"
+                    except:
+                        ip_str = "(UNRESOLVABLE)"
+                    self.report.append(self.format_row(f"MX INTERCEPT LAYER #{idx}", f"{mx_clean} {ip_str}", "+"))
+            else:
+                self.report.append(self.format_row("MX INTERCEPT MATRIX", "NO ACTIVE EXCHANGERS FOUND", "i"))
+        except Exception as e:
+            self.report.append(self.format_row("NSLOOKUP CORE RESOLVER", str(e), "!"))
+            
+        self.report.append("│")
+        self.report.append(self.format_link_row("Hunter.io Corporate Leak Scraper", f"https://hunter.io/try/domain/{domain}"))
+        self.report.append(self.format_link_row("MXToolbox Advanced Diagnostics", f"https://mxtoolbox.com/SuperTool.aspx?action=mx%3a{domain}"))
+        self.report.append(self.format_link_row("IntelX Core Domain Storage", f"https://intelx.io/?s={domain}"))
+        self.report.append(self.format_footer())
 
     async def process_domain(self, session, clean_data):
-        self.report.append(self.section("SERVER RECON MATRIX"))
-        self.report.append(self.row("HOSTNAME", clean_data))
+        self.report.append(self.format_section_header("INFRASTRUCTURE SERVER RECON CORE"))
+        self.report.append(self.format_row("TARGET HOSTNAME RECON", clean_data, "•"))
+        
+        loop = asyncio.get_event_loop()
+        ip_v4 = "N/A"
         try:
-            ip = await asyncio.get_event_loop().run_in_executor(None, lambda: socket.gethostbyname(clean_data))
-            self.report.append(self.row("RESOLVED IPV4", ip, "+"))
-            self.report.append(self.link("Shodan Node", f"https://www.shodan.io/host/{ip}"))
+            ip_v4 = await loop.run_in_executor(None, lambda: socket.gethostbyname(clean_data))
+            self.report.append(self.format_row("RESOLVED HOST MATRIX IPV4", ip_v4, "+"))
         except:
-            self.report.append(self.row("RESOLVED IPV4", "OFFLINE / COLD", "!"))
-        self.report.append(self.link("CRT.sh Certs", f"https://crt.sh/?q={clean_data}"))
+            self.report.append(self.format_row("RESOLVED HOST MATRIX IPV4", "HOST DISCONNECTED / OFFLINE", "!"))
+
+        self.report.append("│")
+        if ip_v4 != "N/A":
+            self.report.append(self.format_link_row("Shodan Network Node Threat", f"https://www.shodan.io/host/{ip_v4}"))
+        else:
+            self.report.append(self.format_link_row("Shodan Domain Infrastructure", f"https://www.shodan.io/search?query={clean_data}"))
+        self.report.append(self.format_link_row("ViewDNS Reverse IP Tracker", f"https://viewdns.info/reverseip/?host={clean_data}&t=1"))
+        self.report.append(self.format_link_row("VirusTotal Intelligence Core", f"https://www.virustotal.com/gui/domain/{clean_data}/detection"))
+        self.report.append(self.format_link_row("CRT.sh Certificate Transparency", f"https://crt.sh/?q={clean_data}"))
+        self.report.append(self.format_footer())
 
     async def process_nickname(self, session, data):
-        self.report.append(self.section("ALIAS SCANNER CORE"))
-        self.report.append(self.row("TARGET NICK", data))
-        async def scan(plat, template):
+        self.report.append(self.format_section_header("CROSS-PLATFORM ALIAS SCANNER MATRIX"))
+        self.report.append(self.format_row("TARGET TARGET ALIAS", data, "•"))
+        
+        async def scan_profile(platform_name, url_template):
+            target_url = url_template.format(data)
             try:
-                async with session.get(template.format(data), headers=get_rotated_headers(), timeout=4) as r:
-                    if r.status == 200: return self.row(plat, f"FOUND LAYER -> {template.format(data)}", "+")
-                    return None
-            except: return None
+                async with session.get(target_url, headers=get_rotated_headers(), timeout=5) as r:
+                    if r.status == 200:
+                        return self.format_row(platform_name, f"[+] FOUND LAYER -> {target_url}", "+")
+                    elif r.status == 404:
+                        return self.format_row(platform_name, "RECORD NOT EXIST (404)", "─")
+                    else:
+                        return self.format_row(platform_name, f"COMPLIANCE BLOCK ({r.status})", "!")
+            except:
+                return self.format_row(platform_name, "REQUEST TIMEOUT ENCOUNTERED", "!")
+                
         results = await asyncio.gather(
-            scan('GitHub Code', 'https://github.com/{}'),
-            scan('Twitter / X', 'https://twitter.com/{}'),
-            scan('Reddit User', 'https://www.reddit.com/user/{}')
+            scan_profile('GitHub Code Core', 'https://github.com/{}'), 
+            scan_profile('Twitter / X Network', 'https://twitter.com/{}'),
+            scan_profile('Reddit Forum Node', 'https://www.reddit.com/user/{}'),
+            scan_profile('DockerHub Base Registry', 'https://hub.docker.com/u/{}')
         )
-        for res in results:
-            if res: self.report.append(res)
+        self.report.extend(results)
+        self.report.append(self.format_footer())
 
     async def run_pipeline(self, raw_data):
         raw_stripped = raw_data.strip()
         clean_data = raw_stripped.replace(" ", "").replace("-", "").upper()
-        resolved_mode = "NICK"
+        resolved_mode = None
+        country_hint = ""
 
-        if '@' in raw_stripped and not raw_stripped.startswith('@'): resolved_mode = "EMAIL"
-        elif raw_stripped.startswith('@'): resolved_mode = "NICK"; clean_data = raw_stripped.replace('@', '')
-        elif re.match(r'^[A-Z]{2}[0-9]{3}[A-Z]{2}$', clean_data) or re.match(r'^[0-9]{1,4}[A-Z]{2,3}[0-9]{2,3}$', clean_data): resolved_mode = "PLATE"; hint = "FRANCE (SIV / F-Plate)"
-        elif re.match(r'^[ABEKMHOPCTYX]{1}[0-9]{3}[ABEKMHOPCTYX]{2}[0-9]{2,3}$', clean_data): resolved_mode = "PLATE"; hint = "RUSSIA / CIS (RU-Plate)"
-        elif clean_data.isdigit() and (len(clean_data) == 9 or len(clean_data) == 14): resolved_mode = "SIRENE"
-        elif re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data) and any(c.isalpha() for c in clean_data[:2]): resolved_mode = "IBAN"
-        elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data: resolved_mode = "PHONE"
-        elif any(i in raw_stripped.lower() for i in ["rue", "avenue", "boulevard", "all.", "allée", "place", "улица", "дом"]): resolved_mode = "ADDRESS"
-        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$', clean_data): resolved_mode = "DOMAIN"
+        if '@' in raw_stripped and not raw_stripped.startswith('@'):
+            resolved_mode = "EMAIL"
+        elif raw_stripped.startswith('@'):
+            resolved_mode = "NICK"
+            clean_data = raw_stripped.replace('@', '')
+        elif re.match(r'^[A-Z]{2}[0-9]{3}[A-Z]{2}$', clean_data) or re.match(r'^[0-9]{1,4}[A-Z]{2,3}[0-9]{2,3}$', clean_data):
+            resolved_mode = "LICENSE_PLATE"
+            country_hint = "FRANCE (SIV / F-Plate)"
+        elif re.match(r'^[ABEKMHOPCTYX]{1}[0-9]{3}[ABEKMHOPCTYX]{2}[0-9]{2,3}$', clean_data):
+            resolved_mode = "LICENSE_PLATE"
+            country_hint = "RUSSIA / CIS (RU-Plate)"
+        elif clean_data.isdigit() and (len(clean_data) == 9 or len(clean_data) == 14):
+            resolved_mode = "SIRENE"
+        elif re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$', clean_data) and any(c.isalpha() for c in clean_data[:2]):
+            resolved_mode = "IBAN"
+        elif re.match(r'^\+?[0-9\s\-()]{7,20}$', clean_data) and not '.' in clean_data:
+            resolved_mode = "PHONE"
+        elif any(indicator in raw_stripped.lower() for indicator in ["rue", "avenue", "boulevard", "all.", "allée", "place", "route", "улица", "дом", "шоссе"]):
+            resolved_mode = "ADDRESS"
+        elif re.match(r'^([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$', clean_data):
+            resolved_mode = "DOMAIN"
         else:
-            if len(raw_stripped) > 3 and not '.' in raw_stripped: resolved_mode = "SIRENE"
+            if len(raw_stripped) > 3 and not '.' in raw_stripped:
+                resolved_mode = "SIRENE"
+            else:
+                resolved_mode = "NICK"
 
-        print(f" [VCTR] DISPATCH ROUTE -> {resolved_mode}")
+        print("⚡ [DISPATCH VECTOR] : MATCHED PIPELINE TYPE ->", resolved_mode)
 
         async with aiohttp.ClientSession(headers=get_rotated_headers()) as session:
-            if resolved_mode == "PLATE": await self.process_license_plate(session, clean_data, hint)
-            elif resolved_mode == "SIRENE": await self.process_sirene(session, raw_stripped)
-            elif resolved_mode == "ADDRESS": await self.process_physical_address(session, raw_stripped)
-            elif resolved_mode == "PHONE": await self.process_phone(session, clean_data)
-            elif resolved_mode == "EMAIL": await self.process_email(session, raw_stripped)
-            elif resolved_mode == "DOMAIN": await self.process_domain(session, clean_data)
-            elif resolved_mode == "NICK": await self.process_nickname(session, clean_data)
+            if resolved_mode == "LICENSE_PLATE":
+                await self.process_license_plate(session, clean_data, country_hint)
+            elif resolved_mode == "SIRENE":
+                await self.process_sirene(session, raw_stripped)
+            elif resolved_mode == "ADDRESS":
+                await self.process_physical_address(session, raw_stripped)
+            elif resolved_mode == "PHONE":
+                await self.process_phone(session, clean_data)
+            elif resolved_mode == "EMAIL":
+                await self.process_email(session, raw_stripped)
+            elif resolved_mode == "DOMAIN":
+                await self.process_domain(session, clean_data)
+            elif resolved_mode == "NICK":
+                await self.process_nickname(session, clean_data)
 
         print("\n".join(self.report))
 
@@ -3567,7 +3709,7 @@ EOF
         deactivate
     fi
     echo ""
-    read -n 1 -s -r -p " [CONTINUE] Press any key to return..."
+    read -n 1 -s -r -p "Press any key to return to the main menu..."
 }
 
 function run_nexus_forensicold() {
