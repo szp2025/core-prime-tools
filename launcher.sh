@@ -8651,7 +8651,179 @@ run_ghost_commander() {
     core_engine_wait
 }
 
+
+
 run_smart_auditor_nexus() {
+    clear
+    core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v2.0"
+
+    local input
+    input=$(core_engine_input "text" "Enter Target (Domain, IP, or Service URL)")
+    [[ -z "$input" ]] && return
+
+    # --- Цветовая палитра для профессионального вывода (если не заданы глобально) ---
+    local R='\033[0;31m'
+    local G='\033[0;32m'
+    local Y='\033[0;33m'
+    local B='\033[0;34m'
+    local M='\033[0;35m'
+    local C='\033[0;36m'
+    local NC='\033[0m'
+    local BOLD='\033[1m'
+
+    # --- 0. ИНТЕЛЛЕКТУАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ (Target Analyzer) ---
+    local target_type="unknown"
+    local host="$input"
+    
+    if [[ "$input" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+        target_type="infrastructure"
+    elif [[ "$input" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        target_type="web"
+    elif [[ "$input" =~ :[0-9]+$ ]]; then
+        target_type="service"
+    fi
+
+    # --- 1. ВЫПОЛНЕНИЕ ПО ТИПУ ЦЕЛИ ---
+    case "$target_type" in
+        "web")
+            core_engine_ui "i" "Mode: WEB APPLICATION AUDIT (Deep Discovery)"
+            
+            local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
+            mkdir -p "$loot_dir" 2>/dev/null
+            local results_file="$loot_dir/audit_full_${host//[^a-zA-Z0-9]/_}_$(date +%Y%m%d_%H%M%S).log"
+            local signals_file="/tmp/signals_$$"
+
+            # Счётчики для финальной статистики
+            local count_critical=0
+            local count_files=0
+
+            # 1.1 Пассивная разведка
+            core_engine_ui "i" "Phase 1: Ingesting target aura..."
+            {
+                curl -Is --connect-timeout 5 --max-time 7 -A "$GLOBAL_NETWORK_UA" "https://$host"
+                host -t txt "$host" 2>/dev/null
+                whois "$host" 2>/dev/null | grep -iE "city|country|orgname"
+            } > "$signals_file" 2>&1
+
+            local is_high_risk=false
+            grep -qiE "${GLOBAL_SECURITY_MATRIX[0]}" "$signals_file" && is_high_risk=true
+
+            # 1.2 Активный аудит (только если риск низкий)
+            if [ "$is_high_risk" = false ]; then
+                core_engine_ui "s" "Target safe. Deploying Active Probe..."
+                local tmp_pipe="/tmp/prime_pipe_$$"
+                touch "$tmp_pipe"
+                
+                (
+                    curl -s -k -L --max-time 7 "https://$host" | grep -oE "\.(php|js|json|sql|env|xml|yaml|config)" | sort -u | awk '{print "HIT|"$1}' >> "$tmp_pipe"
+                    for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
+                        [[ -z "$f" ]] && continue
+                        [[ $(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 2 "https://$host/$f") == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
+                    done
+                ) &
+                wait $!
+
+                # Шапка таблицы результатов на экране
+                echo -e "\n${BOLD}${C}┌──────────────────────────────────────────────────────────────────────────┐${NC}"
+                echo -e "${BOLD}${C}│                           AUDIT TARGET OBJECTS                           │${NC}"
+                echo -e "${BOLD}${C}├───────────────────────┬──────────────┬───────────────────────────────────┤${NC}"
+                printf "${BOLD}${C}│ %-21s │ %-12s │ %-33s │\n${NC}" "TARGET ENDPOINT" "SEVERITY" "STATUS / ACTION"
+                echo -e "${BOLD}${C}├───────────────────────┼──────────────┼───────────────────────────────────┤${NC}"
+
+                while IFS='|' read -r tag target; do
+                    [[ -z "$target" ]] && continue
+                    local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
+                    
+                    if ! echo "$head_check" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}"; then
+                        # Обрезаем имя файла для красивого выравнивания в таблице, если оно слишком длинное
+                        local display_target="$target"
+                        [[ ${#display_target} -gt 21 ]] && display_target="${display_target:0:18}..."
+
+                        if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}|\.(sql|env|config)$"; then
+                            core_engine_loot "CRITICAL" "Exposed: $target on $host"
+                            echo -e "${R}[CRITICAL]${NC} $target" >> "$results_file"
+                            
+                            # Вывод строки CRITICAL в таблицу
+                            printf "│ %-21s │ ${R}%-12s${NC} │ ${Y}%-33s${NC} │\n" "$display_target" "CRITICAL" "Exposed Data Leak Detected"
+                            ((count_critical++))
+                        else
+                            echo -e "${G}[FILE]${NC} $target" >> "$results_file"
+                            
+                            # Вывод строки FILE в таблицу
+                            printf "│ %-21s │ ${G}%-12s${NC} │ %-33s │\n" "$display_target" "LOW/INFO" "File Verified (200 OK)"
+                            ((count_files++))
+                        fi
+                        
+                        if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[2]}|${GLOBAL_SAST_MATRIX[3]}"; then
+                            run_deep_file_probe "$host" "$target" "$head_check"
+                        fi
+                    fi
+                done < <(sort -u "$tmp_pipe")
+                
+                echo -e "${BOLD}${C}└───────────────────────┴──────────────┴───────────────────────────────────┘${NC}"
+                rm -f "$tmp_pipe"
+
+                # Компактная профессиональная панель со статистикой
+                echo -e "\n${BOLD}${B}[📊 SUMMARY REPORT]${NC}"
+                echo -e " └── Target Host     : ${BOLD}${Y}$host${NC}"
+                echo -e " └── Critical Risks : ${BOLD}${R}$count_critical${NC} объектов обнаружено"
+                echo -e " └── Standard Files : ${BOLD}${G}$count_files${NC} объектов обнаружено"
+                echo -e " └── Log Storage    : ${M}$results_file${NC}\n"
+            else
+                core_engine_ui "e" "Active Probe bypassed to maintain stealth."
+                echo -e "${Y}[!] Причина:${NC} Обнаружены сигнатуры средств защиты (WAF/IDS) в ауре цели."
+            fi
+            rm -f "$signals_file"
+            ;;
+            
+        "infrastructure")
+            core_engine_ui "i" "Mode: INFRASTRUCTURE SCAN (Port & Service Audit)"
+            local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
+            local results_file="$loot_dir/infra_scan_$(date +%s).log"
+            
+            echo -e "${Y}[*] Запуск сетевого сканирования Nmap для инфраструктуры ${BOLD}$input${Y}...${NC}"
+            nmap -T3 -n -Pn -sV --script="safe,discovery" -p "80,443,22,21,8080" "$input" >> "$results_file" 2>&1
+            
+            # Красивый вывод результата nmap на экран
+            echo -e "\n${BOLD}${G}┌──────────────────────────────────────────────────────────────────────────┐${NC}"
+            echo -e "${BOLD}${G}│                       INFRASTRUCTURE SCAN COMPLETE                       │${NC}"
+            echo -e "${BOLD}${G}└──────────────────────────────────────────────────────────────────────────┘${NC}"
+            echo -e " └── Target IP   : ${BOLD}${Y}$input${NC}"
+            echo -e " └── Raw Log     : ${M}$results_file${NC}"
+            echo -e "\n${BOLD}${B}[Последние 10 строк отчета Nmap]:${NC}"
+            tail -n 12 "$results_file" | sed 's/^/  /'
+            echo ""
+            ;;
+            
+        "service")
+            core_engine_ui "i" "Mode: SERVICE PROBE (Fingerprinting)"
+            echo -e "${Y}[*] Отправка проверочного запроса к ${BOLD}$input${Y}...${NC}\n"
+            
+            local service_output
+            service_output=$(curl -I -s --connect-timeout 5 "$input")
+            
+            if [[ -n "$service_output" ]]; then
+                echo -e "${BOLD}${G}┌─── [HTTP/SERVICE HEADERS] ───────────────────────────────────────────────┐${NC}"
+                echo "$service_output" | sed 's/^/ │ /'
+                echo -e "${BOLD}${G}└──────────────────────────────────────────────────────────────────────────┘${NC}"
+            else
+                core_engine_ui "e" "Service non-responsive"
+            fi
+            ;;
+            
+        *)
+            core_engine_ui "e" "Target type could not be resolved automatically."
+            return
+            ;;
+    esac
+
+    core_engine_wait
+}
+
+
+
+
+run_smart_auditor_nexusold() {
     clear
     core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v2.0"
 
