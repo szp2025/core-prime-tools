@@ -63,14 +63,10 @@ GLOBAL_MENU_REGISTRY=(
     "MAIN:PASSWORD|run_pass_lab" "MAIN:ANTI_MALWARE|run_anti_malware_engine"
     "MAIN:REANIMATOR|run_cross_os_reanimator" "MAIN:EXIT|exit_script"
     "MAIN:Forensic_Nexus|run_nexus_forensic"
-    "MAIN:Forensic_Breach_Leaks_Mails|run_nexus_breach_intel"
+    "MAIN:Forensic_Breach_Leaks_Mails|run_nexus_breach_intel" 
     
-    
-    
-
     "INTELLIGENCE:Smart_OSINT_Engine|run_smart_osint_engine" "INTELLIGENCE:Network_Intelligence|run_network_analyzer"
  
-
     "SYSTEM:System_Info|run_system_info" "SYSTEM:Sync_DNS|core_network_dns_sync"
     "SYSTEM:Update_OS|run_sys_update" "SYSTEM:Update_Launcher|run_update_prime"
     "SYSTEM:Clean_Logs|run_logs_cleaner" "SYSTEM:System_Pulse|run_system_pulse"
@@ -8301,41 +8297,159 @@ EOF
     core_engine_wait
 }
 
-# ==============================================================================
-# [CORE: CRYPTO-NEXUS STEALTH-ENGINE - FULLY AUTONOMOUS & UNIVERSAL]
-# Анализирует: Любые форматы (бинарные, тексты, дампы, архивы)
-# Режим работы: Интерактивный запрос -> Потоковый анализ -> Чистый вывод
-# ==============================================================================
-
 run_stealth_stream_analyzer() {
-    # 1. Запрос цели (Интерактивный ввод)
-    read -p "Введите путь к целевому файлу для анализа: " target
+    clear
     
-    # Валидация существования цели
-    [[ ! -f "$target" ]] && { echo "Ошибка: Цель не найдена."; return 1; }
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
     
-    # 2. Потоковая обработка (Универсальный движок)
-    # -a: читает все байты (бинарники, архивы)
-    # -t x: выводит смещение (offset) для точного поиска в hex-редакторе
-    strings -a -t x "$target" 2>/dev/null | while read -r offset line; do
-        
-        # Контур 1: Секреты (Hash-Matrix)
-        # Ищем пароли, ключи, хеши. Выводим только само значение.
-        for hsig in "${GLOBAL_HASH_MATRIX[@]}"; do
-            if [[ "$line" =~ $hsig ]]; then
-                echo "SECRET [Offset $offset]: $line"
-            fi
-        done
-        
-        # Контур 2: Угрозы (AV-Matrix)
-        # Ищем руткиты, инжекты, вредоносные сигнатуры.
-        for layer in "${GLOBAL_AV_MATRIX[@]}"; do
-            if [[ "$line" =~ $layer ]]; then
-                echo "[THREAT: $layer] [Offset $offset]"
-            fi
-        done
-        
+    local BR='\033[1;31m'     # Bold Red (Critical Threat Detected)
+    local BY='\033[1;33m'     # Bold Yellow (Secrets / Leaked Hashes)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Offset Identifiers)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
+
+    core_engine_ui "h" "CRYPTO-NEXUS: ASYNCHRONOUS STREAM ANALYZER v3.0"
+
+    # ==============================================================================
+    # BLOCK 1: SIGNATURE MATRIX SAFEGUARD INITIALIZATION
+    # ==============================================================================
+    if [[ ${#GLOBAL_HASH_MATRIX[@]} -eq 0 ]]; then
+        GLOBAL_HASH_MATRIX=(
+            "([a-fA-F0-9]{32})"                  
+            "([a-fA-F0-9]{40})"                  
+            "([^a-fA-F0-9][a-fA-F0-9]{64}[^a-fA-F0-9])" 
+            "(A3T[A-Z0-9]{14})"                  
+        )
+    fi
+
+    if [[ ${#GLOBAL_AV_MATRIX[@]} -eq 0 ]]; then
+        GLOBAL_AV_MATRIX=(
+            "eval\(base64"                       
+            "/bin/sh"                            
+            "exec\s+sp_executesql"               
+            "chmod\s\+x"                         
+        )
+    fi
+
+    # ==============================================================================
+    # BLOCK 2: INTERACTIVE INPUT CAPTURE & TARGET VALIDATION
+    # ==============================================================================
+    local target
+    target=$(core_engine_input "text" "Enter absolute path to target file for asynchronous processing")
+    target=$(echo "$target" | xargs)
+
+    if [[ ! -f "$target" ]]; then
+        core_engine_ui "e" "Critical Error: Specified target object not found."
+        core_engine_wait
+        return 1
+    fi
+
+    local file_size
+    file_size=$(wc -c < "$target" 2>/dev/null | xargs)
+    
+    # Вычисление доступных ядер процессора для асинхронного разпараллеливания
+    local cpu_cores
+    cpu_cores=$(nproc 2>/dev/null || echo 4)
+    core_engine_ui "i" "Target locked. Volume: ${BC}$file_size bytes${NC}. Allocating ${BG}$cpu_cores CPU Cores${NC} for async engine..."
+
+    # ==============================================================================
+    # BLOCK 3: REGEX MATRICES COMPILATION
+    # ==============================================================================
+    local awk_hash_patterns=""
+    local h_item; for h_item in "${GLOBAL_HASH_MATRIX[@]}"; do
+        awk_hash_patterns+="${awk_hash_patterns:+|}$h_item"
     done
+
+    local awk_av_patterns=""
+    local av_item; for av_item in "${GLOBAL_AV_MATRIX[@]}"; do
+        awk_av_patterns+="${awk_av_patterns:+|}$av_item"
+    done
+
+    # Экспортируем переменные, чтобы их видели дочерние асинхронные процессы xargs
+    export awk_hash_patterns
+    export awk_av_patterns
+
+    # ==============================================================================
+    # BLOCK 4: HIGH-PERFORMANCE ASYNCHRONOUS PIPELINE (MAPREDUCE ENGINE)
+    # ==============================================================================
+    echo -e "\n${BC}🔍 ASYNCHRONOUS SIGNATURE STREAM METRICS:${NC}"
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+
+    # Создаем изолированную временную директорию для сбора асинхронных отчетов
+    local async_sandbox="/tmp/nexus_async_$$"
+    mkdir -p "$async_sandbox"
+
+    # Функция-воркер, которая будет выполняться асинхронно на каждом ядре CPU
+    # Она принимает порцию строк, обрабатывает через AWK и складывает результаты в буфер
+    async_worker_process() {
+        local chunk_id=$1
+        awk -v hash_pat="$awk_hash_patterns" -v av_pat="$awk_av_patterns" -v cid="$chunk_id" '
+        BEGIN { matches = 0; }
+        {
+            offset = $1;
+            line = $0;
+            sub(/^[a-fA-F0-9]+\s+/, "", line);
+
+            if (hash_pat != "" && line ~ hash_pat) {
+                printf "  ├── \033[1;33m[ASYNC-SECRET]\033[0m Core-Chunk: %s | Offset: \033[1;36m0x%s\033[0m -> %s\n", cid, offset, line;
+                matches++;
+            }
+            if (av_pat != "" && line ~ av_pat) {
+                printf "  ├── \033[1;31m[ASYNC-THREAT]\033[0m Core-Chunk: %s | Offset: \033[1;36m0x%s\033[0m -> %s\n", cid, offset, line;
+                matches++;
+            }
+        }
+        END { print matches > "'"$async_sandbox"'/match_"cid; }
+        '
+    }
+    # Экспортируем функцию воркера в среду окружения для xargs
+    export -f async_worker_process
+
+    # Асинхронный конвейер:
+    # 1. strings генерирует поток текстовых строк с hex-смещением
+    # 2. split нарезает поток "на лету" на куски по 50 000 строк без записи на диск
+    # 3. xargs подхватывает эти куски и параллельно распределяет по ядрам CPU (-P $cpu_cores)
+    # 4. Каждое ядро асинхронно крутит свой независимый движок AWK
+    strings -a -t x "$target" 2>/dev/null | \
+        split -l 50000 --filter="async_worker_process \$FILE" - "$async_sandbox/chunk_"
+
+    # Подсчет суммарных находок изо всех асинхронных потоков
+    local total_matches=0
+    local match_file
+    for match_file in "$async_sandbox"/match_*; do
+        if [[ -f "$match_file" ]]; then
+            local count
+            count=$(cat "$match_file")
+            total_matches=$((total_matches + count))
+        fi
+    done
+
+    # Полная зачистка асинхронной песочницы (OpSec)
+    rm -rf "$async_sandbox"
+
+    # ==============================================================================
+    # BLOCK 5: DIAGNOSTIC SUMMARY GRAPHICS
+    # ==============================================================================
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+    if (( total_matches > 0 )); then
+        echo -e "  ${DG}└── [ASYNC PIPELINE TERMINATED]${NC} Total triggers isolated: ${BR}$total_matches${NC}\n"
+        core_engine_loot "analyzer" "Async target $target parsed. Parallel threats identified: $total_matches"
+    else
+        echo -e "  ${DG}└── [ASYNC PIPELINE TERMINATED]${NC} ${G}Target verified. Multi-threaded scan found 0 threats.${NC}\n"
+    fi
+
+    core_engine_wait
 }
 
 
@@ -8344,24 +8458,104 @@ run_stealth_stream_analyzer() {
 # [INTEGRATED SECTOR C: CRYPTO-NEXUS ULTIMATE - FULL STREAMING EDITION]
 # ==============================================================================
 
-
-
 # 2. FILE_CRYPTOR: Военное шифрование в потоке (с сохранением полноты)
 run_file_cryptor() {
-    local mode="$1" 
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
     
-    core_engine_ui "w" "Cryptographic Pipeline Initialized [AES-256-CBC-PBKDF2]..."
-    
-    # Полная проверка безопасности перед пропуском данных через шифратор
-    if [[ "$mode" == "enc" ]]; then
-        core_engine_ui "i" "Encrypting data stream with 100,000 iterations..."
-        openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000
-    else
-        core_engine_ui "i" "Decrypting data stream..."
-        openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000
+    local BR='\033[1;31m'     # Bold Red (Critical Threat Detected)
+    local BY='\033[1;33m'     # Bold Yellow (Secrets / Leaked Hashes)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Offset Identifiers)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
+
+    # Извлекаем управляющие параметры
+    local mode="$1"           # Обязательный: enc / dec
+    local source_file="$2"     # Опциональный: Путь к исходному файлу (если пустой — работаем в режиме потока)
+    local output_file="$3"     # Опциональный: Путь к результирующему файлу
+
+    # Защита вывода: Все UI-сообщения принудительно перенаправляются в stderr (>&2)
+    # Это гарантирует, что stdout останется абсолютно чистым для бинарного потока.
+    core_engine_ui "h" "CRYPTO-NEXUS: SECTOR C CRYPTOGRAPHIC PIPELINE v3.0" >&2
+
+    # Валидация бинарных зависимостей OpenSSL в системе
+    if ! command -v openssl &>/dev/null; then
+        core_engine_ui "e" "Dependency Fault: OpenSSL binary infrastructure not found in PATH." >&2
+        return 1
     fi
+
+    # Валидация входного режима
+    if [[ "$mode" != "enc" && "$mode" != "dec" ]]; then
+        core_engine_ui "e" "Invalid Pipeline Mode. Usage: run_file_cryptor <enc|dec> [source_file] [output_file]" >&2
+        return 1
+    fi
+
+    # ==============================================================================
+    # BLOCK 1: SECURE KEY MATERIAL CAPTURE
+    # ==============================================================================
+    local secret_pass
+    secret_pass=$(core_engine_input "password" "Enter master cryptographic passphrase for this stream")
+    secret_pass=$(echo "$secret_pass" | xargs)
+
+    if [[ -z "$secret_pass" ]]; then
+        core_engine_ui "e" "Cryptographic Fault: Passphrase cannot be empty or contain only spaces." >&2
+        return 1
+    fi
+
+    # ==============================================================================
+    # BLOCK 2: PIPELINE ROUTING AND EXECUTION
+    # ==============================================================================
+    local openssl_opts=( "enc" "-aes-256-cbc" "-md" "sha256" "-pbkdf2" "-iter" "100000" "-pass" "pass:$secret_pass" )
     
-    [[ $? -eq 0 ]] && core_engine_ui "s" "Pipeline operation completed successfully." || core_engine_ui "e" "Pipeline FAULT: Code $?"
+    [[ "$mode" == "dec" ]] && openssl_opts+=( "-d" )
+    [[ "$mode" == "enc" ]] && openssl_opts+=( "-salt" )
+
+    if [[ -n "$source_file" ]]; then
+        # РЕЖИМ 1: РАБОТА С ФИЗИЧЕСКИМИ ФАЙЛАМИ (FILE MODE)
+        if [[ ! -f "$source_file" ]]; then
+            core_engine_ui "e" "File IO Error: Target source file [$source_file] not found." >&2
+            return 1
+        fi
+
+        if [[ -z "$output_file" ]]; then
+            core_engine_ui "e" "File IO Error: Output target path must be specified in File Mode." >&2
+            return 1
+        fi
+
+        core_engine_ui "i" "Processing file: ${BW}$source_file${NC} -> ${M}$output_file${NC}..." >&2
+        
+        openssl "${openssl_opts[@]}" -in "$source_file" -out "$output_file" 2>/dev/null
+        local exit_code=$?
+    else
+        # РЕЖИМ 2: АСИНХРОННЫЙ ЧИСТЫЙ ПОТОК (PURE STREAM MODE)
+        core_engine_ui "w" "Engaging raw streaming pipeline. Processing data via active stdin/stdout channels..." >&2
+        
+        openssl "${openssl_opts[@]}" 2>/dev/null
+        local exit_code=$?
+    fi
+
+    # ==============================================================================
+    # BLOCK 3: FORENSIC VERIFICATION & STATUS REPORTING
+    # ==============================================================================
+    if [[ $exit_code -eq 0 ]]; then
+        core_engine_ui "s" "Cryptographic pipeline operation completed successfully." >&2
+        core_engine_loot "cryptor" "Pipeline executed in [$mode] mode. Status: SUCCESS."
+        return 0
+    else
+        core_engine_ui "e" "Pipeline CRITICAL FAULT: OpenSSL engine returned exit code $exit_code" >&2
+        core_engine_loot "cryptor" "Pipeline failure in [$mode] mode. Exit code: $exit_code"
+        return $exit_code
+    fi
 }
 
 
@@ -8371,45 +8565,137 @@ run_file_cryptor() {
 # ==============================================================================
 
 run_printer_repair_nexus() {
-    echo -e "${Y}[!] Инициализация протокола тотального восстановления печати...${NC}"
+    clear
     
-    # 1. Ручной ввод IP (Опционально)
-    read -p "Введите IP-адрес принтера (или нажмите Enter для автопоиска): " target_ip
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
     
-    # 2. Тотальная остановка сервисов печати
-    systemctl stop cups 2>/dev/null
+    local BR='\033[1;31m'     # Bold Red (Critical Error)
+    local BY='\033[1;33m'     # Bold Yellow (Warnings / Execution Points)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Network Addresses)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
+
+    core_engine_ui "h" "HARDWARE-NEXUS: SUBSYSTEM PRINTER RECOVERY ENG v4.0"
+
+    # Принудительная проверка прав суперпользователя (Root), так как модуль управляет ядром и системными демонами
+    if [[ $EUID -ne 0 ]]; then
+        core_engine_ui "e" "Privilege Fault: ROOT permissions required to execute kernel sub-system reset."
+        return 1
+    fi
+
+    # ==============================================================================
+    # BLOCK 1: INTERACTIVE INPUT CAPTURE
+    # ==============================================================================
+    local target_ip
+    target_ip=$(core_engine_input "text" "Enter printer IP address (or leave EMPTY for comprehensive local broadcast reset)")
+    target_ip=$(echo "$target_ip" | xargs)
+
+    # ==============================================================================
+    # BLOCK 2: PRINT SUBSYSTEM DAEMON TERMINATION
+    # ==============================================================================
+    core_engine_ui "i" "Suspending local spooler services and terminating active CUPS daemon..."
+    systemctl stop cups cups-browsed 2>/dev/null
+    killall -9 cupsd cups-browsed 2>/dev/null
+
+    # ==============================================================================
+    # BLOCK 3: DISK SPOOL PURGE & SANITIZATION
+    # ==============================================================================
+    core_engine_ui "i" "Purging corrupt transactional print queues and cache blocks from storage..."
     
-    # 3. Очистка Spool (Физическое удаление файлов заданий)
-    if [[ -d "/var/spool/cups" ]]; then rm -rf /var/spool/cups/*; fi
-    if [[ -d "/var/spool/lpd" ]]; then rm -rf /var/spool/lpd/*; fi
+    # Вычищаем строго файлы заданий (начинаются на c или d) и временные кэши, не уничтожая структуру директорий
+    if [[ -d "/var/spool/cups" ]]; then
+        find /var/spool/cups/ -type f \( -name "c*" -o -name "d*" -o -name "tmp*" \) -delete 2>/dev/null
+    fi
+    if [[ -d "/var/spool/lpd" ]]; then
+        find /var/spool/lpd/ -type f -delete 2>/dev/null
+    fi
+
+    # ==============================================================================
+    # BLOCK 4: ISOLATED HARDWARE USB BUS RESET (SAFE MODE)
+    # ==============================================================================
+    core_engine_ui "i" "Scanning hardware USB topology for printing class interfaces..."
     
-    # 4. Сброс USB-хостов
-    for device in /sys/bus/usb/devices/*/authorized; do
-        echo '0' > "$device" 2>/dev/null
-        echo '1' > "$device" 2>/dev/null
+    local usb_dir usb_dev dev_class
+    local usb_reset_count=0
+
+    # Проходим по всем зарегистрированным USB устройствам в подсистеме ядра sysfs
+    for usb_dir in /sys/bus/usb/devices/*; do
+        if [[ -f "$usb_dir/bDeviceClass" && -f "$usb_dir/authorized" ]]; then
+            dev_class=$(cat "$usb_dir/bDeviceClass" 2>/dev/null)
+            # Класс 07 соответствует принтерам. Если класс 00 (интерфейс определяется на уровне конфигурации),
+            # проверяем класс интерфейса bInterfaceClass внутри дочерних каталогов.
+            if [[ "$dev_class" == "07" ]] || grep -q "07" "$usb_dir"/*/bInterfaceClass 2>/dev/null; then
+                usb_dev=$(basename "$usb_dir")
+                core_engine_ui "w" "Target printer hardware found on bus [$usb_dev]. Re-authorizing device..."
+                echo '0' > "$usb_dir/authorized" 2>/dev/null
+                sleep 0.2
+                echo '1' > "$usb_dir/authorized" 2>/dev/null
+                ((usb_reset_count++))
+            fi
+        fi
     done
-    
-    # 5. Сетевое восстановление
+
+    if (( usb_reset_count == 0 )); then
+        core_engine_ui "i" "No active physical USB printing devices found on local hardware buses."
+    else
+        core_engine_ui "s" "Hardware reset completed. Total printer buses recycled: ${BG}$usb_reset_count${NC}"
+    fi
+
+    # ==============================================================================
+    # BLOCK 5: KERNEL ROUTING TABLE & ARP NEIGHBOR FLUSH
+    # ==============================================================================
     if [[ -n "$target_ip" ]]; then
-        echo -e "${Y}[*] Принудительная очистка маршрута к $target_ip...${NC}"
+        core_engine_ui "i" "Purging kernel routing path cache for target: ${BC}$target_ip${NC}"
         ip neigh flush to "$target_ip" 2>/dev/null
-        # Отправляем ARP-запрос для немедленного обновления таблицы
-        ping -c 1 -W 1 "$target_ip" > /dev/null 2>&1
+        ip route flush cache 2>/dev/null
+        # Асинхронный прогрев для принудительного обновления ARP-записи в ядре
+        ping -c 2 -W 1 "$target_ip" >/dev/null 2>&1 &
     else
+        core_engine_ui "w" "No explicit IP declared. Flushing complete local network neighbor cache..."
         ip neigh flush all 2>/dev/null
+        ip route flush cache 2>/dev/null
     fi
-    
-    # 6. Запуск сервисов
+
+    # ==============================================================================
+    # BLOCK 6: SUBSYSTEM INITIALIZATION & VERIFICATION
+    # ==============================================================================
+    core_engine_ui "i" "Re-engaging printing infrastructure and launching CUPS core daemons..."
     systemctl start cups 2>/dev/null
-    
-    # Финальная проверка
+
+    echo -e "\n${BC}📋 PRINT SUBSYSTEM DIAGNOSTIC REPORT:${NC}"
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+
     if systemctl is-active --quiet cups; then
-        echo -e "${G}[SUCCESS] Система печати восстановлена.${NC}"
-        [[ -n "$target_ip" ]] && echo -e "Статус маршрута к $target_ip: ОБНОВЛЕН."
+        echo -e "  ├── ${W}CUPS Core Daemon${NC}    : ${BG}[ACTIVE / RUNNING]${NC}"
+        if [[ -n "$target_ip" ]]; then
+            echo -e "  ├── ${W}Network Route${NC}       : ${BG}[CACHE FLUSHED & RE-ROUTED]${NC} -> ${BC}$target_ip${NC}"
+        else
+            echo -e "  ├── ${W}Network Route${NC}       : ${BY}[GLOBAL NEIGHBOR FLUSH APPLIED]${NC}"
+        fi
+        echo -e "  └── [${BG}SUCCESS${NC}] Subsystem infrastructure fully restored to factory deployment state.\n"
+        core_engine_loot "printer_repair" "Subsystem successfully recovered. Target IP: ${target_ip:-GLOBAL_RESET}"
     else
-        echo -e "${R}[ERROR] Не удалось перезапустить CUPS.${NC}"
+        echo -e "  ├── ${W}CUPS Core Daemon${NC}    : ${BR}[FAULT / TERMINATED]${NC}"
+        echo -e "  └── [${BR}ERROR${NC}] Critical failure: Unable to re-initialize CUPS subsystem socket.\n"
+        core_engine_loot "printer_repair" "CRITICAL FAULT. Failed to restart CUPS daemon."
+        core_engine_wait
+        return 1
     fi
+
+    core_engine_wait
 }
+
 
 
 # ==============================================================================
@@ -8418,7 +8704,229 @@ run_printer_repair_nexus() {
 # ФУНКЦИОНАЛ: Вывод пользователей списком по номерам, кросс-платформенный сброс
 # СОВМЕСТИМОСТЬ: Windows (10/11/Server), GNU/Linux, macOS. Запуск: Kali/NetHunter/Termux
 # ==============================================================================
-pc_password_management() {
+
+
+
+run_pc_password_management() {
+    clear
+    
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
+    
+    local BR='\033[1;31m'     # Bold Red (Critical Threat Detected)
+    local BY='\033[1;33m'     # Bold Yellow (Secrets / Leaked Hashes)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Offset Identifiers)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
+
+    core_engine_ui "h" "UNIVERSAL USER AUDIT: DYNAMIC MANAGEMENT ENGINE v4.0"
+
+    # ==============================================================================
+    # BLOCK 1: LOCAL ENVIRONMENT MATRIX DETECTION
+    # ==============================================================================
+    local env_platform="Unknown Linux"
+    local base64_mode="standard"
+
+    if [[ -f /etc/os-release ]] && grep -qi "kali" /etc/os-release; then
+        if [[ -d /sdcard ]] || uname -r | grep -qi "android"; then
+            env_platform="Kali NetHunter (Chroot)"
+        else
+            env_platform="Kali Linux (Desktop)"
+        fi
+        base64_mode="standard"
+    elif [[ -n "$TERMUX_VERSION" ]]; then
+        env_platform="Termux (Android)"
+        base64_mode="busybox"
+    fi
+
+    core_engine_ui "i" "Local kernel execution stack: [${BW}$env_platform${NC}]"
+    core_engine_ui "i" "Scanning local network interfaces for active default gateway..."
+    
+    # ==============================================================================
+    # BLOCK 2: HEURISTIC TARGET IP AUTO-DETECTION
+    # ==============================================================================
+    local pc_ip=""
+    pc_ip=$(ip route 2>/dev/null | grep -E 'usb|rndis|wlan|eth|ap0' | awk '/default/ {print $3}' | head -n 1)
+    
+    if [[ -z "$pc_ip" ]]; then
+        pc_ip=$(ip neigh 2>/dev/null | grep -E 'usb|rndis|wlan|eth' | grep -E 'REACHABLE|STALE|DELAY' | awk '{print $1}' | head -n 1)
+    fi
+    
+    if [[ -z "$pc_ip" && -f /proc/net/arp ]]; then
+        pc_ip=$(awk '{print $1}' /proc/net/arp | grep -v "IP" | head -n 1)
+    fi
+
+    if [[ -z "$pc_ip" ]]; then
+        core_engine_ui "w" "Network automation failed to locate endpoint connection gateway."
+        pc_ip=$(core_engine_input "text" "Enter target endpoint IP address manually")
+        [[ -z "$pc_ip" ]] && return 1
+    else
+        core_engine_ui "s" "Establish link with target node gateway: ${BC}$pc_ip${NC}"
+    fi
+    
+    core_engine_ui "line" ""
+    
+    # Инициализация параметров аутентификации SSH
+    local ssh_user
+    ssh_user=$(core_engine_input "text" "Enter administrator username for remote node access (SSH-User)")
+    [[ -z "$ssh_user" ]] && return 1
+
+    # Настройки для минимизации таймаутов и игнорирования локальных ключей (OpSec)
+    local ssh_opts=( -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null )
+
+    # ==============================================================================
+    # BLOCK 3: REMOTE OPERATING SYSTEM OS PROFILING
+    # ==============================================================================
+    core_engine_ui "i" "Querying remote kernel signatures and system descriptors..."
+    
+    local target_os="Unknown"
+    local probe_resp
+    probe_resp=$(ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "uname -s 2>/dev/null || cmd.exe /c ver 2>/dev/null" 2>/dev/null)
+    
+    if [[ "$probe_resp" == *"Microsoft"* || "$probe_resp" == *"Windows"* ]]; then
+        target_os="Windows"
+    elif [[ "$probe_resp" == *"Linux"* ]]; then
+        target_os="Linux"
+    elif [[ "$probe_resp" == *"Darwin"* ]]; then
+        target_os="macOS"
+    else
+        local probe_reserve
+        probe_reserve=$(ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "echo \$OSTYPE" 2>/dev/null)
+        if [[ "$probe_reserve" == *"darwin"* ]]; then 
+            target_os="macOS"
+        else 
+            target_os="Linux"
+        fi
+    fi
+
+    core_engine_ui "s" "Remote node platform successfully profiled: [${BG}$target_os${NC}]"
+    core_engine_ui "line" ""
+
+    # ==============================================================================
+    # BLOCK 4: USER MATRIX EXTRACTION & TREE-VIEW GENERATION
+    # ==============================================================================
+    core_engine_ui "i" "Extracting remote local user security matrix..."
+    local -a user_array=()
+    
+    if [[ "$target_os" == "Windows" ]]; then
+        local req_pwsh="Get-LocalUser | Where-Object { \$_.Enabled -eq \$true } | Select-Object -ExpandProperty Name"
+        local encoded_req=""
+        if command -v iconv &>/dev/null; then
+            [[ "$base64_mode" == "busybox" ]] && encoded_req=$(echo -n "$req_pwsh" | iconv -t UTF-16LE | base64 | tr -d '\r\n') || encoded_req=$(echo -n "$req_pwsh" | iconv -t UTF-16LE | base64 -w0)
+        else
+            encoded_req=$(python3 -c "import base64; print(base64.b64encode('$req_pwsh'.encode('utf-16-le')).decode('utf-8'))")
+        fi
+        
+        local raw_win_users
+        raw_win_users=$(ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "powershell -EncodedCommand $encoded_req" 2>/dev/null)
+        mapfile -t user_array < <(echo "$raw_win_users" | tr -d '\r' | grep -v -E '^(\s*)$')
+        
+    elif [[ "$target_os" == "Linux" ]]; then
+        local raw_lin_users
+        raw_lin_users=$(ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "awk -F: '\$3 == 0 || \$3 >= 1000 {print \$1}' /etc/passwd" 2>/dev/null)
+        mapfile -t user_array < <(echo "$raw_lin_users" | grep -v -E '^(\s*)$')
+        
+    elif [[ "$target_os" == "macOS" ]]; then
+        local raw_mac_users
+        raw_mac_users=$(ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "dscl . list /Users | grep -v '^ _'" 2>/dev/null)
+        mapfile -t user_array < <(echo "$raw_mac_users" | grep -v -E '^(\s*)$')
+    fi
+
+    # Защитный барьер: валидация наполненности результирующего массива
+    if [[ ${#user_array[@]} -eq 0 ]]; then
+        core_engine_ui "e" "User matrix extraction fault. Remote database returned 0 active accounts."
+        core_engine_wait
+        return 1
+    fi
+
+    # Вывод структурированного списка
+    core_engine_ui "h" "TARGET ACCOUNT LIST ($target_os)"
+    local idx=1
+    local user_item
+    for user_item in "${user_array[@]}"; do
+        echo -e "  ├── [${BC}$idx${NC}] Account Username: ${BW}$user_item${NC}"
+        ((idx++))
+    done
+    core_engine_ui "line" ""
+
+    # ==============================================================================
+    # BLOCK 5: TARGET SELECTION & SECURE VALIDATION
+    # ==============================================================================
+    local selection
+    selection=$(core_engine_input "text" "Enter account index number to target")
+    [[ -z "$selection" ]] && return 1
+    
+    # Проверка на то, что ввод является строго числом, и число находится в границах массива
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || (( selection < 1 || selection > ${#user_array[@]} )); then
+        core_engine_ui "e" "Index Error: Invalid numerical selection boundaries."
+        core_engine_wait
+        return 1
+    fi
+    
+    local target_user="${user_array[$((selection-1))]}"
+    core_engine_ui "s" "Target locked on account pointer: ${BY}$target_user${NC}"
+    core_engine_ui "line" ""
+
+    # ==============================================================================
+    # BLOCK 6: CRYPTOGRAPHIC TRANSACTION & REMOTE PASSWORD RESET
+    # ==============================================================================
+    local new_pass
+    new_pass=$(core_engine_input "password" "Set NEW credential password for target identity [$target_user]")
+    if [[ -z "$new_pass" ]]; then
+        core_engine_ui "e" "Input Validation Fault: Password entity cannot be null."
+        core_engine_wait
+        return 1
+    fi
+
+    core_engine_progress 2 "SYNCHRONIZING REMOTE TRANSACTION MATRIX"
+    local execution_status="FAIL"
+
+    if [[ "$target_os" == "Windows" ]]; then
+        local reset_pwsh="Set-LocalUser -Name '$target_user' -Password (ConvertTo-SecureString '$new_pass' -AsPlainText -Force)"
+        local encoded_reset=""
+        if command -v iconv &>/dev/null; then
+            [[ "$base64_mode" == "busybox" ]] && encoded_reset=$(echo -n "$reset_pwsh" | iconv -t UTF-16LE | base64 | tr -d '\r\n') || encoded_reset=$(echo -n "$reset_pwsh" | iconv -t UTF-16LE | base64 -w0)
+        else
+            encoded_reset=$(python3 -c "import base64; print(base64.b64encode('$reset_pwsh'.encode('utf-16-le')).decode('utf-8'))")
+        fi
+        ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "powershell -EncodedCommand $encoded_reset" &>/dev/null
+        [[ $? -eq 0 ]] && execution_status="SUCCESS"
+
+    elif [[ "$target_os" == "Linux" ]]; then
+        # Безопасный пайплайн обновления учетных данных без логирования открытого текста процессами аудита
+        ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "echo '${target_user}:${new_pass}' | sudo chpasswd" &>/dev/null
+        [[ $? -eq 0 ]] && execution_status="SUCCESS"
+
+    elif [[ "$target_os" == "macOS" ]]; then
+        ssh "${ssh_opts[@]}" "${ssh_user}@${pc_ip}" "sudo dscl . -passwd /Users/${target_user} '${new_pass}'" &>/dev/null
+        [[ $? -eq 0 ]] && execution_status="SUCCESS"
+    fi
+
+    # ==============================================================================
+    # BLOCK 7: FORENSIC AUDIT LOGGING AND REPORTING
+    # ==============================================================================
+    if [[ "$execution_status" == "SUCCESS" ]]; then
+        core_engine_ui "s" "Account entity credential update completed successfully."
+        core_engine_loot "universal_audit" "Password successfully reset for identity $target_user on host $target_os ($pc_ip)"
+    else
+        core_engine_ui "e" "Transaction Fault: Insufficient node privileges (SUDO/UAC mitigation) or communication drop."
+    fi
+    
+    core_engine_wait
+}
+
+
+pc_password_managementold() {
     clear
     core_engine_ui "h" "UNIVERSAL USER AUDIT: DYNAMIC MANAGEMENT ENGINE"
     
