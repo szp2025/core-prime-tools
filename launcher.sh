@@ -66,11 +66,12 @@ GLOBAL_MENU_REGISTRY=(
     "MAIN:Forensic_Breach_Leaks_Mails|run_nexus_breach_intel" 
     
     "INTELLIGENCE:Smart_OSINT_Engine|run_smart_osint_engine" "INTELLIGENCE:Network_Intelligence|run_network_analyzer"
+    "INTELLIGENCE:Network_INTELLIGENCE_SCAN|run_network_intelligence"
  
     "SYSTEM:System_Info|run_system_info" "SYSTEM:Sync_DNS|core_network_dns_sync"
     "SYSTEM:Update_OS|run_sys_update" "SYSTEM:Update_Launcher|run_update_prime"
     "SYSTEM:Clean_Logs|run_logs_cleaner" "SYSTEM:System_Pulse|run_system_pulse"
-    "SYSTEM:Printer_Repaire|run_printer_repair_nexus"
+    "SYSTEM:Printer_Repaire|run_printer_repair_nexus" 
 
     
 
@@ -8706,8 +8707,6 @@ run_printer_repair_nexus() {
 # СОВМЕСТИМОСТЬ: Windows (10/11/Server), GNU/Linux, macOS. Запуск: Kali/NetHunter/Termux
 # ==============================================================================
 
-
-
 run_pc_password_management() {
     clear
     
@@ -9960,52 +9959,94 @@ run_system_info() {
 # АРХИТЕКТУРА: Атомарная дедупликация comm, сквозной стриминг без фантомных маркеров
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | ZERO-DUPLICATION
 # ==============================================================================
+
 run_deep_bridge() {
     clear
-    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v22.0 (MATRIX-STREAM)"
     
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
+    
+    local BR='\033[1;31m'     # Bold Red (Critical Error / Drop)
+    local BY='\033[1;33m'     # Bold Yellow (Signature Resonance Alert)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Active Clusters)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
+
+    core_engine_ui "h" "PRIME BRIDGE: NEURAL INTELLIGENCE LINK v22.1 (MATRIX-STREAM)"
+
+    # Валидация базовых массивов конфигурации (Защита от фантомных пустых ссылок)
+    if [[ -z "${GLOBAL_HASH_MATRIX[*]}" || -z "${GLOBAL_FINANCE_MATRIX[*]}" ]]; then
+        core_engine_ui "e" "Matrix Fault: Global signature matrices are not initialized or empty."
+        return 1
+    fi
+
     local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
     local master_loot="$loot_dir/master_intelligence.log"
     mkdir -p "$loot_dir"
 
-    # Бесконечный цикл с защитой от перегрузки CPU/IO
+    # Принудительная изоляция прав создаваемых временных объектов в памяти (OpSec Shield)
+    local old_umask=$(umask)
+    umask 077
+
+    core_engine_ui "w" "Persistent data-link orchestrator engaged. Press [CTRL+C] to terminate."
+
+    # ==============================================================================
+    # BLOCK 1: AUTONOMOUS REAL-TIME AGGREGATION LOOP
+    # ==============================================================================
     while true; do
-        local pool="/tmp/bridge_pool_$$"
-        local stage_file="/tmp/bridge_stage_$$"
+        # Разворачиваем буферные пулы внутри виртуальной памяти (Shared Memory)
+        local pool="/dev/shm/bridge_pool_$$"
+        local stage_file="/dev/shm/bridge_stage_$$"
+        local sorted_master="/dev/shm/bridge_master_sorted_$$"
         
-        # 1. АТОМАРНЫЙ СБОР И ДЕДУПЛИКАЦИЯ (Исключение Race Condition)
-        # Собираем данные, убираем пустые строки, формируем снимок текущего пула
+        # Сбор сырых данных и первичная очистка от пустых строк
         if ls "$loot_dir"/*.log >/dev/null 2>&1; then
-            cat "$loot_dir"/*.log 2>/dev/null | grep -v '^[[:space:]]*$' | sort -u > "$pool" 2>/dev/null
+            # Фильтруем сам мастер-лог, чтобы не читать собственные результаты по кругу
+            cat "$loot_dir"/*.log 2>/dev/null | grep -v "$master_loot" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u > "$pool" 2>/dev/null
         fi
         
-        # Если пул пуст или не содержит новых векторов, уходим в режим ожидания
+        # Если входящий пул пуст — переходим в режим ожидания (экономный цикл CPU)
         if [[ ! -s "$pool" ]]; then
             rm -f "$pool"
             sleep 15
             continue
         fi
 
-        # Если мастер-лог уже существует, отсекаем дубликаты на входе, оставляя только инкремент
-        if [[ -f "$master_loot" ]]; then
-            comm -23 "$pool" <(sort -u "$master_loot" 2>/dev/null) > "$stage_file" 2>/dev/null
+        # Безопасная инкрементальная дедупликация через жесткую фиксацию локали LC_ALL=C
+        if [[ -f "$master_loot" && -s "$master_loot" ]]; then
+            LC_ALL=C sort -u "$master_loot" > "$sorted_master" 2>/dev/null
+            LC_ALL=C comm -23 "$pool" "$sorted_master" > "$stage_file" 2>/dev/null
         else
             cp "$pool" "$stage_file" 2>/dev/null
         fi
 
-        # Если после сверки с мастер-логом новых уникальных строк нет, очищаем буфер
+        # Уничтожаем промежуточный сортированный индекс мастера сразу после сравнения
+        rm -f "$sorted_master"
+
+        # Если уникального инкремента нет — сбрасываем итерацию
         if [[ ! -s "$stage_file" ]]; then
             rm -f "$pool" "$stage_file"
             sleep 15
             continue
         fi
 
-        core_engine_ui "i" "Bridge: Synchronizing neural data clusters via Multi-Layer AWK Engine..."
+        core_engine_ui "i" "Synchronizing data clusters via Multi-Layer AWK Streaming Engine..."
 
-        # 2. ПОТОКОВЫЙ ЭВРИСТИЧЕСКИЙ АНАЛИЗ ЧЕРЕЗ ИЗОЛИРОВАННЫЙ AWK
-        # Передаем элементы матриц напрямую. Одиночные фантомные переменные полностью удалены.
-        awk -v m_loot="$master_loot" \
-            -v fin_iban="${GLOBAL_FINANCE_MATRIX[0]}" \
+        # ==============================================================================
+        # BLOCK 2: ISOLATED STREAM-PROCESSING & SIGNATURE RESONANCE ANALYSIS
+        # ==============================================================================
+        # Модифицированный AWK: выводит результаты резонанса в stdout, а чистый поток дописывает в лог
+        awk -v fin_iban="${GLOBAL_FINANCE_MATRIX[0]}" \
             -v fin_swift="${GLOBAL_FINANCE_MATRIX[1]}" \
             -v fin_rib="${GLOBAL_FINANCE_MATRIX[2]}" \
             -v fin_bban="${GLOBAL_FINANCE_MATRIX[3]}" \
@@ -10021,90 +10062,105 @@ run_deep_bridge() {
             '
             {
                 matched = 0;
+                line_data = $0;
 
-                # --- КОНТУР ИДЕНТИФИКАЦИИ ФИНАНСОВЫХ СИГНАТУР ---
-                if ($0 ~ fin_iban) {
-                    print "RESONANCE: FINANCIAL IBAN -> " $0 >> "/dev/stderr";
+                # --- FINANCIAL MATRIX RESOLUTION LAYER ---
+                if (line_data ~ fin_iban) {
+                    print "RESONANCE: FINANCIAL IBAN -> " line_data;
                     matched = 1;
                 }
-                if ($0 ~ fin_rib) {
-                    print "RESONANCE: FINANCIAL RIB (FR) -> " $0 >> "/dev/stderr";
+                if (line_data ~ fin_rib) {
+                    print "RESONANCE: FINANCIAL RIB (FR) -> " line_data;
                     matched = 1;
                 }
-                if ($0 ~ fin_card) {
-                    print "RESONANCE: LEAKED CREDIT CARD -> " $0 >> "/dev/stderr";
+                if (line_data ~ fin_card) {
+                    print "RESONANCE: EXPOSED CREDIT CARD -> " line_data;
                     matched = 1;
                 }
-                if ($0 ~ fin_crypto) {
-                    print "RESONANCE: CRYPTO WALLET -> " $0 >> "/dev/stderr";
+                if (line_data ~ fin_crypto) {
+                    print "RESONANCE: ACTIVE CRYPTO WALLET -> " line_data;
                     matched = 1;
                 }
-                if ($0 ~ fin_swift) {
-                    print "RESONANCE: FINANCIAL SWIFT/BIC -> " $0 >> "/dev/stderr";
+                if (line_data ~ fin_swift) {
+                    print "RESONANCE: FINANCIAL SWIFT/BIC -> " line_data;
                     matched = 1;
                 }
-                if (!matched && $0 ~ fin_bban) {
-                    print "RESONANCE: FINANCIAL BBAN -> " $0 >> "/dev/stderr";
+                if (!matched && line_data ~ fin_bban) {
+                    print "RESONANCE: FINANCIAL BBAN -> " line_data;
                     matched = 1;
                 }
 
-                # --- КОНТУР ИДЕНТИФИКАЦИИ ХЕШЕЙ И КРЕДЕНШЕНАЛОВ ---
-                # Новая логика: Поглощенный Слой 4 матрицы (hash_ntlm) сразу щелкает и SAM дампы, и суффиксы :$
-                if ($0 ~ hash_ntlm) {
-                    print "RESONANCE: WINDOWS NTLM/LM CREDENTIAL -> " $0 >> "/dev/stderr";
+                # --- CRYPTOGRAPHIC HASH & CREDENTIAL RESOLUTION LAYER ---
+                if (line_data ~ hash_ntlm) {
+                    print "RESONANCE: SECURITY DEPLOYMENT NTLM/LM HASH -> " line_data;
                     matched = 1;
                 }
-                else if ($0 ~ hash_sha512) {
-                    print "RESONANCE: CRYPTO HASH SHA-512 -> " $0 >> "/dev/stderr";
+                else if (line_data ~ hash_sha512) {
+                    print "RESONANCE: SECURE CONTAINER SHA-512 HASH -> " line_data;
                     matched = 1;
                 }
-                else if ($0 ~ hash_sha256) {
-                    print "RESONANCE: CRYPTO HASH SHA-256 -> " $0 >> "/dev/stderr";
+                else if (line_data ~ hash_sha256) {
+                    print "RESONANCE: INTEGRITY CONTROL SHA-256 HASH -> " line_data;
                     matched = 1;
                 }
-                else if ($0 ~ hash_sha1) {
-                    print "RESONANCE: CRYPTO HASH SHA-1 -> " $0 >> "/dev/stderr";
+                else if (line_data ~ hash_sha1) {
+                    print "RESONANCE: INFRASTRUCTURE OLD SHA-1 HASH -> " line_data;
                     matched = 1;
                 }
-                else if ($0 ~ hash_md5) {
-                    print "RESONANCE: CRYPTO HASH MD5 -> " $0 >> "/dev/stderr";
+                else if (line_data ~ hash_md5) {
+                    print "RESONANCE: VERIFICATION BLOCK MD5 HASH -> " line_data;
                     matched = 1;
                 }
                 
-                # Глубокий контекстный и SQL-анализ (Слои 5 и 6 матрицы хешей)
-                if (!matched && ($0 ~ hash_ctx)) {
-                    print "RESONANCE: CONTEXTUAL PASSWORDS/TOKENS -> " $0 >> "/dev/stderr";
+                # --- CONTEXTUAL DATA & DUMP RESOLUTION LAYER ---
+                if (!matched && (line_data ~ hash_ctx)) {
+                    print "RESONANCE: CONTEXTUAL TOKEN ENTITY -> " line_data;
                     matched = 1;
                 }
-                if (!matched && ($0 ~ hash_sql)) {
-                    print "RESONANCE: SQL INJECTION DATABASE DUMP -> " $0 >> "/dev/stderr";
+                if (!matched && (line_data ~ hash_sql)) {
+                    print "RESONANCE: STRUCTURED DATABASE DUMP LOG -> " line_data;
                     matched = 1;
                 }
 
-                # Запись уникального и классифицированного потока в центральное хранилище
-                print $0 >> m_loot;
+                # Передаем строку дальше в конвейер сохранения
+                print line_data > "/dev/stdout";
             }
-        ' "$stage_file" 2>&1 >/dev/null | while read -r line; do 
-            core_engine_ui "y" "$line"
-        done
+        ' "$stage_file" 2>/dev/null >> "$master_loot"
 
-        # 3. АТОМАРНАЯ ОЧИСТКА И РОТАЦИЯ (Защита дисковой подсистемы от переполнения)
+        # Параллельный разбор логов для вывода алертов в UI-панель
+        while read -r resonance_alert; do
+            if [[ "$resonance_alert" == RESONANCE:* ]]; then
+                core_engine_ui "y" "$resonance_alert"
+            fi
+        done < "$stage_file"
+
+        # ==============================================================================
+        # BLOCK 3: ATOMIC ROTATION & MEMORY SANITIZATION
+        # ==============================================================================
         rm -f "$pool" "$stage_file"
         
-        # Проверка лимита размера лога. При превышении 5000 строк — безопасный срез
+        # Контроль переполнения мастер-хранилища (Безопасное скользящее окно лога)
         if [[ -f "$master_loot" ]]; then
-            if (( $(wc -l < "$master_loot") > 5000 )); then
-                core_engine_ui "w" "Log rotation triggered: master_intelligence.log exceeded 5000 lines. Truncating."
-                # Сохраняем последние 500 строк для удержания контекста смежных модулей
-                tail -n 500 "$master_loot" > "${master_loot}.tmp" 2>/dev/null
-                mv "${master_loot}.tmp" "$master_loot" 2>/dev/null
+            local line_count
+            line_count=$(wc -l < "$master_loot" 2>/dev/null)
+            if (( line_count > 5000 )); then
+                core_engine_ui "w" "Log retention guard active: Central intelligence repository exceeded 5000 lines. Truncating."
+                
+                local rotation_tmp="/dev/shm/bridge_rotate_$$"
+                tail -n 500 "$master_loot" > "$rotation_tmp" 2>/dev/null
+                
+                # Используем потоковое перенаправление вместо деструктивного mv для сохранения inode
+                cat "$rotation_tmp" > "$master_loot" 2>/dev/null
+                rm -f "$rotation_tmp"
             fi
         fi
         
         sleep 30
     done
-}
 
+    # Возвращаем исходную маску прав системы
+    umask "$old_umask"
+}
 
 # ==============================================================================
 # @description: OSINT NEXUS v20.0 - SECURE DISPATCHER ENGINE
