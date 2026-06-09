@@ -71,6 +71,7 @@ GLOBAL_MENU_REGISTRY=(
     "SYSTEM:Update_OS|run_sys_update" "SYSTEM:Update_Launcher|run_update_prime"
     "SYSTEM:Clean_Logs|run_logs_cleaner" "SYSTEM:System_Pulse|run_system_pulse"
     "SYSTEM:Printer_Repaire|run_printer_repair_nexus"
+
     
 
     "FORENSICS:ADAPTIVE_ANALYZE|run_auto_forensics" "FORENSICS:Disk_Raw_Recovery|run_raw_recovery"
@@ -78,7 +79,7 @@ GLOBAL_MENU_REGISTRY=(
 
     "CYBER_OPS:Ghost_Commander|run_ghost_commander" "CYBER_OPS:PC_Control|pc_password_recovery"
    #"CYBER_OPS:Ultimate_Exploit|run_prime_exploiter_v5" "CYBER_OPS:Omega_Auditor|run_prime_auditor_v2"
-    "CYBER_OPS:Unified_Auditor|run_smart_auditor_nexus"
+    "CYBER_OPS:Unified_Auditor|run_smart_auditor_nexus" "CYBER_OPS:BLUETOOTH_SCAN|run_bluetooth_scan"    
 
     "CRYPTO_LAB:Hash_Analyzer|run_stealth_stream_analyzer" "CRYPTO_LAB:File_Encryptor|run_file_cryptor"
     "CRYPTO_LAB:SSH_Key_Gen|run_ssh_keygen"
@@ -8926,185 +8927,6 @@ run_pc_password_management() {
 }
 
 
-pc_password_managementold() {
-    clear
-    core_engine_ui "h" "UNIVERSAL USER AUDIT: DYNAMIC MANAGEMENT ENGINE"
-    
-    # --------------------------------------------------------------------------
-    # МАТРИЦА 1: ОПРЕДЕЛЕНИЕ ЛОКАЛЬНОГО ОКРУЖЕНИЯ (ОТКУДА ЗАПУСКАЕМ)
-    # --------------------------------------------------------------------------
-    local ENV_PLATFORM="Unknown Linux"
-    local BASE64_MODE="standard"
-
-    if [ -f /etc/os-release ] && grep -qi "kali" /etc/os-release; then
-        if [ -d /sdcard ] || uname -r | grep -qi "android"; then
-            ENV_PLATFORM="Kali NetHunter (Chroot)"
-        else
-            ENV_PLATFORM="Kali Linux (Desktop)"
-        fi
-        BASE64_MODE="standard"
-    elif [[ -n "$TERMUX_VERSION" ]]; then
-        ENV_PLATFORM="Termux (Android)"
-        BASE64_MODE="busybox"
-    fi
-
-    core_engine_ui "i" "Локальный стек ядра: [$ENV_PLATFORM]"
-    core_engine_ui "i" "Сканирование сетевых интерфейсов и поиск активного узла..."
-    
-    # --------------------------------------------------------------------------
-    # МАТРИЦА 2: ЭВРИСТИЧЕСКИЙ АВТО-ДЕТЕКТ IP-АДРЕСА ЦЕЛИ
-    # --------------------------------------------------------------------------
-    local PC_IP=""
-    PC_IP=$(ip route 2>/dev/null | grep -E 'usb|rndis|wlan|eth|ap0' | awk '/default/ {print $3}' | head -n 1)
-    
-    if [[ -z "$PC_IP" ]]; then
-        PC_IP=$(ip neigh 2>/dev/null | grep -E 'usb|rndis|wlan|eth' | grep -E 'REACHABLE|STALE|DELAY' | awk '{print $1}' | head -n 1)
-    fi
-    
-    if [[ -z "$PC_IP" && -f /proc/net/arp ]]; then
-        PC_IP=$(awk '{print $1}' /proc/net/arp | grep -v "IP" | head -n 1)
-    fi
-
-    if [[ -z "$PC_IP" ]]; then
-        core_engine_ui "w" "Сетевая автоматика не обнаружила шлюз подключения."
-        PC_IP=$(core_engine_input "text" "Введите IP-адрес целевого компьютера вручную")
-        [[ -z "$PC_IP" ]] && return 1
-    else
-        core_engine_ui "s" "Связь установлена с целевым узлом: $PC_IP"
-    fi
-    
-    core_engine_ui "line" ""
-    
-    # Авторизация SSH-сессии
-    local SSH_USER=$(core_engine_input "text" "Логин администратора для подключения (SSH-user)")
-    [[ -z "$SSH_USER" ]] && return 1
-
-    # --------------------------------------------------------------------------
-    # МАТРИЦА 3: ЭВРИСТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ ТИПА ЦЕЛЕВОЙ СИСТЕМЫ (УМНЫЙ СКАНЕР ОС)
-    # --------------------------------------------------------------------------
-    core_engine_ui "i" "Интеллектуальный опрос удаленного ядра ОС..."
-    
-    # Делаем быстрый безопасный заброс, проверяя системные маркеры среды
-    local TARGET_OS="Unknown"
-    local PROBE_RESP=$(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "uname -s 2>/dev/null || cmd.exe /c ver 2>/dev/null" 2>/dev/null)
-    
-    if [[ "$PROBE_RESP" == *"Microsoft"* || "$PROBE_RESP" == *"Windows"* ]]; then
-        TARGET_OS="Windows"
-    elif [[ "$PROBE_RESP" == *"Linux"* ]]; then
-        TARGET_OS="Linux"
-    elif [[ "$PROBE_RESP" == *"Darwin"* ]]; then
-        TARGET_OS="macOS"
-    else
-        # Резервный эвристический анализ по косвенным признакам
-        local PROBE_RESERVE=$(ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "echo \$OSTYPE" 2>/dev/null)
-        if [[ "$PROBE_RESERVE" == *"darwin"* ]]; then TARGET_OS="macOS"; else TARGET_OS="Linux"; fi
-    fi
-
-    core_engine_ui "s" "Удаленный хост идентифицирован как: [$TARGET_OS]"
-    core_engine_ui "line" ""
-
-    # --------------------------------------------------------------------------
-    # МАТРИЦА 4: СБОР ПОЛЬЗОВАТЕЛЕЙ И АВТО-НУМЕРАЦИЯ СПИСКА
-    # --------------------------------------------------------------------------
-    core_engine_ui "i" "Извлечение локальной матрицы пользователей..."
-    local -a USER_ARRAY=()
-    
-    if [[ "$TARGET_OS" == "Windows" ]]; then
-        # Сбор пользователей для Windows (через Base64 PowerShell)
-        local REQ_PWSH="Get-LocalUser | Select-Object -ExpandProperty Name"
-        local ENCODED_REQ=""
-        if command -v iconv &>/dev/null; then
-            [[ "$BASE64_MODE" == "busybox" ]] && ENCODED_REQ=$(echo -n "$REQ_PWSH" | iconv -t UTF-16LE | base64 | tr -d '\r\n') || ENCODED_REQ=$(echo -n "$REQ_PWSH" | iconv -t UTF-16LE | base64 -w0)
-        else
-            ENCODED_REQ=$(python3 -c "import base64; print(base64.b64encode('$REQ_PWSH'.encode('utf-16-le')).decode('utf-8'))")
-        fi
-        
-        local RAW_WIN_USERS=$(ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "powershell -EncodedCommand $ENCODED_REQ" 2>/dev/null)
-        mapfile -t USER_ARRAY < <(echo "$RAW_WIN_USERS" | tr -d '\r' | grep -v '^$')
-        
-    elif [[ "$TARGET_OS" == "Linux" ]]; then
-        # Сбор пользователей для Linux (фильтруем реальных пользователей с UID >= 1000 + root)
-        local RAW_LIN_USERS=$(ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "awk -F: '\$3 == 0 || \$3 >= 1000 {print \$1}' /etc/passwd" 2>/dev/null)
-        mapfile -t USER_ARRAY < <(echo "$RAW_LIN_USERS" | grep -v '^$')
-        
-    elif [[ "$TARGET_OS" == "macOS" ]]; then
-        # Сбор пользователей для macOS (через встроенную утилиту dscl)
-        local RAW_MAC_USERS=$(ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "dscl . list /Users | grep -v '^_'" 2>/dev/null)
-        mapfile -t USER_ARRAY < <(echo "$RAW_MAC_USERS" | grep -v '^$')
-    fi
-
-    # Защита от пустого списка
-    if [ ${#USER_ARRAY[@]} -eq 0 ]; then
-        core_engine_ui "e" "Не удалось получить список пользователей или база пуста."
-        core_engine_wait; return 1
-    fi
-
-    # ВЫВОД ПРОНУМЕРОВАННОГО ИНТЕРФЕЙСА
-    core_engine_ui "h" "СПИСОК ПОЛЬЗОВАТЕЛЕЙ НА ЦЕЛЕВОЙ СИСТЕМЕ ($TARGET_OS)"
-    local idx=1
-    for user in "${USER_ARRAY[@]}"; do
-        echo "  [$idx] 👤 Имя: $user"
-        let idx++
-    done
-    core_engine_ui "line" ""
-
-    # ВЫБОР ПО НОМЕРУ
-    local SELECTION=$(core_engine_input "text" "Введите НОМЕР целевого пользователя")
-    [[ -z "$SELECTION" ]] && return 1
-    
-    local TARGET_USER="${USER_ARRAY[$((SELECTION-1))]}"
-    if [[ -z "$TARGET_USER" ]]; then
-        core_engine_ui "e" "Ошибка: Некорректный номер выбора."; core_engine_wait; return 1
-    fi
-    
-    core_engine_ui "s" "Выбран аккаунт: $TARGET_USER"
-    core_engine_ui "line" ""
-
-    # --------------------------------------------------------------------------
-    # МАТРИЦА 5: ИНТЕРАКТИВНЫЙ КРОСС-ПЛАТФОРМЕННЫЙ СБРОС ПАРОЛЯ
-    # --------------------------------------------------------------------------
-    local NEW_PASS=$(core_engine_input "text" "Задайте НОВЫЙ пароль для $TARGET_USER")
-    [[ -z "$NEW_PASS" ]] && { core_engine_ui "e" "Пароль не может быть пустым."; core_engine_wait; return 1; }
-
-    core_engine_progress 2 "СИНХРОНИЗАЦИЯ ТРАНЗАКЦИИ СБРОСА ПАРОЛЯ"
-    local STATUS="FAIL"
-
-    if [[ "$TARGET_OS" == "Windows" ]]; then
-        # Выполнение сброса на Windows через PowerShell Base64
-        local RESET_PWSH="Set-LocalUser -Name '$TARGET_USER' -Password (ConvertTo-SecureString '$NEW_PASS' -AsPlainText -Force)"
-        local ENCODED_RESET=""
-        if command -v iconv &>/dev/null; then
-            [[ "$BASE64_MODE" == "busybox" ]] && ENCODED_RESET=$(echo -n "$RESET_PWSH" | iconv -t UTF-16LE | base64 | tr -d '\r\n') || ENCODED_RESET=$(echo -n "$RESET_PWSH" | iconv -t UTF-16LE | base64 -w0)
-        else
-            ENCODED_RESET=$(python3 -c "import base64; print(base64.b64encode('$RESET_PWSH'.encode('utf-16-le')).decode('utf-8'))")
-        fi
-        ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "powershell -EncodedCommand $ENCODED_RESET" &>/dev/null
-        [[ $? -eq 0 ]] && STATUS="SUCCESS"
-
-    elif [[ "$TARGET_OS" == "Linux" ]]; then
-        # Выполнение сброса на Linux (универсальный пайплайн через chpasswd или passwd)
-        ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "echo '${TARGET_USER}:${NEW_PASS}' | sudo chpasswd 2>/dev/null || echo -e '${NEW_PASS}\n${NEW_PASS}' | sudo passwd ${TARGET_USER} 2>/dev/null" &>/dev/null
-        [[ $? -eq 0 ]] && STATUS="SUCCESS"
-
-    elif [[ "$TARGET_OS" == "macOS" ]]; then
-        # Выполнение сброса на macOS через встроенный легитимный стек dscl
-        ssh -o ConnectTimeout=6 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${PC_IP}" "sudo dscl . -passwd /Users/${TARGET_USER} '${NEW_PASS}'" &>/dev/null
-        [[ $? -eq 0 ]] && STATUS="SUCCESS"
-    fi
-
-    # --------------------------------------------------------------------------
-    # ВЫВОД РЕЗУЛЬТАТОВ И ЛОГИРОВАНИЕ В СИСТЕМУ LOOT
-    # --------------------------------------------------------------------------
-    if [[ "$STATUS" == "SUCCESS" ]]; then
-        core_engine_ui "s" "Пароль пользователя '$TARGET_USER' [$TARGET_OS] успешно изменен."
-        core_engine_loot "universal_audit" "Успешный сброс пароля для $TARGET_USER на удаленной системе $TARGET_OS ($PC_IP)"
-    else
-        core_engine_ui "e" "Ошибка трансляции. Недостаточно административных прав (SUDO/UAC) или канал связи заблокирован."
-    fi
-    
-    core_engine_wait
-}
-
 # ==============================================================================
 # @description: OSINT NEXUS v27.0 - GHOST-COMMANDER [GHOST-SPEED]
 # МОДЕРНИЗАЦИЯ: Shadow-Logging, Atomic Session Management, Zombie-Process Killer
@@ -9616,166 +9438,6 @@ run_smart_auditor_nexus() {
     core_engine_wait
 }
 
-
-run_smart_auditor_nexusold() {
-    clear
-    core_engine_ui "h" "NEXUS AUDITOR: UNIVERSAL INTEL ENGINE v2.0"
-
-    local input
-    input=$(core_engine_input "text" "Enter Target (Domain, IP, or Service URL)")
-    [[ -z "$input" ]] && return
-
-    # --- 0. ИНТЕЛЛЕКТУАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ (Target Analyzer) ---
-    local target_type="unknown"
-    local host="$input"
-    
-    if [[ "$input" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
-        target_type="infrastructure"
-    elif [[ "$input" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        target_type="web"
-    elif [[ "$input" =~ :[0-9]+$ ]]; then
-        target_type="service"
-    fi
-
-    # --- 1. ВЫПОЛНЕНИЕ ПО ТИПУ ЦЕЛИ ---
-    case "$target_type" in
-        "web")
-            core_engine_ui "i" "Mode: WEB APPLICATION AUDIT (Deep Discovery)"
-            
-            local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
-            mkdir -p "$loot_dir" 2>/dev/null
-            local results_file="$loot_dir/audit_full_${host//[^a-zA-Z0-9]/_}_$(date +%Y%m%d_%H%M%S).log"
-            local signals_file="/tmp/signals_$$"
-
-            local count_critical=0
-            local count_files=0
-
-            # 1.1 Пассивная разведка
-            echo -e "  ${DG}🏃 [1/2]${NC} Анализ защитных барьеров (WAF Matrix)..."
-            {
-                curl -Is --connect-timeout 5 --max-time 7 -A "${GLOBAL_NETWORK_UA[0]}" "https://$host"
-                host -t txt "$host" 2>/dev/null
-            } > "$signals_file" 2>&1 &
-            show_spinner $! "Зондирование сетевой ауры"
-
-            # Проверяем наличие жестких систем фильтрации
-            local is_high_risk=false
-            grep -qiE "${GLOBAL_SECURITY_MATRIX[0]}" "$signals_file" && is_high_risk=true
-
-            local tmp_pipe="/tmp/prime_pipe_$$"
-            touch "$tmp_pipe"
-
-            # 1.2 Адаптивный выбор стратегии сканирования
-            if [ "$is_high_risk" = true ]; then
-                echo -e "  ${BY}[!] ВНИМАНИЕ:${NC} Обнаружены признаки WAF. Активирован ${BY}Стелс-профиль (OpSec Enabled)${NC}."
-                echo -e "  ${DG}└──${NC} Внедрение задержек, спуфинг IP и ротация сигнатур User-Agent."
-                
-                # Запуск сканирования в режиме маскировки
-                (
-                    for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
-                        [[ -z "$f" ]] && continue
-                        
-                        # Выбираем случайный User-Agent для текущего запроса
-                        local rand_ua="${GLOBAL_NETWORK_UA[$((RANDOM % ${#GLOBAL_NETWORK_UA[@]}))]}"
-                        # Генерируем фейковый IP для подмены заголовков обхода лимитов
-                        local fake_ip="$((RANDOM%223+1)).$((RANDOM%254)).$((RANDOM%254)).$((RANDOM%254))"
-                        
-                        # Выполняем скрытный запрос
-                        local http_code=$(curl -s -k -L -I -w "%{http_code}" -o /dev/null \
-                            --connect-timeout 3 \
-                            -A "$rand_ua" \
-                            -H "X-Forwarded-For: $fake_ip" \
-                            -H "X-Real-IP: $fake_ip" \
-                            "https://$host/$f")
-                        
-                        if [ "$http_code" == "200" ]; then
-                            echo "HIT|$f" >> "$tmp_pipe"
-                        fi
-                        
-                        # Динамическая микро-задержка между запросами от 1 до 2 секунд, чтобы сбить тайминги IDS
-                        sleep 1
-                    done
-                ) &
-                show_spinner $! "Выполнение распределенного скрытного фаззинга"
-            else
-                echo -e "  ${BG}[✓] СИСТЕМА ЗАЩИТЫ ЧИСТА.${NC} Запуск высокоскоростного зондирования."
-                (
-                    # Быстрое сканирование без задержек (оригинальный функционал)
-                    curl -s -k -L --max-time 7 "https://$host" | grep -oE "\.(php|js|json|sql|env|xml|yaml|config)" | sort -u | awk '{print "HIT|"$1}' >> "$tmp_pipe"
-                    for f in "${GLOBAL_FUZZ_WORDLIST[@]}"; do
-                        [[ -z "$f" ]] && continue
-                        [[ $(curl -s -k -L -I -w "%{http_code}" -o /dev/null --connect-timeout 2 "https://$host/$f") == "200" ]] && echo "HIT|$f" >> "$tmp_pipe"
-                    done
-                ) &
-                show_spinner $! "Агрессивный перебор структуры"
-            fi
-
-            # 1.3 Фильтрация результатов и защита от Soft-404
-            echo -e "\n  ${BW}📌 ОБНАРУЖЕННЫЕ КОМПОНЕНТЫ И УЯЗВИМОСТИ СТРУКТУРЫ:${NC}"
-            echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
-
-            while IFS='|' read -r tag target; do
-                [[ -z "$target" ]] && continue
-                
-                # Скачиваем первые 500 байт для контентного триажа
-                local head_check=$(curl -s -k -L --max-time 3 "https://$host/$target" | head -c 500)
-                
-                # ФУНКЦИОНАЛЬНЫЙ ФИЛЬТР Soft-404: Проверяем, не поддельная ли это страница успеха
-                if echo "$head_check" | grep -qiE "not found|страница не найдена|error 404|ошибка 404|welcome to nginx"; then
-                    # Пропускаем ложное срабатывание
-                    continue
-                fi
-                
-                if ! echo "$head_check" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}"; then
-                    if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[0]}|\.(sql|env|config)$"; then
-                        core_engine_loot "CRITICAL" "Exposed: $target on $host"
-                        echo -e "${R}[CRITICAL]${NC} $target" >> "$results_file"
-                        
-                        printf "  ${DG}├──${NC} ${BR}%-32s${NC} →   ${R}[КРИТИЧЕСКИЙ СБОЙ]${NC} 🔥 Утечка данных конфигурации\n" "$target"
-                        ((count_critical++))
-                    else
-                        echo -e "${G}[FILE]${NC} $target" >> "$results_file"
-                        
-                        printf "  ${DG}├──${NC} ${W}%-32s${NC} →   ${G}[АКТИВНЫЙ ФАЙЛ]${NC}    ✓ Доступен (HTTP 200)\n" "$target"
-                        ((count_files++))
-                    fi
-                    
-                    if echo "$target" | grep -qiE "${GLOBAL_SAST_MATRIX[2]}|${GLOBAL_SAST_MATRIX[3]}"; then
-                        run_deep_file_probe "$host" "$target" "$head_check"
-                    fi
-                fi
-            done < <(sort -u "$tmp_pipe")
-            
-            echo -e "  ${DG}└──  [КОНЕЦ СТРУКТУРНОГО ДЕРЕВА]${NC}"
-            echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
-            rm -f "$tmp_pipe" "$signals_file"
-            ;;
-            
-        "infrastructure")
-            core_engine_ui "i" "Mode: INFRASTRUCTURE SCAN (Port & Service Audit)"
-            # Интегрированная логика бывшего exploiter_v5
-            local loot_dir="${PRIME_LOOT:-$HOME/prime_loot}"
-            local results_file="$loot_dir/infra_scan_$(date +%s).log"
-            nmap -T3 -n -Pn -sV --script="safe,discovery" -p "80,443,22,21,8080" "$input" >> "$results_file" 2>&1
-            core_engine_ui "s" "Infrastructure scan complete: $results_file"
-            ;;
-            
-        "service")
-            core_engine_ui "i" "Mode: SERVICE PROBE (Fingerprinting)"
-            curl -I "$input" 2>/dev/null || echo "Service non-responsive"
-            ;;
-            
-        *)
-            core_engine_ui "e" "Target type could not be resolved automatically."
-            return
-            ;;
-    esac
-
-    core_engine_wait
-}
-
-
-
 # ==============================================================================
 # @description: OSINT NEXUS v27.1 - ATOMIC SYNC & BOOTSTRAP ENGINE
 # МОДЕРНИЗАЦИЯ: Атомарная транзакция, Rollback-защита, дедупликация алиасов
@@ -9834,216 +9496,119 @@ run_update_prime() {
 
 
 # ==============================================================================
-# @description: Универсальный модуль горячей перезагрузки ядра платформы v27.0
-# МОДЕРНИЗАЦИЯ: Форсированный обход SSL/TLS проверок (ca-certificates bypass)
-# БЕЗОПАСНОСТЬ: Ротация User-Agent (GLOBAL_NETWORK_UA) для бесшовного обхода WAF/DPI
-# АРХИТЕКТУРА: Открытый стрим ошибок сетевых харвестеров для Termux non-root
-# ==============================================================================
-run_update_primeold() {
-    # Слой 1: Заголовок через Голос [1]
-    core_engine_ui "h" "SYSTEM UPDATE & SYNC v27.0"
-    
-    # --- СТАБИЛИЗАЦИЯ И ХАРДЕНИНГ ОКРУЖЕНИЯ $PATH ---
-    if [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
-        [[ ! "$PATH" =~ "$PREFIX/bin" ]] && export PATH="${PREFIX}/bin:${PATH}"
-    fi
-    [[ ! "$PATH" =~ "/usr/local/bin" ]] && export PATH="${PATH}:/usr/local/bin:/usr/bin:/bin"
-    
-    # --- ЭВРИСТИКА ОКРУЖЕНИЯ (Вычисление рабочей зоны) ---
-    local base_work_dir
-    if [[ $EUID -eq 0 ]]; then
-        base_work_dir="/root"
-    else
-        base_work_dir="$HOME"
-    fi
-    
-    local target="${base_work_dir}/launcher.sh"
-    local repo="https://raw.githubusercontent.com/szp2025/core-prime-tools/refs/heads/main/launcher.sh"
-    local tmp="${target}.tmp"
-
-    # --- ИНТЕЛЛЕКТУАЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ БИНАРНИКОВ ---
-    local exe_cmd=""
-
-    if command -v curl >/dev/null 2>&1; then
-        exe_cmd="curl"
-    elif [[ -x "${PREFIX}/bin/curl" ]]; then
-        exe_cmd="${PREFIX}/bin/curl"
-    fi
-
-    if [[ -n "$exe_cmd" ]]; then
-        core_engine_ui "i" "Network harvester verified: cURL Engine active."
-    else
-        if command -v wget >/dev/null 2>&1; then
-            exe_cmd="wget"
-        elif [[ -x "${PREFIX}/bin/wget" ]]; then
-            exe_cmd="${PREFIX}/bin/wget"
-        fi
-        [[ -n "$exe_cmd" ]] && core_engine_ui "i" "Network harvester verified: Wget Engine active."
-    fi
-
-    if [[ -z "$exe_cmd" ]]; then
-        core_engine_ui "w" "Internal verification failed. Using Termux fallback paths..."
-        if [[ -x "${PREFIX}/bin/curl" ]]; then
-            exe_cmd="${PREFIX}/bin/curl"
-        elif [[ -x "${PREFIX}/bin/wget" ]]; then
-            exe_cmd="${PREFIX}/bin/wget"
-        else
-            core_engine_ui "e" "CRITICAL: cURL/Wget binaries completely inaccessible!"
-            core_engine_wait
-            return 1
-        fi
-    fi
-
-    # --- ДИНАМИЧЕСКИЙ РОТАТОР USER-AGENT ---
-    local selected_ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    if [[ -n "${GLOBAL_NETWORK_UA[*]}" ]]; then
-        local ua_size=${#GLOBAL_NETWORK_UA[@]}
-        local rand_idx=$(( RANDOM % ua_size ))
-        selected_ua="${GLOBAL_NETWORK_UA[$rand_idx]}"
-    fi
-
-    core_engine_ui "i" "Connecting to GitHub Repository..."
-    core_engine_ui "d" "Active UA: $selected_ua"
-
-    # Слой 2: Безопасный стрим с обходом валидации SSL-сертификатов
-    rm -f "$tmp"
-    
-    if [[ "$exe_cmd" =~ "curl" ]]; then
-        core_engine_ui "i" "Executing cURL SSL-Bypass stream..."
-        # Добавлен флаг -k (--insecure) для обхода проблем с ca-certificates в Android
-        $exe_cmd -k -L -A "$selected_ua" --connect-timeout 15 "$repo" -o "$tmp"
-    else
-        core_engine_ui "i" "Executing Wget SSL-Bypass stream..."
-        # Добавлен флаг --no-check-certificate
-        $exe_cmd --no-check-certificate -q --user-agent="$selected_ua" --timeout=15 "$repo" -O "$tmp"
-    fi
-    
-    # Слой 3: АВТОНОМНАЯ ВАЛИДАЦИЯ ДАННЫХ
-    if [[ ! -f "$tmp" || ! -s "$tmp" ]]; then
-        core_engine_ui "e" "CRITICAL: Download failed (Empty or missing payload)!"
-        core_engine_ui "!" "Network handshake drop or DNS restriction detected."
-        [[ -f "$tmp" ]] && rm -f "$tmp"
-        core_engine_wait
-        return 1
-    fi
-
-    # Проверка сигнатуры (Защита от заглушек WAF / Ошибок 404)
-    if ! head -n 5 "$tmp" | grep -qE '^#!/bin/|^#!/usr/bin/|^#'; then
-        core_engine_ui "e" "CRITICAL: Target source signature is corrupted (Not a script)!"
-        rm -f "$tmp"
-        core_engine_wait
-        return 1
-    fi
-
-    # --- Слой 4: КРИТИЧЕСКИЙ ФИЛЬТР (С диагностикой ошибок) ---
-    if ! bash -n "$tmp" 2>/dev/null; then
-        core_engine_ui "e" "CRITICAL: Remote code has broken Bash syntax!"
-        
-        # Вывод ошибки, чтобы знать ГДЕ именно поломка
-        echo -e "\n${R}[!] SYNTAX ERROR LOG:${NC}"
-        bash -n "$tmp"
-        echo -e "\n${Y}Check the lines above to fix the remote repository script.${NC}"
-        
-        rm -f "$tmp"
-        core_engine_wait
-        return 1
-    fi
-
-    # Слой 5: Атомарная замена и права
-    core_engine_ui "i" "Applying code synchronization..."
-    if [[ $EUID -eq 0 ]]; then
-        mv "$tmp" "$target" && chmod 755 "$target" && chown root:root "$target" 2>/dev/null
-    else
-        mv "$tmp" "$target" && chmod 755 "$target"
-    fi
-
-    # Слой 6: Восстановление среды (Alias & Symlink)
-    local bashrc_path="${HOME}/.bashrc"
-    [[ -f "${HOME}/.bash_profile" ]] && bashrc_path="${HOME}/.bash_profile"
-
-    if [[ -f "$bashrc_path" ]]; then
-        if ! grep -q "alias launcher=" "$bashrc_path"; then
-            echo "alias launcher='bash $target'" >> "$bashrc_path"
-            core_engine_ui "s" "Alias 'launcher' injected into $(basename "$bashrc_path")"
-        fi
-    else
-        echo "alias launcher='bash $target'" > "$bashrc_path"
-        core_engine_ui "s" "Configuration profile created with 'launcher' alias."
-    fi
-    
-    # Создаем системную ссылку
-    if [[ $EUID -eq 0 ]]; then
-        ln -sf "$target" /usr/local/bin/launcher && chmod +x /usr/local/bin/launcher
-    elif [[ -n "$PREFIX" && -d "$PREFIX/bin" ]]; then
-        ln -sf "$target" "$PREFIX/bin/launcher" && chmod +x "$PREFIX/bin/launcher"
-    fi
-
-    core_engine_ui "s" "Code updated successfully, permissions aligned!"
-    
-    # Слой 7: Синхронизация и перезапуск [13]
-    if command -v core_engine_progress >/dev/null 2>&1; then
-        core_engine_progress 1 "Rebooting Matrix Launcher Core"
-    fi
-    
-    # Полная очистка перед перезапуском [10]
-    if command -v core_engine_clean_env >/dev/null 2>&1; then
-        core_engine_clean_env
-    fi
-    
-    # Мгновенный бесшовный перехват управления дескриптора нового кода
-    exec bash "$target"
-}
-
-
-
-
-
-
-# ==============================================================================
 # @description: OSINT NEXUS v20.0 - BLUETOOTH SPECTRUM ANALYZER
 # МОДЕРНИЗАЦИЯ: Поддержка BLE + Classic, обход конфликтов BlueZ 5+, RAM-Pipeline
 # АРХИТЕКТУРА: Ghost-Speed Engine, Background Discovery, Non-Blocking Probe
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | BT-SPECTRUM LIMIT
 # ==============================================================================
 run_bluetooth_scan() {
-    core_engine_ui "i" "Bluetooth-Scanner: Initializing high-density proximity search..."
+    clear
+    
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
+    
+    local BR='\033[1;31m'     # Bold Red (Critical Error)
+    local BY='\033[1;33m'     # Bold Yellow (Warnings / Signal Verification)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Hardware Addresses)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
 
-    # 1. Защита от системных конфликтов (не трогаем адаптер напрямую)
-    if ! command -v bluetoothctl >/dev/null 2>&1; then
-        core_engine_ui "e" "Dependency 'bluez-utils' missing."
+    core_engine_ui "h" "OSINT NEXUS: BLUETOOTH SPECTRUM ANALYZER v20.1"
+
+    # ==============================================================================
+    # BLOCK 1: DEPENDENCY SECURITY VERIFICATION
+    # ==============================================================================
+    if ! command -v bluetoothctl &>/dev/null; then
+        core_engine_ui "e" "Dependency Fault: Core 'bluez-utils' infrastructure (bluetoothctl) missing."
         return 1
     fi
 
-    # 2. Асинхронный захват в RAM-буфер
-    local tmp_bt="/tmp/nexus_bt_$$"
-    
-    # Запускаем сканирование в фоне на 15 секунд
-    # Используем bluetoothctl, так как он корректно работает через API BlueZ
-    {
-        bluetoothctl scan on &
-        local bt_pid=$!
-        sleep 15
-        bluetoothctl scan off
-        kill $bt_pid 2>/dev/null
-    } >/dev/null 2>&1
-
-    # 3. Извлечение уникальных сигнатур из кеша BlueZ
-    # Забираем только те устройства, которые были реально обнаружены
-    bluetoothctl devices | awk '{print $2, $3$4$5$6$7$8}' > "$tmp_bt"
-
-    # 4. Аналитический отчет (Атомарный вывод)
-    if [[ -s "$tmp_bt" ]]; then
-        core_engine_ui "s" "Bluetooth-Scanner: Discovery successful."
-        while read -r line; do
-            core_engine_ui "+" "Node Detected: $line"
-        done < "$tmp_bt"
-        
-        core_engine_loot "bluetooth" "$(cat "$tmp_bt")"
-    else
-        core_engine_ui "w" "Bluetooth-Scanner: No active signals in range."
+    # Проверяем физический статус Bluetooth-адаптера в системе
+    if ! rfkill list bluetooth | grep -q "blocked: no"; then
+        core_engine_ui "w" "Hardware Alert: Bluetooth adapter is software/hardware blocked. Attempting unblock..."
+        rfkill unblock bluetooth 2>/dev/null
+        sleep 1
     fi
 
-    rm -f "$tmp_bt"
+    core_engine_ui "i" "Initializing high-density proximity search [BLE + Classic Mode]..."
+
+    # ==============================================================================
+    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY
+    # ==============================================================================
+    core_engine_ui "w" "Engaging non-blocking background discovery engine. Duration: 15s"
+    
+    # Асинхронно активируем сканирование внутри BlueZ
+    bluetoothctl scan on &>/dev/null &
+    local scan_pid=$!
+    
+    # Даем движку собрать сигнатуры устройств в системный кэш dbus/bluez
+    local i
+    for ((i=15; i>0; i--)); do
+        echo -ne "  ${DG}├──${NC} Scanning airwaves... Remaining time: ${BY}${i}s${NC}\r"
+        sleep 1
+    done
+    echo -ne "\n"
+
+    # Корректное, безопасное отключение сканирования без перевода процессов в зомби-статус
+    bluetoothctl scan off &>/dev/null
+    kill "$scan_pid" 2>/dev/null
+    wait "$scan_pid" 2>/dev/null
+
+    # ==============================================================================
+    # BLOCK 3: ATOMIC MEMORY-PIPELINE EXTRACTION
+    # ==============================================================================
+    core_engine_ui "i" "Extracting unique signal signatures from active BlueZ storage..."
+    
+    local -a raw_devices=()
+    # Извлекаем данные и аккуратно парсим их. 
+    # awk '$1=="Device" {mac=$2; $1=$2=""; sub(/^  /, ""); print mac " " $0}'
+    # Скрипт берет MAC-адрес ($2), стирает служебные префиксы, сохраняя структуру имени со всеми пробелами.
+    mapfile -t raw_devices < <(bluetoothctl devices 2>/dev/null | awk '$1=="Device" {mac=$2; $1=$2=""; sub(/^  /, ""); if($0=="") $0="Unknown Device"; print mac "|" $0}')
+
+    # ==============================================================================
+    # BLOCK 4: ANALYTICAL STRUCTURAL REPORTING
+    # ==============================================================================
+    echo -e "\n${BC}📡 DETECTED BLUETOOTH SPECTRUM NODES:${NC}"
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+
+    if [[ ${#raw_devices[@]} -eq 0 ]]; then
+        echo -e "  └── [${BY}EMPTY${NC}] No active Bluetooth signals or beacons identified in proximity range.\n"
+        core_engine_loot "bluetooth" "Scan completed. Results: 0 devices."
+        core_engine_wait
+        return 0
+    fi
+
+    local device_entry mac_addr device_name
+    local node_count=0
+    local loot_buffer=""
+
+    for device_entry in "${raw_devices[@]}"; do
+        # Разделяем MAC и Имя по безопасному внутреннему маркеру '|'
+        mac_addr="${device_entry%%|*}"
+        device_name="${device_entry#*|}"
+        
+        ((node_count++))
+        echo -e "  ├── [${BC}NODE $((node_count))${NC}] MAC: ${BW}$mac_addr${NC} -> Alias: ${G}$device_name${NC}"
+        loot_buffer+="MAC: $mac_addr | Name: $device_name\n"
+    done
+
+    echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
+    echo -e "  └── [${BG}ANALYSIS COMPLETE${NC}] Total active wireless targets isolated: ${BG}$node_count${NC}\n"
+
+    # Экспорт результатов в подсистему хранения лута
+    core_engine_loot "bluetooth" "Total detected nodes: $node_count\n$loot_buffer"
+
+    core_engine_wait
 }
 
 
@@ -10055,50 +9620,124 @@ run_bluetooth_scan() {
 # ==============================================================================
 run_network_analyzer() {
     clear
-    core_engine_ui "h" "TOPOLOGY ENGINE v20.0: PERIMETER DISCOVERY"
     
-    # Валидация
-    command -v nmap >/dev/null 2>&1 || { core_engine_ui "e" "Nmap required."; return 1; }
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
+    
+    local BR='\033[1;31m'     # Bold Red (Critical Error / Timeout)
+    local BY='\033[1;33m'     # Bold Yellow (State Warning)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Network Nodes)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
 
-    local range=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3).0/24
-    local state_file="/tmp/nexus_net_state.tmp"
-    touch "$state_file"
+    core_engine_ui "h" "OSINT NEXUS: ACTIVE TOPOLOGY & PERIMETER ENGINE v20.1"
 
-    core_engine_ui "i" "Monitoring perimeter: $range"
+    # ==============================================================================
+    # BLOCK 1: DEPENDENCY VALIDATION & NETWORK PROFILING
+    # ==============================================================================
+    if ! command -v nmap &>/dev/null; then
+        core_engine_ui "e" "Dependency Fault: Core network scanner 'nmap' missing from PATH."
+        return 1
+    fi
 
+    # Эвристическое вычисление активного сетевого диапазона на основе реальной маски интерфейса
+    local gateway_dev
+    gateway_dev=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'dev \K\S+')
+    
+    if [[ -z "$gateway_dev" ]]; then
+        core_engine_ui "e" "Network Fault: Unable to determine default hardware gateway routing interface."
+        return 1
+    fi
+
+    # Извлекаем подсеть в формате CIDR (например, 192.168.1.0/24) для корректной работы в любых сетях
+    local network_range
+    network_range=$(ip addr show dev "$gateway_dev" | grep -w "inet" | awk '{print $2}' | head -n 1)
+
+    if [[ -z "$network_range" ]]; then
+        core_engine_ui "w" "Fallback: Interface mapping missing CIDR block. Applying default 24-bit matrix."
+        local base_ip
+        base_ip=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' | cut -d. -f1-3)
+        network_range="${base_ip}.0/24"
+    fi
+
+    # Разворачиваем базу данных состояния в виртуальной памяти RAM (Shared Memory) для нулевого износа диска
+    local state_db="/dev/shm/nexus_topology_state_$$"
+    touch "$state_db"
+
+    core_engine_ui "i" "Monitoring perimeter scope: ${BC}$network_range${NC} via interface [${BW}$gateway_dev${NC}]"
+    core_engine_ui "w" "Entering background persistent telemetry loop. Press [CTRL+C] to abort."
+
+    # ==============================================================================
+    # BLOCK 2: PERSISTENT TELEMETRY SCANNING LOOP
+    # ==============================================================================
     while true; do
-        # Используем групповой запуск процесса для управления PID
-        (
-            # Nmap запускается и сразу стримит вывод в grep, минуя память Bash
-            # --open - сканируем только открытые узлы (ускоряет работу в 10 раз)
-            nmap -n -sP --open "$range" 2>/dev/null | grep "Nmap scan report for" | awk '{print $NF}' | tr -d '()' | \
-            while read -r host; do
-                if ! grep -qF "$host" "$state_file"; then
-                    core_engine_ui "s" "DISCOVERED: $host"
-                    echo "$host" >> "$state_file"
-                fi
-            done
-        ) &
-        
+        # Сброс локальной маски текущего прохода (хранится в оперативной памяти)
+        local current_pass_cache="/dev/shm/nexus_pass_$$"
+        touch "$current_pass_cache"
+
+        # Запускаем конвейер в фоновом режиме через утилиту 'sh', чтобы получить единую контролируемую группу
+        # Флаг -sn заменяет устаревший -sP в современных версиях Nmap
+        sh -c "nmap -n -sn --open $network_range 2>/dev/null | grep 'Nmap scan report for' | awk '{print \$NF}' | tr -d '()' > $current_pass_cache" &
         local scan_pid=$!
-        
-        # Watchdog с правильной обработкой завершения
+
+        # ==============================================================================
+        # BLOCK 3: ATOMIC WATCHDOG LAYER
+        # ==============================================================================
         local timeout=120
         while (( timeout > 0 )); do
-            if ! kill -0 $scan_pid 2>/dev/null; then break; fi
+            if ! kill -0 "$scan_pid" 2>/dev/null; then 
+                break; 
+            fi
             sleep 1
             ((timeout--))
         done
 
-        # Аварийное завершение зомби
+        # Обработка аварийного превышения лимита времени (Таранное глушение всей группы процессов)
         if (( timeout <= 0 )); then
-            core_engine_ui "e" "Scan timeout. Cleanup..."
-            kill -9 $scan_pid 2>/dev/null
-            wait $scan_pid 2>/dev/null
+            core_engine_ui "e" "Scan execution timeout triggered. Executing deep process tree cleanup..."
+            # Посылаем сигнал SIGKILL всей группе процессов во главе с scan_pid, предотвращая сиротство nmap
+            pkill -9 -P "$scan_pid" 2>/dev/null
+            kill -9 "$scan_pid" 2>/dev/null
+            wait "$scan_pid" 2>/dev/null
         fi
-        
+
+        # ==============================================================================
+        # BLOCK 4: STATE ENGINE CORRELATION & DELTA ANALYSIS
+        # ==============================================================================
+        if [[ -s "$current_pass_cache" ]]; then
+            local host_node
+            while read -r host_node; do
+                host_node=$(echo "$host_node" | xargs)
+                [[ -z "$host_node" ]] && continue
+
+                # Если хоста нет в глобальной базе состояния — регистрируем новое обнаружение
+                if ! grep -qF "$host_node" "$state_db"; then
+                    core_engine_ui "s" "NEW NODE ISOLATED: ${G}$host_node${NC}"
+                    echo "$host_node" >> "$state_db"
+                    core_engine_loot "topology_engine" "New node discovered on perimeter: $host_node"
+                fi
+            done < "$current_pass_cache"
+        fi
+
+        # Очищаем кэш итерации прохода (OpSec)
+        rm -f "$current_pass_cache"
+
+        # Тайм-аут отдыха перед следующим циклом сканирования волны периметра
         sleep 60
     done
+
+    # Полное уничтожение базы данных состояния при выходе из функции
+    rm -f "$state_db"
 }
 
 
@@ -10111,45 +9750,129 @@ run_network_analyzer() {
 # @status: GHOST-SPEED COMPLIANT | PRODUCTION READY | NETWORK INTELLIGENCE LIMIT
 # ==============================================================================
 run_network_intelligence() {
-    # 1. Валидация зависимостей
-    local deps=(tshark awk stdbuf)
-    for cmd in "${deps[@]}"; do
-        command -v "$cmd" >/dev/null 2>&1 || { core_engine_ui "e" "Missing $cmd"; return 1; }
+    clear
+    
+    # ==============================================================================
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # ==============================================================================
+    local R='\033;31m'        # Red (Errors / Failures)
+    local G='\033;32m'        # Green (Success States)
+    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033;34m'        # Blue (Informational Output)
+    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033;36m'        # Cyan (Separators & System Metadata)
+    local W='\033;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
+    
+    local BR='\033[1;31m'     # Bold Red (Critical Sensor Failure)
+    local BY='\033[1;33m'     # Bold Yellow (Telemetry Alert)
+    local BC='\033[1;36m'     # Bold Cyan (Headers & Operational Nodes)
+    local BG='\033[1;32m'     # Bold Green (Verification Passed)
+    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'        # Terminal Style Reset
+
+    core_engine_ui "h" "OSINT NEXUS: AUTONOMOUS TRAFFIC SENSOR v20.1"
+
+    # ==============================================================================
+    # BLOCK 1: HARDWARE PRIVILEGES & DEPENDENCY VALIDATION
+    # ==============================================================================
+    local deps=(tshark awk stdbuf pkill)
+    local cmd; for cmd in "${deps[@]}"; do
+        if ! command -v "$cmd" &>/dev/null; then
+            core_engine_ui "e" "Dependency Fault: Core command [$cmd] missing from execution path."
+            return 1
+        fi
     done
 
-    local iface=$(ip route | grep default | grep -oP 'dev \K\S+' || echo "eth0")
-    local loot_dir="${BASE_DIR:-.}/prime_loot"
+    # Для захвата сырого трафика необходимы привилегии Root или соответствующие Capabilities
+    if [[ $EUID -ne 0 ]]; then
+        core_engine_ui "e" "Privilege Fault: ROOT access required to bind socket listeners to raw hardware interfaces."
+        return 1
+    fi
+
+    # Автоматическое определение активного интерфейса по дефолтному маршруту ядра
+    local iface
+    iface=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'dev \K\S+')
+    [[ -z "$iface" ]] && iface="eth0"
+
+    # Изоляция директории лута (Перенос в RAM-диск /dev/shm для максимальной скорости и скрытия следов)
+    local loot_dir="/dev/shm/nexus_traffic_$$"
     mkdir -p "$loot_dir"
 
-    core_engine_ui "+" "Sensor: Deploying single-pass capture on $iface..."
+    core_engine_ui "i" "Sensor deployed on network interface: ${BC}$iface${NC}"
+    core_engine_ui "w" "BPF Matrix Active: [port 53, 80, 443]. Storage allocation: RAM-Buffer Target."
 
-    # 2. Адаптивный BPF-фильтр
+    # ==============================================================================
+    # BLOCK 2: KERNEL-LEVEL FILTERING & SINGLE-PASS EXTRACTION
+    # ==============================================================================
     local bpf="port 53 or port 80 or port 443"
-
-    # 3. Единый контур захвата (Single-Pass Multiplexing)
-    # Используем 'tee' для дублирования потока: один в PCAP, другой в анализатор
-    # Это снижает нагрузку на CPU на 50%
-    (
-        tshark -i "$iface" -f "$bpf" -w - 2>/dev/null | tee >(
-            # Потоковая эвристика (только метаданные)
-            tshark -r - -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null \
-            | stdbuf -oL awk NF | stdbuf -oL uniq | while read -r line; do
-                core_engine_loot "traffic_leads" "LEAD: $line"
-            done
-        ) > "$loot_dir/current_capture.pcap" &
-    )
     
-    # 4. Управление ротацией и Watchdog
+    # Флаги нативной атомарной ротации tshark: 
+    # -b duration:60 (ротация файлов каждые 60 секунд)
+    # -b files:5 (хранить максимум 5 последних файлов, автоматически стирая старые)
+    local tshark_capture_opts=(
+        -i "$iface"
+        -f "$bpf"
+        -w "$loot_dir/capture.pcap"
+        -b duration:60
+        -b files:5
+        -q
+    )
+
+    # Запускаем основной контролируемый процесс захвата в фоновом режиме
+    tshark "${tshark_capture_opts[@]}" 2>/dev/null &
+    local core_sensor_pid=$!
+
+    # Проверяем успешность запуска бинарного сенсора
+    sleep 1.5
+    if ! kill -0 "$core_sensor_pid" 2>/dev/null; then
+        core_engine_ui "e" "Critical Engine Fault: tshark core interface initialization failed."
+        rm -rf "$loot_dir"
+        return 1
+    fi
+
+    # ==============================================================================
+    # BLOCK 3: ASYNCHRONOUS METADATA HEURISTICS CONDUIT
+    # ==============================================================================
+    # Запуск асинхронной подсистемы потокового разбора извлекаемых метаданных трафика
+    # Разбор идет через tshark, считывающий TShark Live-интерфейс событий с подавлением буферов (stdbuf)
+    (
+        stdbuf -oL tshark -i "$iface" -f "$bpf" -Y "http.request || dns.flags.response == 0" -T fields -e http.host -e dns.qry.name 2>/dev/null | \
+        stdbuf -oL awk 'NF {print $0}' | \
+        stdbuf -oL uniq | \
+        while read -r lead_data; do
+            lead_data=$(echo "$lead_data" | xargs)
+            if [[ -n "$lead_data" ]]; then
+                core_engine_ui "+" "TRAFFIC LEAD ISOLATED: ${G}$lead_data${NC}"
+                core_engine_loot "traffic_leads" "Network Intel Asset: $lead_data"
+            fi
+        done
+    ) &
+    local heuristics_pid=$!
+
+    core_engine_ui "s" "Autonomous Intelligence Sensor fully operational. Telemetry loop active."
+    core_engine_ui "w" "Persistent monitoring engaged. Press [CTRL+C] to dismantle pipeline."
+
+    # ==============================================================================
+    # BLOCK 4: PERSISTENT WATCHDOG LAYER & OPSEC SANITIZATION
+    # ==============================================================================
     while true; do
-        sleep 60
-        # Ротация PCAP
-        mv "$loot_dir/current_capture.pcap" "$loot_dir/capture_$(date +%s).pcap"
+        sleep 10
         
-        # Очистка старья
-        find "$loot_dir" -name "capture_*.pcap" -mmin +60 -delete
-        
-        # Check Watchdog
-        pgrep -x tshark >/dev/null || core_engine_ui "e" "CRITICAL: Sensor process dead. Restarting..."
+        # Контроль жизнедеятельности основного ядра сбора трафика
+        if ! kill -0 "$core_sensor_pid" 2>/dev/null; then
+            core_engine_ui "e" "CRITICAL EVENT: Master traffic sensor process died. Re-initializing engine..."
+            
+            # Таранное глушение зависших дочерних хвостов и эвристики
+            kill -9 "$heuristics_pid" 2>/dev/null
+            wait "$heuristics_pid" 2>/dev/null
+            
+            # Финальная чистка RAM-диска перед аварийным перезапуском контура
+            rm -rf "$loot_dir"
+            
+            # Выход с кодом ошибки для обработки внешней управляющей оболочкой (Core System)
+            return 2
+        fi
     done
 }
 
