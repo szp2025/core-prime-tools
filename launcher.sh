@@ -9504,61 +9504,77 @@ run_bluetooth_scan() {
     clear
     
     # ==============================================================================
-    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS
+    # BLOCK 0: HIGH-TECH COLOR PALETTE & STRUCTURAL GRAPHIC MARKERS (FIXED ANSI)
     # ==============================================================================
-    local R='\033;31m'        # Red (Errors / Failures)
-    local G='\033;32m'        # Green (Success States)
-    local Y='\033;33m'        # Yellow (Warnings / Attention Required)
-    local B='\033;34m'        # Blue (Informational Output)
-    local M='\033;35m'        # Magenta (File Paths, Logs, Tokens)
-    local C='\033;36m'        # Cyan (Separators & System Metadata)
-    local W='\033;37m'        # White (Standard Text Data)
-    local DG='\033[1;30m'     # Dark Gray (Tree Nodes and Frame Graphics)
+    local R='\033[0;31m'        # Red (Errors / Failures)
+    local G='\033[0;32m'        # Green (Success States)
+    local Y='\033[0;33m'        # Yellow (Warnings / Attention Required)
+    local B='\033[0;34m'        # Blue (Informational Output)
+    local M='\033[0;35m'        # Magenta (File Paths, Logs, Tokens)
+    local C='\033[0;36m'        # Cyan (Separators & System Metadata)
+    local W='\033[0;37m'        # White (Standard Text Data)
+    local DG='\033[1;30m'       # Dark Gray (Tree Nodes and Frame Graphics)
     
-    local BR='\033[1;31m'     # Bold Red (Critical Error)
-    local BY='\033[1;33m'     # Bold Yellow (Warnings / Signal Verification)
-    local BC='\033[1;36m'     # Bold Cyan (Headers & Hardware Addresses)
-    local BG='\033[1;32m'     # Bold Green (Verification Passed)
-    local BW='\033[1;37m'     # Bold White (Emphasized Data Elements)
-    local NC='\033[0m'        # Terminal Style Reset
+    local BR='\033[1;31m'       # Bold Red (Critical Error)
+    local BY='\033[1;33m'       # Bold Yellow (Warnings / Signal Verification)
+    local BC='\033[1;36m'       # Bold Cyan (Headers & Hardware Addresses)
+    local BG='\033[1;32m'       # Bold Green (Verification Passed)
+    local BW='\033[1;37m'       # Bold White (Emphasized Data Elements)
+    local NC='\033[0m'          # Terminal Style Reset
 
-    core_engine_ui "h" "OSINT NEXUS: BLUETOOTH SPECTRUM ANALYZER v20.1"
+    # Вызов UI-компонента ядра
+    if command -v core_engine_ui &>/dev/null; then
+        core_engine_ui "h" "OSINT NEXUS: BLUETOOTH SPECTRUM ANALYZER v20.1"
+    else
+        echo -e "${BC}====================================================${NC}"
+        echo -e "${BW}     OSINT NEXUS: BLUETOOTH SPECTRUM ANALYZER v20.1 ${NC}"
+        echo -e "${BC}====================================================${NC}"
+    fi
 
     # ==============================================================================
     # BLOCK 1: DEPENDENCY SECURITY VERIFICATION
     # ==============================================================================
     if ! command -v bluetoothctl &>/dev/null; then
-        core_engine_ui "e" "Dependency Fault: Core 'bluez-utils' infrastructure (bluetoothctl) missing."
+        if command -v core_engine_ui &>/dev/null; then
+            core_engine_ui "e" "Dependency Fault: Core 'bluez-utils' infrastructure (bluetoothctl) missing."
+        else
+            echo -e " ${BR}[!] Dependency Fault: 'bluetoothctl' missing.${NC}"
+        fi
         return 1
     fi
 
-    # Проверяем физический статус Bluetooth-адаптера в системе
-    if ! rfkill list bluetooth | grep -q "blocked: no"; then
-        core_engine_ui "w" "Hardware Alert: Bluetooth adapter is software/hardware blocked. Attempting unblock..."
-        rfkill unblock bluetooth 2>/dev/null
-        sleep 1
+    # Безопасная проверка rfkill без генерации системных ошибок
+    if command -v rfkill &>/dev/null; then
+        if ! rfkill list bluetooth 2>/dev/null | grep -q "blocked: no"; then
+            echo -e " ${BY}[!] Hardware Alert: Bluetooth adapter software-blocked. Unblocking...${NC}"
+            rfkill unblock bluetooth 2>/dev/null
+            sleep 1
+        fi
+    else
+        # Если rfkill нет (стандарт для Termux без root), мягко пропускаем без падения скрипта
+        echo -e " ${B}[i] Android Environment Sandbox: Internal Bluetooth driver management active.${NC}"
     fi
 
-    core_engine_ui "i" "Initializing high-density proximity search [BLE + Classic Mode]..."
+    echo -e " ${C}[i] Initializing high-density proximity search [BLE + Classic Mode]...${NC}"
 
     # ==============================================================================
     # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY
     # ==============================================================================
-    core_engine_ui "w" "Engaging non-blocking background discovery engine. Duration: 15s"
+    echo -e " ${Y}[!] Engaging non-blocking background discovery engine. Duration: 15s${NC}"
     
-    # Асинхронно активируем сканирование внутри BlueZ
+    # Асинхронная активация сканирования внутри BlueZ
     bluetoothctl scan on &>/dev/null &
     local scan_pid=$!
     
-    # Даем движку собрать сигнатуры устройств в системный кэш dbus/bluez
+    # Эмуляция прогресс-бара сбора сигнатур
     local i
     for ((i=15; i>0; i--)); do
-        echo -ne "  ${DG}├──${NC} Scanning airwaves... Remaining time: ${BY}${i}s${NC}\r"
+        echo -ne "  ${DG}├──${NC} Scanning airwaves... Remaining time: ${BY}${i}ss${NC}\r"
         sleep 1
     done
     echo -ne "\n"
 
-    # Корректное, безопасное отключение сканирования без перевода процессов в зомби-статус
+    # Безопасная остановка процессов фонового сканирования
     bluetoothctl scan off &>/dev/null
     kill "$scan_pid" 2>/dev/null
     wait "$scan_pid" 2>/dev/null
@@ -9566,48 +9582,78 @@ run_bluetooth_scan() {
     # ==============================================================================
     # BLOCK 3: ATOMIC MEMORY-PIPELINE EXTRACTION
     # ==============================================================================
-    core_engine_ui "i" "Extracting unique signal signatures from active BlueZ storage..."
+    echo -e " ${C}[i] Extracting unique signal signatures from active BlueZ storage...${NC}"
     
     local -a raw_devices=()
-    # Извлекаем данные и аккуратно парсим их. 
-    # awk '$1=="Device" {mac=$2; $1=$2=""; sub(/^  /, ""); print mac " " $0}'
-    # Скрипт берет MAC-адрес ($2), стирает служебные префиксы, сохраняя структуру имени со всеми пробелами.
+    # Сбор кэшированных беспроводных нод
     mapfile -t raw_devices < <(bluetoothctl devices 2>/dev/null | awk '$1=="Device" {mac=$2; $1=$2=""; sub(/^  /, ""); if($0=="") $0="Unknown Device"; print mac "|" $0}')
 
     # ==============================================================================
-    # BLOCK 4: ANALYTICAL STRUCTURAL REPORTING
+    # BLOCK 4: ANALYTICAL STRUCTURAL REPORTING (DYNAMIC WRAPPER)
     # ==============================================================================
     echo -e "\n${BC}📡 DETECTED BLUETOOTH SPECTRUM NODES:${NC}"
     echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
 
     if [[ ${#raw_devices[@]} -eq 0 ]]; then
-        echo -e "  └── [${BY}EMPTY${NC}] No active Bluetooth signals or beacons identified in proximity range.\n"
-        core_engine_loot "bluetooth" "Scan completed. Results: 0 devices."
-        core_engine_wait
+        echo -e "  └── [${BY}EMPTY${NC}] No active Bluetooth signals identified in proximity range.\n"
+        if command -v core_engine_loot &>/dev/null; then
+            core_engine_loot "bluetooth" "Scan completed. Results: 0 devices."
+        fi
+        if command -v core_engine_wait &>/dev/null; then core_engine_wait; fi
         return 0
     fi
 
     local device_entry mac_addr device_name
     local node_count=0
     local loot_buffer=""
+    
+    # Параметры адаптивного переноса длинных имен устройств для экранов смартфонов
+    local terminal_width=46
+    local prefix_length=28  # Длина строки '  ├── [NODE 1] MAC: XX:XX:XX... -> '
 
     for device_entry in "${raw_devices[@]}"; do
-        # Разделяем MAC и Имя по безопасному внутреннему маркеру '|'
         mac_addr="${device_entry%%|*}"
         device_name="${device_entry#*|}"
-        
         ((node_count++))
-        echo -e "  ├── [${BC}NODE $((node_count))${NC}] MAC: ${BW}$mac_addr${NC} -> Alias: ${G}$device_name${NC}"
+        
+        # Первая строка вывода ноды
+        local output_prefix="  ├── [${BC}NODE ${node_count}${NC}] MAC: ${BW}${mac_addr}${NC} -> "
+        
+        # Динамический перенос имени устройства средствами встроенного Python без потери данных
+        local wrapped_name
+        wrapped_name=$(python3 -c "import textwrap; print('|||'.join(textwrap.wrap('''$device_name''', width=$((terminal_width - 15)))))")
+        
+        IFS='|||' read -r -a name_lines <<< "$wrapped_name"
+        
+        # Печать первой строки
+        echo -e "${output_prefix}${G}${name_lines[0]}${NC}"
+        
+        # Печать последующих строк, если имя не влезло в экран Termux
+        if [[ ${#name_lines[@]} -gt 1 ]]; then
+            local indent=$(printf ' %.0s' $(seq 1 $prefix_length))
+            local j
+            for ((j=1; j<${#name_lines[@]}; j++)); do
+                echo -e "${indent}${G}${name_lines[j]}${NC}"
+            done
+        fi
+        
         loot_buffer+="MAC: $mac_addr | Name: $device_name\n"
     done
 
     echo -e "  ${DG}────────────────────────────────────────────────────────────────────────${NC}"
     echo -e "  └── [${BG}ANALYSIS COMPLETE${NC}] Total active wireless targets isolated: ${BG}$node_count${NC}\n"
 
-    # Экспорт результатов в подсистему хранения лута
-    core_engine_loot "bluetooth" "Total detected nodes: $node_count\n$loot_buffer"
+    # Экспорт результатов в подсистему лута ядра
+    if command -v core_engine_loot &>/dev/null; then
+        core_engine_loot "bluetooth" "Total detected nodes: $node_count\n$loot_buffer"
+    fi
 
-    core_engine_wait
+    if command -v core_engine_wait &>/dev/null; then
+        core_engine_wait
+    else
+        echo -e "${BC}================ [PROCESS PIPELINE TERMINATED] ================${NC}"
+        read -n 1 -s -r -p " Press any key to return to the main menu..."
+    fi
 }
 
 
