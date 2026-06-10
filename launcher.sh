@@ -9558,11 +9558,14 @@ run_bluetooth_scan() {
     echo -e " ${C}[i] Initializing high-density proximity search [BLE + Classic Mode]...${NC}"
 
     # ==============================================================================
-    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY (STABLE TERMUX FIX)
+    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY (SURGICAL TERMUX FIX)
     # ==============================================================================
     core_engine_ui "w" "Engaging non-blocking background discovery engine. Duration: 15s"
     
-    # Асинхронно активируем сканирование внутри BlueZ, полностью изолируя дескрипторы
+    # Отключаем системные уведомления bash о состоянии фоновых задач (Job Control)
+    set +m
+    
+    # Асинхронно активируем сканирование, изолируя потоки
     bluetoothctl scan on >/dev/null 2>&1 &
     local scan_pid=$!
     
@@ -9574,12 +9577,15 @@ run_bluetooth_scan() {
     done
     echo -ne "\n"
 
-    # Жёстко и бесшумно тушим фоновый процесс вместо вызова падения 'scan off'
-    kill -15 "$scan_pid" >/dev/null 2>&1
+    # Гасим фоновый процесс через SIGKILL (-9) — быстро, жестко и без обсуждений со стороны D-Bus
+    kill -9 "$scan_pid" >/dev/null 2>&1
     wait "$scan_pid" >/dev/null 2>&1
     
-    # Мягкий сброс состояния самого bluetoothctl (ошибки перенаправляем в /dev/null)
+    # Закрываем сессию сканирования (теперь bash промолчит при любом исходе)
     bluetoothctl scan off >/dev/null 2>&1
+    
+    # Возвращаем стандартный режим мониторинга задач обратно
+    set -m
 
     # ==============================================================================
     # BLOCK 3: ATOMIC MEMORY-PIPELINE EXTRACTION
