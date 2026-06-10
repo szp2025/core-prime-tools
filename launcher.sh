@@ -9558,26 +9558,28 @@ run_bluetooth_scan() {
     echo -e " ${C}[i] Initializing high-density proximity search [BLE + Classic Mode]...${NC}"
 
     # ==============================================================================
-    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY
+    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY (STABLE TERMUX FIX)
     # ==============================================================================
-    echo -e " ${Y}[!] Engaging non-blocking background discovery engine. Duration: 15s${NC}"
+    core_engine_ui "w" "Engaging non-blocking background discovery engine. Duration: 15s"
     
-    # Асинхронная активация сканирования внутри BlueZ
-    bluetoothctl scan on &>/dev/null &
+    # Асинхронно активируем сканирование внутри BlueZ, полностью изолируя дескрипторы
+    bluetoothctl scan on >/dev/null 2>&1 &
     local scan_pid=$!
     
-    # Эмуляция прогресс-бара сбора сигнатур
+    # Даем движку собрать сигнатуры устройств в системный кэш dbus/bluez
     local i
     for ((i=15; i>0; i--)); do
-        echo -ne "  ${DG}├──${NC} Scanning airwaves... Remaining time: ${BY}${i}ss${NC}\r"
+        echo -ne "  ${DG}├──${NC} Scanning airwaves... Remaining time: ${BY}${i}s${NC} \r"
         sleep 1
     done
     echo -ne "\n"
 
-    # Безопасная остановка процессов фонового сканирования
-    bluetoothctl scan off &>/dev/null
-    kill "$scan_pid" 2>/dev/null
-    wait "$scan_pid" 2>/dev/null
+    # Жёстко и бесшумно тушим фоновый процесс вместо вызова падения 'scan off'
+    kill -15 "$scan_pid" >/dev/null 2>&1
+    wait "$scan_pid" >/dev/null 2>&1
+    
+    # Мягкий сброс состояния самого bluetoothctl (ошибки перенаправляем в /dev/null)
+    bluetoothctl scan off >/dev/null 2>&1
 
     # ==============================================================================
     # BLOCK 3: ATOMIC MEMORY-PIPELINE EXTRACTION
