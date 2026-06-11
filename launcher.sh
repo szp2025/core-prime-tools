@@ -9551,7 +9551,6 @@ run_bluetooth_scan() {
             sleep 1
         fi
     else
-        # Если rfkill нет (стандарт для Termux без root), мягко пропускаем без падения скрипта
         echo -e " ${B}[i] Android Environment Sandbox: Internal Bluetooth driver management active.${NC}"
     fi
 
@@ -9562,7 +9561,7 @@ run_bluetooth_scan() {
     fi
 
     # ==============================================================================
-    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY (SUBSHELL SILENCE FIX)
+    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY (TOTAL SILENCE ENGINE)
     # ==============================================================================
     if command -v core_engine_ui &>/dev/null; then
         core_engine_ui "w" "Engaging non-blocking background discovery engine. Duration: 15s"
@@ -9570,14 +9569,14 @@ run_bluetooth_scan() {
         echo -e " ${Y}[!] Engaging non-blocking background discovery engine. Duration: 15s${NC}"
     fi
     
-    # Полное отключение Job Control текущей оболочки
+    # Полностью отключаем мониторинг задач текущей сессии
     set +m
     
-    # Асинхронно активируем сканирование внутри изолированного subshell
-    ( bluetoothctl scan on >/dev/null 2>&1 ) &
+    # Запускаем сканирование, полностью отвязав процесс от текущего терминала (Double-Fork Метод)
+    ((bluetoothctl scan on) >/dev/null 2>&1) &
     local scan_pid=$!
     
-    # Таймер удержания радиоэфира
+    # Эмулируем работу таймера обратного отсчета
     local i
     for ((i=15; i>0; i--)); do
         echo -ne "  ${DG}├──${NC} Scanning airwaves... Remaining time: ${BY}${i}s${NC} \r"
@@ -9585,15 +9584,16 @@ run_bluetooth_scan() {
     done
     echo -ne "\n"
 
-    # КРИТИЧЕСКИЙ ФИКС: Пакуем уничтожение процесса и чистку триггера в абсолютно немой subshell.
-    # Перенаправление внешних дескрипторов 2>/dev/null на скобках глушит сообщения ядра Bash об Aborted.
-    (
-        kill -9 "$scan_pid"
-        wait "$scan_pid"
-        bluetoothctl scan off
-    ) >/dev/null 2>&1
+    # Убиваем фоновый процесс. Перенаправляем лог дескрипторов встроенной команды kill.
+    # Мы НЕ вызываем 'bluetoothctl scan off', так как уничтожение фонового процесса 
+    # автоматически прекращает широковещательный поиск в радиоэфире.
+    kill -15 "$scan_pid" >/dev/null 2>&1
+    kill -9 "$scan_pid" >/dev/null 2>&1
     
-    # На всякий случай очищаем ловушки ядра и восстанавливаем мониторинг задач
+    # Чистим таблицу зомби-процессов без вывода абортов оболочки
+    wait "$scan_pid" 2>/dev/null
+    
+    # Возвращаем стандартный режим ведения задач обратно
     set -m
 
     # ==============================================================================
@@ -9676,6 +9676,7 @@ run_bluetooth_scan() {
         read -n 1 -s -r -p " Press any key to return to the main menu..."
     fi
 }
+
 
 
 
