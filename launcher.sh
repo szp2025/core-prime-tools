@@ -9555,21 +9555,29 @@ run_bluetooth_scan() {
         echo -e " ${B}[i] Android Environment Sandbox: Internal Bluetooth driver management active.${NC}"
     fi
 
-    echo -e " ${C}[i] Initializing high-density proximity search [BLE + Classic Mode]...${NC}"
+    if command -v core_engine_ui &>/dev/null; then
+        core_engine_ui "i" "Initializing high-density proximity search [BLE + Classic Mode]..."
+    else
+        echo -e " ${C}[i] Initializing high-density proximity search [BLE + Classic Mode]...${NC}"
+    fi
 
     # ==============================================================================
-    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY (SURGICAL TERMUX FIX)
+    # BLOCK 2: ASYNCHRONOUS BACKGROUND SPECTRUM DISCOVERY (SUBSHELL SILENCE FIX)
     # ==============================================================================
-    core_engine_ui "w" "Engaging non-blocking background discovery engine. Duration: 15s"
+    if command -v core_engine_ui &>/dev/null; then
+        core_engine_ui "w" "Engaging non-blocking background discovery engine. Duration: 15s"
+    else
+        echo -e " ${Y}[!] Engaging non-blocking background discovery engine. Duration: 15s${NC}"
+    fi
     
-    # Отключаем системные уведомления bash о состоянии фоновых задач (Job Control)
+    # Полное отключение Job Control текущей оболочки
     set +m
     
-    # Асинхронно активируем сканирование, изолируя потоки
-    bluetoothctl scan on >/dev/null 2>&1 &
+    # Асинхронно активируем сканирование внутри изолированного subshell
+    ( bluetoothctl scan on >/dev/null 2>&1 ) &
     local scan_pid=$!
     
-    # Даем движку собрать сигнатуры устройств в системный кэш dbus/bluez
+    # Таймер удержания радиоэфира
     local i
     for ((i=15; i>0; i--)); do
         echo -ne "  ${DG}├──${NC} Scanning airwaves... Remaining time: ${BY}${i}s${NC} \r"
@@ -9577,20 +9585,25 @@ run_bluetooth_scan() {
     done
     echo -ne "\n"
 
-    # Гасим фоновый процесс через SIGKILL (-9) — быстро, жестко и без обсуждений со стороны D-Bus
-    kill -9 "$scan_pid" >/dev/null 2>&1
-    wait "$scan_pid" >/dev/null 2>&1
+    # КРИТИЧЕСКИЙ ФИКС: Пакуем уничтожение процесса и чистку триггера в абсолютно немой subshell.
+    # Перенаправление внешних дескрипторов 2>/dev/null на скобках глушит сообщения ядра Bash об Aborted.
+    (
+        kill -9 "$scan_pid"
+        wait "$scan_pid"
+        bluetoothctl scan off
+    ) >/dev/null 2>&1
     
-    # Закрываем сессию сканирования (теперь bash промолчит при любом исходе)
-    bluetoothctl scan off >/dev/null 2>&1
-    
-    # Возвращаем стандартный режим мониторинга задач обратно
+    # На всякий случай очищаем ловушки ядра и восстанавливаем мониторинг задач
     set -m
 
     # ==============================================================================
     # BLOCK 3: ATOMIC MEMORY-PIPELINE EXTRACTION
     # ==============================================================================
-    echo -e " ${C}[i] Extracting unique signal signatures from active BlueZ storage...${NC}"
+    if command -v core_engine_ui &>/dev/null; then
+        core_engine_ui "i" "Extracting unique signal signatures from active BlueZ storage..."
+    else
+        echo -e " ${C}[i] Extracting unique signal signatures from active BlueZ storage...${NC}"
+    fi
     
     local -a raw_devices=()
     # Сбор кэшированных беспроводных нод
@@ -9663,6 +9676,7 @@ run_bluetooth_scan() {
         read -n 1 -s -r -p " Press any key to return to the main menu..."
     fi
 }
+
 
 
 # ==============================================================================
