@@ -65,7 +65,7 @@ GLOBAL_MENU_REGISTRY=(
     "MAIN:Forensic_Nexus|run_nexus_forensic"
     "MAIN:Forensic_Breach_Leaks_Mails|run_nexus_breach_intel" 
     
-    "INTELLIGENCE:Smart_OSINT_Engine|run_smart_osint_engine" "INTELLIGENCE:Network_Intelligence|run_network_analyzer"
+    "INTELLIGENCE:Smart_OSINT_Engine|run_smart_osint_engine" "INTELLIGENCE:Network_ANALYZER|run_network_analyzer"
     "INTELLIGENCE:Network_INTELLIGENCE_SCAN|run_network_intelligence"
  
     "SYSTEM:System_Info|run_system_info" "SYSTEM:Sync_DNS|core_network_dns_sync"
